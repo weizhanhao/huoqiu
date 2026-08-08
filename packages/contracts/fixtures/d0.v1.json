@@ -1,0 +1,261 @@
+{
+  "version": "d0.v1",
+  "mode": "fixture",
+  "seed_user": {
+    "id": "user_demo_0001",
+    "name": "演示用户",
+    "avatar_key": "demo-avatar"
+  },
+  "market": {
+    "source": "huoqiu-synthetic",
+    "as_of": "2026-08-08T06:00:00.000Z"
+  },
+  "watchlist": {
+    "persistence": "session-only",
+    "listing_ids": []
+  },
+  "instruments": [
+    {
+      "instrument_id": "instrument_syn_0001",
+      "listing_id": "listing_syn_0001",
+      "symbol": "SYN001",
+      "name": "合成示例一号",
+      "pinyin": "hechengshiliyhao",
+      "aliases": ["合成一号", "synthetic one"],
+      "market": "CN",
+      "currency": "CNY",
+      "status": "open"
+    }
+  ],
+  "quotes": [
+    {
+      "listing_id": "listing_syn_0001",
+      "last": "108.64",
+      "change": "1.26",
+      "change_pct": "1.1734",
+      "source": "huoqiu-synthetic",
+      "as_of": "2026-08-08T06:00:00.000Z",
+      "stale": false,
+      "entitlement": "synthetic"
+    }
+  ],
+  "bars": [
+    {
+      "listing_id": "listing_syn_0001",
+      "interval": "1d",
+      "points": [
+        {
+          "at": "2026-07-20T05:00:00.000Z",
+          "open": "99.80",
+          "high": "101.40",
+          "low": "99.10",
+          "close": "100.60",
+          "volume": "1200000"
+        },
+        {
+          "at": "2026-07-21T05:00:00.000Z",
+          "open": "100.50",
+          "high": "102.10",
+          "low": "100.10",
+          "close": "101.80",
+          "volume": "1280000"
+        },
+        {
+          "at": "2026-07-22T05:00:00.000Z",
+          "open": "101.70",
+          "high": "102.40",
+          "low": "100.90",
+          "close": "101.20",
+          "volume": "1160000"
+        },
+        {
+          "at": "2026-07-23T05:00:00.000Z",
+          "open": "101.10",
+          "high": "103.00",
+          "low": "100.80",
+          "close": "102.65",
+          "volume": "1410000"
+        },
+        {
+          "at": "2026-07-24T05:00:00.000Z",
+          "open": "102.50",
+          "high": "103.20",
+          "low": "101.70",
+          "close": "102.10",
+          "volume": "1320000"
+        },
+        {
+          "at": "2026-07-25T05:00:00.000Z",
+          "open": "102.00",
+          "high": "104.00",
+          "low": "101.80",
+          "close": "103.70",
+          "volume": "1540000"
+        },
+        {
+          "at": "2026-07-26T05:00:00.000Z",
+          "open": "103.60",
+          "high": "104.30",
+          "low": "102.90",
+          "close": "103.20",
+          "volume": "1370000"
+        },
+        {
+          "at": "2026-07-27T05:00:00.000Z",
+          "open": "103.10",
+          "high": "104.90",
+          "low": "102.80",
+          "close": "104.50",
+          "volume": "1680000"
+        },
+        {
+          "at": "2026-07-28T05:00:00.000Z",
+          "open": "104.40",
+          "high": "105.10",
+          "low": "103.60",
+          "close": "104.00",
+          "volume": "1450000"
+        },
+        {
+          "at": "2026-07-29T05:00:00.000Z",
+          "open": "103.90",
+          "high": "105.80",
+          "low": "103.50",
+          "close": "105.40",
+          "volume": "1760000"
+        },
+        {
+          "at": "2026-07-30T05:00:00.000Z",
+          "open": "105.30",
+          "high": "106.00",
+          "low": "104.50",
+          "close": "105.10",
+          "volume": "1510000"
+        },
+        {
+          "at": "2026-07-31T05:00:00.000Z",
+          "open": "105.00",
+          "high": "106.40",
+          "low": "104.70",
+          "close": "106.20",
+          "volume": "1620000"
+        },
+        {
+          "at": "2026-08-01T05:00:00.000Z",
+          "open": "106.10",
+          "high": "107.00",
+          "low": "105.30",
+          "close": "105.80",
+          "volume": "1490000"
+        },
+        {
+          "at": "2026-08-02T05:00:00.000Z",
+          "open": "105.70",
+          "high": "107.30",
+          "low": "105.40",
+          "close": "106.90",
+          "volume": "1710000"
+        },
+        {
+          "at": "2026-08-03T05:00:00.000Z",
+          "open": "106.80",
+          "high": "107.70",
+          "low": "106.20",
+          "close": "107.40",
+          "volume": "1580000"
+        },
+        {
+          "at": "2026-08-04T05:00:00.000Z",
+          "open": "107.30",
+          "high": "108.20",
+          "low": "106.50",
+          "close": "106.95",
+          "volume": "1640000"
+        },
+        {
+          "at": "2026-08-05T05:00:00.000Z",
+          "open": "106.90",
+          "high": "108.00",
+          "low": "106.30",
+          "close": "107.65",
+          "volume": "1730000"
+        },
+        {
+          "at": "2026-08-06T05:00:00.000Z",
+          "open": "107.50",
+          "high": "108.60",
+          "low": "106.90",
+          "close": "108.10",
+          "volume": "1820000"
+        },
+        {
+          "at": "2026-08-07T05:00:00.000Z",
+          "open": "108.00",
+          "high": "108.50",
+          "low": "106.80",
+          "close": "107.38",
+          "volume": "1690000"
+        },
+        {
+          "at": "2026-08-08T05:00:00.000Z",
+          "open": "107.20",
+          "high": "109.10",
+          "low": "106.88",
+          "close": "108.64",
+          "volume": "1980000"
+        }
+      ]
+    }
+  ],
+  "feed": [
+    {
+      "type": "market_strip",
+      "schema_version": 1,
+      "card_id": "card_demo_market_0001",
+      "published_at": "2026-08-08T06:00:00.000Z",
+      "source": "huoqiu-synthetic",
+      "permissions": {
+        "alpha_access": true,
+        "visibility": "alpha-public"
+      },
+      "payload": {
+        "title": "合成行情",
+        "listing_ids": ["listing_syn_0001"],
+        "notice": "演示数据，不构成投资建议"
+      }
+    },
+    {
+      "type": "post",
+      "schema_version": 1,
+      "card_id": "card_demo_post_0001",
+      "published_at": "2026-08-08T05:58:00.000Z",
+      "source": "huoqiu-synthetic",
+      "permissions": {
+        "alpha_access": true,
+        "visibility": "alpha-public"
+      },
+      "payload": {
+        "author_id": "user_demo_0001",
+        "author_name": "演示用户",
+        "title": "合成市场的第一份观察",
+        "body": "本内容由固定 Fixture 生成，仅用于验证内容流功能。"
+      }
+    },
+    {
+      "type": "news",
+      "schema_version": 1,
+      "card_id": "card_demo_news_0001",
+      "published_at": "2026-08-08T05:55:00.000Z",
+      "source": "huoqiu-synthetic",
+      "permissions": {
+        "alpha_access": true,
+        "visibility": "alpha-public"
+      },
+      "payload": {
+        "publisher": "火球演示资讯",
+        "title": "合成示例一号完成日内数据更新",
+        "summary": "所有行情字段均来自离线演示数据，不连接外部数据源。"
+      }
+    }
+  ]
+}

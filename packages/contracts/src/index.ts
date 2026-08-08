@@ -13,3 +13,5 @@ export {
   type Cursor,
   type CursorPage,
 } from "./shared/page.js";
+export { d0FixtureSchema, type D0Fixture } from "./d0/schema.js";
+export { feedCardV1Schema, type FeedCardV1 } from "./feed/card-v1.js";

@@ -6,13 +6,16 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./d0": "./src/d0/index.ts",
+    "./d0/fixture": "./fixtures/d0.v1.json",
+    "./feed/card-v1": "./src/feed/card-v1.ts",
     "./shared/error": "./src/shared/error.ts",
     "./shared/page": "./src/shared/page.ts"
   },
   "scripts": {
     "lint": "eslint --config ../config/eslint/base.mjs src test",
     "test": "vitest run --config ../config/vitest/base.ts test",
-    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals src/index.ts src/shared/error.ts src/shared/page.ts test/shared.spec.ts"
+    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals src/index.ts src/d0/index.ts src/d0/schema.ts src/feed/card-v1.ts src/shared/error.ts src/shared/page.ts test/d0-fixture.contract.spec.ts test/feed-card-v1.spec.ts test/shared.spec.ts test/synthetic-market-fixture.spec.ts"
   },
   "dependencies": {
     "zod": "4.4.3"
