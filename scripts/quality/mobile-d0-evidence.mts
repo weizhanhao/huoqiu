@@ -1,7 +1,16 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -13,6 +22,7 @@ import {
 import { QualityGateError } from "./gate-core.mts";
 
 export type MobileD0Platform = "android" | "ios";
+type ToolName = "adb" | "git" | "maestro" | "pnpm" | "tar" | "xcrun";
 
 export interface CommandRequest {
   args: string[];
@@ -31,16 +41,31 @@ export interface CommandResult {
 }
 
 interface Snapshot {
+  archivePath: string;
   cleanup: () => Promise<void>;
   root: string;
+  temporaryRoot: string;
 }
+
+export interface ToolIdentity {
+  executable: string;
+  prefixArgs: string[];
+  realpath: string;
+  sha256: string;
+  version?: string;
+}
+
+type ToolSet = Partial<Record<ToolName, ToolIdentity>>;
 
 export interface MobileD0EvidenceDependencies {
   artifactDirectory: (commit: string, platform: MobileD0Platform) => string;
-  createSnapshot: (commit: string) => Promise<Snapshot>;
+  createSnapshot: () => Promise<Snapshot>;
+  discoverCommit: () => Promise<string>;
+  ensureArtifactDirectory: (directory: string) => Promise<void>;
   now: () => Date;
   output: (line: string) => void;
   repositoryRoot: string;
+  resolveTools: (platform: MobileD0Platform) => Promise<ToolSet>;
   runCommand: (request: CommandRequest) => Promise<CommandResult>;
   writeArtifact: (
     directory: string,
@@ -73,6 +98,10 @@ const SHA_PATTERN = /^[a-f0-9]{40,64}$/u;
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const BUILD_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
+const ANSI_COLOR_PATTERN = new RegExp(
+  `${String.fromCodePoint(27)}\\[[0-9;]*m`,
+  "gu",
+);
 
 const parsePlatform = (args: string[]): MobileD0Platform => {
   const flags = parseStrictFlags(args, new Set(["--platform"]));
@@ -168,8 +197,24 @@ const androidTarget = (stdout: string): MobileTarget | undefined => {
   return undefined;
 };
 
-const pnpmExecutable = (): string =>
-  process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const safeEnvironment = (): NodeJS.ProcessEnv => {
+  const environment: NodeJS.ProcessEnv = {
+    CI: "1",
+    LANG: process.env.LANG ?? "C.UTF-8",
+    PATH: [dirname(process.execPath), "/usr/bin", "/bin"].join(":"),
+  };
+  for (const name of [
+    "DEVELOPER_DIR",
+    "HOME",
+    "JAVA_HOME",
+    "LC_ALL",
+    "TMPDIR",
+  ] as const) {
+    const value = process.env[name];
+    if (value !== undefined) environment[name] = value;
+  }
+  return environment;
+};
 
 const defaultRunCommand = async (
   request: CommandRequest,
@@ -180,17 +225,14 @@ const defaultRunCommand = async (
       request.args,
       {
         cwd: request.cwd,
-        env: { ...process.env, CI: "1" },
+        env: safeEnvironment(),
         maxBuffer: MAX_OUTPUT_BYTES,
         timeout: request.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         windowsHide: true,
       },
       (error, stdout, stderr) => {
         const processError = error as
-          | (NodeJS.ErrnoException & {
-              signal?: NodeJS.Signals | null;
-            })
-          | null;
+          (NodeJS.ErrnoException & { signal?: NodeJS.Signals | null }) | null;
         resolvePromise({
           ...(processError?.message === undefined
             ? {}
@@ -209,41 +251,146 @@ const defaultRunCommand = async (
     );
   });
 
-const createSnapshot = async (commit: string): Promise<Snapshot> => {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "huoqiu-d0-mobile-"));
-  const archivePath = join(temporaryRoot, "source.tar");
-  const snapshotRoot = join(temporaryRoot, "source");
-  await mkdir(snapshotRoot, { recursive: true });
-  const archive = await defaultRunCommand({
-    args: ["archive", "--format=tar", `--output=${archivePath}`, commit],
-    cwd: repositoryRoot,
-    executable: "git",
-    label: "snapshot-archive",
-  });
-  if (archive.exitCode !== 0) {
-    await rm(temporaryRoot, { force: true, recursive: true });
-    throw new QualityGateError(
-      "D0_MOBILE_SNAPSHOT_FAILED",
-      commandFailureReason(archive),
-    );
+const gitDirectory = async (root: string): Promise<string> => {
+  const marker = join(root, ".git");
+  const markerStat = await stat(marker);
+  if (markerStat.isDirectory()) return marker;
+  const contents = await readFile(marker, "utf8");
+  const match = /^gitdir:\s*(.+)\s*$/u.exec(contents);
+  if (match?.[1] === undefined)
+    throw new QualityGateError("D0_MOBILE_CONTEXT_INVALID", "invalid .git");
+  return resolve(root, match[1]);
+};
+
+const discoverCommit = async (): Promise<string> => {
+  const directory = await gitDirectory(repositoryRoot);
+  const head = (await readFile(join(directory, "HEAD"), "utf8")).trim();
+  if (SHA_PATTERN.test(head)) return head;
+  const reference = /^ref:\s*(.+)$/u.exec(head)?.[1];
+  if (reference === undefined)
+    throw new QualityGateError("D0_MOBILE_CONTEXT_INVALID", "invalid HEAD");
+  try {
+    return (await readFile(join(directory, reference), "utf8")).trim();
+  } catch {
+    let commonDirectory = directory;
+    try {
+      commonDirectory = resolve(
+        directory,
+        (await readFile(join(directory, "commondir"), "utf8")).trim(),
+      );
+    } catch {
+      // A main worktree keeps refs in its own .git directory.
+    }
+    try {
+      return (await readFile(join(commonDirectory, reference), "utf8")).trim();
+    } catch {
+      const packed = await readFile(
+        join(commonDirectory, "packed-refs"),
+        "utf8",
+      );
+      return (
+        packed
+          .split(/\r?\n/u)
+          .map((line) => line.split(" "))
+          .find((parts) => parts[1] === reference)?.[0] ?? ""
+      );
+    }
   }
-  const extract = await defaultRunCommand({
-    args: ["-xf", archivePath, "-C", snapshotRoot],
-    cwd: temporaryRoot,
-    executable: "tar",
-    label: "snapshot-extract",
-  });
-  if (extract.exitCode !== 0) {
-    await rm(temporaryRoot, { force: true, recursive: true });
-    throw new QualityGateError(
-      "D0_MOBILE_SNAPSHOT_FAILED",
-      commandFailureReason(extract),
-    );
-  }
+};
+
+export const trustedToolCandidates = (
+  platform: MobileD0Platform,
+): Readonly<Record<ToolName, readonly string[]>> => {
+  const nodeDirectory = dirname(process.execPath);
+  const userHome = homedir();
   return {
+    adb:
+      platform === "android"
+        ? [
+            join(userHome, "Library/Android/sdk/platform-tools/adb"),
+            "/opt/homebrew/bin/adb",
+            "/usr/local/bin/adb",
+          ]
+        : [],
+    git: ["/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git"],
+    maestro: [
+      join(userHome, ".maestro/bin/maestro"),
+      "/opt/homebrew/bin/maestro",
+      "/usr/local/bin/maestro",
+    ],
+    pnpm: [
+      join(nodeDirectory, process.platform === "win32" ? "pnpm.cmd" : "pnpm"),
+      "/opt/homebrew/bin/pnpm",
+      "/usr/local/bin/pnpm",
+    ],
+    tar: ["/usr/bin/tar", "/bin/tar", "/opt/homebrew/bin/gtar"],
+    xcrun: platform === "ios" ? ["/usr/bin/xcrun"] : [],
+  };
+};
+
+const resolveTool = async (
+  name: ToolName,
+  candidates: readonly string[],
+): Promise<ToolIdentity | undefined> => {
+  for (const candidate of candidates) {
+    if (!isAbsolute(candidate)) continue;
+    try {
+      const canonicalPath = await realpath(candidate);
+      const metadata = await stat(canonicalPath);
+      if (!metadata.isFile() || (metadata.mode & 0o022) !== 0) continue;
+      const sha256 = createHash("sha256")
+        .update(await readFile(canonicalPath))
+        .digest("hex");
+      const useNodeLauncher =
+        name === "pnpm" && !canonicalPath.toLowerCase().endsWith(".exe");
+      return {
+        executable: useNodeLauncher
+          ? await realpath(process.execPath)
+          : canonicalPath,
+        prefixArgs: useNodeLauncher ? [canonicalPath] : [],
+        realpath: canonicalPath,
+        sha256,
+      };
+    } catch {
+      // Missing and untrusted candidates are intentionally ignored.
+    }
+  }
+  return undefined;
+};
+
+const resolveTools = async (platform: MobileD0Platform): Promise<ToolSet> => {
+  const candidates = trustedToolCandidates(platform);
+  const names: ToolName[] = [
+    "git",
+    "tar",
+    "pnpm",
+    platform === "ios" ? "xcrun" : "adb",
+    "maestro",
+  ];
+  const entries = await Promise.all(
+    names.map(
+      async (name) =>
+        [name, await resolveTool(name, candidates[name])] as const,
+    ),
+  );
+  return Object.fromEntries(
+    entries.filter(
+      (entry): entry is readonly [ToolName, ToolIdentity] =>
+        entry[1] !== undefined,
+    ),
+  );
+};
+
+const createSnapshot = async (): Promise<Snapshot> => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "huoqiu-d0-mobile-"));
+  const root = join(temporaryRoot, "source");
+  await mkdir(root, { recursive: true });
+  return {
+    archivePath: join(temporaryRoot, "source.tar"),
     cleanup: async () =>
       await rm(temporaryRoot, { force: true, recursive: true }),
-    root: snapshotRoot,
+    root,
+    temporaryRoot,
   };
 };
 
@@ -258,14 +405,67 @@ const defaultDependencies: MobileD0EvidenceDependencies = {
       platform,
     ),
   createSnapshot,
+  discoverCommit,
+  ensureArtifactDirectory: async (directory) => {
+    await mkdir(directory, { recursive: true });
+  },
   now: () => new Date(),
   output: (line) => process.stdout.write(`${line}\n`),
   repositoryRoot,
+  resolveTools,
   runCommand: defaultRunCommand,
-  writeArtifact: async (directory, name, contents) => {
-    await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, name), contents, "utf8");
-  },
+  writeArtifact: async (directory, name, contents) =>
+    await writeFile(join(directory, name), contents, "utf8"),
+};
+
+const versionContract = (
+  name: ToolName,
+): Readonly<{ args: string[]; pattern: RegExp }> => {
+  switch (name) {
+    case "git":
+      return { args: ["--version"], pattern: /^git version \d+\.\d+/iu };
+    case "tar":
+      return { args: ["--version"], pattern: /\b(?:bsdtar|tar)\b.*\d+/iu };
+    case "pnpm":
+      return { args: ["--version"], pattern: /^11\.4\.0\s*$/u };
+    case "xcrun":
+      return { args: ["--version"], pattern: /^xcrun version \d+/iu };
+    case "adb":
+      return { args: ["version"], pattern: /Android Debug Bridge version/iu };
+    case "maestro":
+      return { args: ["--version"], pattern: /^\d+\.\d+\.\d+/u };
+  }
+};
+
+const maestroTotals = (
+  output: string,
+):
+  Readonly<{ failed: number; passed: number; skipped: number }> | undefined => {
+  const totals = { failed: 0, passed: 0, skipped: 0 };
+  let passedSummaryCount = 0;
+  for (const originalLine of output.split(/\r?\n/u)) {
+    const line = originalLine.replace(ANSI_COLOR_PATTERN, "").trim();
+    if (line.length === 0) continue;
+    const summary = /^(\d+)\s+Flows?\s+(Passed|Failed|Skipped)$/iu.exec(line);
+    if (summary !== null) {
+      const count = Number(summary[1]);
+      const status = summary[2]?.toLowerCase();
+      if (status === "passed") {
+        totals.passed += count;
+        passedSummaryCount += 1;
+      } else if (status === "failed") totals.failed += count;
+      else if (status === "skipped") totals.skipped += count;
+      continue;
+    }
+    if (/\b(?:error|flow|flows|failed|failure|skipped)\b/iu.test(line))
+      return undefined;
+  }
+  return passedSummaryCount === 1 &&
+    totals.passed === 1 &&
+    totals.failed === 0 &&
+    totals.skipped === 0
+    ? totals
+    : undefined;
 };
 
 export const runMobileD0Evidence = async (
@@ -273,12 +473,25 @@ export const runMobileD0Evidence = async (
   dependencies: MobileD0EvidenceDependencies = defaultDependencies,
 ): Promise<void> => {
   const platform = parsePlatform(args);
+  const discoveredCommit = await dependencies.discoverCommit();
+  if (!SHA_PATTERN.test(discoveredCommit))
+    throw new QualityGateError(
+      "D0_MOBILE_CONTEXT_INVALID",
+      "cannot discover an exact HEAD commit",
+    );
+  const artifactDirectory = dependencies.artifactDirectory(
+    discoveredCommit,
+    platform,
+  );
+  await dependencies.ensureArtifactDirectory(artifactDirectory);
   const records: RecordedCommand[] = [];
 
-  const run = async (
-    request: CommandRequest,
-    artifactDirectory?: string,
-  ): Promise<CommandResult> => {
+  const run = async (request: CommandRequest): Promise<CommandResult> => {
+    if (!isAbsolute(request.executable))
+      throw new QualityGateError(
+        "D0_MOBILE_TOOL_UNTRUSTED",
+        `${request.label} executable must be absolute`,
+      );
     const commandResult = await dependencies.runCommand(request);
     records.push({
       args: request.args,
@@ -291,287 +504,333 @@ export const runMobileD0Evidence = async (
       label: request.label,
       signal: commandResult.signal,
     });
-    if (artifactDirectory !== undefined)
-      await dependencies.writeArtifact(
-        artifactDirectory,
-        `${request.label}.log`,
-        commandLog(request, commandResult),
-      );
+    await dependencies.writeArtifact(
+      artifactDirectory,
+      `${request.label}.log`,
+      commandLog(request, commandResult),
+    );
     return commandResult;
   };
 
-  const head = await run({
-    args: ["rev-parse", "HEAD"],
-    cwd: dependencies.repositoryRoot,
-    executable: "git",
-    label: "git-head",
-  });
-  const commit = head.stdout.trim();
-  if (head.exitCode !== 0 || !SHA_PATTERN.test(commit))
+  const tools = await dependencies.resolveTools(platform);
+  const runTool = async (
+    name: ToolName,
+    args: string[],
+    cwd: string,
+    label: string,
+    timeoutMs?: number,
+  ): Promise<CommandResult | undefined> => {
+    const tool = tools[name];
+    if (tool === undefined) return undefined;
+    return await run({
+      args: [...tool.prefixArgs, ...args],
+      cwd,
+      executable: tool.executable,
+      label,
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    });
+  };
+
+  const invalidTools = new Set<ToolName>();
+  for (const name of Object.keys(tools).sort() as ToolName[]) {
+    const contract = versionContract(name);
+    const probe = await runTool(
+      name,
+      contract.args,
+      dependencies.repositoryRoot,
+      `tool-${name}-version`,
+    );
+    const versionOutput =
+      `${probe?.stdout ?? ""}\n${probe?.stderr ?? ""}`.trim();
+    if (probe?.exitCode !== 0 || !contract.pattern.test(versionOutput))
+      invalidTools.add(name);
+    else if (tools[name] !== undefined) tools[name].version = versionOutput;
+  }
+  const toolSummary = Object.fromEntries(
+    Object.entries(tools).map(([name, identity]) => [
+      name,
+      {
+        executable: identity.executable,
+        realpath: identity.realpath,
+        sha256: identity.sha256,
+        version: identity.version ?? null,
+      },
+    ]),
+  );
+  const writeSummary = async (
+    verified: boolean,
+    reason: string | null,
+    totals: Readonly<{ failed: number; passed: number; skipped: number }>,
+  ): Promise<void> => {
+    await dependencies.writeArtifact(
+      artifactDirectory,
+      "summary.json",
+      `${JSON.stringify(
+        {
+          schema_version: 1,
+          commit_sha: discoveredCommit,
+          failed: totals.failed,
+          flow_count: totals.passed,
+          generated_at: dependencies.now().toISOString(),
+          passed: totals.passed,
+          platform,
+          reason,
+          skipped: totals.skipped,
+          tools: toolSummary,
+          tool_errors: [
+            ...invalidTools,
+            ...(
+              [
+                "git",
+                "tar",
+                "pnpm",
+                platform === "ios" ? "xcrun" : "adb",
+                "maestro",
+              ] as ToolName[]
+            ).filter((name) => tools[name] === undefined),
+          ].sort(),
+          verified,
+          commands: records,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  };
+  const finishNotVerified = async (reason: string): Promise<never> => {
+    await writeSummary(false, reason, { failed: 0, passed: 0, skipped: 0 });
+    dependencies.output(
+      `D0_MOBILE NOT_VERIFIED platform=${platform} reason=${reason}`,
+    );
+    throw new QualityGateError("D0_MOBILE_NOT_VERIFIED", reason);
+  };
+
+  for (const coreTool of ["git", "tar", "pnpm"] as ToolName[]) {
+    if (tools[coreTool] === undefined)
+      return await finishNotVerified(`tool_identity_missing:${coreTool}`);
+    if (invalidTools.has(coreTool))
+      return await finishNotVerified(`tool_identity_invalid:${coreTool}`);
+  }
+  const head = await runTool(
+    "git",
+    ["rev-parse", "HEAD"],
+    dependencies.repositoryRoot,
+    "git-head",
+  );
+  const commit = head?.stdout.trim() ?? "";
+  if (
+    head?.exitCode !== 0 ||
+    !SHA_PATTERN.test(commit) ||
+    commit !== discoveredCommit
+  )
     throw new QualityGateError(
       "D0_MOBILE_CONTEXT_INVALID",
-      "cannot resolve an exact HEAD commit",
+      "cannot resolve the discovered exact HEAD commit",
     );
-  const status = await run({
-    args: ["status", "--porcelain"],
-    cwd: dependencies.repositoryRoot,
-    executable: "git",
-    label: "git-status",
-  });
-  if (status.exitCode !== 0 || status.stdout.trim().length > 0)
+  const status = await runTool(
+    "git",
+    ["status", "--porcelain"],
+    dependencies.repositoryRoot,
+    "git-status",
+  );
+  if (status?.exitCode !== 0 || status.stdout.trim().length > 0)
     throw new QualityGateError(
       "D0_MOBILE_CONTEXT_INVALID",
       "evidence requires a clean worktree",
     );
 
-  const artifactDirectory = dependencies.artifactDirectory(commit, platform);
   let target: MobileTarget | undefined;
   let reason: string | undefined;
-
   if (platform === "ios") {
-    const probe = await run(
-      {
-        args: ["simctl", "list", "devices", "available", "--json"],
-        cwd: dependencies.repositoryRoot,
-        executable: "xcrun",
-        label: "ios-probe",
-      },
-      artifactDirectory,
-    );
-    if (probe.exitCode !== 0)
-      reason = `ios_xcrun_unavailable:${commandFailureReason(probe)}`;
+    if (tools.xcrun === undefined || invalidTools.has("xcrun"))
+      reason = `ios_xcrun_unavailable:tool_identity_${
+        tools.xcrun === undefined ? "missing" : "invalid"
+      }`;
     else {
-      target = iosTarget(probe.stdout);
-      if (target === undefined) reason = "ios_no_available_simulator";
+      const probe = await runTool(
+        "xcrun",
+        ["simctl", "list", "devices", "available", "--json"],
+        dependencies.repositoryRoot,
+        "ios-probe",
+      );
+      if (probe === undefined)
+        reason = "ios_xcrun_unavailable:tool_identity_missing";
+      else if (probe.exitCode !== 0)
+        reason = `ios_xcrun_unavailable:${commandFailureReason(probe)}`;
+      else {
+        target = iosTarget(probe.stdout);
+        if (target === undefined) reason = "ios_no_available_simulator";
+      }
     }
   } else {
-    const probe = await run(
-      {
-        args: ["devices"],
-        cwd: dependencies.repositoryRoot,
-        executable: "adb",
-        label: "android-probe",
-      },
-      artifactDirectory,
-    );
-    if (probe.exitCode !== 0)
-      reason = `android_adb_unavailable:${commandFailureReason(probe)}`;
+    if (tools.adb === undefined || invalidTools.has("adb"))
+      reason = `android_adb_unavailable:tool_identity_${
+        tools.adb === undefined ? "missing" : "invalid"
+      }`;
     else {
-      target = androidTarget(probe.stdout);
-      if (target === undefined) reason = "android_no_connected_device";
+      const probe = await runTool(
+        "adb",
+        ["devices"],
+        dependencies.repositoryRoot,
+        "android-probe",
+      );
+      if (probe === undefined)
+        reason = "android_adb_unavailable:tool_identity_missing";
+      else if (probe.exitCode !== 0)
+        reason = `android_adb_unavailable:${commandFailureReason(probe)}`;
+      else {
+        target = androidTarget(probe.stdout);
+        if (target === undefined) reason = "android_no_connected_device";
+      }
     }
   }
 
-  if (target !== undefined) {
-    const maestroProbe = await run(
-      {
-        args: ["--version"],
-        cwd: dependencies.repositoryRoot,
-        executable: "maestro",
-        label: "maestro-probe",
-      },
-      artifactDirectory,
-    );
-    if (maestroProbe.exitCode !== 0)
-      reason = `maestro_unavailable:${commandFailureReason(maestroProbe)}`;
-  }
-
-  let snapshot: Snapshot;
+  const snapshot = await dependencies.createSnapshot();
   try {
-    snapshot = await dependencies.createSnapshot(commit);
-  } catch (error) {
-    const snapshotReason =
-      error instanceof Error ? normalizedReason(error.message) : "unknown";
-    reason ??= `snapshot_creation_failed:${snapshotReason}`;
-    const summary = {
-      schema_version: 1,
-      commit_sha: commit,
-      flow_count: 0,
-      generated_at: dependencies.now().toISOString(),
-      platform,
-      reason,
-      verified: false,
-      commands: records,
-    };
-    await dependencies.writeArtifact(
-      artifactDirectory,
-      "summary.json",
-      `${JSON.stringify(summary, null, 2)}\n`,
+    const archive = await runTool(
+      "git",
+      ["archive", "--format=tar", `--output=${snapshot.archivePath}`, commit],
+      dependencies.repositoryRoot,
+      "snapshot-archive",
     );
-    dependencies.output(
-      `D0_MOBILE NOT_VERIFIED platform=${platform} reason=${reason}`,
+    if (archive === undefined)
+      return await finishNotVerified("snapshot_archive_failed:git_missing");
+    if (archive.exitCode !== 0)
+      return await finishNotVerified(
+        `snapshot_archive_failed:${commandFailureReason(archive)}`,
+      );
+    const extract = await runTool(
+      "tar",
+      ["-xf", snapshot.archivePath, "-C", snapshot.root],
+      snapshot.temporaryRoot,
+      "snapshot-extract",
     );
-    throw new QualityGateError("D0_MOBILE_NOT_VERIFIED", reason);
-  }
+    if (extract === undefined)
+      return await finishNotVerified("snapshot_extract_failed:tar_missing");
+    if (extract.exitCode !== 0)
+      return await finishNotVerified(
+        `snapshot_extract_failed:${commandFailureReason(extract)}`,
+      );
 
-  const finishNotVerified = async (
-    notVerifiedReason: string,
-  ): Promise<never> => {
-    const summary = {
-      schema_version: 1,
-      commit_sha: commit,
-      flow_count: 0,
-      generated_at: dependencies.now().toISOString(),
-      platform,
-      reason: notVerifiedReason,
-      verified: false,
-      commands: records,
-    };
-    await dependencies.writeArtifact(
-      artifactDirectory,
-      "summary.json",
-      `${JSON.stringify(summary, null, 2)}\n`,
+    const install = await runTool(
+      "pnpm",
+      ["install", "--frozen-lockfile", "--offline"],
+      snapshot.root,
+      "snapshot-install",
+      BUILD_TIMEOUT_MS,
     );
-    dependencies.output(
-      `D0_MOBILE NOT_VERIFIED platform=${platform} reason=${notVerifiedReason}`,
+    const exportResult = await runTool(
+      "pnpm",
+      [
+        "--filter",
+        "@huoqiu/mobile",
+        "exec",
+        "expo",
+        "export",
+        "--platform",
+        "web",
+        "--output-dir",
+        join(snapshot.root, ".d0-evidence", "expo-web"),
+      ],
+      snapshot.root,
+      "expo-export",
+      BUILD_TIMEOUT_MS,
     );
-    throw new QualityGateError("D0_MOBILE_NOT_VERIFIED", notVerifiedReason);
-  };
-
-  try {
-    const install = await run(
-      {
-        args: ["install", "--frozen-lockfile", "--offline"],
-        cwd: snapshot.root,
-        executable: pnpmExecutable(),
-        label: "snapshot-install",
-        timeoutMs: BUILD_TIMEOUT_MS,
-      },
-      artifactDirectory,
-    );
-    const exportResult = await run(
-      {
-        args: [
-          "--filter",
-          "@huoqiu/mobile",
-          "exec",
-          "expo",
-          "export",
-          "--platform",
-          "web",
-          "--output-dir",
-          join(snapshot.root, ".d0-evidence", "expo-web"),
-        ],
-        cwd: snapshot.root,
-        executable: pnpmExecutable(),
-        label: "expo-export",
-        timeoutMs: BUILD_TIMEOUT_MS,
-      },
-      artifactDirectory,
-    );
-    const prebuild = await run(
-      {
-        args: [
-          "--filter",
-          "@huoqiu/mobile",
-          "exec",
-          "expo",
-          "prebuild",
-          "--no-install",
-          "--platform",
-          platform,
-        ],
-        cwd: snapshot.root,
-        executable: pnpmExecutable(),
-        label: "expo-prebuild",
-        timeoutMs: BUILD_TIMEOUT_MS,
-      },
-      artifactDirectory,
+    const prebuild = await runTool(
+      "pnpm",
+      [
+        "--filter",
+        "@huoqiu/mobile",
+        "exec",
+        "expo",
+        "prebuild",
+        "--no-install",
+        "--platform",
+        platform,
+      ],
+      snapshot.root,
+      "expo-prebuild",
+      BUILD_TIMEOUT_MS,
     );
 
     if (reason !== undefined) return await finishNotVerified(reason);
-    if (install.exitCode !== 0)
+    if (install?.exitCode !== 0)
       return await finishNotVerified("snapshot_install_failed");
-    if (exportResult.exitCode !== 0)
+    if (exportResult?.exitCode !== 0)
       return await finishNotVerified("expo_export_failed");
-    if (prebuild.exitCode !== 0)
+    if (prebuild?.exitCode !== 0)
       return await finishNotVerified("expo_prebuild_failed");
     if (target === undefined)
       return await finishNotVerified(`${platform}_target_unavailable`);
+    if (tools.maestro === undefined)
+      return await finishNotVerified(
+        "maestro_unavailable:tool_identity_missing",
+      );
+    if (invalidTools.has("maestro"))
+      return await finishNotVerified(
+        "maestro_unavailable:tool_identity_invalid",
+      );
 
     if (platform === "ios" && target.state !== "Booted") {
-      const boot = await run(
-        {
-          args: ["simctl", "boot", target.id],
-          cwd: snapshot.root,
-          executable: "xcrun",
-          label: "ios-boot",
-        },
-        artifactDirectory,
+      const boot = await runTool(
+        "xcrun",
+        ["simctl", "boot", target.id],
+        snapshot.root,
+        "ios-boot",
       );
-      if (boot.exitCode !== 0)
+      if (boot?.exitCode !== 0)
         return await finishNotVerified("ios_simulator_boot_failed");
-      const bootStatus = await run(
-        {
-          args: ["simctl", "bootstatus", target.id, "-b"],
-          cwd: snapshot.root,
-          executable: "xcrun",
-          label: "ios-boot-status",
-          timeoutMs: BUILD_TIMEOUT_MS,
-        },
-        artifactDirectory,
+      const bootStatus = await runTool(
+        "xcrun",
+        ["simctl", "bootstatus", target.id, "-b"],
+        snapshot.root,
+        "ios-boot-status",
+        BUILD_TIMEOUT_MS,
       );
-      if (bootStatus.exitCode !== 0)
+      if (bootStatus?.exitCode !== 0)
         return await finishNotVerified("ios_simulator_boot_status_failed");
     }
 
-    const launch = await run(
-      {
-        args: [
-          "--filter",
-          "@huoqiu/mobile",
-          "exec",
-          "expo",
-          `run:${platform}`,
-          "--no-install",
-          "--device",
-          target.id,
-        ],
-        cwd: snapshot.root,
-        executable: pnpmExecutable(),
-        label: "app-launch",
-        timeoutMs: BUILD_TIMEOUT_MS,
-      },
-      artifactDirectory,
+    const launch = await runTool(
+      "pnpm",
+      [
+        "--filter",
+        "@huoqiu/mobile",
+        "exec",
+        "expo",
+        `run:${platform}`,
+        "--no-install",
+        "--device",
+        target.id,
+      ],
+      snapshot.root,
+      "app-launch",
+      BUILD_TIMEOUT_MS,
     );
-    if (launch.exitCode !== 0)
+    if (launch?.exitCode !== 0)
       return await finishNotVerified(`${platform}_build_or_launch_failed`);
 
-    const flow = await run(
-      {
-        args: [
-          "--device",
-          target.id,
-          "test",
-          "tests/e2e/maestro/d0/golden.yaml",
-        ],
-        cwd: snapshot.root,
-        executable: "maestro",
-        label: "maestro-flow",
-        timeoutMs: BUILD_TIMEOUT_MS,
-      },
-      artifactDirectory,
+    const flow = await runTool(
+      "maestro",
+      ["--device", target.id, "test", "tests/e2e/maestro/d0/golden.yaml"],
+      snapshot.root,
+      "maestro-flow",
+      BUILD_TIMEOUT_MS,
     );
-    if (flow.exitCode !== 0)
+    if (flow?.exitCode !== 0)
       return await finishNotVerified("maestro_flow_failed");
-    if (!/\b1\s+Flow Passed\b/u.test(`${flow.stdout}\n${flow.stderr}`))
-      return await finishNotVerified("maestro_flow_result_missing");
+    const flowOutput = `${flow.stdout}\n${flow.stderr}`;
+    const totals = maestroTotals(flowOutput);
+    if (totals === undefined) {
+      const hasPassedSummary = /^1\s+Flow Passed$/imu.test(flowOutput);
+      return await finishNotVerified(
+        hasPassedSummary
+          ? "maestro_flow_result_invalid"
+          : "maestro_flow_result_missing",
+      );
+    }
 
-    const summary = {
-      schema_version: 1,
-      commit_sha: commit,
-      flow_count: 1,
-      generated_at: dependencies.now().toISOString(),
-      platform,
-      reason: null,
-      verified: true,
-      commands: records,
-    };
-    await dependencies.writeArtifact(
-      artifactDirectory,
-      "summary.json",
-      `${JSON.stringify(summary, null, 2)}\n`,
-    );
+    await writeSummary(true, null, totals);
     dependencies.output(
       `D0_MOBILE VERIFIED platform=${platform} commit=${commit} flows=1`,
     );

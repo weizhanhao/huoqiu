@@ -3,6 +3,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseAllDocuments } from "yaml";
 
+import {
+  d0MaestroLabels,
+  d0OpenInstrumentLabel,
+  d0WatchlistCountLabel,
+} from "../../../apps/mobile/src/accessibility/d0-maestro-labels";
+
 const flowPath = new URL(
   "../../../tests/e2e/maestro/d0/golden.yaml",
   import.meta.url,
@@ -18,63 +24,48 @@ describe("D0 Maestro flow", () => {
     );
 
     const header = documents[0]?.toJS() as Record<string, unknown>;
-    const commands = documents[1]?.toJS() as Array<Record<string, unknown>>;
+    const commands = documents[1]?.toJS() as Record<string, unknown>[];
     expect(header).toMatchObject({
       appId: "com.huoqiu.alpha",
       name: "D0 fixture golden path",
     });
+    const fixture = JSON.parse(
+      readFileSync(
+        new URL(
+          "../../../packages/contracts/fixtures/d0.v1.json",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ) as {
+      instruments: [{ name: string; symbol: string }];
+      market: { source: string };
+    };
+    const instrument = fixture.instruments[0];
+    expect(instrument).toBeDefined();
+    if (instrument === undefined) throw new Error("D0 instrument is required");
+
     expect(commands).toEqual([
       { launchApp: { clearState: true } },
-      { assertVisible: "演示数据" },
-      { tapOn: "搜索演示标的" },
-      { tapOn: "输入演示标的关键词" },
-      { inputText: "SYN001" },
-      { tapOn: "提交演示标的搜索" },
-      { assertVisible: "搜索结果" },
-      { tapOn: "打开合成示例一号详情" },
-      { assertVisible: "huoqiu-synthetic" },
-      { assertVisible: "演示数据说明" },
-      { tapOn: "加自选" },
-      { assertVisible: "已加自选" },
-      { tapOn: "返回" },
-      { tapOn: "返回" },
-      { tapOn: "自选" },
-      { assertVisible: "我的自选" },
-      { assertVisible: "自选标的 1 个" },
-      { tapOn: "重置自选" },
-      { assertVisible: "暂无自选标的，可从详情页加入" },
+      { assertVisible: d0MaestroLabels.demoData },
+      { tapOn: d0MaestroLabels.searchTrigger },
+      { tapOn: d0MaestroLabels.searchInput },
+      { inputText: instrument.symbol },
+      { tapOn: d0MaestroLabels.searchSubmit },
+      { assertVisible: d0MaestroLabels.searchResults },
+      { tapOn: d0OpenInstrumentLabel(instrument.name) },
+      { assertVisible: fixture.market.source },
+      { assertVisible: d0MaestroLabels.detailDisclosure },
+      { tapOn: d0MaestroLabels.addWatchlist },
+      { assertVisible: d0MaestroLabels.includedWatchlist },
+      { tapOn: d0MaestroLabels.back },
+      { tapOn: d0MaestroLabels.back },
+      { tapOn: d0MaestroLabels.watchlistTab },
+      { assertVisible: d0MaestroLabels.watchlistTitle },
+      { assertVisible: d0WatchlistCountLabel(1) },
+      { tapOn: d0MaestroLabels.watchlistReset },
+      { assertVisible: d0MaestroLabels.watchlistEmpty },
     ]);
-
-    const appSources = [
-      "../../../apps/mobile/src/components/d0/home-feed.tsx",
-      "../../../apps/mobile/src/components/d0/instrument-search.tsx",
-      "../../../apps/mobile/src/components/d0/instrument-detail.tsx",
-      "../../../apps/mobile/src/components/d0/screen-header.tsx",
-      "../../../apps/mobile/src/components/d0/watchlist-panel.tsx",
-      "../../../apps/mobile/src/components/d0/watchlist-toggle.tsx",
-      "../../../apps/mobile/app/(tabs)/_layout.tsx",
-    ].map((path) => readFileSync(new URL(path, import.meta.url), "utf8"));
-    for (const label of [
-      "演示数据",
-      "搜索演示标的",
-      "输入演示标的关键词",
-      "提交演示标的搜索",
-      "搜索结果",
-      "演示数据说明",
-      "加自选",
-      "已加自选",
-      "返回",
-      "自选",
-      "我的自选",
-      "自选标的 1 个",
-      "重置自选",
-      "暂无自选标的，可从详情页加入",
-    ]) {
-      expect(
-        appSources.some((source) => source.includes(label)),
-        `Maestro label is not rendered or exposed by the app: ${label}`,
-      ).toBe(true);
-    }
     expect(flow).not.toMatch(/localhost|127\.0\.0\.1|expo\s+web/iu);
   });
 });

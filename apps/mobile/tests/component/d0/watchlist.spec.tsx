@@ -54,6 +54,8 @@ describe("D0 mobile session watchlist", () => {
     expect(markup).toContain("合成示例一号");
     expect(markup).toContain("108.64");
     expect(markup).toContain("移出自选");
+    expect(markup).toContain("自选标的 1 个");
+    expect(markup).toContain("重置自选");
     expect(markup).toContain('data-testid="watchlist-detail-listing_syn_0001"');
   });
 

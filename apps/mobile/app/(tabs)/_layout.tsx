@@ -2,6 +2,8 @@ import { tokens } from "@huoqiu/native-ui";
 import { Tabs } from "expo-router";
 import { Text } from "react-native";
 
+import { d0MaestroLabels } from "../../src/accessibility/d0-maestro-labels";
+
 export default function TabLayout() {
   return (
     <Tabs
@@ -34,13 +36,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="watchlist"
         options={{
-          tabBarAccessibilityLabel: "自选",
+          tabBarAccessibilityLabel: d0MaestroLabels.watchlistTab,
           tabBarIcon: ({ color }) => (
             <Text aria-hidden style={{ color, fontSize: 18 }}>
               ◇
             </Text>
           ),
-          title: "自选",
+          title: d0MaestroLabels.watchlistTab,
         }}
       />
     </Tabs>

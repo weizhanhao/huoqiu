@@ -2,6 +2,8 @@ import { tokens } from "@huoqiu/native-ui";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { d0MaestroLabels } from "../../accessibility/d0-maestro-labels";
+
 type ScreenHeaderProperties = Readonly<{
   title: string;
   subtitle?: string;
@@ -30,7 +32,7 @@ export function ScreenHeader({
             </View>
           ) : (
             <Pressable
-              accessibilityLabel="返回"
+              accessibilityLabel={d0MaestroLabels.back}
               accessibilityRole="button"
               onPress={onBack}
               style={styles.back}
@@ -58,11 +60,11 @@ export function ScreenHeader({
         </View>
         {onSearch === undefined ? (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>演示数据</Text>
+            <Text style={styles.badgeText}>{d0MaestroLabels.demoData}</Text>
           </View>
         ) : (
           <Pressable
-            accessibilityLabel="搜索演示标的"
+            accessibilityLabel={d0MaestroLabels.searchTrigger}
             accessibilityRole="button"
             onPress={onSearch}
             style={styles.search}

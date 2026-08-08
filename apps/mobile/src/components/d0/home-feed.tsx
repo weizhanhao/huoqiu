@@ -2,6 +2,10 @@ import type { D0Fixture } from "@huoqiu/contracts/d0";
 import { tokens } from "@huoqiu/native-ui";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import {
+  d0MaestroLabels,
+  d0OpenInstrumentLabel,
+} from "../../accessibility/d0-maestro-labels";
 import { d0TextColors } from "../../styles/d0-colors";
 import { PageState } from "./page-state";
 import { ScreenHeader } from "./screen-header";
@@ -50,7 +54,9 @@ export function HomeFeed({
               D0 / FIXTURE FEED
             </Text>
             <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>演示数据</Text>
+              <Text style={styles.heroBadgeText}>
+                {d0MaestroLabels.demoData}
+              </Text>
             </View>
           </View>
           <Text style={styles.heroTitle}>
@@ -73,7 +79,7 @@ export function HomeFeed({
             <>
               <Pressable
                 accessibilityHint={instrument.listing_id}
-                accessibilityLabel={`打开${instrument.name}详情`}
+                accessibilityLabel={d0OpenInstrumentLabel(instrument.name)}
                 accessibilityRole="button"
                 onPress={() => onOpenInstrument?.(instrument.listing_id)}
                 style={styles.marketCard}

@@ -1,6 +1,7 @@
 import { tokens } from "@huoqiu/native-ui";
 import { Pressable, StyleSheet, Text } from "react-native";
 
+import { d0MaestroLabels } from "../../accessibility/d0-maestro-labels";
 import { useD0Watchlist } from "../../stores/d0-watchlist";
 
 type WatchlistToggleProperties = Readonly<{
@@ -10,14 +11,16 @@ type WatchlistToggleProperties = Readonly<{
 
 export function WatchlistToggle({
   listingId,
-  removeLabel = "已加自选",
+  removeLabel = d0MaestroLabels.includedWatchlist,
 }: WatchlistToggleProperties) {
   const { add, has, remove } = useD0Watchlist();
   const isIncluded = has(listingId);
 
   return (
     <Pressable
-      accessibilityLabel={isIncluded ? "取消自选" : "加自选"}
+      accessibilityLabel={
+        isIncluded ? "取消自选" : d0MaestroLabels.addWatchlist
+      }
       accessibilityRole="button"
       accessibilityState={{ selected: isIncluded }}
       aria-pressed={isIncluded}
@@ -31,7 +34,7 @@ export function WatchlistToggle({
       style={[styles.button, isIncluded && styles.buttonIncluded]}
     >
       <Text style={[styles.label, isIncluded && styles.labelIncluded]}>
-        {isIncluded ? removeLabel : "加自选"}
+        {isIncluded ? removeLabel : d0MaestroLabels.addWatchlist}
       </Text>
     </Pressable>
   );

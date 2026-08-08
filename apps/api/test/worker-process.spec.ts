@@ -6,66 +6,63 @@ import { expect, it } from "vitest";
 
 import { waitForShutdownSignal } from "../src/runtime/shutdown-signal.js";
 
+const READY_TIMEOUT_MS = 10_000;
+
 const waitForWorkerReady = async (
   child: ReturnType<typeof spawn>,
   consumer: string,
 ): Promise<void> =>
-  await new Promise<void>((resolve, reject) => {
-    if (child.stdout === null)
-      return reject(new Error("worker stdout must be piped"));
-    let buffer = "";
-    let settled = false;
-    const settle = (callback: () => void): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      child.off("error", onError);
-      child.off("exit", onExit);
-      child.stdout?.off("data", onData);
-      callback();
-    };
-    const onError = (error: Error): void => settle(() => reject(error));
-    const onExit = (code: number | null, signal: NodeJS.Signals | null): void =>
-      settle(() =>
-        reject(
-          new Error(
-            `worker exited before readiness (code=${String(code)}, signal=${String(signal)})`,
-          ),
+  await new Promise((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(
+        new Error(
+          `Timed out waiting for ${consumer} worker.ready; stderr=${stderr}`,
         ),
       );
-    const onData = (chunk: Buffer | string): void => {
-      buffer += chunk.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
+    }, READY_TIMEOUT_MS);
+    const cleanup = () => {
+      clearTimeout(timeout);
+      child.stdout?.off("data", onStdout);
+      child.stderr?.off("data", onStderr);
+      child.off("exit", onExit);
+    };
+    const onStderr = (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    };
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      cleanup();
+      reject(
+        new Error(
+          `${consumer} exited before worker.ready: code=${String(code)} signal=${String(signal)} stderr=${stderr}`,
+        ),
+      );
+    };
+    const onStdout = (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+      const lines = stdout.split(/\r?\n/u);
+      stdout = lines.pop() ?? "";
       for (const line of lines) {
-        if (line.trim().length === 0) continue;
-        let event: unknown;
         try {
-          event = JSON.parse(line) as unknown;
-        } catch (error) {
-          settle(() => reject(error as Error));
-          return;
-        }
-        if (
-          typeof event === "object" &&
-          event !== null &&
-          "event" in event &&
-          event.event === "worker.ready" &&
-          "consumer" in event &&
-          event.consumer === consumer
-        ) {
-          settle(resolve);
-          return;
+          const event = JSON.parse(line) as {
+            consumer?: unknown;
+            event?: unknown;
+          };
+          if (event.event === "worker.ready" && event.consumer === consumer) {
+            cleanup();
+            resolve();
+            return;
+          }
+        } catch {
+          // Ignore non-JSON diagnostics until the bounded readiness deadline.
         }
       }
     };
-    const timeout = setTimeout(
-      () => settle(() => reject(new Error("worker readiness timed out"))),
-      15_000,
-    );
-    child.once("error", onError);
+    child.stdout?.on("data", onStdout);
+    child.stderr?.on("data", onStderr);
     child.once("exit", onExit);
-    child.stdout.on("data", onData);
   });
 
 it("removes both process signal listeners after the first shutdown signal", async () => {
@@ -104,7 +101,7 @@ it.each(["events.main.ts", "market.main.ts"])(
     });
 
     try {
-      await waitForWorkerReady(child, consumer);
+      await waitForWorkerReady(child, entrypoint.replace(".main.ts", ""));
       expect(child.exitCode).toBeNull();
 
       child.kill("SIGTERM");

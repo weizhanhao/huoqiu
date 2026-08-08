@@ -3,6 +3,7 @@ import { tokens } from "@huoqiu/native-ui";
 import type { ReactNode } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { d0MaestroLabels } from "../../accessibility/d0-maestro-labels";
 import { d0TextColors } from "../../styles/d0-colors";
 import { PageState } from "./page-state";
 import { ScreenHeader } from "./screen-header";
@@ -112,7 +113,9 @@ export function InstrumentDetail({
         )}
 
         <View style={styles.disclosure}>
-          <Text style={styles.disclosureTitle}>演示数据说明</Text>
+          <Text style={styles.disclosureTitle}>
+            {d0MaestroLabels.detailDisclosure}
+          </Text>
           <Text style={styles.disclosureCopy}>
             本页只读取 huoqiu-synthetic
             固定快照，不连接真实行情，不提供投资建议或交易能力。

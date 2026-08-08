@@ -9,6 +9,10 @@ import {
   View,
 } from "react-native";
 
+import {
+  d0MaestroLabels,
+  d0OpenInstrumentLabel,
+} from "../../accessibility/d0-maestro-labels";
 import { d0TextColors } from "../../styles/d0-colors";
 import { PageState } from "./page-state";
 import { ScreenHeader } from "./screen-header";
@@ -79,10 +83,10 @@ export function InstrumentSearch({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.searchCard}>
-          <Text style={styles.label}>搜索演示标的</Text>
+          <Text style={styles.label}>{d0MaestroLabels.searchTrigger}</Text>
           <View style={styles.searchRow}>
             <TextInput
-              accessibilityLabel="输入演示标的关键词"
+              accessibilityLabel={d0MaestroLabels.searchInput}
               autoCapitalize="none"
               autoCorrect={false}
               onChangeText={onQueryChange}
@@ -94,7 +98,7 @@ export function InstrumentSearch({
               value={query}
             />
             <Pressable
-              accessibilityLabel="提交演示标的搜索"
+              accessibilityLabel={d0MaestroLabels.searchSubmit}
               accessibilityRole="button"
               onPress={onSubmit}
               style={styles.submit}
@@ -126,7 +130,9 @@ export function InstrumentSearch({
             <PageState state="empty" emptyMessage="没有找到匹配的演示标的" />
           ) : (
             <View style={styles.results}>
-              <Text style={styles.resultsLabel}>搜索结果</Text>
+              <Text style={styles.resultsLabel}>
+                {d0MaestroLabels.searchResults}
+              </Text>
               {results.map((instrument) => {
                 const quote = fixture.quotes.find(
                   (candidate) => candidate.listing_id === instrument.listing_id,
@@ -134,7 +140,7 @@ export function InstrumentSearch({
                 return (
                   <Pressable
                     accessibilityHint={instrument.listing_id}
-                    accessibilityLabel={`打开${instrument.name}详情`}
+                    accessibilityLabel={d0OpenInstrumentLabel(instrument.name)}
                     accessibilityRole="button"
                     key={instrument.listing_id}
                     onPress={() => onOpenInstrument?.(instrument.listing_id)}

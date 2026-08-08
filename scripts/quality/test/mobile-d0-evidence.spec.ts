@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   runMobileD0Evidence,
+  trustedToolCandidates,
   type CommandRequest,
   type CommandResult,
   type MobileD0EvidenceDependencies,
@@ -18,6 +19,22 @@ const result = (overrides: Partial<CommandResult> = {}): CommandResult => ({
   stdout: "",
   ...overrides,
 });
+
+const versionResults: Readonly<Record<string, CommandResult>> = {
+  "tool-adb-version": result({
+    stdout: "Android Debug Bridge version 1.0.41\n",
+  }),
+  "tool-git-version": result({ stdout: "git version 2.50.0\n" }),
+  "tool-maestro-version": result({ stdout: "2.0.0\n" }),
+  "tool-pnpm-version": result({ stdout: "11.4.0\n" }),
+  "tool-tar-version": result({ stdout: "bsdtar 3.5.3\n" }),
+  "tool-xcrun-version": result({ stdout: "xcrun version 70.\n" }),
+};
+
+const actionLabels = (requests: readonly CommandRequest[]): string[] =>
+  requests
+    .map(({ label }) => label)
+    .filter((label) => !label.startsWith("tool-"));
 
 const harness = (
   responses: Readonly<Record<string, CommandResult>>,
@@ -38,13 +55,47 @@ const harness = (
     dependencies: {
       artifactDirectory: (commit, platform) =>
         `/evidence/${commit}/mobile-d0/${platform}`,
-      createSnapshot: vi.fn(async () => ({ cleanup, root: "/snapshot" })),
+      createSnapshot: vi.fn(async () => ({
+        archivePath: "/temporary/source.tar",
+        cleanup,
+        root: "/snapshot",
+        temporaryRoot: "/temporary",
+      })),
+      discoverCommit: vi.fn(async () => SHA),
+      ensureArtifactDirectory: vi.fn(async () => undefined),
       now: () => new Date("2026-08-08T16:00:00.000Z"),
       output: (line) => output.push(line),
       repositoryRoot: "/repository",
+      resolveTools: vi.fn(async (platform) => {
+        const names = [
+          "git",
+          "tar",
+          "pnpm",
+          "maestro",
+          platform === "ios" ? "xcrun" : "adb",
+        ];
+        return Object.fromEntries(
+          names.map((name) => [
+            name,
+            {
+              executable: `/trusted/${name}`,
+              prefixArgs: [],
+              realpath: `/trusted/${name}`,
+              sha256: "b".repeat(64),
+            },
+          ]),
+        );
+      }),
       runCommand: vi.fn(async (request) => {
         requests.push(request);
-        return responses[request.label] ?? result({ exitCode: 127 });
+        return (
+          responses[request.label] ??
+          versionResults[request.label] ??
+          (request.label === "snapshot-archive" ||
+          request.label === "snapshot-extract"
+            ? result()
+            : result({ exitCode: 127 }))
+        );
       }),
       writeArtifact: vi.fn(async (directory, name, contents) => {
         artifacts.set(`${directory}/${name}`, contents);
@@ -81,7 +132,7 @@ describe("D0 mobile evidence", () => {
       runMobileD0Evidence(["--platform", "ios"], testHarness.dependencies),
     ).rejects.toThrow("D0_MOBILE_CONTEXT_INVALID");
 
-    expect(testHarness.requests.map(({ label }) => label)).toEqual([
+    expect(actionLabels(testHarness.requests)).toEqual([
       "git-head",
       "git-status",
     ]);
@@ -105,10 +156,12 @@ describe("D0 mobile evidence", () => {
       runMobileD0Evidence(["--platform", "ios"], testHarness.dependencies),
     ).rejects.toThrow("D0_MOBILE_NOT_VERIFIED");
 
-    expect(testHarness.requests.map(({ label }) => label)).toEqual([
+    expect(actionLabels(testHarness.requests)).toEqual([
       "git-head",
       "git-status",
       "ios-probe",
+      "snapshot-archive",
+      "snapshot-extract",
       "snapshot-install",
       "expo-export",
       "expo-prebuild",
@@ -300,7 +353,7 @@ describe("D0 mobile evidence", () => {
         testHarness.artifacts.get(
           `/evidence/${SHA}/mobile-d0/ios/${label}.log`,
         ),
-      ).toContain(`\"label\":\"${label}\"`);
+      ).toContain(`"label":"${label}"`);
     }
     expect(events.indexOf("write:git-head.log")).toBeLessThan(
       events.indexOf("run:git-status"),
@@ -321,6 +374,13 @@ describe("D0 mobile evidence", () => {
     const originalPath = process.env.PATH;
     process.env.PATH = "/attacker-controlled/bin";
     try {
+      const candidates = trustedToolCandidates("android");
+      expect(candidates.git).not.toHaveLength(0);
+      expect(candidates.tar).not.toHaveLength(0);
+      expect(candidates.pnpm).not.toHaveLength(0);
+      expect(Object.values(candidates).flat()).not.toContain(
+        "/attacker-controlled/bin/git",
+      );
       await expect(
         runMobileD0Evidence(
           ["--platform", "android"],
@@ -347,6 +407,20 @@ describe("D0 mobile evidence", () => {
     });
   });
 
+  it("fails closed before evidence commands when a core tool version is outside policy", async () => {
+    const testHarness = harness({
+      "tool-pnpm-version": result({ stdout: "99.0.0\n" }),
+    });
+
+    await expect(
+      runMobileD0Evidence(["--platform", "ios"], testHarness.dependencies),
+    ).rejects.toThrow("D0_MOBILE_NOT_VERIFIED");
+    expect(testHarness.output).toEqual([
+      "D0_MOBILE NOT_VERIFIED platform=ios reason=tool_identity_invalid:pnpm",
+    ]);
+    expect(actionLabels(testHarness.requests)).toEqual([]);
+  });
+
   it("runs both fallback captures even when snapshot installation fails", async () => {
     const testHarness = harness({
       "git-head": result({ stdout: `${SHA}\n` }),
@@ -361,10 +435,12 @@ describe("D0 mobile evidence", () => {
       runMobileD0Evidence(["--platform", "android"], testHarness.dependencies),
     ).rejects.toThrow("D0_MOBILE_NOT_VERIFIED");
 
-    expect(testHarness.requests.map(({ label }) => label)).toEqual([
+    expect(actionLabels(testHarness.requests)).toEqual([
       "git-head",
       "git-status",
       "android-probe",
+      "snapshot-archive",
+      "snapshot-extract",
       "snapshot-install",
       "expo-export",
       "expo-prebuild",

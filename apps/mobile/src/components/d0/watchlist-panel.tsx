@@ -2,6 +2,11 @@ import type { D0Fixture } from "@huoqiu/contracts/d0";
 import { tokens } from "@huoqiu/native-ui";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import {
+  d0MaestroLabels,
+  d0OpenInstrumentLabel,
+  d0WatchlistCountLabel,
+} from "../../accessibility/d0-maestro-labels";
 import { useD0Watchlist } from "../../stores/d0-watchlist";
 import { d0TextColors } from "../../styles/d0-colors";
 import { PageState } from "./page-state";
@@ -21,7 +26,7 @@ export function WatchlistPanel({
   onOpenInstrument,
   onRetry,
 }: WatchlistPanelProperties) {
-  const { listingIds } = useD0Watchlist();
+  const { listingIds, reset } = useD0Watchlist();
   const entries = listingIds.flatMap((listingId) => {
     const instrument = fixture.instruments.find(
       (candidate) => candidate.listing_id === listingId,
@@ -40,7 +45,7 @@ export function WatchlistPanel({
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <Text style={styles.kicker}>SESSION WATCHLIST</Text>
-          <Text style={styles.heroTitle}>我的自选</Text>
+          <Text style={styles.heroTitle}>{d0MaestroLabels.watchlistTitle}</Text>
           <Text style={styles.heroCopy}>
             仅本次演示保留，不会跨设备同步，也不会发送网络 mutation。
           </Text>
@@ -55,43 +60,66 @@ export function WatchlistPanel({
           {entries.length === 0 ? (
             <PageState
               state="empty"
-              emptyMessage="暂无自选标的，可从详情页加入"
+              emptyMessage={d0MaestroLabels.watchlistEmpty}
             />
           ) : (
-            <View style={styles.list}>
-              {entries.map(({ instrument, quote }) => {
-                const isUp = !quote.change.startsWith("-");
-                return (
-                  <View key={instrument.listing_id} style={styles.row}>
-                    <Pressable
-                      accessibilityHint={instrument.listing_id}
-                      accessibilityLabel={`打开${instrument.name}详情`}
-                      accessibilityRole="button"
-                      onPress={() => onOpenInstrument?.(instrument.listing_id)}
-                      style={styles.identity}
-                      testID={"watchlist-detail-" + instrument.listing_id}
-                    >
-                      <Text style={styles.name}>{instrument.name}</Text>
-                      <Text style={styles.symbol}>
-                        {instrument.symbol} · {instrument.market}
-                      </Text>
-                    </Pressable>
-                    <View style={styles.quote}>
-                      <Text style={isUp ? styles.quoteUp : styles.quoteDown}>
-                        {quote.last}
-                      </Text>
-                      <Text style={isUp ? styles.changeUp : styles.changeDown}>
-                        {isUp ? "+" : ""}
-                        {quote.change_pct}%
-                      </Text>
+            <View style={styles.listWrap}>
+              <View style={styles.listToolbar}>
+                <Text style={styles.countLabel}>
+                  {d0WatchlistCountLabel(entries.length)}
+                </Text>
+                <Pressable
+                  accessibilityLabel={d0MaestroLabels.watchlistReset}
+                  accessibilityRole="button"
+                  onPress={reset}
+                  style={styles.resetButton}
+                >
+                  <Text style={styles.resetLabel}>
+                    {d0MaestroLabels.watchlistReset}
+                  </Text>
+                </Pressable>
+              </View>
+              <View style={styles.list}>
+                {entries.map(({ instrument, quote }) => {
+                  const isUp = !quote.change.startsWith("-");
+                  return (
+                    <View key={instrument.listing_id} style={styles.row}>
+                      <Pressable
+                        accessibilityHint={instrument.listing_id}
+                        accessibilityLabel={d0OpenInstrumentLabel(
+                          instrument.name,
+                        )}
+                        accessibilityRole="button"
+                        onPress={() =>
+                          onOpenInstrument?.(instrument.listing_id)
+                        }
+                        style={styles.identity}
+                        testID={"watchlist-detail-" + instrument.listing_id}
+                      >
+                        <Text style={styles.name}>{instrument.name}</Text>
+                        <Text style={styles.symbol}>
+                          {instrument.symbol} · {instrument.market}
+                        </Text>
+                      </Pressable>
+                      <View style={styles.quote}>
+                        <Text style={isUp ? styles.quoteUp : styles.quoteDown}>
+                          {quote.last}
+                        </Text>
+                        <Text
+                          style={isUp ? styles.changeUp : styles.changeDown}
+                        >
+                          {isUp ? "+" : ""}
+                          {quote.change_pct}%
+                        </Text>
+                      </View>
+                      <WatchlistToggle
+                        listingId={instrument.listing_id}
+                        removeLabel="移出自选"
+                      />
                     </View>
-                    <WatchlistToggle
-                      listingId={instrument.listing_id}
-                      removeLabel="移出自选"
-                    />
-                  </View>
-                );
-              })}
+                  );
+                })}
+              </View>
             </View>
           )}
         </PageState>
@@ -141,6 +169,33 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
+  },
+  listWrap: {
+    gap: 10,
+  },
+  listToolbar: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  countLabel: {
+    color: tokens.text.secondary,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  resetButton: {
+    alignItems: "center",
+    borderColor: tokens.surface.divider,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 14,
+  },
+  resetLabel: {
+    color: tokens.text.secondary,
+    fontSize: 13,
+    fontWeight: "600",
   },
   row: {
     alignItems: "center",
