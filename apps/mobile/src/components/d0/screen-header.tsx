@@ -5,26 +5,41 @@ import { SafeAreaView } from "react-native-safe-area-context";
 type ScreenHeaderProperties = Readonly<{
   title: string;
   subtitle?: string;
+  onBack?: (() => void) | undefined;
   onSearch?: (() => void) | undefined;
 }>;
 
 export function ScreenHeader({
   title,
   subtitle,
+  onBack,
   onSearch,
 }: ScreenHeaderProperties) {
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.identity}>
-          <View
-            accessibilityElementsHidden
-            aria-hidden
-            importantForAccessibility="no-hide-descendants"
-            style={styles.mark}
-          >
-            <Text style={styles.markText}>火</Text>
-          </View>
+          {onBack === undefined ? (
+            <View
+              accessibilityElementsHidden
+              aria-hidden
+              importantForAccessibility="no-hide-descendants"
+              style={styles.mark}
+            >
+              <Text style={styles.markText}>火</Text>
+            </View>
+          ) : (
+            <Pressable
+              accessibilityLabel="返回"
+              accessibilityRole="button"
+              onPress={onBack}
+              style={styles.back}
+            >
+              <Text aria-hidden style={styles.backGlyph}>
+                ‹
+              </Text>
+            </Pressable>
+          )}
           <View style={styles.copy}>
             <Text
               accessibilityRole="header"
@@ -96,6 +111,21 @@ const styles = StyleSheet.create({
     color: tokens.brand.onPrimary,
     fontSize: 18,
     fontWeight: "700",
+  },
+  back: {
+    alignItems: "center",
+    borderColor: tokens.surface.divider,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  backGlyph: {
+    color: tokens.text.primary,
+    fontSize: 32,
+    fontWeight: "400",
+    lineHeight: 34,
   },
   copy: {
     flex: 1,

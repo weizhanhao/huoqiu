@@ -1,10 +1,11 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { InstrumentDetail } from "../../src/components/d0/instrument-detail";
 import { PageState } from "../../src/components/d0/page-state";
 import { loadD0Fixture } from "../../src/lib/d0-fixture";
 
 export default function InstrumentScreen() {
+  const router = useRouter();
   const parameters = useLocalSearchParams<{ listingId?: string | string[] }>();
   const fixtureResult = loadD0Fixture();
   const listingId = Array.isArray(parameters.listingId)
@@ -19,6 +20,7 @@ export default function InstrumentScreen() {
     <InstrumentDetail
       fixture={fixtureResult.data}
       listingId={listingId ?? ""}
+      onBack={() => router.back()}
       state="normal"
     />
   );

@@ -11,6 +11,7 @@ type InstrumentDetailProperties = Readonly<{
   fixture: D0Fixture;
   listingId: string;
   state: "normal" | "loading" | "empty" | "error";
+  onBack?: (() => void) | undefined;
   onRetry?: (() => void) | undefined;
 }>;
 
@@ -24,6 +25,7 @@ export function InstrumentDetail({
   fixture,
   listingId,
   state,
+  onBack,
   onRetry,
 }: InstrumentDetailProperties) {
   const instrument = fixture.instruments.find(
@@ -39,7 +41,7 @@ export function InstrumentDetail({
   if (state !== "normal") {
     return (
       <View style={styles.viewport}>
-        <ScreenHeader title="标的详情" />
+        <ScreenHeader onBack={onBack} title="标的详情" />
         <View style={styles.stateWrap}>
           <PageState
             emptyMessage="暂无日 K 演示数据"
@@ -55,7 +57,7 @@ export function InstrumentDetail({
   if (instrument === undefined || quote === undefined) {
     return (
       <View style={styles.viewport}>
-        <ScreenHeader title="标的详情" />
+        <ScreenHeader onBack={onBack} title="标的详情" />
         <View style={styles.stateWrap}>
           <PageState state="empty" emptyMessage="没有这个演示标的" />
         </View>
@@ -65,7 +67,11 @@ export function InstrumentDetail({
 
   return (
     <View style={styles.viewport}>
-      <ScreenHeader subtitle={instrument.symbol} title={instrument.name} />
+      <ScreenHeader
+        onBack={onBack}
+        subtitle={instrument.symbol}
+        title={instrument.name}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.quoteCard}>
           <View style={styles.quoteTopline}>
@@ -140,6 +146,10 @@ function CandleChart({
   const maximum = Math.max(...highs);
   const range = Math.max(maximum - minimum, 0.01);
   const toY = (value: number) => ((maximum - value) / range) * 132;
+  const maximumVolume = Math.max(
+    ...points.map((point) => Number(point.volume)),
+    1,
+  );
 
   return (
     <View style={styles.chartCard}>
@@ -195,6 +205,33 @@ function CandleChart({
         <Text style={styles.chartMeta}>{points[0]?.at.slice(0, 10)}</Text>
         <Text style={styles.chartMeta}>{points.length} 个日 K 点</Text>
         <Text style={styles.chartMeta}>{points.at(-1)?.at.slice(0, 10)}</Text>
+      </View>
+      <Text style={styles.volumeLabel}>成交量</Text>
+      <View
+        accessibilityLabel={`${instrumentName} ${points.length} 个成交量柱`}
+        accessibilityRole="image"
+        style={styles.volumeChart}
+      >
+        {points.map((point, index) => {
+          const isUp = Number(point.close) >= Number(point.open);
+          return (
+            <View key={point.at} style={styles.volumeSlot}>
+              <View
+                style={[
+                  styles.volumeBar,
+                  isUp ? styles.up : styles.down,
+                  {
+                    height: Math.max(
+                      (Number(point.volume) / maximumVolume) * 48,
+                      2,
+                    ),
+                  },
+                ]}
+                testID={`d0-volume-${index}`}
+              />
+            </View>
+          );
+        })}
       </View>
     </View>
   );
@@ -340,6 +377,33 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingTop: 10,
+  },
+  volumeLabel: {
+    color: tokens.text.tertiary,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1,
+    paddingTop: 18,
+  },
+  volumeChart: {
+    alignItems: "flex-end",
+    borderBottomColor: tokens.surface.divider,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    height: 56,
+    marginTop: 8,
+  },
+  volumeSlot: {
+    alignItems: "center",
+    flex: 1,
+    height: 52,
+    justifyContent: "flex-end",
+  },
+  volumeBar: {
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
+    opacity: 0.72,
+    width: "62%",
   },
   disclosure: {
     backgroundColor: tokens.surface.base,

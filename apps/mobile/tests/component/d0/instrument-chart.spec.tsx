@@ -34,6 +34,7 @@ describe("D0 mobile instrument detail", () => {
     expect(markup).toContain("2026-08-08T06:00:00.000Z");
     expect(markup).toContain("演示数据");
     expect(markup.match(/data-testid="d0-candle-/gu)).toHaveLength(20);
+    expect(markup.match(/data-testid="d0-volume-/gu)).toHaveLength(20);
     expect(markup).toContain("20 个日 K 点");
     expect(markup).toContain("加自选");
   });

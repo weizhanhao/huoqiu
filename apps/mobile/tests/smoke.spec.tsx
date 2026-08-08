@@ -186,6 +186,15 @@ describe("mobile shell", () => {
     expect(readSemanticSnapshot(renderShell()).textNodes).not.toContain("火");
   });
 
+  it("renders an explicit accessible back control for stack screens", () => {
+    const markup = renderToStaticMarkup(
+      <ScreenHeader onBack={() => undefined} title="搜索" />,
+    );
+
+    expect(markup).toContain('aria-label="返回"');
+    expect(markup).toContain("搜索");
+  });
+
   it("describes a neutral public-market information workspace", () => {
     expect(renderShell()).toContain("公开市场信息的观察与整理");
   });

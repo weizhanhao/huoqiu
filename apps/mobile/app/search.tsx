@@ -17,6 +17,7 @@ export default function SearchScreen() {
   return (
     <InstrumentSearch
       fixture={fixtureResult.data}
+      onBack={() => router.back()}
       onOpenInstrument={(listingId) =>
         router.push({
           pathname: "/instrument/[listingId]",

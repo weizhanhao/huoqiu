@@ -37,6 +37,7 @@ type InstrumentSearchProperties = Readonly<{
   fixture: D0Fixture;
   query: string;
   state: "normal" | "loading" | "empty" | "error";
+  onBack?: (() => void) | undefined;
   onQueryChange?: ((query: string) => void) | undefined;
   onSubmit?: (() => void) | undefined;
   onOpenInstrument?: ((listingId: string) => void) | undefined;
@@ -47,6 +48,7 @@ export function InstrumentSearch({
   fixture,
   query,
   state,
+  onBack,
   onQueryChange,
   onSubmit,
   onOpenInstrument,
@@ -57,7 +59,11 @@ export function InstrumentSearch({
 
   return (
     <View style={styles.viewport}>
-      <ScreenHeader subtitle="代码 · 名称 · 拼音 · 别名" title="搜索" />
+      <ScreenHeader
+        onBack={onBack}
+        subtitle="代码 · 名称 · 拼音 · 别名"
+        title="搜索"
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
