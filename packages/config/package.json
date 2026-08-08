@@ -15,6 +15,7 @@
     "./vitest/base": "./vitest/base.ts"
   },
   "scripts": {
+    "lint": "eslint --config eslint/base.mjs src test vitest eslint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals src/env.ts test/env.spec.ts vitest/base.ts"
   },
