@@ -130,6 +130,28 @@ describe("D0 mobile evidence", () => {
     expect(testHarness.cleanup).toHaveBeenCalledOnce();
   });
 
+  it("preserves the exact executable-launch blocker instead of reporting unknown", async () => {
+    const testHarness = harness({
+      "git-head": result({ stdout: `${SHA}\n` }),
+      "git-status": result(),
+      "android-probe": result({
+        exitCode: 127,
+        stdout: "spawn adb ENOENT\n",
+      }),
+      "snapshot-install": result(),
+      "expo-export": result(),
+      "expo-prebuild": result(),
+    });
+
+    await expect(
+      runMobileD0Evidence(["--platform", "android"], testHarness.dependencies),
+    ).rejects.toThrow("D0_MOBILE_NOT_VERIFIED");
+
+    expect(testHarness.output).toEqual([
+      "D0_MOBILE NOT_VERIFIED platform=android reason=android_adb_unavailable:spawn_adb_enoent",
+    ]);
+  });
+
   it("boots an available iOS simulator and verifies exactly one Maestro flow", async () => {
     const testHarness = harness({
       "git-head": result({ stdout: `${SHA}\n` }),

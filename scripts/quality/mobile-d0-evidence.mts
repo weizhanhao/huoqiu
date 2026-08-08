@@ -23,6 +23,7 @@ export interface CommandRequest {
 }
 
 export interface CommandResult {
+  errorMessage?: string;
   exitCode: number;
   signal: NodeJS.Signals | null;
   stderr: string;
@@ -57,6 +58,7 @@ interface RecordedCommand {
   args: string[];
   cwd: string;
   executable: string;
+  error_message?: string;
   exit_code: number;
   label: string;
   signal: NodeJS.Signals | null;
@@ -105,6 +107,9 @@ const commandLog = (
       args: request.args,
       cwd: request.cwd,
       executable: request.executable,
+      ...(commandResult.errorMessage === undefined
+        ? {}
+        : { error_message: commandResult.errorMessage }),
       exit_code: commandResult.exitCode,
       label: request.label,
       signal: commandResult.signal,
@@ -114,6 +119,14 @@ const commandLog = (
     "--- stderr ---",
     commandResult.stderr,
   ].join("\n") + "\n";
+
+const commandFailureReason = (commandResult: CommandResult): string =>
+  normalizedReason(
+    commandResult.stderr ||
+      commandResult.errorMessage ||
+      commandResult.stdout ||
+      "unknown",
+  );
 
 const iosTarget = (stdout: string): MobileTarget | undefined => {
   let parsed: unknown;
@@ -179,6 +192,9 @@ const defaultRunCommand = async (
             })
           | null;
         resolvePromise({
+          ...(processError?.message === undefined
+            ? {}
+            : { errorMessage: processError.message }),
           exitCode:
             processError === null
               ? 0
@@ -208,7 +224,7 @@ const createSnapshot = async (commit: string): Promise<Snapshot> => {
     await rm(temporaryRoot, { force: true, recursive: true });
     throw new QualityGateError(
       "D0_MOBILE_SNAPSHOT_FAILED",
-      normalizedReason(archive.stderr),
+      commandFailureReason(archive),
     );
   }
   const extract = await defaultRunCommand({
@@ -221,7 +237,7 @@ const createSnapshot = async (commit: string): Promise<Snapshot> => {
     await rm(temporaryRoot, { force: true, recursive: true });
     throw new QualityGateError(
       "D0_MOBILE_SNAPSHOT_FAILED",
-      normalizedReason(extract.stderr),
+      commandFailureReason(extract),
     );
   }
   return {
@@ -268,6 +284,9 @@ export const runMobileD0Evidence = async (
       args: request.args,
       cwd: request.cwd,
       executable: request.executable,
+      ...(commandResult.errorMessage === undefined
+        ? {}
+        : { error_message: commandResult.errorMessage }),
       exit_code: commandResult.exitCode,
       label: request.label,
       signal: commandResult.signal,
@@ -320,7 +339,7 @@ export const runMobileD0Evidence = async (
       artifactDirectory,
     );
     if (probe.exitCode !== 0)
-      reason = `ios_xcrun_unavailable:${normalizedReason(probe.stderr)}`;
+      reason = `ios_xcrun_unavailable:${commandFailureReason(probe)}`;
     else {
       target = iosTarget(probe.stdout);
       if (target === undefined) reason = "ios_no_available_simulator";
@@ -336,7 +355,7 @@ export const runMobileD0Evidence = async (
       artifactDirectory,
     );
     if (probe.exitCode !== 0)
-      reason = `android_adb_unavailable:${normalizedReason(probe.stderr)}`;
+      reason = `android_adb_unavailable:${commandFailureReason(probe)}`;
     else {
       target = androidTarget(probe.stdout);
       if (target === undefined) reason = "android_no_connected_device";
@@ -354,7 +373,7 @@ export const runMobileD0Evidence = async (
       artifactDirectory,
     );
     if (maestroProbe.exitCode !== 0)
-      reason = `maestro_unavailable:${normalizedReason(maestroProbe.stderr)}`;
+      reason = `maestro_unavailable:${commandFailureReason(maestroProbe)}`;
   }
 
   let snapshot: Snapshot;
