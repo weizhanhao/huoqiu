@@ -280,7 +280,20 @@ const isStaticSurfaceRegistry = (path: string): boolean => {
       part,
     ),
   );
-  return isDomainRegistry(path) || (hasRegistry && hasSurfaceContext);
+  const hasStandaloneRegistry = parts.some((part) =>
+    /^registr(?:y|ies)(?:\.[^.]+)?$/i.test(part),
+  );
+  const isClientApplicationRegistry =
+    parts[0] === "apps" &&
+    parts[1] !== undefined &&
+    parts[1] !== "api" &&
+    hasRegistry;
+  return (
+    isDomainRegistry(path) ||
+    hasStandaloneRegistry ||
+    (hasRegistry && hasSurfaceContext) ||
+    isClientApplicationRegistry
+  );
 };
 
 const isRuntimeCandidate = (path: string): boolean => {
@@ -363,6 +376,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   const sourceFile = parseSourceFile(file, content);
   const constants = new Map<string, ts.Expression>();
   const topLevelConstants = new Map<string, ts.Expression>();
+  const topLevelFunctions = new Map<string, ts.FunctionDeclaration>();
   const nestRouteDecoratorAliases = new Set<string>();
   const nestNamespaces = new Set<string>();
   const surfaces = new Set<string>();
@@ -447,6 +461,10 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   indexConstants(sourceFile);
 
   for (const statement of sourceFile.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name !== undefined) {
+      topLevelFunctions.set(statement.name.text, statement);
+      continue;
+    }
     if (
       !ts.isVariableStatement(statement) ||
       (statement.declarationList.flags & ts.NodeFlags.Const) === 0
@@ -467,18 +485,112 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       statement.moduleSpecifier.text !== "@nestjs/common"
     )
       continue;
-    const bindings = statement.importClause?.namedBindings;
+    const importClause = statement.importClause;
+    if (importClause?.isTypeOnly === true) continue;
+    const bindings = importClause?.namedBindings;
     if (bindings === undefined) continue;
     if (ts.isNamespaceImport(bindings)) {
       nestNamespaces.add(bindings.name.text);
       continue;
     }
     for (const element of bindings.elements) {
+      if (element.isTypeOnly) continue;
       const imported = (element.propertyName ?? element.name).text;
       if (NEST_ROUTE_DECORATOR.test(imported))
         nestRouteDecoratorAliases.add(element.name.text);
     }
   }
+
+  const unwrapExpression = (expression: ts.Expression): ts.Expression => {
+    if (
+      ts.isParenthesizedExpression(expression) ||
+      ts.isAsExpression(expression) ||
+      ts.isTypeAssertionExpression(expression) ||
+      ts.isSatisfiesExpression(expression)
+    )
+      return unwrapExpression(expression.expression);
+    return expression;
+  };
+
+  const isNestNamespaceReference = (expression: ts.Expression): boolean => {
+    const value = unwrapExpression(expression);
+    return ts.isIdentifier(value) && nestNamespaces.has(value.text);
+  };
+
+  const nestDecoratorReference = (
+    expression: ts.Expression,
+  ): string | undefined => {
+    const value = unwrapExpression(expression);
+    if (ts.isIdentifier(value))
+      return nestRouteDecoratorAliases.has(value.text) ? value.text : undefined;
+    if (ts.isPropertyAccessExpression(value))
+      return isNestNamespaceReference(value.expression) &&
+        NEST_ROUTE_DECORATOR.test(value.name.text)
+        ? value.name.text
+        : undefined;
+    if (
+      ts.isElementAccessExpression(value) &&
+      isNestNamespaceReference(value.expression) &&
+      value.argumentExpression !== undefined
+    ) {
+      const name = evaluate(value.argumentExpression, topLevelConstants);
+      return name !== undefined && NEST_ROUTE_DECORATOR.test(name)
+        ? name
+        : undefined;
+    }
+    return undefined;
+  };
+
+  let discoveredNestAlias: boolean;
+  do {
+    discoveredNestAlias = false;
+    const visitAliases = (node: ts.Node): void => {
+      if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
+        if (ts.isIdentifier(node.name)) {
+          if (
+            isNestNamespaceReference(node.initializer) &&
+            !nestNamespaces.has(node.name.text)
+          ) {
+            nestNamespaces.add(node.name.text);
+            discoveredNestAlias = true;
+          }
+          if (
+            nestDecoratorReference(node.initializer) !== undefined &&
+            !nestRouteDecoratorAliases.has(node.name.text)
+          ) {
+            nestRouteDecoratorAliases.add(node.name.text);
+            discoveredNestAlias = true;
+          }
+        } else if (
+          ts.isObjectBindingPattern(node.name) &&
+          isNestNamespaceReference(node.initializer)
+        ) {
+          for (const element of node.name.elements) {
+            if (
+              element.dotDotDotToken !== undefined ||
+              !ts.isIdentifier(element.name)
+            )
+              continue;
+            const imported = element.propertyName ?? element.name;
+            const importedName =
+              ts.isIdentifier(imported) || ts.isStringLiteralLike(imported)
+                ? imported.text
+                : undefined;
+            if (
+              importedName !== undefined &&
+              NEST_ROUTE_DECORATOR.test(importedName) &&
+              !nestRouteDecoratorAliases.has(element.name.text)
+            ) {
+              nestRouteDecoratorAliases.add(element.name.text);
+              discoveredNestAlias = true;
+            }
+          }
+        }
+      }
+      ts.forEachChild(node, visitAliases);
+    };
+    visitAliases(sourceFile);
+  } while (discoveredNestAlias);
 
   const runtimeField = (name: ts.BindingName | ts.PropertyName): boolean => {
     const value =
@@ -568,17 +680,26 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   };
 
   const routeDecorator = (expression: ts.LeftHandSideExpression): boolean => {
-    if (ts.isIdentifier(expression))
+    const value = unwrapExpression(expression);
+    if (ts.isIdentifier(value))
       return (
-        NEST_ROUTE_DECORATOR.test(expression.text) ||
-        nestRouteDecoratorAliases.has(expression.text)
+        NEST_ROUTE_DECORATOR.test(value.text) ||
+        nestRouteDecoratorAliases.has(value.text)
       );
-    if (!ts.isPropertyAccessExpression(expression)) return false;
-    return (
-      NEST_ROUTE_DECORATOR.test(expression.name.text) &&
-      ts.isIdentifier(expression.expression) &&
-      nestNamespaces.has(expression.expression.text)
-    );
+    if (ts.isPropertyAccessExpression(value))
+      return (
+        NEST_ROUTE_DECORATOR.test(value.name.text) &&
+        isNestNamespaceReference(value.expression)
+      );
+    if (
+      ts.isElementAccessExpression(value) &&
+      isNestNamespaceReference(value.expression) &&
+      value.argumentExpression !== undefined
+    ) {
+      const name = evaluate(value.argumentExpression, topLevelConstants);
+      return name !== undefined && NEST_ROUTE_DECORATOR.test(name);
+    }
+    return false;
   };
 
   const requireStatic = (expression: ts.Expression, label: string): void => {
@@ -697,19 +818,92 @@ const sourceSurfaces = (file: string, content: string): string[] => {
 
   const validateTopLevelRegistryExports = (): void => {
     if (!isStaticSurfaceRegistry(file)) return;
+
+    const isModuleExports = (expression: ts.Expression): boolean => {
+      if (ts.isPropertyAccessExpression(expression))
+        return (
+          ts.isIdentifier(expression.expression) &&
+          expression.expression.text === "module" &&
+          expression.name.text === "exports"
+        );
+      if (!ts.isElementAccessExpression(expression)) return false;
+      return (
+        ts.isIdentifier(expression.expression) &&
+        expression.expression.text === "module" &&
+        expression.argumentExpression !== undefined &&
+        evaluate(expression.argumentExpression, topLevelConstants) === "exports"
+      );
+    };
+
+    const isCommonJsExportTarget = (expression: ts.Expression): boolean => {
+      if (isModuleExports(expression)) return true;
+      if (
+        !ts.isPropertyAccessExpression(expression) &&
+        !ts.isElementAccessExpression(expression)
+      )
+        return false;
+      const base = expression.expression;
+      return (
+        (ts.isIdentifier(base) && base.text === "exports") ||
+        isModuleExports(base)
+      );
+    };
+
+    const requireStaticRegistryExport = (
+      expression: ts.Expression,
+      label: string,
+    ): void => {
+      const value = unwrapExpression(expression);
+      if (ts.isIdentifier(value)) {
+        const declaration = topLevelFunctions.get(value.text);
+        if (declaration !== undefined) {
+          requireStaticRegistryFunction(declaration);
+          return;
+        }
+      }
+      requireStaticRegistry(expression, label);
+    };
+
     for (const statement of sourceFile.statements) {
-      if (ts.isExportAssignment(statement)) {
-        requireStaticRegistry(statement.expression, "default export");
+      if (
+        ts.isImportDeclaration(statement) ||
+        ts.isInterfaceDeclaration(statement) ||
+        ts.isTypeAliasDeclaration(statement) ||
+        ts.isEmptyStatement(statement)
+      )
+        continue;
+      if (ts.isExpressionStatement(statement)) {
+        if (ts.isStringLiteralLike(statement.expression)) continue;
+        if (
+          !ts.isBinaryExpression(statement.expression) ||
+          !isCommonJsExportTarget(statement.expression.left)
+        )
+          return fail(
+            "RUNTIME_CANDIDATE_UNRESOLVED",
+            `${file}: unsupported top-level registry runtime expression`,
+          );
+        if (
+          statement.expression.operatorToken.kind !== ts.SyntaxKind.EqualsToken
+        )
+          return fail(
+            "RUNTIME_CANDIDATE_UNRESOLVED",
+            `${file}: compound CommonJS registry exports are not statically decidable`,
+          );
+        requireStaticRegistryExport(
+          statement.expression.right,
+          statement.expression.left.getText(sourceFile),
+        );
         continue;
       }
-      if (
-        ts.isVariableStatement(statement) &&
-        hasModifier(statement, ts.SyntaxKind.ExportKeyword)
-      ) {
+      if (ts.isExportAssignment(statement)) {
+        requireStaticRegistryExport(statement.expression, "default export");
+        continue;
+      }
+      if (ts.isVariableStatement(statement)) {
         if ((statement.declarationList.flags & ts.NodeFlags.Const) === 0)
-          fail(
+          return fail(
             "RUNTIME_CANDIDATE_UNRESOLVED",
-            `${file}: exported registry bindings must be const`,
+            `${file}: registry bindings must be const`,
           );
         for (const declaration of statement.declarationList.declarations) {
           const initializer = declaration.initializer;
@@ -725,10 +919,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
         }
         continue;
       }
-      if (
-        ts.isFunctionDeclaration(statement) &&
-        hasModifier(statement, ts.SyntaxKind.ExportKeyword)
-      ) {
+      if (ts.isFunctionDeclaration(statement)) {
         requireStaticRegistryFunction(statement);
         continue;
       }
@@ -748,24 +939,26 @@ const sourceSurfaces = (file: string, content: string): string[] => {
           if (element.isTypeOnly) continue;
           const localName = (element.propertyName ?? element.name).text;
           const initializer = topLevelConstants.get(localName);
-          if (initializer === undefined)
-            return fail(
-              "RUNTIME_CANDIDATE_UNRESOLVED",
-              `${file}: exported ${localName} has no static initializer`,
-            );
-          requireStaticRegistry(initializer, localName);
+          if (initializer !== undefined) {
+            requireStaticRegistry(initializer, localName);
+            continue;
+          }
+          const functionDeclaration = topLevelFunctions.get(localName);
+          if (functionDeclaration !== undefined) {
+            requireStaticRegistryFunction(functionDeclaration);
+            continue;
+          }
+          return fail(
+            "RUNTIME_CANDIDATE_UNRESOLVED",
+            `${file}: exported ${localName} has no static binding`,
+          );
         }
         continue;
       }
-      if (
-        hasModifier(statement, ts.SyntaxKind.ExportKeyword) &&
-        !ts.isInterfaceDeclaration(statement) &&
-        !ts.isTypeAliasDeclaration(statement)
-      )
-        fail(
-          "RUNTIME_CANDIDATE_UNRESOLVED",
-          `${file}: unsupported runtime registry export ${ts.SyntaxKind[statement.kind]}`,
-        );
+      return fail(
+        "RUNTIME_CANDIDATE_UNRESOLVED",
+        `${file}: unsupported top-level registry statement ${ts.SyntaxKind[statement.kind]}`,
+      );
     }
   };
 

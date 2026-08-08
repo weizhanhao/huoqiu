@@ -297,6 +297,93 @@ describe("forbidden runtime surfaces", () => {
   });
 
   it.each([
+    "const RouteController = Nest.Controller; @RouteController(resolveRoute()) class Orders {}",
+    "const ReadRoute = Nest.Get; class Orders { @ReadRoute(resolveRoute()) list() {} }",
+    "const { Post: CreateRoute } = Nest; class Orders { @CreateRoute(resolveRoute()) create() {} }",
+  ])(
+    "fails closed for a local alias derived from an @nestjs/common namespace %s",
+    async (declaration) => {
+      const root = await createRepository();
+      const relativePath = "apps/api/src/execution/orders.ts";
+      await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+      await writeCandidate(
+        root,
+        `import * as Nest from "@nestjs/common";\n${declaration}`,
+        relativePath,
+      );
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it.each([
+    'const ReadRoute = Nest.Get; class Orders { @ReadRoute("watchlist") list() {} }',
+    'const { Post: CreateRoute } = Nest; class Orders { @CreateRoute("watchlist") create() {} }',
+  ])(
+    "accepts a static route through an @nestjs/common namespace alias %s",
+    async (declaration) => {
+      const root = await createRepository();
+      await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+      await writeCandidate(
+        root,
+        `import * as Nest from "@nestjs/common";\n${declaration}`,
+        "apps/api/src/execution/orders.ts",
+      );
+
+      expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+    },
+  );
+
+  it("fails closed for a computed Nest namespace decorator with a dynamic route", async () => {
+    const root = await createRepository();
+    const relativePath = "apps/api/src/execution/orders.ts";
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      'import * as Nest from "@nestjs/common";\n@(Nest["Controller"])(resolveRoute()) class Orders {}',
+      relativePath,
+    );
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+    expect(result.stderr).toContain(relativePath);
+  });
+
+  it("accepts a computed Nest namespace decorator with a static route", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      'import * as Nest from "@nestjs/common";\nclass Orders { @(Nest["Get"])("watchlist") list() {} }',
+      "apps/api/src/execution/orders.ts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it("rejects the direct computed Nest decorator spelling as malformed TypeScript", async () => {
+    const root = await createRepository();
+    const relativePath = "apps/api/src/execution/orders.ts";
+    await writeCandidate(
+      root,
+      'import * as Nest from "@nestjs/common";\n@Nest["Controller"](resolveRoute()) class Orders {}',
+      relativePath,
+    );
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("RUNTIME_CANDIDATE_MALFORMED");
+    expect(result.stderr).toContain(relativePath);
+  });
+
+  it.each([
     ['export const route = "/tr\\u0061de";', "trade"],
     ['export const route = "/tr" + "ade";', "trade"],
     ['export const route = `/tr${"ade"}`;', "trade"],
@@ -394,6 +481,106 @@ describe("forbidden runtime surfaces", () => {
       expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
     },
   );
+
+  it.each([
+    "module.exports = resolveRuntimeRegistry();",
+    "exports.registry = resolveRuntimeRegistry();",
+  ])(
+    "requires a CommonJS registry export to satisfy the static schema %s",
+    async (source) => {
+      const root = await createRepository();
+      const relativePath = "apps/web/src/navigation/route-registry.cjs";
+      await writeCandidate(root, source, relativePath);
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it.each([
+    'module.exports = { routes: ["/watchlist"] };',
+    'exports.registry = { routes: ["/watchlist"] };',
+  ])(
+    "accepts a statically decidable CommonJS registry export %s",
+    async (source) => {
+      const root = await createRepository();
+      await writeCandidate(
+        root,
+        source,
+        "apps/web/src/navigation/route-registry.cjs",
+      );
+
+      expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+    },
+  );
+
+  it("requires a generic client registry default export to satisfy the static schema", async () => {
+    const root = await createRepository();
+    const relativePath = "apps/web/src/registry.ts";
+    await writeCandidate(
+      root,
+      "export default resolveRuntimeRegistry();",
+      relativePath,
+    );
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+    expect(result.stderr).toContain(relativePath);
+  });
+
+  it("requires a generic API registry default export to satisfy the static schema", async () => {
+    const root = await createRepository();
+    const relativePath = "apps/api/src/registry.ts";
+    await writeCandidate(
+      root,
+      "export default resolveRuntimeRegistry();",
+      relativePath,
+    );
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+    expect(result.stderr).toContain(relativePath);
+  });
+
+  it.each([
+    "if (enabled) module.exports = resolveRuntimeRegistry();",
+    "Object.assign(module.exports, resolveRuntimeRegistry());",
+    'export const registry = { routes: ["/watchlist"] }; registry.routes.push(resolveRuntimeRoute());',
+    'export const registry = { routes: ["/watchlist"] }; registry.routes = resolveRuntimeRoutes();',
+  ])(
+    "rejects unsupported top-level runtime logic in a static registry %s",
+    async (source) => {
+      const root = await createRepository();
+      const relativePath = source.includes("module.exports")
+        ? "apps/web/src/navigation/route-registry.cjs"
+        : "apps/web/src/navigation/route-registry.ts";
+      await writeCandidate(root, source, relativePath);
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it("accepts static top-level constants followed by an explicit export", async () => {
+    const root = await createRepository();
+    await writeCandidate(
+      root,
+      'const routes = ["/watchlist"]; const registry = { routes }; export { registry };',
+      "apps/web/src/navigation/route-registry.ts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
 
   it.each([
     [JSON.stringify({ route: "/portfolio/public" }), "public_portfolio"],

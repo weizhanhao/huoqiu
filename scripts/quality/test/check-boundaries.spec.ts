@@ -339,6 +339,58 @@ describe("workspace and supply-chain boundaries", () => {
     expect(result.stderr).toContain("@huoqiu/ui/missing");
   });
 
+  it("checks every conditional runtime export even when TypeScript resolves a safe path", async () => {
+    const root = await createRepository();
+    const path = "packages/ui/package.json";
+    const manifest = await readManifest(root, path);
+    manifest.exports = {
+      "./button": {
+        types: "./src/button.ts",
+        import: "./docs/runtime-button.ts",
+      },
+    };
+    await writeJson(root, path, manifest);
+    await writeText(
+      root,
+      "packages/ui/docs/runtime-button.ts",
+      "export const Button = 1;\n",
+    );
+    await writeJson(root, "apps/web/tsconfig.json", {
+      compilerOptions: {
+        baseUrl: ".",
+        paths: { "@huoqiu/ui/*": ["../../packages/ui/src/*"] },
+      },
+    });
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+    expect(result.stderr).toContain("packages/ui/docs/runtime-button.ts");
+  });
+
+  it("uses the most specific matching package export pattern", async () => {
+    const root = await createRepository();
+    const path = "packages/ui/package.json";
+    const manifest = await readManifest(root, path);
+    manifest.exports = {
+      "./*": "./src/*.ts",
+      "./button*": "./docs/button*.ts",
+    };
+    await writeJson(root, path, manifest);
+    await writeText(
+      root,
+      "packages/ui/docs/button.ts",
+      "export const Button = 1;\n",
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+    expect(result.stderr).toContain("packages/ui/docs/button.ts");
+  });
+
   it("rejects a package importing an app through a relative path", async () => {
     const root = await createRepository();
     await writeText(

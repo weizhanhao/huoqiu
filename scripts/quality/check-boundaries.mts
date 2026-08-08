@@ -661,6 +661,20 @@ const validateSourceImports = async (
     let selected: unknown;
     let replacement: string | undefined;
 
+    const comparePatternKeys = (left: string, right: string): number => {
+      const leftStar = left.indexOf("*");
+      const rightStar = right.indexOf("*");
+      const leftBaseLength = leftStar < 0 ? left.length : leftStar + 1;
+      const rightBaseLength = rightStar < 0 ? right.length : rightStar + 1;
+      if (leftBaseLength > rightBaseLength) return -1;
+      if (rightBaseLength > leftBaseLength) return 1;
+      if (leftStar < 0) return 1;
+      if (rightStar < 0) return -1;
+      if (left.length > right.length) return -1;
+      if (right.length > left.length) return 1;
+      return 0;
+    };
+
     if (typeof exportsValue === "string" || Array.isArray(exportsValue)) {
       if (exportKey === ".") selected = exportsValue;
     } else if (typeof exportsValue === "object" && exportsValue !== null) {
@@ -671,8 +685,11 @@ const validateSourceImports = async (
       if (!subpathMap && exportKey === ".") selected = exportsRecord;
       else {
         selected = exportsRecord[exportKey];
-        if (selected === undefined)
-          for (const [pattern, value] of Object.entries(exportsRecord)) {
+        if (selected === undefined) {
+          const patterns = Object.entries(exportsRecord).toSorted(
+            ([left], [right]) => comparePatternKeys(left, right),
+          );
+          for (const [pattern, value] of patterns) {
             const star = pattern.indexOf("*");
             if (star < 0 || pattern.indexOf("*", star + 1) >= 0) continue;
             const prefix = pattern.slice(0, star);
@@ -690,6 +707,7 @@ const validateSourceImports = async (
               break;
             }
           }
+        }
       }
     }
     if (selected === undefined)
@@ -796,7 +814,6 @@ const validateSourceImports = async (
           file,
           specifier,
         );
-        return;
       }
       for (const exportTarget of packageExportTargets(target, specifier, file))
         await validateWorkspaceImportTarget(
