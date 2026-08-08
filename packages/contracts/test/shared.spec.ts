@@ -21,6 +21,55 @@ describe("shared API error contract", () => {
     expect(apiErrorSchema.parse(validApiError).code).toBe("VALIDATION_FAILED");
   });
 
+  it("accepts normal Chinese public copy and rejects blank messages", () => {
+    expect(
+      apiErrorSchema.parse({
+        ...validApiError,
+        message: "输入不合法，请检查查询条件。",
+      }).message,
+    ).toBe("输入不合法，请检查查询条件。");
+    expect(() =>
+      apiErrorSchema.parse({ ...validApiError, message: "   " }),
+    ).toThrow();
+  });
+
+  it.each([
+    "Error at handler (/workspace/service.js:42:7)",
+    "SELECT password FROM users WHERE id = 1",
+    "INSERT INTO audit_log (private_value) VALUES ('hidden')",
+    "UPDATE users SET password = hidden",
+    "DELETE FROM internal_table WHERE id = 1",
+    "Failure in /srv/app/private/service.ts:12:2",
+    "Failure in C:\\app\\private\\service.ts:12:2",
+    "Bearer abcdefghijklmnop",
+    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature",
+    "vendor credential sk_live_1234567890",
+    "vendor credential sk_test_1234567890",
+    "vendor credential AKIA1234567890ABCDEF",
+    "vendor credential ghp_1234567890abcdef",
+    "token=supersecret",
+    "api_key = hidden-value",
+    "secret=do-not-return",
+    "password=do-not-return",
+  ])("rejects sensitive public message %j", (message) => {
+    expect(() => apiErrorSchema.parse({ ...validApiError, message })).toThrow();
+  });
+
+  it("rejects credential-shaped values in public detail aliases", () => {
+    expect(() =>
+      apiErrorSchema.parse({
+        ...validApiError,
+        details: { field: "eyJhbGciOiJIUzI1NiJ9" },
+      }),
+    ).toThrow();
+    expect(() =>
+      apiErrorSchema.parse({
+        ...validApiError,
+        details: { constraint: "sk_live_1234567890" },
+      }),
+    ).toThrow();
+  });
+
   it("contains exactly the approved error codes in canonical order", () => {
     expect(errorCodes).toEqual([
       "AUTH_REQUIRED",

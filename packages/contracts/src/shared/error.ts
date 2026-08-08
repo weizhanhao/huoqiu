@@ -18,18 +18,46 @@ export const errorCodes = [
 
 export const apiErrorCodeSchema = z.enum(errorCodes);
 
+const sensitivePublicContentPatterns = [
+  /(?:^|\s)at\s+(?:async\s+)?(?:[^()\s]+\s+\()?(?:(?:file:\/\/)?\/|[A-Za-z]:\\)[^)\r\n]+:\d+:\d+\)?/u,
+  /\bselect\b[\s\S]+\bfrom\b/iu,
+  /\binsert\b[\s\S]+\binto\b/iu,
+  /\bupdate\b[\s\S]+\bset\b/iu,
+  /\bdelete\b[\s\S]+\bfrom\b/iu,
+  /(?:^|[\s("'=:[{])\/(?:srv|app|home|users|var|etc|opt|tmp)\/[^\s"'<>]+/iu,
+  /(?:^|[\s("'=:[{])[A-Za-z]:\\(?:[^\\\r\n]+\\)*[^\\\r\n]+/u,
+  /\bbearer\s+[A-Za-z0-9._~+/=-]{8,}/iu,
+  /\beyJ[A-Za-z0-9_-]{5,}(?:\.[A-Za-z0-9_-]{2,}){0,2}\b/u,
+  /\b(?:sk_live_|sk_test_)[A-Za-z0-9_-]+\b/iu,
+  /\bAKIA[A-Z0-9]{8,}\b/u,
+  /\bghp_[A-Za-z0-9]+\b/u,
+  /\b(?:token|api[_-]?key|secret|password)\s*=\s*(?:"[^"\r\n]+"|'[^'\r\n]+'|[^\s,;]+)/iu,
+] as const;
+
+const isSafePublicContent = (value: string): boolean =>
+  sensitivePublicContentPatterns.every((pattern) => !pattern.test(value));
+
 const publicAliasSchema = z
   .string()
   .min(1)
   .max(128)
-  .regex(/^[A-Za-z][A-Za-z0-9_.:-]*$/u, "Expected a bounded public alias");
+  .regex(/^[A-Za-z][A-Za-z0-9_.:-]*$/u, "Expected a bounded public alias")
+  .refine(isSafePublicContent, {
+    message: "Public alias must not contain sensitive content",
+  });
 
 const boundedPublicTextSchema = z
   .string()
   .min(1)
   .max(256)
+  .refine((value) => value.trim().length > 0, {
+    message: "Public error text must not be blank",
+  })
   .refine((value) => !/\p{Cc}/u.test(value), {
     message: "Public error text must not contain control characters",
+  })
+  .refine(isSafePublicContent, {
+    message: "Public error text must not contain sensitive content",
   });
 
 const traceIdSchema = z

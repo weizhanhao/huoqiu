@@ -16,5 +16,13 @@
   },
   "dependencies": {
     "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@huoqiu/config": "workspace:*"
+  },
+  "peerDependencies": {
+    "eslint": "10.8.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
   }
 }

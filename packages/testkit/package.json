@@ -13,5 +13,12 @@
   },
   "dependencies": {
     "@huoqiu/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@huoqiu/config": "workspace:*"
+  },
+  "peerDependencies": {
+    "eslint": "10.8.0",
+    "typescript": "6.0.3"
   }
 }
