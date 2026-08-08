@@ -63,7 +63,7 @@
         "repository",
         "repository_id",
         "workflow_ref",
-        "workflow_sha",
+        "workflow_file_sha256",
         "ref",
         "event_name",
         "protected_environment",
@@ -88,7 +88,7 @@
           "type": "string",
           "pattern": "^[^\\u0000\\r\\n]+/\\.github/workflows/[^\\u0000\\r\\n]+@refs/[^\\u0000\\r\\n]+$"
         },
-        "workflow_sha": { "$ref": "#/$defs/gitSha40" },
+        "workflow_file_sha256": { "$ref": "#/$defs/sha256" },
         "ref": {
           "type": "string",
           "pattern": "^refs/(heads|tags)/[A-Za-z0-9._/-]+$"

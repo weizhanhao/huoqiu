@@ -3,25 +3,22 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  executeCommand,
-  parseCapabilitySummary,
-} from "../gate-core.mts";
+import { executeCommand, parseCapabilitySummary } from "../gate-core.mts";
 
 const sourceRoot = resolve(import.meta.dirname, "..", "..", "..");
 
 describe("D0 capability certification commands", () => {
-  it("registers real per-capability commands instead of pending placeholders", async () => {
+  it("keeps manifest registration fail-closed until implementer identity is supplied", async () => {
     const manifest = JSON.parse(
       await readFile(
         resolve(sourceRoot, "quality/manifests/d0-required.json"),
         "utf8",
       ),
     ) as {
-      required_caps: Array<{
+      required_caps: {
         command: { args: string[]; executable: string };
         implementer_ids: string[];
-      }>;
+      }[];
     };
 
     expect(manifest.required_caps).toHaveLength(5);
@@ -29,16 +26,33 @@ describe("D0 capability certification commands", () => {
       expect(item.command).toMatchObject({
         executable: "pnpm",
         args: expect.arrayContaining([
-          "scripts/quality/d0-capability-gate.mts",
+          "scripts/quality/not-implemented-gate.mts",
         ]),
       });
-      expect(item.command.args).not.toContain(
-        "scripts/quality/not-implemented-gate.mts",
-      );
       expect(item.implementer_ids).toEqual([
-        expect.stringMatching(/^github:[1-9][0-9]*$/u),
+        "pending:capability-implementation",
       ]);
     }
+  });
+
+  it("provides a protected CI signing path without a repository private key", async () => {
+    const workflow = await readFile(
+      resolve(sourceRoot, ".github/workflows/d0-quality-review.yml"),
+      "utf8",
+    );
+    const guide = await readFile(
+      resolve(sourceRoot, "docs/quality/d0-certification.md"),
+      "utf8",
+    );
+
+    expect(workflow).toContain("environment: quality-review");
+    expect(workflow).toContain("secrets.HUOQIU_REVIEW_PRIVATE_KEY_B64");
+    expect(workflow).toContain("secrets.HUOQIU_REVIEW_CHECKLIST_B64");
+    expect(workflow).toContain("pnpm gate:d0");
+    expect(workflow).not.toMatch(/BEGIN (?:OPENSSH|PRIVATE) KEY/u);
+    expect(guide).toContain("github:<numeric-id>");
+    expect(guide).toContain("Ed25519");
+    expect(guide).toContain("fail closed");
   });
 
   it("runs a real watchlist capability and emits one normalized passing result", async () => {

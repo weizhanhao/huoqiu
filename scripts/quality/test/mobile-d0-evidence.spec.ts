@@ -6,6 +6,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  realpath,
   rm,
   symlink,
   writeFile,
@@ -46,6 +47,7 @@ const versionResults: Readonly<Record<string, CommandResult>> = {
   }),
   "tool-git-version": result({ stdout: "git version 2.50.0\n" }),
   "tool-maestro-version": result({ stdout: "2.0.0\n" }),
+  "tool-node-version": result({ stdout: "v24.15.0\n" }),
   "tool-pnpm-version": result({ stdout: "11.4.0\n" }),
   "tool-tar-version": result({ stdout: "bsdtar 3.5.3\n" }),
   "tool-xcrun-version": result({ stdout: "xcrun version 70.\n" }),
@@ -91,6 +93,7 @@ const harness = (
           "git",
           "tar",
           "pnpm",
+          "node",
           "maestro",
           platform === "ios" ? "xcrun" : "adb",
         ];
@@ -98,6 +101,15 @@ const harness = (
           names.map((name) => [
             name,
             {
+              components: [
+                {
+                  mode: 0o100755,
+                  path: `/trusted/${name}`,
+                  realpath: `/trusted/${name}`,
+                  sha256: "b".repeat(64),
+                  uid: 0,
+                },
+              ],
               executable: `/trusted/${name}`,
               prefixArgs: [],
               realpath: `/trusted/${name}`,
@@ -117,6 +129,7 @@ const harness = (
             : result({ exitCode: 127 }))
         );
       }),
+      verifyToolIdentity: vi.fn(async () => true),
       writeArtifact: vi.fn(async (directory, name, contents) => {
         artifacts.set(`${directory}/${name}`, contents);
       }),
@@ -397,7 +410,9 @@ describe("D0 mobile evidence", () => {
       const candidates = trustedToolCandidates("android");
       expect(candidates.git).not.toHaveLength(0);
       expect(candidates.tar).not.toHaveLength(0);
-      expect(candidates.pnpm).not.toHaveLength(0);
+      expect(candidates.adb).toEqual([]);
+      expect(candidates.maestro).toEqual([]);
+      expect(candidates.pnpm).toEqual([]);
       expect(Object.values(candidates).flat()).not.toContain(
         "/attacker-controlled/bin/git",
       );
@@ -451,18 +466,48 @@ describe("D0 mobile evidence", () => {
           (error) => (error === null ? resolvePromise() : rejectPromise(error)),
         );
       });
-      const commit = await new Promise<string>((resolvePromise, rejectPromise) => {
+      await copyFile(
+        join(sourceRoot, "scripts", "quality", "mobile-d0-evidence.mts"),
+        join(repository, "scripts", "quality", "mobile-d0-evidence.mts"),
+      );
+      await new Promise<void>((resolvePromise, rejectPromise) => {
         execFile(
           "/usr/bin/git",
-          ["-C", repository, "rev-parse", "HEAD"],
-          (error, stdout) =>
-            error === null
-              ? resolvePromise(stdout.trim())
-              : rejectPromise(error),
+          [
+            "-C",
+            repository,
+            "-c",
+            "user.name=D0 hostile test",
+            "-c",
+            "user.email=d0-hostile@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-qam",
+            "test hostile production resolver",
+          ],
+          (error) => (error === null ? resolvePromise() : rejectPromise(error)),
         );
       });
-      await appendFile(join(repository, ".git", "info", "exclude"), "\nnode_modules\n");
-      await symlink(join(sourceRoot, "node_modules"), join(repository, "node_modules"));
+      const commit = await new Promise<string>(
+        (resolvePromise, rejectPromise) => {
+          execFile(
+            "/usr/bin/git",
+            ["-C", repository, "rev-parse", "HEAD"],
+            (error, stdout) =>
+              error === null
+                ? resolvePromise(stdout.trim())
+                : rejectPromise(error),
+          );
+        },
+      );
+      await appendFile(
+        join(repository, ".git", "info", "exclude"),
+        "\nnode_modules\n",
+      );
+      await symlink(
+        join(sourceRoot, "node_modules"),
+        join(repository, "node_modules"),
+      );
       await mkdir(dirname(fakeAdb), { recursive: true });
       await mkdir(dirname(fakeMaestro), { recursive: true });
       await mkdir(fakeRuntime, { recursive: true });
@@ -490,6 +535,9 @@ describe("D0 mobile evidence", () => {
         chmod(fakeMaestro, 0o700),
       ]);
 
+      const evidenceScript = await realpath(
+        join(repository, "scripts", "quality", "mobile-d0-evidence.mts"),
+      );
       const execution = await new Promise<{
         exitCode: number;
         stderr: string;
@@ -497,12 +545,7 @@ describe("D0 mobile evidence", () => {
       }>((resolvePromise) => {
         execFile(
           fakeNode,
-          [
-            join(sourceRoot, "node_modules", "tsx", "dist", "cli.mjs"),
-            join(repository, "scripts", "quality", "mobile-d0-evidence.mts"),
-            "--platform",
-            "android",
-          ],
+          [evidenceScript, "--platform", "android"],
           {
             cwd: repository,
             env: {
@@ -525,7 +568,10 @@ describe("D0 mobile evidence", () => {
         );
       });
 
-      expect(execution.exitCode).not.toBe(0);
+      expect(
+        execution.exitCode,
+        `${execution.stdout}\n${execution.stderr}`,
+      ).not.toBe(0);
       expect(`${execution.stdout}\n${execution.stderr}`).toContain(
         "D0_MOBILE NOT_VERIFIED",
       );
@@ -551,11 +597,11 @@ describe("D0 mobile evidence", () => {
         verified?: unknown;
       };
       expect(summary).toMatchObject({
-        reason: "tool_identity_missing:pnpm",
+        reason: "tool_identity_missing:node",
         verified: false,
       });
       expect(summary.tool_errors).toEqual(
-        expect.arrayContaining(["adb", "maestro", "pnpm"]),
+        expect.arrayContaining(["adb", "maestro", "node", "pnpm"]),
       );
     } finally {
       await rm(temporaryRoot, { force: true, recursive: true });
@@ -572,6 +618,24 @@ describe("D0 mobile evidence", () => {
     ).rejects.toThrow("D0_MOBILE_NOT_VERIFIED");
     expect(testHarness.output).toEqual([
       "D0_MOBILE NOT_VERIFIED platform=ios reason=tool_identity_invalid:pnpm",
+    ]);
+    expect(actionLabels(testHarness.requests)).toEqual([]);
+  });
+
+  it("writes NOT_VERIFIED when an immutable tool identity changes before reuse", async () => {
+    const testHarness = harness({});
+    let gitChecks = 0;
+    testHarness.dependencies.verifyToolIdentity = vi.fn(async (identity) => {
+      if (!identity.realpath.endsWith("/git")) return true;
+      gitChecks += 1;
+      return gitChecks === 1;
+    });
+
+    await expect(
+      runMobileD0Evidence(["--platform", "ios"], testHarness.dependencies),
+    ).rejects.toThrow("D0_MOBILE_NOT_VERIFIED");
+    expect(testHarness.output).toEqual([
+      "D0_MOBILE NOT_VERIFIED platform=ios reason=tool_identity_changed:git",
     ]);
     expect(actionLabels(testHarness.requests)).toEqual([]);
   });

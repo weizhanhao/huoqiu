@@ -106,6 +106,7 @@ const CONFIG_INPUT_PATHS = [
   "quality/evidence/review.schema.json",
   "quality/reviewers/trust-registry.schema.json",
   "quality/reviewers/trust-registry.v2.json",
+  ".github/workflows/d0-quality-review.yml",
 ] as const;
 
 const INVALID_TEST_MARKERS = [
@@ -2775,7 +2776,7 @@ interface TrustPolicy {
   repository: string;
   repository_id: string;
   workflow_ref: string;
-  workflow_sha: string;
+  workflow_file_sha256: string;
   ref: string;
   event_name: string;
   protected_environment: string;
@@ -2862,7 +2863,7 @@ const validateTrustRegistry = (value: unknown): TrustRegistry => {
       "repository",
       "repository_id",
       "workflow_ref",
-      "workflow_sha",
+      "workflow_file_sha256",
       "ref",
       "event_name",
       "protected_environment",
@@ -2939,11 +2940,11 @@ const validateTrustRegistry = (value: unknown): TrustRegistry => {
       repository,
       repository_id: policyRepositoryId,
       workflow_ref: workflowRef,
-      workflow_sha: requireSha(
-        policy.workflow_sha,
+      workflow_file_sha256: requireSha(
+        policy.workflow_file_sha256,
         code,
-        `${keyId}.workflow_sha`,
-        /^[a-f0-9]{40}$/,
+        `${keyId}.workflow_file_sha256`,
+        /^[a-f0-9]{64}$/,
       ),
       ref: requirePatternString(
         policy.ref,
@@ -3324,7 +3325,6 @@ const policyMatchesIdentity = (
     policy.repository === source.repository &&
     policy.repository_id === source.repository_id &&
     policy.workflow_ref === source.workflow_ref &&
-    policy.workflow_sha === source.workflow_sha &&
     policy.ref === source.ref &&
     policy.event_name === source.event_name &&
     policy.protected_environment === source.protected_environment
@@ -3970,6 +3970,37 @@ const verifyAuthorship = async (
     fail("AUTHORSHIP_ATTESTATION_INVALID", "authorship signature invalid");
   }
   return { attestation, sha256: sha256(contents) };
+};
+
+const trustedWorkflowPath = (policy: TrustPolicy): string => {
+  const marker = "/.github/workflows/";
+  const markerIndex = policy.workflow_ref.indexOf(marker);
+  const referenceIndex = policy.workflow_ref.indexOf("@refs/", markerIndex);
+  if (markerIndex < 0 || referenceIndex < 0)
+    fail("REVIEW_TRUST_REGISTRY_INVALID", "workflow_ref is malformed");
+  return policy.workflow_ref.slice(markerIndex + 1, referenceIndex);
+};
+
+const assertTrustedWorkflow = async (
+  root: string,
+  policy: TrustPolicy,
+  workflowSha: string,
+  context: CurrentContext,
+): Promise<void> => {
+  if (workflowSha !== context.commit_sha)
+    fail(
+      "REVIEW_TRUST_POLICY_MISMATCH",
+      "review workflow commit does not equal the certified commit",
+    );
+  const path = trustedWorkflowPath(policy);
+  const contents = await readFile(
+    safeRepositoryPath(root, path, "REVIEW_TRUST_REGISTRY_INVALID"),
+  );
+  if (sha256(contents) !== policy.workflow_file_sha256)
+    fail(
+      "REVIEW_TRUST_POLICY_MISMATCH",
+      "review workflow bytes are not registered",
+    );
 };
 
 export interface Review {
@@ -4628,6 +4659,12 @@ const verifyReview = async (
   };
   if (!policyMatchesIdentity(policy, identity, "review"))
     fail("REVIEW_TRUST_POLICY_MISMATCH", "signed provenance is not authorized");
+  await assertTrustedWorkflow(
+    root,
+    policy,
+    review.reviewer_source.workflow_sha,
+    context,
+  );
   if (
     Date.parse(review.reviewed_at) <
     Date.parse(currentEvidenceSet.latestFinishedAt)
@@ -4712,6 +4749,12 @@ export const recordReview = async (
       "REVIEW_TRUST_POLICY_MISMATCH",
       "workflow provenance is not authorized",
     );
+  await assertTrustedWorkflow(
+    root,
+    policy,
+    identity.source.workflow_sha,
+    context,
+  );
   const checklistRelativePath = checklistPath(
     context.commit_sha,
     milestone,

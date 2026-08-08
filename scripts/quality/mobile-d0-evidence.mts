@@ -9,8 +9,8 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, isAbsolute, join, parse, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -22,7 +22,7 @@ import {
 import { QualityGateError } from "./gate-core.mts";
 
 export type MobileD0Platform = "android" | "ios";
-type ToolName = "adb" | "git" | "maestro" | "pnpm" | "tar" | "xcrun";
+type ToolName = "adb" | "git" | "maestro" | "node" | "pnpm" | "tar" | "xcrun";
 
 export interface CommandRequest {
   args: string[];
@@ -48,11 +48,20 @@ interface Snapshot {
 }
 
 export interface ToolIdentity {
+  components: ToolComponentIdentity[];
   executable: string;
   prefixArgs: string[];
   realpath: string;
   sha256: string;
   version?: string;
+}
+
+export interface ToolComponentIdentity {
+  mode: number;
+  path: string;
+  realpath: string;
+  sha256: string;
+  uid: number;
 }
 
 type ToolSet = Partial<Record<ToolName, ToolIdentity>>;
@@ -67,6 +76,7 @@ export interface MobileD0EvidenceDependencies {
   repositoryRoot: string;
   resolveTools: (platform: MobileD0Platform) => Promise<ToolSet>;
   runCommand: (request: CommandRequest) => Promise<CommandResult>;
+  verifyToolIdentity: (identity: ToolIdentity) => Promise<boolean>;
   writeArtifact: (
     directory: string,
     name: string,
@@ -198,22 +208,14 @@ const androidTarget = (stdout: string): MobileTarget | undefined => {
 };
 
 const safeEnvironment = (): NodeJS.ProcessEnv => {
-  const environment: NodeJS.ProcessEnv = {
+  return {
     CI: "1",
-    LANG: process.env.LANG ?? "C.UTF-8",
-    PATH: [dirname(process.execPath), "/usr/bin", "/bin"].join(":"),
+    HOME: "/var/empty",
+    LANG: "C",
+    LC_ALL: "C",
+    PATH: "/usr/bin:/bin",
+    TMPDIR: "/tmp",
   };
-  for (const name of [
-    "DEVELOPER_DIR",
-    "HOME",
-    "JAVA_HOME",
-    "LC_ALL",
-    "TMPDIR",
-  ] as const) {
-    const value = process.env[name];
-    if (value !== undefined) environment[name] = value;
-  }
-  return environment;
 };
 
 const defaultRunCommand = async (
@@ -301,61 +303,87 @@ const discoverCommit = async (): Promise<string> => {
 export const trustedToolCandidates = (
   platform: MobileD0Platform,
 ): Readonly<Record<ToolName, readonly string[]>> => {
-  const nodeDirectory = dirname(process.execPath);
-  const userHome = homedir();
+  void platform;
   return {
-    adb:
-      platform === "android"
-        ? [
-            join(userHome, "Library/Android/sdk/platform-tools/adb"),
-            "/opt/homebrew/bin/adb",
-            "/usr/local/bin/adb",
-          ]
-        : [],
-    git: ["/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git"],
-    maestro: [
-      join(userHome, ".maestro/bin/maestro"),
-      "/opt/homebrew/bin/maestro",
-      "/usr/local/bin/maestro",
-    ],
-    pnpm: [
-      join(nodeDirectory, process.platform === "win32" ? "pnpm.cmd" : "pnpm"),
-      "/opt/homebrew/bin/pnpm",
-      "/usr/local/bin/pnpm",
-    ],
-    tar: ["/usr/bin/tar", "/bin/tar", "/opt/homebrew/bin/gtar"],
-    xcrun: platform === "ios" ? ["/usr/bin/xcrun"] : [],
+    adb: [],
+    git: ["/usr/bin/git"],
+    maestro: [],
+    node: [process.execPath],
+    pnpm: [],
+    tar: ["/usr/bin/tar"],
+    xcrun: ["/usr/bin/xcrun"],
   };
 };
 
+const hasRootOwnedImmutableChain = async (path: string): Promise<boolean> => {
+  let cursor = path;
+  const filesystemRoot = parse(path).root;
+  while (true) {
+    const metadata = await stat(cursor);
+    if (metadata.uid !== 0 || (metadata.mode & 0o022) !== 0) return false;
+    if (cursor === filesystemRoot) return true;
+    cursor = dirname(cursor);
+  }
+};
+
+const componentIdentity = async (
+  candidate: string,
+): Promise<ToolComponentIdentity | undefined> => {
+  if (!isAbsolute(candidate)) return undefined;
+  try {
+    const canonicalPath = await realpath(candidate);
+    const metadata = await stat(canonicalPath);
+    if (
+      !metadata.isFile() ||
+      !(await hasRootOwnedImmutableChain(canonicalPath))
+    )
+      return undefined;
+    return {
+      mode: metadata.mode,
+      path: candidate,
+      realpath: canonicalPath,
+      sha256: createHash("sha256")
+        .update(await readFile(canonicalPath))
+        .digest("hex"),
+      uid: metadata.uid,
+    };
+  } catch {
+    return undefined;
+  }
+};
+
 const resolveTool = async (
-  name: ToolName,
   candidates: readonly string[],
 ): Promise<ToolIdentity | undefined> => {
   for (const candidate of candidates) {
-    if (!isAbsolute(candidate)) continue;
-    try {
-      const canonicalPath = await realpath(candidate);
-      const metadata = await stat(canonicalPath);
-      if (!metadata.isFile() || (metadata.mode & 0o022) !== 0) continue;
-      const sha256 = createHash("sha256")
-        .update(await readFile(canonicalPath))
-        .digest("hex");
-      const useNodeLauncher =
-        name === "pnpm" && !canonicalPath.toLowerCase().endsWith(".exe");
-      return {
-        executable: useNodeLauncher
-          ? await realpath(process.execPath)
-          : canonicalPath,
-        prefixArgs: useNodeLauncher ? [canonicalPath] : [],
-        realpath: canonicalPath,
-        sha256,
-      };
-    } catch {
-      // Missing and untrusted candidates are intentionally ignored.
-    }
+    const component = await componentIdentity(candidate);
+    if (component === undefined) continue;
+    return {
+      components: [component],
+      executable: component.realpath,
+      prefixArgs: [],
+      realpath: component.realpath,
+      sha256: component.sha256,
+    };
   }
   return undefined;
+};
+
+const verifyToolIdentity = async (identity: ToolIdentity): Promise<boolean> => {
+  if (identity.components.length === 0) return false;
+  for (const expected of identity.components) {
+    const current = await componentIdentity(expected.path);
+    if (
+      current === undefined ||
+      current.realpath !== expected.realpath ||
+      current.sha256 !== expected.sha256 ||
+      current.uid !== expected.uid ||
+      current.mode !== expected.mode
+    )
+      return false;
+  }
+  const launcher = identity.components[0];
+  return launcher !== undefined && identity.executable === launcher.realpath;
 };
 
 const resolveTools = async (platform: MobileD0Platform): Promise<ToolSet> => {
@@ -363,14 +391,14 @@ const resolveTools = async (platform: MobileD0Platform): Promise<ToolSet> => {
   const names: ToolName[] = [
     "git",
     "tar",
+    "node",
     "pnpm",
     platform === "ios" ? "xcrun" : "adb",
     "maestro",
   ];
   const entries = await Promise.all(
     names.map(
-      async (name) =>
-        [name, await resolveTool(name, candidates[name])] as const,
+      async (name) => [name, await resolveTool(candidates[name])] as const,
     ),
   );
   return Object.fromEntries(
@@ -414,6 +442,7 @@ const defaultDependencies: MobileD0EvidenceDependencies = {
   repositoryRoot,
   resolveTools,
   runCommand: defaultRunCommand,
+  verifyToolIdentity,
   writeArtifact: async (directory, name, contents) =>
     await writeFile(join(directory, name), contents, "utf8"),
 };
@@ -428,6 +457,8 @@ const versionContract = (
       return { args: ["--version"], pattern: /\b(?:bsdtar|tar)\b.*\d+/iu };
     case "pnpm":
       return { args: ["--version"], pattern: /^11\.4\.0\s*$/u };
+    case "node":
+      return { args: ["--version"], pattern: /^v24\.15\.\d+\s*$/u };
     case "xcrun":
       return { args: ["--version"], pattern: /^xcrun version \d+/iu };
     case "adb":
@@ -513,6 +544,8 @@ export const runMobileD0Evidence = async (
   };
 
   const tools = await dependencies.resolveTools(platform);
+  const invalidTools = new Set<ToolName>();
+  const changedTools = new Set<ToolName>();
   const runTool = async (
     name: ToolName,
     args: string[],
@@ -522,6 +555,11 @@ export const runMobileD0Evidence = async (
   ): Promise<CommandResult | undefined> => {
     const tool = tools[name];
     if (tool === undefined) return undefined;
+    if (!(await dependencies.verifyToolIdentity(tool))) {
+      invalidTools.add(name);
+      changedTools.add(name);
+      return undefined;
+    }
     return await run({
       args: [...tool.prefixArgs, ...args],
       cwd,
@@ -531,7 +569,6 @@ export const runMobileD0Evidence = async (
     });
   };
 
-  const invalidTools = new Set<ToolName>();
   for (const name of Object.keys(tools).sort() as ToolName[]) {
     const contract = versionContract(name);
     const probe = await runTool(
@@ -551,6 +588,7 @@ export const runMobileD0Evidence = async (
       name,
       {
         executable: identity.executable,
+        components: identity.components,
         realpath: identity.realpath,
         sha256: identity.sha256,
         version: identity.version ?? null,
@@ -583,6 +621,7 @@ export const runMobileD0Evidence = async (
               [
                 "git",
                 "tar",
+                "node",
                 "pnpm",
                 platform === "ios" ? "xcrun" : "adb",
                 "maestro",
@@ -605,7 +644,7 @@ export const runMobileD0Evidence = async (
     throw new QualityGateError("D0_MOBILE_NOT_VERIFIED", reason);
   };
 
-  for (const coreTool of ["git", "tar", "pnpm"] as ToolName[]) {
+  for (const coreTool of ["node", "git", "tar", "pnpm"] as ToolName[]) {
     if (tools[coreTool] === undefined)
       return await finishNotVerified(`tool_identity_missing:${coreTool}`);
     if (invalidTools.has(coreTool))
@@ -617,6 +656,8 @@ export const runMobileD0Evidence = async (
     dependencies.repositoryRoot,
     "git-head",
   );
+  if (head === undefined && changedTools.has("git"))
+    return await finishNotVerified("tool_identity_changed:git");
   const commit = head?.stdout.trim() ?? "";
   if (
     head?.exitCode !== 0 ||
@@ -633,6 +674,8 @@ export const runMobileD0Evidence = async (
     dependencies.repositoryRoot,
     "git-status",
   );
+  if (status === undefined && changedTools.has("git"))
+    return await finishNotVerified("tool_identity_changed:git");
   if (status?.exitCode !== 0 || status.stdout.trim().length > 0)
     throw new QualityGateError(
       "D0_MOBILE_CONTEXT_INVALID",
@@ -694,7 +737,11 @@ export const runMobileD0Evidence = async (
       "snapshot-archive",
     );
     if (archive === undefined)
-      return await finishNotVerified("snapshot_archive_failed:git_missing");
+      return await finishNotVerified(
+        changedTools.has("git")
+          ? "tool_identity_changed:git"
+          : "snapshot_archive_failed:git_missing",
+      );
     if (archive.exitCode !== 0)
       return await finishNotVerified(
         `snapshot_archive_failed:${commandFailureReason(archive)}`,
@@ -706,7 +753,11 @@ export const runMobileD0Evidence = async (
       "snapshot-extract",
     );
     if (extract === undefined)
-      return await finishNotVerified("snapshot_extract_failed:tar_missing");
+      return await finishNotVerified(
+        changedTools.has("tar")
+          ? "tool_identity_changed:tar"
+          : "snapshot_extract_failed:tar_missing",
+      );
     if (extract.exitCode !== 0)
       return await finishNotVerified(
         `snapshot_extract_failed:${commandFailureReason(extract)}`,

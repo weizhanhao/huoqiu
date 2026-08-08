@@ -1,0 +1,80 @@
+name: D0 protected quality review
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Exact candidate commit to certify
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capability-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.commit_sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.15.0
+      - run: corepack enable
+      - run: corepack prepare pnpm@11.4.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: Verify exact clean candidate
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.commit_sha }}"
+          test -z "$(git status --porcelain)"
+      - name: Generate current-commit capability evidence
+        run: |
+          for cap in CAP-ID-001 CAP-INST-001 CAP-MD-001 CAP-FEED-001 CAP-WATCH-001; do
+            pnpm qa:cap -- --milestone d0 --cap "$cap"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d0-capability-evidence-${{ inputs.commit_sha }}
+          path: artifacts/evidence/${{ inputs.commit_sha }}
+          if-no-files-found: error
+
+  independent-review:
+    needs: capability-evidence
+    runs-on: ubuntu-latest
+    environment: quality-review
+    env:
+      HUOQIU_REVIEW_ENVIRONMENT: quality-review
+      HUOQIU_REVIEW_KEY_ID: ${{ secrets.HUOQIU_REVIEW_KEY_ID }}
+      HUOQIU_REVIEW_PRIVATE_KEY_B64: ${{ secrets.HUOQIU_REVIEW_PRIVATE_KEY_B64 }}
+      HUOQIU_REVIEW_CHECKLIST_B64: ${{ secrets.HUOQIU_REVIEW_CHECKLIST_B64 }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.commit_sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.15.0
+      - run: corepack enable
+      - run: corepack prepare pnpm@11.4.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: d0-capability-evidence-${{ inputs.commit_sha }}
+          path: artifacts/evidence/${{ inputs.commit_sha }}
+      - name: Materialize independently supplied checklist
+        run: |
+          test -n "$HUOQIU_REVIEW_CHECKLIST_B64"
+          mkdir -p "artifacts/evidence/${{ inputs.commit_sha }}/reviews"
+          printf '%s' "$HUOQIU_REVIEW_CHECKLIST_B64" | base64 --decode > "artifacts/evidence/${{ inputs.commit_sha }}/reviews/d0-checklist.json"
+      - name: Sign review and run final gate
+        run: |
+          pnpm exec tsx scripts/quality/record-review.mts --milestone d0 --commit-sha "${{ inputs.commit_sha }}"
+          pnpm gate:d0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d0-certified-evidence-${{ inputs.commit_sha }}
+          path: artifacts/evidence/${{ inputs.commit_sha }}
+          if-no-files-found: error

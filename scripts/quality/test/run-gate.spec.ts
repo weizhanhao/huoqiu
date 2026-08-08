@@ -112,6 +112,9 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
   const authorshipPair = generateKeyPairSync("ed25519");
   const publicDer = publicKey.export({ format: "der", type: "spki" });
   const keyId = `ed25519:${createHash("sha256").update(publicDer).digest("hex")}`;
+  const workflowContents = await readFile(
+    resolve(root, ".github/workflows/d0-quality-review.yml"),
+  );
   const authorshipDer = authorshipPair.publicKey.export({
     format: "der",
     type: "spki",
@@ -119,7 +122,6 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
   const authorshipKeyId = `ed25519:${createHash("sha256")
     .update(authorshipDer)
     .digest("hex")}`;
-  const workflowSha = "a".repeat(40);
   const authorshipWorkflowSha = "d".repeat(40);
   const rootDer = rootPair.publicKey.export({ format: "der", type: "spki" });
   const rootKeyId = `ed25519:${createHash("sha256").update(rootDer).digest("hex")}`;
@@ -190,8 +192,10 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
         repository: "huoqiu/huoqiu",
         repository_id: "9001",
         workflow_ref:
-          "huoqiu/huoqiu/.github/workflows/quality-review.yml@refs/heads/main",
-        workflow_sha: workflowSha,
+          "huoqiu/huoqiu/.github/workflows/d0-quality-review.yml@refs/heads/main",
+        workflow_file_sha256: createHash("sha256")
+          .update(workflowContents)
+          .digest("hex"),
         ref: "refs/heads/main",
         event_name: "workflow_dispatch",
         protected_environment: "quality-review",
@@ -208,7 +212,9 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
         repository_id: "9001",
         workflow_ref:
           "huoqiu/huoqiu/.github/workflows/authorship.yml@refs/heads/main",
-        workflow_sha: authorshipWorkflowSha,
+        workflow_file_sha256: createHash("sha256")
+          .update(workflowContents)
+          .digest("hex"),
         ref: "refs/heads/main",
         event_name: "workflow_dispatch",
         protected_environment: "authorship",
@@ -254,8 +260,8 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
     GITHUB_REPOSITORY: "huoqiu/huoqiu",
     GITHUB_REPOSITORY_ID: "9001",
     GITHUB_WORKFLOW_REF:
-      "huoqiu/huoqiu/.github/workflows/quality-review.yml@refs/heads/main",
-    GITHUB_WORKFLOW_SHA: workflowSha,
+      "huoqiu/huoqiu/.github/workflows/d0-quality-review.yml@refs/heads/main",
+    GITHUB_WORKFLOW_SHA: "a".repeat(40),
     GITHUB_REF: "refs/heads/main",
     GITHUB_REF_PROTECTED: "true",
     GITHUB_EVENT_NAME: "workflow_dispatch",
@@ -508,6 +514,7 @@ const setupRepository = async (
   temporaryRoots.push(root);
   for (const path of [
     ".gitignore",
+    ".github/workflows/d0-quality-review.yml",
     "quality/gate-config.v1.json",
     "quality/evidence/authorship-input.schema.json",
     "quality/evidence/authorship.schema.json",
@@ -590,6 +597,7 @@ const setupRepository = async (
     throw new Error("missing ephemeral signing environment");
   authorshipEnvironment.HUOQIU_TRUSTED_BASE_SHA = head;
   reviewEnvironment.HUOQIU_TRUSTED_BASE_SHA = head;
+  reviewEnvironment.GITHUB_WORKFLOW_SHA = head;
   reviewEnvironment.HUOQIU_AUTHORSHIP_POLICY_VERSION =
     authorshipEnvironment.HUOQIU_AUTHORSHIP_POLICY_VERSION;
   installAuthorshipArchive(root, head, ["100"]);

@@ -99,6 +99,7 @@
     "quality/evidence/evidence.schema.json",
     "quality/evidence/review.schema.json",
     "quality/reviewers/trust-registry.schema.json",
-    "quality/reviewers/trust-registry.v2.json"
+    "quality/reviewers/trust-registry.v2.json",
+    ".github/workflows/d0-quality-review.yml"
   ]
 }
