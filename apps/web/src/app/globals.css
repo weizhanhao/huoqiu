@@ -805,6 +805,308 @@ h3 {
   border-left: var(--hq-spacing-1) solid var(--hq-brand-primary);
 }
 
+.instrument-search,
+.instrument-detail {
+  display: grid;
+  gap: var(--hq-spacing-4);
+}
+
+.search-heading,
+.instrument-search-form,
+.quote-header,
+.price-chart,
+.instrument-disclosure {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-surface-divider);
+  border-radius: var(--hq-radius-card);
+  box-shadow: var(--hq-shadow-card);
+}
+
+.search-heading {
+  padding: var(--hq-spacing-8);
+}
+
+.search-heading h2,
+.quote-header h2,
+.chart-heading h2 {
+  font-size: var(--hq-type-size-headline);
+  letter-spacing: -0.04em;
+  line-height: var(--hq-type-line-height-compact);
+}
+
+.search-heading h2 {
+  padding: var(--hq-spacing-2) 0 var(--hq-spacing-3);
+}
+
+.search-heading > p:last-child,
+.quote-identity p:last-child,
+.instrument-disclosure p {
+  color: var(--hq-text-secondary);
+  line-height: var(--hq-type-line-height-body);
+}
+
+.instrument-search-form {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-5);
+}
+
+.instrument-search-form label {
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.instrument-search-form > div {
+  display: flex;
+}
+
+.instrument-search-form input {
+  background: var(--hq-surface-canvas);
+  border: 1px solid var(--hq-surface-divider);
+  border-radius: var(--hq-radius-control) 0 0 var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  font: inherit;
+  min-height: var(--hq-touch-web-minimum);
+  min-width: 0;
+  padding: 0 var(--hq-spacing-4);
+  width: 100%;
+}
+
+.instrument-search-form button {
+  background: var(--hq-brand-primary);
+  border: 0;
+  border-radius: 0 var(--hq-radius-control) var(--hq-radius-control) 0;
+  color: var(--hq-brand-on-primary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--hq-type-weight-semibold);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-6);
+}
+
+.instrument-search-form input:focus-visible,
+.instrument-search-form button:focus-visible,
+.search-results a:focus-visible {
+  box-shadow: var(--hq-shadow-focus);
+  outline: 2px solid transparent;
+  position: relative;
+  z-index: 1;
+}
+
+.search-results {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-surface-divider);
+  border-radius: var(--hq-radius-card);
+  box-shadow: var(--hq-shadow-card);
+  list-style: none;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.search-results li + li {
+  border-top: 1px solid var(--hq-surface-divider);
+}
+
+.search-results a {
+  align-items: center;
+  color: var(--hq-text-primary);
+  display: flex;
+  justify-content: space-between;
+  min-height: 84px;
+  padding: var(--hq-spacing-4) var(--hq-spacing-5);
+  text-decoration: none;
+}
+
+.search-results a:hover {
+  background: var(--hq-surface-subtle);
+}
+
+.search-results strong,
+.search-results small {
+  display: block;
+}
+
+.search-results small {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  padding-top: var(--hq-spacing-1);
+}
+
+.search-result-price {
+  font-family: var(--hq-type-family-mono);
+  text-align: right;
+}
+
+.search-result-price small {
+  color: currentColor;
+}
+
+.quote-header {
+  display: grid;
+  gap: var(--hq-spacing-5);
+  padding: var(--hq-spacing-6);
+}
+
+.quote-identity {
+  align-items: start;
+  display: flex;
+  gap: var(--hq-spacing-4);
+  justify-content: space-between;
+}
+
+.quote-identity h2 {
+  padding: var(--hq-spacing-2) 0;
+}
+
+.quote-primary {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-4);
+}
+
+.quote-primary strong {
+  font-family: var(--hq-type-family-mono);
+  font-size: clamp(var(--hq-type-size-headline), 8vw, 56px);
+  letter-spacing: -0.05em;
+}
+
+.quote-primary span {
+  font-family: var(--hq-type-family-mono);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.quote-meta {
+  display: grid;
+  gap: var(--hq-spacing-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.quote-meta div {
+  border-top: 1px solid var(--hq-surface-divider);
+  padding-top: var(--hq-spacing-3);
+}
+
+.quote-meta dt {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.quote-meta dd {
+  font-size: var(--hq-type-size-label);
+  margin: var(--hq-spacing-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.instrument-tabs {
+  background: var(--hq-surface-base);
+  border-bottom: 1px solid var(--hq-surface-divider);
+  display: flex;
+  gap: var(--hq-spacing-6);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-5);
+}
+
+.instrument-tabs span {
+  align-items: center;
+  color: var(--hq-text-secondary);
+  display: inline-flex;
+  position: relative;
+}
+
+.instrument-tabs [aria-current="page"] {
+  color: var(--hq-text-primary);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.instrument-tabs [aria-current="page"]::after {
+  background: var(--hq-brand-primary);
+  border-radius: var(--hq-radius-pill);
+  bottom: 0;
+  content: "";
+  height: 3px;
+  inset-inline: 0;
+  position: absolute;
+}
+
+.price-chart {
+  margin: 0;
+  overflow: hidden;
+  padding: var(--hq-spacing-5);
+}
+
+.chart-heading {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: var(--hq-spacing-4);
+}
+
+.chart-heading span,
+.price-chart figcaption {
+  color: var(--hq-text-tertiary);
+  font-family: var(--hq-type-family-mono);
+  font-size: var(--hq-type-size-caption);
+}
+
+.price-chart svg {
+  display: block;
+  height: auto;
+  overflow: visible;
+  width: 100%;
+}
+
+.chart-grid-line {
+  stroke: var(--hq-surface-divider);
+  stroke-width: 1;
+}
+
+.chart-axis-label {
+  fill: var(--hq-text-tertiary);
+  font-family: var(--hq-type-family-mono);
+  font-size: 10px;
+}
+
+.chart-axis-end {
+  text-anchor: end;
+}
+
+.chart-up {
+  fill: var(--hq-market-up);
+  stroke: var(--hq-market-up);
+  stroke-width: 1.5;
+}
+
+.chart-down {
+  fill: var(--hq-market-down);
+  stroke: var(--hq-market-down);
+  stroke-width: 1.5;
+}
+
+.chart-volume {
+  opacity: 0.25;
+  stroke: none;
+}
+
+.price-chart figcaption {
+  border-top: 1px solid var(--hq-surface-divider);
+  display: flex;
+  justify-content: space-between;
+  padding-top: var(--hq-spacing-3);
+}
+
+.instrument-disclosure {
+  border-left: var(--hq-spacing-1) solid var(--hq-market-warning);
+  padding: var(--hq-spacing-5);
+}
+
+.instrument-disclosure strong {
+  display: block;
+  padding-bottom: var(--hq-spacing-2);
+}
+
 @media (max-width: 1040px) {
   .d0-layout {
     grid-template-columns: 190px minmax(0, 1fr);
@@ -872,6 +1174,22 @@ h3 {
   .content-kind,
   .news-source time {
     display: none;
+  }
+
+  .search-heading,
+  .quote-header,
+  .price-chart {
+    padding: var(--hq-spacing-5);
+  }
+
+  .quote-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .price-chart figcaption {
+    align-items: start;
+    flex-direction: column;
+    gap: var(--hq-spacing-1);
   }
 }
 
