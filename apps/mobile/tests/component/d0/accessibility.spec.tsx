@@ -200,6 +200,27 @@ describe("D0 mobile WCAG AA color use", () => {
     ).toBeGreaterThanOrEqual(4.5);
   });
 
+  it("renders the real market kicker at AA contrast on its base surface", () => {
+    const home = HomeFeed({ fixture: readyFixture(), state: "normal" });
+    const marketKicker = findElement(
+      home,
+      (element) => literalText(element) === "合成行情",
+    );
+    const marketSurface = findElement(home, (element) => {
+      const flattened = StyleSheet.flatten(
+        propertiesOf(element).style as Parameters<typeof StyleSheet.flatten>[0],
+      ) as Readonly<{ backgroundColor?: string }> | undefined;
+      return (
+        flattened?.backgroundColor === tokens.surface.base &&
+        literalText(element).includes("合成行情")
+      );
+    });
+
+    expect(
+      contrastRatio(textColor(marketKicker), backgroundColor(marketSurface)),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("gives the watchlist detail control at least a 44pt touch target", () => {
     const watchlist = WatchlistPanel({
       fixture: readyFixture(),

@@ -46,7 +46,9 @@ export function HomeFeed({
       >
         <View style={styles.hero}>
           <View style={styles.heroTopline}>
-            <Text style={styles.kicker}>D0 / FIXTURE FEED</Text>
+            <Text style={[styles.kicker, styles.heroKicker]}>
+              D0 / FIXTURE FEED
+            </Text>
             <View style={styles.heroBadge}>
               <Text style={styles.heroBadgeText}>演示数据</Text>
             </View>
@@ -78,7 +80,9 @@ export function HomeFeed({
               >
                 <View style={styles.cardHeading}>
                   <View>
-                    <Text style={styles.kicker}>合成行情</Text>
+                    <Text style={[styles.kicker, styles.baseKicker]}>
+                      合成行情
+                    </Text>
                     <Text style={styles.marketName}>{instrument.name}</Text>
                     <Text style={styles.symbol}>
                       {instrument.symbol} · {instrument.market} ·{" "}
@@ -183,10 +187,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   kicker: {
-    color: d0TextColors.inverseMuted,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1,
+  },
+  heroKicker: {
+    color: d0TextColors.inverseMuted,
+  },
+  baseKicker: {
+    color: tokens.text.secondary,
   },
   heroBadge: {
     backgroundColor: tokens.brand.primary,
