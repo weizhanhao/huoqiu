@@ -3,9 +3,13 @@ import { QuoteHeader } from "../../../components/instrument/quote-header";
 import { DesktopShell } from "../../../components/shell/desktop-shell";
 import { PageState } from "../../../components/system/page-state";
 import { loadD0Fixture } from "../../../lib/d0-fixture";
+import { normalizeD0FixtureState } from "../../../lib/d0-page-state";
 
 type InstrumentPageProperties = Readonly<{
   params: Promise<Readonly<{ listingId: string }>>;
+  searchParams: Promise<
+    Readonly<{ fixture_state?: string | readonly string[] }>
+  >;
 }>;
 
 export const generateStaticParams = () => {
@@ -19,9 +23,11 @@ export const generateStaticParams = () => {
 
 export default async function InstrumentPage({
   params,
+  searchParams,
 }: InstrumentPageProperties) {
   const fixtureResult = loadD0Fixture();
   const { listingId } = await params;
+  const state = normalizeD0FixtureState((await searchParams).fixture_state);
 
   if (fixtureResult.status !== "ready") {
     return <DesktopShell fixtureResult={fixtureResult}>{null}</DesktopShell>;
@@ -39,7 +45,13 @@ export default async function InstrumentPage({
 
   return (
     <DesktopShell fixtureResult={fixtureResult}>
-      {instrument === undefined || quote === undefined ? (
+      {state !== "normal" ? (
+        <PageState
+          state={state}
+          emptyMessage="暂无演示标的详情"
+          errorMessage="演示标的详情暂时不可用"
+        />
+      ) : instrument === undefined || quote === undefined ? (
         <PageState state="empty" emptyMessage="没有这个演示标的" />
       ) : (
         <div className="instrument-detail">

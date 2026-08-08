@@ -1,9 +1,15 @@
 import { InstrumentSearch } from "../../components/instrument/instrument-search";
 import { DesktopShell } from "../../components/shell/desktop-shell";
 import { loadD0Fixture } from "../../lib/d0-fixture";
+import { normalizeD0FixtureState } from "../../lib/d0-page-state";
 
 type SearchPageProperties = Readonly<{
-  searchParams: Promise<Readonly<{ q?: string | readonly string[] }>>;
+  searchParams: Promise<
+    Readonly<{
+      fixture_state?: string | readonly string[];
+      q?: string | readonly string[];
+    }>
+  >;
 }>;
 
 const normalizeQueryParameter = (
@@ -17,7 +23,9 @@ export default async function SearchPage({
   searchParams,
 }: SearchPageProperties) {
   const fixtureResult = loadD0Fixture();
-  const query = normalizeQueryParameter((await searchParams).q);
+  const resolvedSearchParameters = await searchParams;
+  const query = normalizeQueryParameter(resolvedSearchParameters.q);
+  const state = normalizeD0FixtureState(resolvedSearchParameters.fixture_state);
 
   return (
     <DesktopShell fixtureResult={fixtureResult}>
@@ -25,7 +33,7 @@ export default async function SearchPage({
         <InstrumentSearch
           fixture={fixtureResult.data}
           query={query}
-          state="normal"
+          state={state}
         />
       ) : null}
     </DesktopShell>

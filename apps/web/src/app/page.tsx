@@ -1,9 +1,17 @@
 import { D0Feed } from "../components/feed/feed-card";
 import { DesktopShell } from "../components/shell/desktop-shell";
 import { loadD0Fixture } from "../lib/d0-fixture";
+import { normalizeD0FixtureState } from "../lib/d0-page-state";
 
-export default function HomePage() {
+type HomePageProperties = Readonly<{
+  searchParams: Promise<
+    Readonly<{ fixture_state?: string | readonly string[] }>
+  >;
+}>;
+
+export default async function HomePage({ searchParams }: HomePageProperties) {
   const fixtureResult = loadD0Fixture();
+  const state = normalizeD0FixtureState((await searchParams).fixture_state);
 
   return (
     <DesktopShell fixtureResult={fixtureResult}>
@@ -26,7 +34,7 @@ export default function HomePage() {
           <D0Feed
             cards={fixtureResult.data.feed}
             fixture={fixtureResult.data}
-            state="normal"
+            state={state}
           />
         </>
       ) : null}

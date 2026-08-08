@@ -4,15 +4,20 @@ import type { D0Fixture } from "@huoqiu/contracts/d0";
 import Link from "next/link";
 
 import { useD0Watchlist } from "../../stores/d0-watchlist";
+import type { D0PageState } from "../../lib/d0-page-state";
 import { DemoDataBadge } from "../system/demo-data-badge";
 import { PageState } from "../system/page-state";
 import { WatchlistToggle } from "./watchlist-toggle";
 
 type WatchlistPanelProperties = Readonly<{
   fixture: D0Fixture;
+  state?: D0PageState;
 }>;
 
-export function WatchlistPanel({ fixture }: WatchlistPanelProperties) {
+export function WatchlistPanel({
+  fixture,
+  state = "normal",
+}: WatchlistPanelProperties) {
   const { listingIds } = useD0Watchlist();
   const entries = listingIds.flatMap((listingId) => {
     const instrument = fixture.instruments.find(
@@ -37,7 +42,13 @@ export function WatchlistPanel({ fixture }: WatchlistPanelProperties) {
         <DemoDataBadge />
       </header>
 
-      {entries.length === 0 ? (
+      {state !== "normal" ? (
+        <PageState
+          state={state}
+          emptyMessage="暂无演示自选数据"
+          errorMessage="演示自选暂时不可用"
+        />
+      ) : entries.length === 0 ? (
         <PageState
           state="empty"
           emptyMessage="暂无自选标的，可从演示标的详情加入"

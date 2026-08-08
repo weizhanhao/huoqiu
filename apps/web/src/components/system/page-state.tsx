@@ -2,8 +2,10 @@
 
 import type { ReactNode } from "react";
 
+import { type D0PageState, retryD0FixtureState } from "../../lib/d0-page-state";
+
 type PageStateProperties = Readonly<{
-  state: "normal" | "loading" | "empty" | "error";
+  state: D0PageState;
   children?: ReactNode;
   emptyMessage?: string;
   errorMessage?: string;
@@ -59,7 +61,7 @@ export function PageState({
       </span>
       <h2>{errorMessage}</h2>
       <p>未使用未校验数据，也没有连接外部服务。</p>
-      <button type="button" onClick={onRetry}>
+      <button type="button" onClick={onRetry ?? (() => retryD0FixtureState())}>
         重试
       </button>
     </section>
