@@ -42,11 +42,13 @@
     "gate:m1": "tsx scripts/quality/run-gate.mts --milestone m1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
+    "@playwright/test": "1.62.1",
     "@types/node": "24.13.3",
     "eslint": "10.8.0",
     "prettier": "3.9.6",
-    "turbo": "2.10.8",
     "tsx": "4.23.9",
+    "turbo": "2.10.8",
     "typescript": "6.0.3",
     "vitest": "4.1.10",
     "yaml": "2.9.0"
