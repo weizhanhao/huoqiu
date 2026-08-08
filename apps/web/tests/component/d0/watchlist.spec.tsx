@@ -82,9 +82,9 @@ describe("D0 session watchlist", () => {
     );
 
     expect(addedMarkup).toContain('aria-pressed="false"');
-    expect(addedMarkup).toContain("加入自选");
+    expect(addedMarkup).toContain("加自选");
     expect(removedMarkup).toContain('aria-pressed="true"');
-    expect(removedMarkup).toContain("取消自选");
+    expect(removedMarkup).toContain("已加自选");
   });
 
   it("mounts the session provider once at the application root", () => {
@@ -94,7 +94,7 @@ describe("D0 session watchlist", () => {
       </RootLayout>,
     );
 
-    expect(markup).toContain("加入自选");
+    expect(markup).toContain("加自选");
     expect(markup).toContain("仅当前会话");
   });
 });

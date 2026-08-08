@@ -9,13 +9,14 @@ type WatchlistToggleProperties = Readonly<{
 
 export function WatchlistToggle({
   listingId,
-  removeLabel = "取消自选",
+  removeLabel = "已加自选",
 }: WatchlistToggleProperties) {
   const { add, has, remove } = useD0Watchlist();
   const isIncluded = has(listingId);
 
   return (
     <button
+      aria-label={isIncluded ? "取消自选" : "加自选"}
       aria-pressed={isIncluded}
       className="watchlist-toggle"
       onClick={() => {
@@ -27,7 +28,7 @@ export function WatchlistToggle({
       }}
       type="button"
     >
-      {isIncluded ? removeLabel : "加入自选"}
+      {isIncluded ? removeLabel : "加自选"}
     </button>
   );
 }
