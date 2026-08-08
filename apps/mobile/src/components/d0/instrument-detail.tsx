@@ -3,6 +3,7 @@ import { tokens } from "@huoqiu/native-ui";
 import type { ReactNode } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { d0TextColors } from "../../styles/d0-colors";
 import { PageState } from "./page-state";
 import { ScreenHeader } from "./screen-header";
 import { WatchlistToggle } from "./watchlist-toggle";
@@ -286,13 +287,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   last: {
-    color: tokens.market.up,
+    color: d0TextColors.marketUp,
     fontSize: 42,
     fontWeight: "700",
     letterSpacing: -2,
   },
   change: {
-    color: tokens.market.up,
+    color: d0TextColors.marketUp,
     fontSize: 14,
     fontWeight: "700",
   },

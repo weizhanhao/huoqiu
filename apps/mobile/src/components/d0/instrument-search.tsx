@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 
+import { d0TextColors } from "../../styles/d0-colors";
 import { PageState } from "./page-state";
 import { ScreenHeader } from "./screen-header";
 
@@ -36,6 +37,7 @@ export const searchD0Listings = (
 type InstrumentSearchProperties = Readonly<{
   fixture: D0Fixture;
   query: string;
+  submittedQuery?: string | undefined;
   state: "normal" | "loading" | "empty" | "error";
   onBack?: (() => void) | undefined;
   onQueryChange?: ((query: string) => void) | undefined;
@@ -47,6 +49,7 @@ type InstrumentSearchProperties = Readonly<{
 export function InstrumentSearch({
   fixture,
   query,
+  submittedQuery,
   state,
   onBack,
   onQueryChange,
@@ -54,8 +57,15 @@ export function InstrumentSearch({
   onOpenInstrument,
   onRetry,
 }: InstrumentSearchProperties) {
-  const results = searchD0Listings(query, fixture);
-  const hasQuery = query.trim().length > 0;
+  const effectiveSubmittedQuery = submittedQuery ?? query;
+  const results = searchD0Listings(effectiveSubmittedQuery, fixture);
+  const hasSubmittedQuery = effectiveSubmittedQuery.trim().length > 0;
+  const submissionLabel =
+    submittedQuery === undefined
+      ? "当前查询：" + (query.length === 0 ? "未输入" : query)
+      : hasSubmittedQuery
+        ? "已提交：" + effectiveSubmittedQuery
+        : "尚未提交搜索";
 
   return (
     <View style={styles.viewport}>
@@ -78,12 +88,13 @@ export function InstrumentSearch({
               onChangeText={onQueryChange}
               onSubmitEditing={onSubmit}
               placeholder="SYN001 / 合成示例一号"
-              placeholderTextColor={tokens.text.disabled}
+              placeholderTextColor={d0TextColors.placeholder}
               returnKeyType="search"
               style={styles.input}
               value={query}
             />
             <Pressable
+              accessibilityLabel="提交演示标的搜索"
               accessibilityRole="button"
               onPress={onSubmit}
               style={styles.submit}
@@ -92,7 +103,7 @@ export function InstrumentSearch({
             </Pressable>
           </View>
           <Text style={styles.fixtureNotice}>
-            当前查询：{query.length === 0 ? "未输入" : query} · 固定 Fixture
+            {submissionLabel} · 固定 Fixture
           </Text>
         </View>
 
@@ -102,8 +113,15 @@ export function InstrumentSearch({
           onRetry={onRetry}
           state={state}
         >
-          {!hasQuery ? (
-            <PageState state="empty" emptyMessage="请输入演示标的关键词" />
+          {!hasSubmittedQuery ? (
+            <PageState
+              state="empty"
+              emptyMessage={
+                query.trim().length === 0
+                  ? "请输入演示标的关键词"
+                  : "输入关键词后点击搜索"
+              }
+            />
           ) : results.length === 0 ? (
             <PageState state="empty" emptyMessage="没有找到匹配的演示标的" />
           ) : (
@@ -246,12 +264,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   resultLast: {
-    color: tokens.market.up,
+    color: d0TextColors.marketUp,
     fontSize: 16,
     fontWeight: "700",
   },
   resultChange: {
-    color: tokens.market.up,
+    color: d0TextColors.marketUp,
     fontSize: 11,
     paddingTop: 4,
   },

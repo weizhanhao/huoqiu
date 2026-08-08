@@ -2,6 +2,7 @@ import type { D0Fixture } from "@huoqiu/contracts/d0";
 import { tokens } from "@huoqiu/native-ui";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { d0TextColors } from "../../styles/d0-colors";
 import { PageState } from "./page-state";
 import { ScreenHeader } from "./screen-header";
 
@@ -240,12 +241,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   quoteLast: {
-    color: tokens.market.up,
+    color: d0TextColors.marketUp,
     fontSize: 22,
     fontWeight: "700",
   },
   quoteChange: {
-    color: tokens.market.up,
+    color: d0TextColors.marketUp,
     fontSize: 12,
     fontWeight: "600",
     paddingTop: 4,
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
   notice: {
     borderTopColor: tokens.surface.divider,
     borderTopWidth: StyleSheet.hairlineWidth,
-    color: tokens.market.warning,
+    color: d0TextColors.warning,
     fontSize: 11,
     marginTop: 12,
     paddingTop: 10,

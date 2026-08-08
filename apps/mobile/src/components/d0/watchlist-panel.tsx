@@ -3,6 +3,7 @@ import { tokens } from "@huoqiu/native-ui";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { useD0Watchlist } from "../../stores/d0-watchlist";
+import { d0TextColors } from "../../styles/d0-colors";
 import { PageState } from "./page-state";
 import { ScreenHeader } from "./screen-header";
 import { WatchlistToggle } from "./watchlist-toggle";
@@ -68,6 +69,7 @@ export function WatchlistPanel({
                       accessibilityRole="button"
                       onPress={() => onOpenInstrument?.(instrument.listing_id)}
                       style={styles.identity}
+                      testID={"watchlist-detail-" + instrument.listing_id}
                     >
                       <Text style={styles.name}>{instrument.name}</Text>
                       <Text style={styles.symbol}>
@@ -151,6 +153,8 @@ const styles = StyleSheet.create({
   },
   identity: {
     flex: 1,
+    justifyContent: "center",
+    minHeight: 48,
     minWidth: 0,
   },
   name: {
@@ -167,22 +171,22 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   quoteUp: {
-    color: tokens.market.up,
+    color: d0TextColors.marketUp,
     fontSize: 15,
     fontWeight: "700",
   },
   quoteDown: {
-    color: tokens.market.down,
+    color: d0TextColors.marketDown,
     fontSize: 15,
     fontWeight: "700",
   },
   changeUp: {
-    color: tokens.market.up,
+    color: d0TextColors.marketUp,
     fontSize: 10,
     paddingTop: 4,
   },
   changeDown: {
-    color: tokens.market.down,
+    color: d0TextColors.marketDown,
     fontSize: 10,
     paddingTop: 4,
   },

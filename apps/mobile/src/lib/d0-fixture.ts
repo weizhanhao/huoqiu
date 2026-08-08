@@ -19,6 +19,4 @@ const parseD0Fixture = (): D0FixtureLoadResult => {
   }
 };
 
-const moduleFixtureResult = parseD0Fixture();
-
-export const loadD0Fixture = (): D0FixtureLoadResult => moduleFixtureResult;
+export const loadD0Fixture = (): D0FixtureLoadResult => parseD0Fixture();

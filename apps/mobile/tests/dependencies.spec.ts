@@ -42,6 +42,19 @@ describe("Expo native dependency graph", () => {
     );
   });
 
+  it("locks every declared mobile workspace dependency for frozen installs", () => {
+    const mobileImporter = lockfile
+      .split("  apps/mobile:\n", 2)[1]
+      ?.split("\n  apps/web:\n", 1)[0];
+
+    expect(mobileImporter).toBeDefined();
+    expect(mobileImporter).toContain('      "@huoqiu/contracts":');
+    expect(mobileImporter).toContain("        specifier: workspace:*");
+    expect(mobileImporter).toContain(
+      "        version: link:../../packages/contracts",
+    );
+  });
+
   it.each(Object.entries(expectedNativeDependencies))(
     "declares Expo SDK 57 mapping for %s",
     (dependency, expectedVersion) => {

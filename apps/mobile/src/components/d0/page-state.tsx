@@ -56,6 +56,7 @@ export function PageState({
       </Text>
       <Text style={styles.copy}>没有使用未校验数据，也未连接外部服务。</Text>
       <Pressable
+        accessibilityLabel="重试加载演示数据"
         accessibilityRole="button"
         onPress={onRetry}
         style={styles.retry}
