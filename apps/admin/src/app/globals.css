@@ -1,0 +1,107 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--hq-surface-inverse);
+  color: var(--hq-text-primary);
+  font-family: var(--hq-type-family-sans);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+p,
+h1 {
+  margin: 0;
+}
+
+.admin-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  padding: var(--hq-spacing-8);
+}
+
+.admin-brand {
+  align-items: center;
+  color: var(--hq-text-inverse);
+  display: flex;
+  gap: var(--hq-spacing-3);
+}
+
+.admin-brand span {
+  align-items: center;
+  background: var(--hq-brand-primary);
+  border-radius: 50%;
+  display: inline-flex;
+  font-weight: var(--hq-type-weight-bold);
+  height: var(--hq-touch-web-minimum);
+  justify-content: center;
+  width: var(--hq-touch-web-minimum);
+}
+
+.admin-brand p {
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.entry-card {
+  align-self: center;
+  background: var(--hq-surface-base);
+  border-radius: var(--hq-radius-sheet);
+  box-shadow: var(--hq-shadow-floating);
+  justify-self: center;
+  max-width: 560px;
+  padding: var(--hq-spacing-10);
+  width: 100%;
+}
+
+.eyebrow {
+  color: var(--hq-brand-primary);
+  font-family: var(--hq-type-family-mono);
+  font-size: var(--hq-type-size-caption);
+  letter-spacing: 0.12em;
+}
+
+.entry-card h1 {
+  font-size: var(--hq-type-size-quote);
+  letter-spacing: -0.04em;
+  padding: var(--hq-spacing-4) 0;
+}
+
+.entry-note {
+  color: var(--hq-text-secondary);
+  line-height: var(--hq-type-line-height-body);
+}
+
+.entry-action {
+  align-items: center;
+  background: var(--hq-brand-primary);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-brand-on-primary);
+  display: inline-flex;
+  font-weight: var(--hq-type-weight-semibold);
+  justify-content: center;
+  margin-top: var(--hq-spacing-8);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-6);
+  text-decoration: none;
+}
+
+.entry-action:focus-visible {
+  box-shadow: var(--hq-shadow-focus);
+  outline: 0;
+}
+
+@media (max-width: 640px) {
+  .admin-shell {
+    padding: var(--hq-spacing-5);
+  }
+
+  .entry-card {
+    padding: var(--hq-spacing-6);
+  }
+}
