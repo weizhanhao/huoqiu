@@ -150,7 +150,7 @@ h3 {
 }
 
 .market-key small {
-  color: var(--hq-text-disabled);
+  color: var(--hq-text-tertiary);
   line-height: var(--hq-type-line-height-body);
 }
 
@@ -505,11 +505,11 @@ h3 {
 }
 
 .market-up {
-  color: var(--hq-market-up);
+  color: var(--hq-market-up-text);
 }
 
 .market-down {
-  color: var(--hq-market-down);
+  color: var(--hq-market-down-text);
 }
 
 .rail-disclosure {
@@ -603,7 +603,7 @@ h3 {
 }
 
 .feed-intro > p {
-  color: var(--hq-text-disabled);
+  color: var(--hq-text-secondary);
   line-height: var(--hq-type-line-height-body);
   max-width: 220px;
   position: relative;
@@ -611,11 +611,15 @@ h3 {
 }
 
 .card-kicker {
-  color: var(--hq-brand-secondary);
+  color: var(--hq-brand-primary);
   font-family: var(--hq-type-family-mono);
   font-size: var(--hq-type-size-caption);
   font-weight: var(--hq-type-weight-semibold);
   letter-spacing: 0.1em;
+}
+
+.feed-intro .card-kicker {
+  color: var(--hq-brand-secondary);
 }
 
 .channel-tabs {
@@ -713,12 +717,12 @@ h3 {
 }
 
 .market-strip-quote .market-up small {
-  color: var(--hq-market-up);
+  color: var(--hq-market-up-text);
 }
 
 .card-disclosure {
   background: var(--hq-surface-subtle);
-  color: var(--hq-market-warning);
+  color: var(--hq-market-warning-text);
   font-size: var(--hq-type-size-caption);
   padding: var(--hq-spacing-3) var(--hq-spacing-5);
 }
@@ -1169,7 +1173,7 @@ h3 {
 }
 
 .watchlist-heading > div > p:last-child {
-  color: var(--hq-text-disabled);
+  color: var(--hq-text-secondary);
   line-height: var(--hq-type-line-height-body);
   max-width: 520px;
 }

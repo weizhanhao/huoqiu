@@ -83,10 +83,30 @@ describe("Huoqiu design tokens", () => {
     ).toBeGreaterThanOrEqual(4.5);
   });
 
+  it("provides AA-safe market text colors without changing chart semantics", () => {
+    for (const color of [
+      tokens.market.upText,
+      tokens.market.downText,
+      tokens.market.warningText,
+    ]) {
+      for (const surface of [
+        tokens.surface.base,
+        tokens.surface.canvas,
+        tokens.surface.subtle,
+      ]) {
+        expect(contrastRatio(color, surface)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+
+    expect(tokens.market.upText).not.toBe(tokens.market.up);
+    expect(tokens.market.downText).not.toBe(tokens.market.down);
+  });
+
   it("generates deterministic, namespaced CSS variables", () => {
     expect(tokensToCssVariables(tokens)).toBe(cssVariables);
     expect(cssVariables).toContain("--hq-brand-primary: #C2410C;");
     expect(cssVariables).toContain("--hq-market-down: #16A37A;");
+    expect(cssVariables).toContain("--hq-market-down-text: #067647;");
     expect(cssVariables).toContain("--hq-touch-app-minimum: 48px;");
 
     const names = [...cssVariables.matchAll(/--hq-[a-z0-9-]+/gu)].map(

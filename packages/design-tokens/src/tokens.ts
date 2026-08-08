@@ -26,11 +26,14 @@ export const tokens = {
   },
   market: {
     up: "#F04444",
+    upText: "#D92D20",
     upSubtle: "#FFF0F0",
     down: "#16A37A",
+    downText: "#067647",
     downSubtle: "#EAF8F3",
     flat: "#667085",
     warning: "#D97706",
+    warningText: "#B54708",
   },
   spacing: {
     0: "0px",
