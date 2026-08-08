@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huoqiu.invalid/schemas/authorship-input.v1.json",
+  "title": "Huoqiu protected authorship derivation archive v1",
+  "type": "object",
+  "additionalProperties": false,
+  "$comment": "The certifying verifier hashes the exact protected-channel archive bytes before parsing, validates this closed shape at runtime, binds repository/base/HEAD context, and derives canonical github:<actor_id> identities without accepting caller-provided implementers.",
+  "required": [
+    "schema_version",
+    "provider",
+    "repository_id",
+    "trusted_base_sha",
+    "head_sha",
+    "contributors"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "provider": { "const": "external-attestor" },
+    "repository_id": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+    "trusted_base_sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}([a-f0-9]{24})?$"
+    },
+    "head_sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}([a-f0-9]{24})?$"
+    },
+    "contributors": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider", "actor_id"],
+        "properties": {
+          "provider": { "const": "github" },
+          "actor_id": { "type": "string", "pattern": "^[1-9][0-9]*$" }
+        }
+      }
+    }
+  }
+}

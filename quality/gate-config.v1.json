@@ -94,6 +94,7 @@
   },
   "config_inputs": [
     "quality/gate-config.v1.json",
+    "quality/evidence/authorship-input.schema.json",
     "quality/evidence/authorship.schema.json",
     "quality/evidence/evidence.schema.json",
     "quality/evidence/review.schema.json",

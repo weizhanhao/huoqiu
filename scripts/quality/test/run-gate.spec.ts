@@ -5,6 +5,7 @@ import {
   sign as signBytes,
 } from "node:crypto";
 import {
+  chmod,
   copyFile,
   mkdir,
   mkdtemp,
@@ -13,6 +14,7 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -63,6 +65,7 @@ const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const temporaryRoots: string[] = [];
 const reviewEnvironments = new Map<string, NodeJS.ProcessEnv>();
 const authorshipEnvironments = new Map<string, NodeJS.ProcessEnv>();
+const registrySigners = new Map<string, (unsigned: unknown) => string>();
 
 const canonicalJsonForTesting = (value: unknown): string => {
   if (Array.isArray(value))
@@ -97,7 +100,54 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
   const authorshipWorkflowSha = "d".repeat(40);
   const rootDer = rootPair.publicKey.export({ format: "der", type: "spki" });
   const rootKeyId = `ed25519:${createHash("sha256").update(rootDer).digest("hex")}`;
-  const verifierSha = "b".repeat(64);
+  const verifierArgument = process.argv[1];
+  if (verifierArgument === undefined)
+    throw new Error("missing test verifier entrypoint");
+  const verifierEntrypoint = resolve(verifierArgument);
+  const verifierSha = createHash("sha256")
+    .update(await readFile(verifierEntrypoint))
+    .digest("hex");
+  const launcherRoot = await mkdtemp(
+    resolve(tmpdir(), "huoqiu-protected-launcher-"),
+  );
+  temporaryRoots.push(launcherRoot);
+  const launcherPath = resolve(launcherRoot, "launcher.mjs");
+  await writeFile(
+    launcherPath,
+    [
+      "#!/usr/bin/env node",
+      "import { spawn } from 'node:child_process';",
+      "const marker = process.argv[2];",
+      "const encoded = process.argv[3];",
+      "if (marker !== '--huoqiu-request-v1' || encoded === undefined) process.exit(90);",
+      "const request = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));",
+      "const environment = { PATH: process.env.PATH, LANG: 'C', LC_ALL: 'C', TZ: 'UTC' };",
+      "const run = (command) => new Promise((resolve, reject) => {",
+      "  const child = spawn(command.executable, command.args, { cwd: request.workspace, env: environment, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });",
+      "  let stdout = ''; let stderr = '';",
+      "  child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');",
+      "  child.stdout.on('data', (chunk) => { stdout += chunk; });",
+      "  child.stderr.on('data', (chunk) => { stderr += chunk; });",
+      "  child.once('error', reject);",
+      "  child.once('close', (code, signal) => resolve({ code: code ?? -1, signal, stdout, stderr }));",
+      "});",
+      "if (request.install === true) {",
+      "  const install = await run({ executable: 'pnpm', args: ['install', '--offline', '--frozen-lockfile', '--strict-peer-dependencies'] });",
+      "  if (install.code !== 0 || install.signal !== null) { process.stderr.write(install.stderr); process.exit(91); }",
+      "}",
+      "const startedAt = new Date().toISOString();",
+      "const result = await run(request.command);",
+      "const finishedAt = new Date().toISOString();",
+      "const report = { schema_version: 1, command: request.command, started_at: startedAt, finished_at: finishedAt, exit_code: result.code, signal: result.signal, stdout: result.stdout, stderr: result.stderr };",
+      "process.stdout.write(`HUOQIU_PROTECTED_EXECUTION_RESULT ${Buffer.from(JSON.stringify(report), 'utf8').toString('base64')}\\n`);",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await chmod(launcherPath, 0o700);
+  const launcherSha = createHash("sha256")
+    .update(await readFile(launcherPath))
+    .digest("hex");
   const unsignedRegistry = {
     schema_version: 2,
     trust_domain: "huoqiu-quality",
@@ -106,6 +156,7 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
     previous_registry_sha256: null,
     expires_at: "2099-01-01T00:00:00.000Z",
     verifier_sha256: verifierSha,
+    execution_launcher_sha256: launcherSha,
     keys: {
       [keyId]: {
         subject_id: "github:200",
@@ -158,6 +209,20 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
       ).toString("base64"),
     },
   });
+  registrySigners.set(root, (unsigned) =>
+    signBytes(
+      null,
+      Buffer.from(
+        `HUOQIU-TRUST-REGISTRY\0v2\0${canonicalJsonForTesting(unsigned)}`,
+        "utf8",
+      ),
+      rootPair.privateKey,
+    ).toString("base64"),
+  );
+  const registryBytes = await readFile(
+    resolve(root, "quality/reviewers/trust-registry.v2.json"),
+  );
+  const registrySha = createHash("sha256").update(registryBytes).digest("hex");
   reviewEnvironments.set(root, {
     GITHUB_ACTIONS: "true",
     GITHUB_ACTOR: "quality-reviewer",
@@ -183,8 +248,14 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
       Buffer.from(rootDer).toString("base64"),
     HUOQIU_VERIFIER_ROOT_KEY_ID: rootKeyId,
     HUOQIU_VERIFIER_SHA256: verifierSha,
+    HUOQIU_VERIFIER_ENTRYPOINT_PATH: verifierEntrypoint,
+    HUOQIU_EXECUTION_LAUNCHER_PATH: launcherPath,
+    HUOQIU_EXECUTION_LAUNCHER_SHA256: launcherSha,
+    HUOQIU_EXECUTION_ISOLATION_PROFILE:
+      "container-v1:no-network,read-only-source,owned-process-tree",
     HUOQIU_REPOSITORY_ID: "9001",
     HUOQIU_TRUST_REGISTRY_EPOCH: "1",
+    HUOQIU_TRUST_REGISTRY_SHA256: registrySha,
   });
   authorshipEnvironments.set(root, {
     GITHUB_ACTIONS: "true",
@@ -215,8 +286,14 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
       Buffer.from(rootDer).toString("base64"),
     HUOQIU_VERIFIER_ROOT_KEY_ID: rootKeyId,
     HUOQIU_VERIFIER_SHA256: verifierSha,
+    HUOQIU_VERIFIER_ENTRYPOINT_PATH: verifierEntrypoint,
+    HUOQIU_EXECUTION_LAUNCHER_PATH: launcherPath,
+    HUOQIU_EXECUTION_LAUNCHER_SHA256: launcherSha,
+    HUOQIU_EXECUTION_ISOLATION_PROFILE:
+      "container-v1:no-network,read-only-source,owned-process-tree",
     HUOQIU_REPOSITORY_ID: "9001",
     HUOQIU_TRUST_REGISTRY_EPOCH: "1",
+    HUOQIU_TRUST_REGISTRY_SHA256: registrySha,
   });
 };
 
@@ -226,6 +303,71 @@ const json = async (path: string): Promise<Record<string, unknown>> =>
 const writeJson = async (path: string, value: unknown): Promise<void> => {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+};
+
+const installAuthorshipArchive = (
+  root: string,
+  headSha: string,
+  actorIds: string[],
+): void => {
+  const authorshipEnvironment = authorshipEnvironments.get(root);
+  const reviewEnvironment = reviewEnvironments.get(root);
+  if (authorshipEnvironment === undefined || reviewEnvironment === undefined)
+    throw new Error("missing ephemeral authorship environment");
+  const trustedBaseSha = authorshipEnvironment.HUOQIU_TRUSTED_BASE_SHA;
+  if (trustedBaseSha === undefined)
+    throw new Error("missing trusted base for authorship archive");
+  const bytes = Buffer.from(
+    `${JSON.stringify({
+      schema_version: 1,
+      provider: "external-attestor",
+      repository_id: "9001",
+      trusted_base_sha: trustedBaseSha,
+      head_sha: headSha,
+      contributors: actorIds.map((actorId) => ({
+        provider: "github",
+        actor_id: actorId,
+      })),
+    })}\n`,
+    "utf8",
+  );
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const encoded = bytes.toString("base64");
+  authorshipEnvironment.HUOQIU_AUTHORSHIP_ARCHIVE_B64 = encoded;
+  authorshipEnvironment.HUOQIU_AUTHORSHIP_INPUT_SHA256 = digest;
+  reviewEnvironment.HUOQIU_AUTHORSHIP_ARCHIVE_B64 = encoded;
+  reviewEnvironment.HUOQIU_AUTHORSHIP_INPUT_SHA256 = digest;
+};
+
+const rewriteSignedRegistry = async (
+  root: string,
+  mutate: (unsigned: Record<string, unknown>) => void,
+): Promise<string> => {
+  const path = resolve(root, "quality/reviewers/trust-registry.v2.json");
+  const registry = await json(path);
+  const signature = registry.signature as Record<string, unknown>;
+  const unsigned = { ...registry };
+  delete unsigned.signature;
+  mutate(unsigned);
+  const signer = registrySigners.get(root);
+  if (signer === undefined) throw new Error("missing registry signer");
+  await writeJson(path, {
+    ...unsigned,
+    signature: {
+      algorithm: "Ed25519",
+      key_id: signature.key_id,
+      value_base64: signer(unsigned),
+    },
+  });
+  await execFile("git", ["add", "quality/reviewers/trust-registry.v2.json"], {
+    cwd: root,
+  });
+  await execFile("git", ["commit", "-q", "-m", "rotate trust registry"], {
+    cwd: root,
+  });
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex");
 };
 
 const copyRepositoryFile = async (
@@ -266,6 +408,7 @@ const setupRepository = async (
   for (const path of [
     ".gitignore",
     "quality/gate-config.v1.json",
+    "quality/evidence/authorship-input.schema.json",
     "quality/evidence/authorship.schema.json",
     "quality/evidence/evidence.schema.json",
     "quality/evidence/review.schema.json",
@@ -335,11 +478,10 @@ const setupRepository = async (
     throw new Error("missing ephemeral signing environment");
   authorshipEnvironment.HUOQIU_TRUSTED_BASE_SHA = head;
   reviewEnvironment.HUOQIU_TRUSTED_BASE_SHA = head;
-  reviewEnvironment.HUOQIU_AUTHORSHIP_INPUT_SHA256 =
-    authorshipEnvironment.HUOQIU_AUTHORSHIP_INPUT_SHA256;
   reviewEnvironment.HUOQIU_AUTHORSHIP_POLICY_VERSION =
     authorshipEnvironment.HUOQIU_AUTHORSHIP_POLICY_VERSION;
-  await recordAuthorship(root, head, ["github:100"], {
+  installAuthorshipArchive(root, head, ["100"]);
+  await recordAuthorship(root, head, {
     milestone,
     environment: authorshipEnvironment,
   });
@@ -357,7 +499,12 @@ const refreshAuthorship = async (
   const environment = authorshipEnvironments.get(root);
   if (environment === undefined)
     throw new Error("missing ephemeral authorship environment");
-  await recordAuthorship(root, head, implementerIds, {
+  installAuthorshipArchive(
+    root,
+    head,
+    implementerIds.map((identity) => identity.replace(/^github:/u, "")),
+  );
+  await recordAuthorship(root, head, {
     milestone,
     environment,
   });
@@ -396,12 +543,22 @@ const runTrustedGate = async (
     environment: reviewEnvironments.get(root) ?? {},
   });
 
+const runTrustedCapability = async (
+  root: string,
+  milestone: "d0" | "m1",
+  capId: string,
+) =>
+  await runCapability(root, milestone, capId, {
+    environment: reviewEnvironments.get(root) ?? {},
+  });
+
 const prepareReviewInputs = async (
   root: string,
   milestone: "d0" | "m1",
 ): Promise<Awaited<ReturnType<typeof computeCurrentContext>>> => {
   const capIds = milestone === "d0" ? D0_REQUIRED_CAP_IDS : M1_REQUIRED_CAP_IDS;
-  for (const capId of capIds) await runCapability(root, milestone, capId);
+  for (const capId of capIds)
+    await runTrustedCapability(root, milestone, capId);
   const context = await computeCurrentContext(root, milestone);
   await writeChecklistForTesting(
     root,
@@ -643,9 +800,9 @@ describe("required test validity", () => {
     await execFile("git", ["commit", "-q", "-m", "exercise skipped result"], {
       cwd: root,
     });
-    await expect(runCapability(root, "d0", "CAP-ID-001")).rejects.toThrow(
-      "REQUIRED_TEST_INVALID",
-    );
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("REQUIRED_TEST_INVALID");
   });
 
   it("check-no-skips accepts zero and rejects explicit skip syntax", async () => {
@@ -729,6 +886,24 @@ describe("deterministic context hashing", () => {
     },
   );
 
+  it("removes hostile inherited GIT_* variables from verifier git calls", async () => {
+    const root = await setupRepository();
+    const originalGitDir = process.env.GIT_DIR;
+    const originalGitWorkTree = process.env.GIT_WORK_TREE;
+    process.env.GIT_DIR = resolve(root, "attacker-controlled-git-dir");
+    process.env.GIT_WORK_TREE = resolve(root, "attacker-controlled-worktree");
+    try {
+      await expect(computeCurrentContext(root, "d0")).resolves.toMatchObject({
+        commit_sha: expect.stringMatching(/^[a-f0-9]{40}$/u),
+      });
+    } finally {
+      if (originalGitDir === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = originalGitDir;
+      if (originalGitWorkTree === undefined) delete process.env.GIT_WORK_TREE;
+      else process.env.GIT_WORK_TREE = originalGitWorkTree;
+    }
+  });
+
   it("rejects an input whose parent directory is a symlink outside the repository", async () => {
     const root = await mkdtemp(resolve(tmpdir(), "huoqiu-parent-link-root-"));
     const outside = await mkdtemp(
@@ -762,6 +937,15 @@ describe("argv-only capability execution", () => {
     },
   );
 
+  it("rejects an env wrapper that indirectly launches a shell", () => {
+    expect(() =>
+      validateCommand({
+        executable: "/usr/bin/env",
+        args: ["sh", "-c", "printf attacker"],
+      }),
+    ).toThrow("COMMAND_INVALID");
+  });
+
   it("passes metacharacters as a literal argv value and never invokes a shell", async () => {
     const root = await mkdtemp(resolve(tmpdir(), "huoqiu-argv-"));
     temporaryRoots.push(root);
@@ -772,6 +956,46 @@ describe("argv-only capability execution", () => {
       args: ["-e", "console.log(process.argv[1])", injected],
     });
     expect(result.stdout.trim()).toBe(injected);
+    await expect(readFile(marker)).rejects.toThrow();
+  });
+
+  it("does not inherit caller secrets into executed commands", async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "huoqiu-env-"));
+    temporaryRoots.push(root);
+    const result = await executeCommand(
+      root,
+      {
+        executable: process.execPath,
+        args: ["-e", "console.log(process.env.HUOQIU_SECRET_SENTINEL)"],
+      },
+      {
+        environment: {
+          ...process.env,
+          HUOQIU_SECRET_SENTINEL: "must-not-leak",
+          GIT_DIR: "/tmp/hostile-git-dir",
+        },
+      },
+    );
+    expect(result.stdout.trim()).toBe("undefined");
+  });
+
+  it("kills descendants after a normally exiting command", async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "huoqiu-orphan-"));
+    temporaryRoots.push(root);
+    const marker = resolve(root, "orphan-wrote-after-parent-exit");
+    const childProgram = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'escaped'), 350)`;
+    const parentProgram = [
+      "const { spawn } = require('node:child_process');",
+      `spawn(process.execPath, ['-e', ${JSON.stringify(childProgram)}], { stdio: 'ignore' }).unref();`,
+    ].join("\n");
+    const result = await executeCommand(root, {
+      executable: process.execPath,
+      args: ["-e", parentProgram],
+    });
+    expect(result.exit_code).toBe(0);
+    await new Promise<void>((resolvePromise) =>
+      setTimeout(resolvePromise, 600),
+    );
     await expect(readFile(marker)).rejects.toThrow();
   });
 
@@ -976,6 +1200,83 @@ describe("strict CLI normalization", () => {
 });
 
 describe("current evidence and independent review binding", () => {
+  it("fails closed without a pinned protected launcher before network or external writes", async () => {
+    const root = await setupRepository();
+    const marker = resolve(root, "artifacts/external-write");
+    let networkRequests = 0;
+    const server = createServer((_request, response) => {
+      networkRequests += 1;
+      response.end("reachable");
+    });
+    await new Promise<void>((resolvePromise, rejectPromise) => {
+      server.once("error", rejectPromise);
+      server.listen(0, "127.0.0.1", resolvePromise);
+    });
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string")
+        throw new Error("missing local test server address");
+      const manifestPath = resolve(root, "quality/manifests/d0-required.json");
+      const manifest = await json(manifestPath);
+      const first = (manifest.required_caps as Record<string, unknown>[])[0];
+      if (first === undefined) throw new Error("missing test capability");
+      const summary = `HUOQIU_CAPABILITY_RESULT ${JSON.stringify({
+        fixture_version: "d0.v1",
+        passed: 1,
+        failed: 0,
+        skipped: 0,
+        invalid_test_markers: [],
+        p0: 0,
+        p1: 0,
+      })}`;
+      first.command = {
+        executable: process.execPath,
+        args: [
+          "-e",
+          [
+            `fetch('http://127.0.0.1:${address.port}')`,
+            `.then(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'escaped'))`,
+            `.then(() => console.log(${JSON.stringify(summary)}))`,
+          ].join(""),
+        ],
+      };
+      await writeJson(manifestPath, manifest);
+      await execFile("git", ["add", "quality/manifests/d0-required.json"], {
+        cwd: root,
+      });
+      await execFile("git", ["commit", "-q", "-m", "sandbox escape attack"], {
+        cwd: root,
+      });
+      await expect(runCapability(root, "d0", "CAP-ID-001")).rejects.toThrow(
+        "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
+      );
+      expect(networkRequests).toBe(0);
+      await expect(readFile(marker)).rejects.toThrow();
+    } finally {
+      await new Promise<void>((resolvePromise, rejectPromise) =>
+        server.close((error) =>
+          error === undefined ? resolvePromise() : rejectPromise(error),
+        ),
+      );
+    }
+  });
+
+  it("measures the actual protected launcher bytes before candidate execution", async () => {
+    const root = await setupRepository();
+    const environment = reviewEnvironments.get(root);
+    const launcherPath = environment?.HUOQIU_EXECUTION_LAUNCHER_PATH;
+    if (launcherPath === undefined)
+      throw new Error("missing protected launcher path");
+    await writeFile(
+      launcherPath,
+      `${await readFile(launcherPath, "utf8")}\n// tampered\n`,
+      "utf8",
+    );
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("PROTECTED_EXECUTION_LAUNCHER_REQUIRED");
+  });
+
   it("rechecks repository context after a capability command before writing evidence", async () => {
     const root = await setupRepository();
     const manifestPath = resolve(root, "quality/manifests/d0-required.json");
@@ -1006,9 +1307,9 @@ describe("current evidence and independent review binding", () => {
     await execFile("git", ["commit", "-q", "-m", "mutating capability"], {
       cwd: root,
     });
-    await expect(runCapability(root, "d0", "CAP-ID-001")).rejects.toThrow(
-      "CONTEXT_CHANGED_DURING_EXECUTION",
-    );
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("CONTEXT_CHANGED_DURING_EXECUTION");
   });
 
   it("detects a tracked write even when the command restores the original bytes", async () => {
@@ -1041,9 +1342,9 @@ describe("current evidence and independent review binding", () => {
     await execFile("git", ["commit", "-q", "-m", "restore mutation attack"], {
       cwd: root,
     });
-    await expect(runCapability(root, "d0", "CAP-ID-001")).rejects.toThrow(
-      "CONTEXT_CHANGED_DURING_EXECUTION",
-    );
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("CONTEXT_CHANGED_DURING_EXECUTION");
   });
 
   it("detects modify-restore writes from dependency installation", async () => {
@@ -1085,9 +1386,9 @@ describe("current evidence and independent review binding", () => {
     await execFile("git", ["commit", "-q", "-m", "install mutation attack"], {
       cwd: root,
     });
-    await expect(runCapability(root, "d0", "CAP-ID-001")).rejects.toThrow(
-      "CONTEXT_CHANGED_DURING_EXECUTION",
-    );
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("CONTEXT_CHANGED_DURING_EXECUTION");
   });
 
   it("rejects assembling evidence from caller-supplied raw reports", async () => {
@@ -1220,7 +1521,7 @@ describe("current evidence and independent review binding", () => {
     });
     await refreshAuthorship(root, "d0", ["github:200"]);
     for (const capId of D0_REQUIRED_CAP_IDS)
-      await runCapability(root, "d0", capId);
+      await runTrustedCapability(root, "d0", capId);
     const context = await computeCurrentContext(root, "d0");
     await writeChecklistForTesting(root, "d0", context.commit_sha, [
       "functional",
@@ -1234,7 +1535,7 @@ describe("current evidence and independent review binding", () => {
   it("rejects checklist counters that do not match strict finding severities", async () => {
     const root = await setupRepository();
     for (const capId of D0_REQUIRED_CAP_IDS)
-      await runCapability(root, "d0", capId);
+      await runTrustedCapability(root, "d0", capId);
     const context = await computeCurrentContext(root, "d0");
     await writeEvidenceFileForTesting(
       root,
@@ -1266,7 +1567,7 @@ describe("current evidence and independent review binding", () => {
   it("rejects arbitrary review dimensions", async () => {
     const root = await setupRepository();
     for (const capId of D0_REQUIRED_CAP_IDS)
-      await runCapability(root, "d0", capId);
+      await runTrustedCapability(root, "d0", capId);
     const context = await computeCurrentContext(root, "d0");
     await writeChecklistForTesting(root, "d0", context.commit_sha, [
       "invented",
@@ -1279,7 +1580,7 @@ describe("current evidence and independent review binding", () => {
   it("requires review time to be at or after the latest evidence", async () => {
     const root = await setupRepository();
     for (const capId of D0_REQUIRED_CAP_IDS)
-      await runCapability(root, "d0", capId);
+      await runTrustedCapability(root, "d0", capId);
     const context = await computeCurrentContext(root, "d0");
     await writeChecklistForTesting(root, "d0", context.commit_sha, [
       "functional",
@@ -1367,6 +1668,51 @@ describe("trusted reviewer identity boundary", () => {
     ).rejects.toThrow("VERIFIER_TRUST_ROOT_REQUIRED");
   });
 
+  it("pins the exact current registry digest to prevent same-epoch equivocation", async () => {
+    const root = await setupRepository();
+    await rewriteSignedRegistry(root, (registry) => {
+      registry.expires_at = "2098-01-01T00:00:00.000Z";
+    });
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("VERIFIER_TRUST_ROOT_REQUIRED");
+  });
+
+  it("validates the protected previous digest for an epoch transition", async () => {
+    const root = await setupRepository();
+    const currentDigest = await rewriteSignedRegistry(root, (registry) => {
+      registry.epoch = 2;
+      registry.previous_registry_sha256 = "1".repeat(64);
+    });
+    const environment = reviewEnvironments.get(root);
+    if (environment === undefined)
+      throw new Error("missing review environment");
+    environment.HUOQIU_TRUST_REGISTRY_EPOCH = "2";
+    environment.HUOQIU_TRUST_REGISTRY_SHA256 = currentDigest;
+    environment.HUOQIU_TRUST_REGISTRY_PREVIOUS_SHA256 = "2".repeat(64);
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("VERIFIER_TRUST_ROOT_REQUIRED");
+  });
+
+  it("measures the actual verifier entrypoint instead of trusting a digest string", async () => {
+    const root = await setupRepository();
+    const context = await prepareReviewInputs(root, "d0");
+    await expect(
+      recordReview(
+        root,
+        "d0",
+        context.commit_sha,
+        signingOptions(root, {
+          HUOQIU_VERIFIER_ENTRYPOINT_PATH: resolve(
+            root,
+            "quality/gate-config.v1.json",
+          ),
+        }),
+      ),
+    ).rejects.toThrow("VERIFIER_TRUST_ROOT_REQUIRED");
+  });
+
   it("requires a signed authorship statement for the exact reviewed commit", async () => {
     const root = await setupRepository();
     const context = await prepareReviewInputs(root, "d0");
@@ -1395,6 +1741,44 @@ describe("trusted reviewer identity boundary", () => {
     ).rejects.toThrow("AUTHORSHIP_ATTESTATION_INVALID");
   });
 
+  it("derives multiple implementers only from the exact protected archive bytes", async () => {
+    const root = await setupRepository();
+    const head = (
+      await execFile("git", ["rev-parse", "HEAD"], { cwd: root })
+    ).stdout.trim();
+    installAuthorshipArchive(root, head, ["101", "100"]);
+    const environment = authorshipEnvironments.get(root);
+    if (environment === undefined)
+      throw new Error("missing authorship environment");
+    const attestation = await recordAuthorship(root, head, {
+      milestone: "d0",
+      environment,
+    });
+    expect(attestation.implementer_ids).toEqual(["github:100", "github:101"]);
+  });
+
+  it("rejects protected authorship archive bytes that do not match their digest", async () => {
+    const root = await setupRepository();
+    const head = (
+      await execFile("git", ["rev-parse", "HEAD"], { cwd: root })
+    ).stdout.trim();
+    installAuthorshipArchive(root, head, ["100"]);
+    const environment = authorshipEnvironments.get(root);
+    if (environment === undefined)
+      throw new Error("missing authorship environment");
+    const archive = Buffer.from(
+      String(environment.HUOQIU_AUTHORSHIP_ARCHIVE_B64),
+      "base64",
+    );
+    environment.HUOQIU_AUTHORSHIP_ARCHIVE_B64 = Buffer.concat([
+      archive,
+      Buffer.from(" ", "utf8"),
+    ]).toString("base64");
+    await expect(
+      recordAuthorship(root, head, { milestone: "d0", environment }),
+    ).rejects.toThrow("AUTHORSHIP_IDENTITY_NOT_CONFIGURED");
+  });
+
   it("rejects a CLI reviewer override before touching repository state", async () => {
     await expect(
       recordReviewMain([
@@ -1415,12 +1799,24 @@ describe("trusted reviewer identity boundary", () => {
         "d0",
         "--commit-sha",
         "a".repeat(40),
-        "--implementer-id",
-        "github:100",
         "--issuer-id",
         "github:999",
       ]),
     ).rejects.toThrow("CLI_ARGUMENT_INVALID");
+  });
+
+  it("records authorship without caller-supplied implementer flags", async () => {
+    const root = await setupRepository();
+    const head = (
+      await execFile("git", ["rev-parse", "HEAD"], { cwd: root })
+    ).stdout.trim();
+    await expect(
+      recordAuthorshipMain(
+        ["--milestone", "d0", "--commit-sha", head],
+        root,
+        authorshipEnvironments.get(root),
+      ),
+    ).resolves.toBeUndefined();
   });
 
   it("records a versioned Ed25519 signature over evidence and provenance", async () => {
@@ -1462,9 +1858,14 @@ describe("trusted reviewer identity boundary", () => {
     await execFile("git", ["commit", "-q", "-m", "empty reviewer trust"], {
       cwd: root,
     });
-    const context = await prepareReviewInputs(root, "d0");
+    const environment = reviewEnvironments.get(root);
+    if (environment === undefined)
+      throw new Error("missing review environment");
+    environment.HUOQIU_TRUST_REGISTRY_SHA256 = createHash("sha256")
+      .update(await readFile(registryPath))
+      .digest("hex");
     await expect(
-      recordReview(root, "d0", context.commit_sha, signingOptions(root)),
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
     ).rejects.toThrow("REVIEW_TRUST_REQUIRED");
   });
 
@@ -1486,9 +1887,14 @@ describe("trusted reviewer identity boundary", () => {
     await execFile("git", ["commit", "-q", "-m", "malformed trust policy"], {
       cwd: root,
     });
-    const context = await prepareReviewInputs(root, "d0");
+    const environment = reviewEnvironments.get(root);
+    if (environment === undefined)
+      throw new Error("missing review environment");
+    environment.HUOQIU_TRUST_REGISTRY_SHA256 = createHash("sha256")
+      .update(await readFile(registryPath))
+      .digest("hex");
     await expect(
-      recordReview(root, "d0", context.commit_sha, signingOptions(root)),
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
     ).rejects.toThrow("REVIEW_TRUST_REGISTRY_INVALID");
   });
 
@@ -1687,12 +2093,17 @@ describe("milestone results and explicit not-ready behavior", () => {
     const authorshipSchema = await json(
       resolve(sourceRoot, "quality/evidence/authorship.schema.json"),
     );
+    const authorshipInputSchema = await json(
+      resolve(sourceRoot, "quality/evidence/authorship-input.schema.json"),
+    );
     const registrySchema = await json(
       resolve(sourceRoot, "quality/reviewers/trust-registry.schema.json"),
     );
     expect(evidenceSchema.additionalProperties).toBe(false);
     expect(reviewSchema.additionalProperties).toBe(false);
     expect(authorshipSchema.additionalProperties).toBe(false);
+    expect(authorshipInputSchema.additionalProperties).toBe(false);
+    expect(authorshipInputSchema.required).toContain("contributors");
     expect(registrySchema.additionalProperties).toBe(false);
     expect(
       (reviewSchema.properties as Record<string, Record<string, unknown>>)

@@ -5,28 +5,22 @@ import {
   requiredFlag,
   runCli,
 } from "./cli.mts";
-import { QualityGateError, recordAuthorship } from "./gate-core.mts";
+import { recordAuthorship } from "./gate-core.mts";
 
 export const main = async (
   args = process.argv.slice(2),
   root = process.cwd(),
+  environment = process.env,
 ): Promise<void> => {
   const flags = parseStrictFlags(
     args,
-    new Set(["--milestone", "--commit-sha", "--implementer-id"]),
+    new Set(["--milestone", "--commit-sha"]),
   );
-  const implementerIds = flags.get("--implementer-id") ?? [];
-  if (implementerIds.length === 0)
-    throw new QualityGateError(
-      "CLI_ARGUMENT_INVALID",
-      "--implementer-id is required",
-    );
   const milestone = milestoneFlag(flags);
   const attestation = await recordAuthorship(
     root,
     requiredFlag(flags, "--commit-sha"),
-    implementerIds,
-    { milestone },
+    { milestone, environment },
   );
   process.stdout.write(
     `AUTHORSHIP_RECORDED issuer=${attestation.issuer_id} commit=${attestation.head_sha}\n`,

@@ -94,6 +94,7 @@ const EXPECTED_MANIFEST_PATHS: Record<Milestone, string> = {
 
 const CONFIG_INPUT_PATHS = [
   "quality/gate-config.v1.json",
+  "quality/evidence/authorship-input.schema.json",
   "quality/evidence/authorship.schema.json",
   "quality/evidence/evidence.schema.json",
   "quality/evidence/review.schema.json",
@@ -315,10 +316,17 @@ const FORBIDDEN_EXECUTABLES = new Set([
   "cmd",
   "cmd.exe",
   "fish",
+  "env",
+  "nohup",
+  "setsid",
   "powershell",
   "powershell.exe",
   "pwsh",
+  "script",
   "sh",
+  "start",
+  "timeout",
+  "xargs",
   "zsh",
 ]);
 
@@ -897,6 +905,7 @@ export const validateRawReport = (value: unknown): SpawnResult => {
 export interface ExecuteCommandOptions {
   clock?: () => Date;
   environment?: NodeJS.ProcessEnv;
+  environmentProfile?: "minimal" | "git";
   timeoutMs?: number;
   maxOutputBytes?: number;
 }
@@ -904,22 +913,87 @@ export interface ExecuteCommandOptions {
 const DEFAULT_COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 
-const terminateProcessGroup = (child: ReturnType<typeof spawn>): void => {
-  if (child.pid === undefined) return;
+const minimalChildEnvironment = (
+  source: NodeJS.ProcessEnv,
+  profile: "minimal" | "git" = "minimal",
+): NodeJS.ProcessEnv => {
+  const environment: NodeJS.ProcessEnv = {
+    LANG: "C",
+    LC_ALL: "C",
+    TZ: "UTC",
+  };
+  for (const name of ["PATH", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT"]) {
+    const value = source[name] ?? process.env[name];
+    if (value !== undefined) environment[name] = value;
+  }
+  const temporaryDirectory = tmpdir();
+  environment.TMPDIR = temporaryDirectory;
+  environment.TEMP = temporaryDirectory;
+  environment.TMP = temporaryDirectory;
+  if (source.CI === "true") environment.CI = "true";
+  if (profile === "git") {
+    environment.GIT_CONFIG_NOSYSTEM = "1";
+    environment.GIT_CONFIG_GLOBAL =
+      process.platform === "win32" ? "NUL" : "/dev/null";
+    environment.GIT_TERMINAL_PROMPT = "0";
+    environment.GIT_OPTIONAL_LOCKS = "0";
+  }
+  return environment;
+};
+
+const processGroupExists = (pid: number): boolean => {
+  if (process.platform === "win32") return false;
   try {
-    if (process.platform === "win32") {
+    process.kill(-pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const terminateProcessGroup = async (
+  child: ReturnType<typeof spawn>,
+): Promise<void> => {
+  if (child.pid === undefined) return;
+  if (process.platform === "win32") {
+    await new Promise<void>((resolvePromise) => {
       const killer = spawn(
         "taskkill",
         ["/pid", String(child.pid), "/t", "/f"],
-        { shell: false, stdio: "ignore", windowsHide: true },
+        {
+          env: minimalChildEnvironment(process.env),
+          shell: false,
+          stdio: "ignore",
+          windowsHide: true,
+        },
       );
-      killer.on("error", () => child.kill("SIGKILL"));
-      killer.unref();
-    } else {
-      process.kill(-child.pid, "SIGKILL");
-    }
+      killer.once("error", () => {
+        child.kill("SIGKILL");
+        resolvePromise();
+      });
+      killer.once("close", () => resolvePromise());
+    });
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGKILL");
   } catch {
     child.kill("SIGKILL");
+  }
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (!processGroupExists(child.pid)) return;
+    await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 10));
+  }
+  if (processGroupExists(child.pid)) {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch {
+      // The group disappeared between the existence check and final signal.
+    }
+    fail(
+      "PROCESS_TREE_CLEANUP_FAILED",
+      "command descendants survived process-group termination",
+    );
   }
 };
 
@@ -948,7 +1022,10 @@ export const executeCommand = async (
     const child = spawn(safeCommand.executable, safeCommand.args, {
       cwd: root,
       detached: process.platform !== "win32",
-      env: options.environment ?? process.env,
+      env: minimalChildEnvironment(
+        options.environment ?? process.env,
+        options.environmentProfile,
+      ),
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -962,7 +1039,7 @@ export const executeCommand = async (
         "COMMAND_TIMEOUT",
         `exceeded ${timeoutMs}ms`,
       );
-      terminateProcessGroup(child);
+      void terminateProcessGroup(child);
     }, timeoutMs);
     timeout.unref();
     const appendOutput = (stream: "stdout" | "stderr", chunk: string): void => {
@@ -972,7 +1049,7 @@ export const executeCommand = async (
           "COMMAND_OUTPUT_LIMIT",
           `exceeded ${maxOutputBytes} bytes`,
         );
-        terminateProcessGroup(child);
+        void terminateProcessGroup(child);
         return;
       }
       if (stream === "stdout") stdout += chunk;
@@ -990,33 +1067,43 @@ export const executeCommand = async (
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      rejectPromise(
-        new QualityGateError("COMMAND_EXECUTION_FAILED", error.message),
+      void terminateProcessGroup(child).then(
+        () =>
+          rejectPromise(
+            new QualityGateError("COMMAND_EXECUTION_FAILED", error.message),
+          ),
+        rejectPromise,
       );
     });
     child.on("close", (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      if (terminalError !== undefined) {
-        rejectPromise(terminalError);
-        return;
-      }
-      resolvePromise({
-        command: safeCommand,
-        started_at: startedAt,
-        finished_at: clock().toISOString(),
-        exit_code: code ?? -1,
-        signal,
-        stdout,
-        stderr,
-      });
+      void terminateProcessGroup(child).then(() => {
+        if (terminalError !== undefined) {
+          rejectPromise(terminalError);
+          return;
+        }
+        resolvePromise({
+          command: safeCommand,
+          started_at: startedAt,
+          finished_at: clock().toISOString(),
+          exit_code: code ?? -1,
+          signal,
+          stdout,
+          stderr,
+        });
+      }, rejectPromise);
     });
   });
 };
 
 const runGitRaw = async (root: string, args: string[]): Promise<string> => {
-  const result = await executeCommand(root, { executable: "git", args });
+  const result = await executeCommand(
+    root,
+    { executable: "git", args },
+    { environmentProfile: "git" },
+  );
   if (result.exit_code !== 0)
     fail("GIT_CONTEXT_UNAVAILABLE", result.stderr.trim());
   return result.stdout;
@@ -1609,10 +1696,168 @@ const loadMilestoneInputs = async (
   return { manifest, context: await computeCurrentContext(root, milestone) };
 };
 
+interface ProtectedExecutionLauncher {
+  path: string;
+  sha256: string;
+}
+
+const PROTECTED_ISOLATION_PROFILE =
+  "container-v1:no-network,read-only-source,owned-process-tree";
+
+const protectedExecutionLauncher = async (
+  root: string,
+  environment: NodeJS.ProcessEnv,
+): Promise<ProtectedExecutionLauncher> => {
+  const code = "PROTECTED_EXECUTION_LAUNCHER_REQUIRED";
+  const configuredPath =
+    environment.HUOQIU_EXECUTION_LAUNCHER_PATH ??
+    fail(
+      code,
+      "a protected external no-network/read-only/process-owned launcher is required",
+    );
+  const configuredSha = requireSha(
+    environment.HUOQIU_EXECUTION_LAUNCHER_SHA256,
+    code,
+    "HUOQIU_EXECUTION_LAUNCHER_SHA256",
+    /^[a-f0-9]{64}$/,
+  );
+  if (
+    environment.HUOQIU_EXECUTION_ISOLATION_PROFILE !==
+    PROTECTED_ISOLATION_PROFILE
+  )
+    fail(code, "the protected execution isolation profile is missing");
+  if (!isAbsolute(configuredPath))
+    fail(code, "protected execution launcher path must be absolute");
+  const [launcherPath, repositoryPath] = await Promise.all([
+    realpath(configuredPath).catch(() =>
+      fail(code, "protected execution launcher cannot be resolved"),
+    ),
+    realpath(root).catch(() =>
+      fail(code, "repository root cannot be resolved"),
+    ),
+  ]);
+  const fromRepository = relative(repositoryPath, launcherPath);
+  if (
+    fromRepository === "" ||
+    (!fromRepository.startsWith(`..${sep}`) && fromRepository !== "..")
+  ) {
+    fail(
+      code,
+      "protected execution launcher must be outside the candidate repository",
+    );
+  }
+  const metadata = await lstat(launcherPath).catch(() =>
+    fail(code, "protected execution launcher cannot be inspected"),
+  );
+  if (!metadata.isFile())
+    fail(code, "protected execution launcher is not a file");
+  if (process.platform !== "win32" && (metadata.mode & 0o111) === 0)
+    fail(code, "protected execution launcher is not executable");
+  const measuredSha = sha256(
+    await readFile(launcherPath).catch(() =>
+      fail(code, "protected execution launcher cannot be read"),
+    ),
+  );
+  if (measuredSha !== configuredSha)
+    fail(code, "protected execution launcher digest mismatch");
+  const registry = await loadTrustRegistry(root, environment);
+  if (registry.registry.execution_launcher_sha256 !== measuredSha)
+    fail(code, "launcher digest is not authorized by the trust registry");
+  return { path: launcherPath, sha256: measuredSha };
+};
+
+const executeWithProtectedLauncher = async (
+  root: string,
+  launcher: ProtectedExecutionLauncher,
+  command: RunCommand,
+  install: boolean,
+  options: ExecuteCommandOptions,
+): Promise<SpawnResult> => {
+  const safeCommand = validateCommand(command);
+  const request = Buffer.from(
+    canonicalJson({
+      schema_version: 1,
+      workspace: root,
+      install,
+      command: safeCommand,
+      isolation_profile: PROTECTED_ISOLATION_PROFILE,
+    }),
+    "utf8",
+  ).toString("base64");
+  const launcherResult = await executeCommand(
+    root,
+    {
+      executable: launcher.path,
+      args: ["--huoqiu-request-v1", request],
+    },
+    {
+      ...(options.timeoutMs === undefined
+        ? {}
+        : { timeoutMs: options.timeoutMs }),
+      maxOutputBytes: DEFAULT_MAX_OUTPUT_BYTES * 2,
+      ...(options.environment === undefined
+        ? {}
+        : { environment: options.environment }),
+    },
+  );
+  if (launcherResult.exit_code !== 0 || launcherResult.signal !== null)
+    fail(
+      "PROTECTED_EXECUTION_FAILED",
+      `launcher exit_code=${launcherResult.exit_code}`,
+    );
+  if (launcherResult.stderr.length > 0)
+    fail("PROTECTED_EXECUTION_FAILED", "launcher emitted stderr");
+  const prefix = "HUOQIU_PROTECTED_EXECUTION_RESULT ";
+  const lines = launcherResult.stdout.trimEnd().split(/\r?\n/u);
+  if (lines.length !== 1 || !lines[0]?.startsWith(prefix))
+    fail("PROTECTED_EXECUTION_FAILED", "launcher result envelope is invalid");
+  const encoded = requireString(
+    lines[0]?.slice(prefix.length),
+    "PROTECTED_EXECUTION_FAILED",
+    "launcher result envelope",
+  );
+  const bytes = Buffer.from(encoded, "base64");
+  if (bytes.toString("base64") !== encoded)
+    fail(
+      "PROTECTED_EXECUTION_FAILED",
+      "launcher result is not canonical base64",
+    );
+  const result = validateRawReport(
+    parseJson(
+      bytes.toString("utf8"),
+      "PROTECTED_EXECUTION_FAILED",
+      "protected launcher result",
+    ),
+  );
+  if (canonicalJson(result.command) !== canonicalJson(safeCommand))
+    fail("PROTECTED_EXECUTION_FAILED", "launcher changed the command scope");
+  if (
+    Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr) >
+    DEFAULT_MAX_OUTPUT_BYTES
+  ) {
+    fail("COMMAND_OUTPUT_LIMIT", `exceeded ${DEFAULT_MAX_OUTPUT_BYTES} bytes`);
+  }
+  const postExecutionSha = sha256(
+    await readFile(launcher.path).catch(() =>
+      fail(
+        "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
+        "launcher disappeared during execution",
+      ),
+    ),
+  );
+  if (postExecutionSha !== launcher.sha256)
+    fail(
+      "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
+      "launcher bytes changed during execution",
+    );
+  return result;
+};
+
 const executeInDetachedSnapshot = async (
   root: string,
   context: CurrentContext,
   command: RunCommand,
+  launcher: ProtectedExecutionLauncher,
   options: ExecuteCommandOptions,
 ): Promise<SpawnResult> => {
   const temporaryParent = await mkdtemp(resolve(tmpdir(), "huoqiu-snapshot-"));
@@ -1664,25 +1909,15 @@ const executeInDetachedSnapshot = async (
     await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 20));
     const hasPackage = before.paths.includes("package.json");
     const hasLockfile = before.paths.includes("pnpm-lock.yaml");
-    if (hasPackage || hasLockfile) {
-      if (!hasPackage || !hasLockfile)
-        fail(
-          "SNAPSHOT_PREPARATION_FAILED",
-          "package and lockfile must coexist",
-        );
-      const install = await executeCommand(snapshotRoot, {
-        executable: "pnpm",
-        args: [
-          "install",
-          "--offline",
-          "--frozen-lockfile",
-          "--strict-peer-dependencies",
-        ],
-      });
-      if (install.exit_code !== 0)
-        fail("SNAPSHOT_PREPARATION_FAILED", install.stderr.trim());
-    }
-    const execution = await executeCommand(snapshotRoot, command, options);
+    if (hasPackage !== hasLockfile)
+      fail("SNAPSHOT_PREPARATION_FAILED", "package and lockfile must coexist");
+    const execution = await executeWithProtectedLauncher(
+      snapshotRoot,
+      launcher,
+      command,
+      hasPackage,
+      options,
+    );
     await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 50));
     const after = await computeTrackedSourceSnapshot(snapshotRoot);
     if (trackedWrite || after.sha256 !== before.sha256)
@@ -1723,6 +1958,8 @@ export const runCapability = async (
     );
   }
   const context = await computeCurrentContext(root, milestone);
+  const environment = options.environment ?? process.env;
+  const launcher = await protectedExecutionLauncher(root, environment);
   const commandOptions: ExecuteCommandOptions = {};
   if (options.clock !== undefined) commandOptions.clock = options.clock;
   if (options.environment !== undefined)
@@ -1731,6 +1968,7 @@ export const runCapability = async (
     root,
     context,
     item.command,
+    launcher,
     commandOptions,
   );
   return await assembleEvidence(
@@ -1978,6 +2216,7 @@ interface TrustRegistry {
   previous_registry_sha256: string | null;
   expires_at: string;
   verifier_sha256: string;
+  execution_launcher_sha256: string;
   keys: Record<string, TrustPolicy>;
   signature: {
     algorithm: "Ed25519";
@@ -2007,6 +2246,7 @@ const validateTrustRegistry = (value: unknown): TrustRegistry => {
       "previous_registry_sha256",
       "expires_at",
       "verifier_sha256",
+      "execution_launcher_sha256",
       "keys",
       "signature",
     ],
@@ -2203,6 +2443,12 @@ const validateTrustRegistry = (value: unknown): TrustRegistry => {
       "verifier_sha256",
       /^[a-f0-9]{64}$/,
     ),
+    execution_launcher_sha256: requireSha(
+      registry.execution_launcher_sha256,
+      code,
+      "execution_launcher_sha256",
+      /^[a-f0-9]{64}$/,
+    ),
     keys,
     signature,
   };
@@ -2218,6 +2464,7 @@ const unsignedTrustRegistry = (
   previous_registry_sha256: registry.previous_registry_sha256,
   expires_at: registry.expires_at,
   verifier_sha256: registry.verifier_sha256,
+  execution_launcher_sha256: registry.execution_launcher_sha256,
   keys: registry.keys,
 });
 
@@ -2260,11 +2507,57 @@ const verifierRoot = (
   return { keyId, publicKey };
 };
 
+const measuredVerifierSha256 = async (
+  root: string,
+  environment: NodeJS.ProcessEnv,
+): Promise<string> => {
+  const code = "VERIFIER_TRUST_ROOT_REQUIRED";
+  const configuredPath =
+    environment.HUOQIU_VERIFIER_ENTRYPOINT_PATH ??
+    fail(code, "protected verifier entrypoint path is required");
+  const actualArgument =
+    process.argv[1] ?? fail(code, "actual verifier entrypoint is unavailable");
+  if (!isAbsolute(configuredPath))
+    fail(code, "protected verifier entrypoint path must be absolute");
+  const [configuredRealPath, actualRealPath, repositoryRealPath] =
+    await Promise.all([
+      realpath(configuredPath).catch(() =>
+        fail(code, "protected verifier entrypoint cannot be resolved"),
+      ),
+      realpath(resolve(actualArgument)).catch(() =>
+        fail(code, "actual verifier entrypoint cannot be resolved"),
+      ),
+      realpath(root).catch(() =>
+        fail(code, "repository root cannot be resolved"),
+      ),
+    ]);
+  if (configuredRealPath !== actualRealPath)
+    fail(code, "configured verifier is not the executing entrypoint");
+  const fromRepository = relative(repositoryRealPath, actualRealPath);
+  if (
+    fromRepository === "" ||
+    (!fromRepository.startsWith(`..${sep}`) && fromRepository !== "..")
+  ) {
+    fail(code, "verifier entrypoint must be outside the candidate repository");
+  }
+  const entrypoint = await lstat(actualRealPath).catch(() =>
+    fail(code, "actual verifier entrypoint cannot be inspected"),
+  );
+  if (!entrypoint.isFile())
+    fail(code, "actual verifier entrypoint is not a file");
+  return sha256(
+    await readFile(actualRealPath).catch(() =>
+      fail(code, "actual verifier entrypoint cannot be read"),
+    ),
+  );
+};
+
 const loadTrustRegistry = async (
   root: string,
   environment: NodeJS.ProcessEnv = process.env,
 ): Promise<LoadedTrustRegistry> => {
   const rootAnchor = verifierRoot(environment);
+  const measuredVerifierSha = await measuredVerifierSha256(root, environment);
   const absolute = safeRepositoryPath(
     root,
     TRUST_REGISTRY_PATH,
@@ -2278,6 +2571,18 @@ const loadTrustRegistry = async (
       "REVIEW_TRUST_REGISTRY_INVALID",
     );
     const contents = await readFile(absolute);
+    const currentRegistrySha = sha256(contents);
+    const protectedRegistrySha = requireSha(
+      environment.HUOQIU_TRUST_REGISTRY_SHA256,
+      "VERIFIER_TRUST_ROOT_REQUIRED",
+      "HUOQIU_TRUST_REGISTRY_SHA256",
+      /^[a-f0-9]{64}$/,
+    );
+    if (currentRegistrySha !== protectedRegistrySha)
+      fail(
+        "VERIFIER_TRUST_ROOT_REQUIRED",
+        "current trust registry digest does not match the protected pin",
+      );
     const registry = validateTrustRegistry(
       parseJson(
         Buffer.from(contents).toString("utf8"),
@@ -2308,6 +2613,7 @@ const loadTrustRegistry = async (
       !POSITIVE_DECIMAL_PATTERN.test(expectedEpoch) ||
       registry.repository_id !== expectedRepositoryId ||
       registry.verifier_sha256 !== expectedVerifierSha ||
+      registry.verifier_sha256 !== measuredVerifierSha ||
       String(registry.epoch) !== expectedEpoch
     ) {
       fail(
@@ -2315,11 +2621,32 @@ const loadTrustRegistry = async (
         "protected repository, verifier, and registry epoch pins are missing or mismatched",
       );
     }
+    const protectedPreviousSha =
+      environment.HUOQIU_TRUST_REGISTRY_PREVIOUS_SHA256;
+    if (registry.epoch === 1) {
+      if (protectedPreviousSha !== undefined)
+        fail(
+          "VERIFIER_TRUST_ROOT_REQUIRED",
+          "epoch 1 must not carry a protected previous-registry pin",
+        );
+    } else {
+      const expectedPreviousSha = requireSha(
+        protectedPreviousSha,
+        "VERIFIER_TRUST_ROOT_REQUIRED",
+        "HUOQIU_TRUST_REGISTRY_PREVIOUS_SHA256",
+        /^[a-f0-9]{64}$/,
+      );
+      if (registry.previous_registry_sha256 !== expectedPreviousSha)
+        fail(
+          "VERIFIER_TRUST_ROOT_REQUIRED",
+          "previous trust registry digest does not match the protected chain pin",
+        );
+    }
     if (Date.parse(registry.expires_at) <= Date.now())
       fail("REVIEW_TRUST_REGISTRY_INVALID", "trust registry has expired");
     return {
       registry,
-      sha256: sha256(contents),
+      sha256: currentRegistrySha,
       verifierRootKeyId: rootAnchor.keyId,
     };
   } catch (error) {
@@ -2373,6 +2700,145 @@ export interface AuthorshipAttestation {
     value_base64: string;
   };
 }
+
+interface AuthorshipDerivationArchive {
+  schema_version: 1;
+  provider: "external-attestor";
+  repository_id: string;
+  trusted_base_sha: string;
+  head_sha: string;
+  contributors: {
+    provider: "github";
+    actor_id: string;
+  }[];
+}
+
+const validateAuthorshipDerivationArchive = (
+  value: unknown,
+): AuthorshipDerivationArchive => {
+  const code = "AUTHORSHIP_IDENTITY_NOT_CONFIGURED";
+  const archive = requireRecord(value, code, "authorship archive");
+  assertExactKeys(
+    archive,
+    [
+      "schema_version",
+      "provider",
+      "repository_id",
+      "trusted_base_sha",
+      "head_sha",
+      "contributors",
+    ],
+    code,
+    "authorship archive",
+  );
+  if (archive.schema_version !== 1)
+    fail(code, "authorship archive schema_version must be 1");
+  if (archive.provider !== "external-attestor")
+    fail(code, "authorship archive provider is invalid");
+  if (!Array.isArray(archive.contributors) || archive.contributors.length === 0)
+    fail(code, "authorship archive contributors must be non-empty");
+  const contributors = (archive.contributors as unknown[]).map(
+    (unknownContributor, index) => {
+      const contributor = requireRecord(
+        unknownContributor,
+        code,
+        `contributors[${index}]`,
+      );
+      assertExactKeys(
+        contributor,
+        ["provider", "actor_id"],
+        code,
+        `contributors[${index}]`,
+      );
+      if (contributor.provider !== "github")
+        fail(code, `contributors[${index}].provider must be github`);
+      return {
+        provider: "github" as const,
+        actor_id: requirePatternString(
+          contributor.actor_id,
+          code,
+          `contributors[${index}].actor_id`,
+          POSITIVE_DECIMAL_PATTERN,
+        ),
+      };
+    },
+  );
+  if (
+    new Set(contributors.map(({ actor_id }) => actor_id)).size !==
+    contributors.length
+  )
+    fail(code, "authorship archive contributors contain duplicates");
+  return {
+    schema_version: 1,
+    provider: "external-attestor",
+    repository_id: requirePatternString(
+      archive.repository_id,
+      code,
+      "repository_id",
+      POSITIVE_DECIMAL_PATTERN,
+    ),
+    trusted_base_sha: requireSha(
+      archive.trusted_base_sha,
+      code,
+      "trusted_base_sha",
+      /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/,
+    ),
+    head_sha: requireSha(
+      archive.head_sha,
+      code,
+      "head_sha",
+      /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/,
+    ),
+    contributors,
+  };
+};
+
+const protectedAuthorshipDerivation = (
+  environment: NodeJS.ProcessEnv,
+  expected: {
+    repositoryId: string;
+    trustedBaseSha: string;
+    headSha: string;
+  },
+): { archiveSha256: string; implementerIds: string[] } => {
+  const code = "AUTHORSHIP_IDENTITY_NOT_CONFIGURED";
+  const encoded =
+    environment.HUOQIU_AUTHORSHIP_ARCHIVE_B64 ??
+    fail(code, "protected authorship archive bytes are required");
+  const bytes = Buffer.from(encoded, "base64");
+  if (
+    bytes.byteLength === 0 ||
+    bytes.byteLength > 1024 * 1024 ||
+    bytes.toString("base64") !== encoded
+  ) {
+    fail(code, "protected authorship archive is not canonical base64");
+  }
+  const archiveSha256 = sha256(bytes);
+  const expectedSha256 = requireSha(
+    environment.HUOQIU_AUTHORSHIP_INPUT_SHA256,
+    code,
+    "HUOQIU_AUTHORSHIP_INPUT_SHA256",
+    /^[a-f0-9]{64}$/,
+  );
+  if (archiveSha256 !== expectedSha256)
+    fail(code, "protected authorship archive digest mismatch");
+  const archive = validateAuthorshipDerivationArchive(
+    parseJson(bytes.toString("utf8"), code, "protected authorship archive"),
+  );
+  if (
+    archive.repository_id !== expected.repositoryId ||
+    archive.trusted_base_sha !== expected.trustedBaseSha ||
+    archive.head_sha !== expected.headSha
+  ) {
+    fail(code, "protected authorship archive context mismatch");
+  }
+  return {
+    archiveSha256,
+    implementerIds: archive.contributors
+      .map(({ actor_id }) => `github:${actor_id}`)
+      .sort(),
+  };
+};
 
 export const authorshipPath = (commitSha: string): string =>
   `artifacts/evidence/${commitSha}/authorship.v1.json`;
@@ -2670,7 +3136,6 @@ const assertPrivateKeyMatchesPolicy = (
 export const recordAuthorship = async (
   root: string,
   commitSha: string,
-  implementerIdsInput: string[],
   options: {
     milestone?: Milestone;
     environment?: NodeJS.ProcessEnv;
@@ -2684,20 +3149,8 @@ export const recordAuthorship = async (
       "AUTHORSHIP_ATTESTATION_INVALID",
       "authorship only accepts current HEAD",
     );
-  const implementerIds = requireUniqueStrings(
-    implementerIdsInput,
-    "AUTHORSHIP_ATTESTATION_INVALID",
-    "implementer_ids",
-  ).sort();
-  if (!implementerIds.every(isCanonicalIdentity))
-    fail("AUTHORSHIP_ATTESTATION_INVALID", "implementer IDs are not canonical");
   const registry = await loadTrustRegistry(root, environment);
   const identity = resolveTrustedReviewerIdentity(environment);
-  if (implementerIds.includes(identity.reviewer_id))
-    fail(
-      "INDEPENDENT_REVIEW_REQUIRED",
-      "authorship attestor is listed as an implementer",
-    );
   const { keyId, policy } = policyForKey(
     registry.registry,
     environment.HUOQIU_AUTHORSHIP_KEY_ID,
@@ -2713,16 +3166,21 @@ export const recordAuthorship = async (
     "HUOQIU_TRUSTED_BASE_SHA",
     /^[a-f0-9]{40,64}$/,
   );
-  const attestorInputSha = requireSha(
-    environment.HUOQIU_AUTHORSHIP_INPUT_SHA256,
-    "AUTHORSHIP_IDENTITY_NOT_CONFIGURED",
-    "HUOQIU_AUTHORSHIP_INPUT_SHA256",
-    /^[a-f0-9]{64}$/,
-  );
   if (environment.HUOQIU_AUTHORSHIP_POLICY_VERSION !== "external-attestor-v1")
     fail(
       "AUTHORSHIP_IDENTITY_NOT_CONFIGURED",
       "authorship policy is not pinned",
+    );
+  const derivation = protectedAuthorshipDerivation(environment, {
+    repositoryId: registry.registry.repository_id,
+    trustedBaseSha,
+    headSha: commitSha,
+  });
+  const implementerIds = derivation.implementerIds;
+  if (implementerIds.includes(identity.reviewer_id))
+    fail(
+      "INDEPENDENT_REVIEW_REQUIRED",
+      "authorship attestor is listed as an implementer",
     );
   const headTreeOid = await runGit(root, ["rev-parse", `${commitSha}^{tree}`]);
   const unsigned: Omit<AuthorshipAttestation, "signature"> = {
@@ -2739,7 +3197,7 @@ export const recordAuthorship = async (
     source_tree_sha256: context.source_tree_sha256,
     trust_registry_sha256: registry.sha256,
     derivation_policy_version: "external-attestor-v1",
-    attestor_input_sha256: attestorInputSha,
+    attestor_input_sha256: derivation.archiveSha256,
     implementer_ids: implementerIds,
     issued_at: (options.clock ?? (() => new Date()))().toISOString(),
     issuer_id: identity.reviewer_id,
@@ -2799,18 +3257,17 @@ const verifyAuthorship = async (
     "HUOQIU_TRUSTED_BASE_SHA",
     /^[a-f0-9]{40,64}$/,
   );
-  const attestorInputSha = requireSha(
-    environment.HUOQIU_AUTHORSHIP_INPUT_SHA256,
-    "AUTHORSHIP_IDENTITY_NOT_CONFIGURED",
-    "HUOQIU_AUTHORSHIP_INPUT_SHA256",
-    /^[a-f0-9]{64}$/,
-  );
   if (environment.HUOQIU_AUTHORSHIP_POLICY_VERSION !== "external-attestor-v1") {
     fail(
       "AUTHORSHIP_IDENTITY_NOT_CONFIGURED",
       "protected authorship derivation pins are required",
     );
   }
+  const derivation = protectedAuthorshipDerivation(environment, {
+    repositoryId: registry.registry.repository_id,
+    trustedBaseSha,
+    headSha: context.commit_sha,
+  });
   const headTreeOid = await runGit(root, [
     "rev-parse",
     `${context.commit_sha}^{tree}`,
@@ -2824,8 +3281,9 @@ const verifyAuthorship = async (
       (await canonicalDiffSha256(root, trustedBaseSha, context.commit_sha)) ||
     attestation.source_tree_sha256 !== context.source_tree_sha256 ||
     attestation.trust_registry_sha256 !== registry.sha256 ||
-    attestation.attestor_input_sha256 !== attestorInputSha ||
-    !sameStringArray(attestation.implementer_ids, implementerIds)
+    attestation.attestor_input_sha256 !== derivation.archiveSha256 ||
+    !sameStringArray(attestation.implementer_ids, derivation.implementerIds) ||
+    !sameStringArray(derivation.implementerIds, implementerIds)
   ) {
     fail(
       "AUTHORSHIP_ATTESTATION_INVALID",
