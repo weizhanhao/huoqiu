@@ -33,19 +33,17 @@
 - [ ] **Step 1: 先写 Fixture 版本、来源和稳定 ID 的失败测试**
 
 ```ts
-import fixture from "../fixtures/d0.v1.json";
-import { d0FixtureSchema } from "../src/d0/schema";
+import fixture from '../fixtures/d0.v1.json';
+import { d0FixtureSchema } from '../src/d0/schema';
 
-it("parses a versioned, synthetic-only fixture", () => {
+it('parses a versioned, synthetic-only fixture', () => {
   const parsed = d0FixtureSchema.parse(fixture);
-  expect(parsed.version).toBe("d0.v1");
-  expect(parsed.mode).toBe("fixture");
-  expect(parsed.market.source).toBe("huoqiu-synthetic");
-  expect(parsed.instruments[0]?.listing_id).toBe("listing_syn_0001");
+  expect(parsed.version).toBe('d0.v1');
+  expect(parsed.mode).toBe('fixture');
+  expect(parsed.market.source).toBe('huoqiu-synthetic');
+  expect(parsed.instruments[0]?.listing_id).toBe('listing_syn_0001');
   expect(parsed.quotes[0]).toMatchObject({
-    source: "huoqiu-synthetic",
-    stale: false,
-    entitlement: "synthetic",
+    source: 'huoqiu-synthetic', stale: false, entitlement: 'synthetic',
   });
   expect(parsed.feed[0]?.permissions.alpha_access).toBe(true);
 });
@@ -62,68 +60,29 @@ pnpm exec vitest run packages/contracts/test/d0-fixture.contract.spec.ts
 - [ ] **Step 3: 定义精确 Schema**
 
 ```ts
-import { z } from "zod";
+import { z } from 'zod';
 
-import { feedCardV1Schema } from "../feed/card-v1";
+import { feedCardV1Schema } from '../feed/card-v1';
 
 const decimalString = z.string().regex(/^-?\d+(\.\d+)?$/);
 const isoInstant = z.string().datetime({ offset: true });
 
 export const d0FixtureSchema = z.object({
-  version: z.literal("d0.v1"),
-  mode: z.literal("fixture"),
-  seed_user: z.object({
-    id: z.literal("user_demo_0001"),
-    name: z.string(),
-    avatar_key: z.literal("demo-avatar"),
-  }),
-  market: z.object({
-    source: z.literal("huoqiu-synthetic"),
-    as_of: isoInstant,
-  }),
-  instruments: z
-    .array(
-      z.object({
-        instrument_id: z.string(),
-        listing_id: z.string(),
-        symbol: z.string(),
-        name: z.string(),
-        pinyin: z.string(),
-        aliases: z.array(z.string()),
-        market: z.enum(["CN", "HK", "US"]),
-        currency: z.enum(["CNY", "HKD", "USD"]),
-        status: z.enum(["open", "closed", "halted"]),
-      }),
-    )
-    .min(1),
-  quotes: z.array(
-    z.object({
-      listing_id: z.string(),
-      last: decimalString,
-      change: decimalString,
-      change_pct: decimalString,
-      source: z.literal("huoqiu-synthetic"),
-      as_of: isoInstant,
-      stale: z.boolean(),
-      entitlement: z.literal("synthetic"),
-    }),
-  ),
-  bars: z.array(
-    z.object({
-      listing_id: z.string(),
-      interval: z.literal("1d"),
-      points: z.array(
-        z.object({
-          at: isoInstant,
-          open: decimalString,
-          high: decimalString,
-          low: decimalString,
-          close: decimalString,
-          volume: decimalString,
-        }),
-      ),
-    }),
-  ),
+  version: z.literal('d0.v1'),
+  mode: z.literal('fixture'),
+  seed_user: z.object({ id: z.literal('user_demo_0001'), name: z.string(), avatar_key: z.literal('demo-avatar') }),
+  market: z.object({ source: z.literal('huoqiu-synthetic'), as_of: isoInstant }),
+  instruments: z.array(z.object({
+    instrument_id: z.string(), listing_id: z.string(), symbol: z.string(), name: z.string(),
+    pinyin: z.string(), aliases: z.array(z.string()), market: z.enum(['CN', 'HK', 'US']),
+    currency: z.enum(['CNY', 'HKD', 'USD']), status: z.enum(['open', 'closed', 'halted']),
+  })).min(1),
+  quotes: z.array(z.object({
+    listing_id: z.string(), last: decimalString, change: decimalString, change_pct: decimalString,
+    source: z.literal('huoqiu-synthetic'), as_of: isoInstant, stale: z.boolean(),
+    entitlement: z.literal('synthetic'),
+  })),
+  bars: z.array(z.object({ listing_id: z.string(), interval: z.literal('1d'), points: z.array(z.object({ at: isoInstant, open: decimalString, high: decimalString, low: decimalString, close: decimalString, volume: decimalString })) })),
   feed: z.array(feedCardV1Schema),
 });
 ```
@@ -131,17 +90,17 @@ export const d0FixtureSchema = z.object({
 `packages/contracts/src/feed/card-v1.ts` 是 D0 Fixture 与 M1 API 共用的唯一 Card v1 Schema，公共字段不得在 M1 重新定义：
 
 ```ts
-import { z } from "zod";
+import { z } from 'zod';
 
 export const feedCardV1Schema = z.object({
-  type: z.enum(["post", "news", "market_strip", "topic", "ops_banner"]),
+  type: z.enum(['post', 'news', 'market_strip', 'topic', 'ops_banner']),
   schema_version: z.literal(1),
   card_id: z.string().min(1),
   published_at: z.string().datetime({ offset: true }),
   source: z.string().min(1),
   permissions: z.object({
     alpha_access: z.literal(true),
-    visibility: z.enum(["alpha-public", "owner", "reviewer"]),
+    visibility: z.enum(['alpha-public', 'owner', 'reviewer']),
   }),
   payload: z.record(z.string(), z.unknown()),
 });
@@ -182,14 +141,10 @@ git commit -m "feat(contracts): add versioned D0 fixture"
 - [ ] **Step 1: 写 seed identity 与状态矩阵失败测试**
 
 ```tsx
-render(
-  <DesktopShell>
-    <div>内容</div>
-  </DesktopShell>,
-);
-expect(screen.getByText("演示用户")).toBeVisible();
-expect(screen.getByText("演示数据")).toBeVisible();
-expect(screen.queryByText("私募认购")).not.toBeInTheDocument();
+render(<DesktopShell><div>内容</div></DesktopShell>);
+expect(screen.getByText('演示用户')).toBeVisible();
+expect(screen.getByText('演示数据')).toBeVisible();
+expect(screen.queryByText('私募认购')).not.toBeInTheDocument();
 ```
 
 - [ ] **Step 2: 运行组件测试并确认失败**
@@ -316,16 +271,12 @@ pnpm --filter @huoqiu/web exec vitest run tests/component/d0/search.spec.tsx tes
 - [ ] **Step 4: 实现纯函数搜索和详情 loader**
 
 ```ts
-export function searchD0Listings(
-  query: string,
-  fixture: D0Fixture,
-): D0Instrument[] {
-  const normalized = query.trim().toLocaleLowerCase("zh-CN");
+export function searchD0Listings(query: string, fixture: D0Fixture): D0Instrument[] {
+  const normalized = query.trim().toLocaleLowerCase('zh-CN');
   if (!normalized) return [];
   return fixture.instruments.filter((item) =>
-    [item.symbol, item.name, item.pinyin, ...item.aliases].some((value) =>
-      value.toLocaleLowerCase("zh-CN").includes(normalized),
-    ),
+    [item.symbol, item.name, item.pinyin, ...item.aliases]
+      .some((value) => value.toLocaleLowerCase('zh-CN').includes(normalized)),
   );
 }
 ```
@@ -447,19 +398,17 @@ git commit -m "feat(mobile): add D0 four-screen fixture demo"
 - [ ] **Step 1: 写尚未通过的黄金路径**
 
 ```ts
-test("seed identity -> feed -> search -> detail -> watchlist", async ({
-  page,
-}) => {
-  await page.goto("/?fixture=d0.v1");
-  await expect(page.getByText("演示数据")).toBeVisible();
-  await page.getByRole("searchbox").fill("SYN001");
-  await page.getByRole("button", { name: "搜索" }).click();
-  await page.getByRole("link", { name: /合成示例一号/ }).click();
+test('seed identity -> feed -> search -> detail -> watchlist', async ({ page }) => {
+  await page.goto('/?fixture=d0.v1');
+  await expect(page.getByText('演示数据')).toBeVisible();
+  await page.getByRole('searchbox').fill('SYN001');
+  await page.getByRole('button', { name: '搜索' }).click();
+  await page.getByRole('link', { name: /合成示例一号/ }).click();
   await expect(page).toHaveURL(/instruments\/listing_syn_0001/);
-  await expect(page.getByText("huoqiu-synthetic")).toBeVisible();
-  await page.getByRole("button", { name: "加自选" }).click();
-  await page.getByRole("link", { name: "自选" }).click();
-  await expect(page.getByText("合成示例一号")).toHaveCount(1);
+  await expect(page.getByText('huoqiu-synthetic')).toBeVisible();
+  await page.getByRole('button', { name: '加自选' }).click();
+  await page.getByRole('link', { name: '自选' }).click();
+  await expect(page.getByText('合成示例一号')).toHaveCount(1);
 });
 ```
 

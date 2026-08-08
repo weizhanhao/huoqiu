@@ -26,16 +26,16 @@
 
 ## 1. 计划文件与执行顺序
 
-| 顺序 | 计划文件                                                 | 交付物                                         | 开始条件                         |
-| ---: | -------------------------------------------------------- | ---------------------------------------------- | -------------------------------- |
-|    1 | `2026-08-08-huoqiu-wave0-bootstrap.md`                   | Monorepo、共享原语、应用壳、质量 runner        | 批准规格与本地工具链             |
-|    2 | `2026-08-08-huoqiu-d0-demo.md`                           | D0 契约、Web 黄金路径、App 四页导航壳          | Wave 0 bootstrap SHA             |
-|    3 | `2026-08-08-huoqiu-m1-foundation.md`                     | 31 个 API、18 个事件、SDK、数据库、认证与 Seed | D0 可并行，不要求 D0 Gate 先通过 |
-|    4 | `2026-08-08-huoqiu-m1-market-watchlist.md`               | Identity、标的、行情、Feed、自选纵向链         | M1 contract SHA 与空库迁移通过   |
-|    5 | `2026-08-08-huoqiu-m1-community-moderation.md`           | 短帖、评论、点赞、举报、审核后台               | Content/Moderation 状态机冻结    |
-|    6 | `2026-08-08-huoqiu-m1-portfolio-notifications.md`        | canonical Inbox/SSE、私有组合账本              | Identity、Synthetic Market 可用  |
-|    7 | `2026-08-08-huoqiu-m1-mobile-integration-release.md`     | 三端集成、安全、恢复、发布证据                 | 10 个 Required CAP 代码冻结      |
-|    8 | `2026-08-08-huoqiu-post-m1-high-completeness-roadmap.md` | M2、公开 V1 与高完整度路线                     | M1 通过；每波外部依赖单独过 Gate |
+| 顺序 | 计划文件 | 交付物 | 开始条件 |
+|---:|---|---|---|
+| 1 | `2026-08-08-huoqiu-wave0-bootstrap.md` | Monorepo、共享原语、应用壳、质量 runner | 批准规格与本地工具链 |
+| 2 | `2026-08-08-huoqiu-d0-demo.md` | D0 契约、Web 黄金路径、App 四页导航壳 | Wave 0 bootstrap SHA |
+| 3 | `2026-08-08-huoqiu-m1-foundation.md` | 31 个 API、18 个事件、SDK、数据库、认证与 Seed | D0 可并行，不要求 D0 Gate 先通过 |
+| 4 | `2026-08-08-huoqiu-m1-market-watchlist.md` | Identity、标的、行情、Feed、自选纵向链 | M1 contract SHA 与空库迁移通过 |
+| 5 | `2026-08-08-huoqiu-m1-community-moderation.md` | 短帖、评论、点赞、举报、审核后台 | Content/Moderation 状态机冻结 |
+| 6 | `2026-08-08-huoqiu-m1-portfolio-notifications.md` | canonical Inbox/SSE、私有组合账本 | Identity、Synthetic Market 可用 |
+| 7 | `2026-08-08-huoqiu-m1-mobile-integration-release.md` | 三端集成、安全、恢复、发布证据 | 10 个 Required CAP 代码冻结 |
+| 8 | `2026-08-08-huoqiu-post-m1-high-completeness-roadmap.md` | M2、公开 V1 与高完整度路线 | M1 通过；每波外部依赖单独过 Gate |
 
 Wave 0 与 D0 的 UI 实现可以在 D0 contract SHA 发布后并行；M1 API 的数据库与 Seed 不以 D0 Gate 为硬前置。任何客户端不得在 contract SHA 发布前复制 DTO 或猜测字段。
 
@@ -82,32 +82,32 @@ artifacts/evidence/.gitkeep
 
 以下版本在 2026-08-08 从 npm registry 核对；实现任务不得自动升级，变更必须经主代理更新许可证/SCA 证据和 lockfile：
 
-| 类别             | 精确版本                                                                                                                                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime/Monorepo | `pnpm@11.4.0`、`turbo@2.10.8`、`typescript@6.0.3`、`tsx@4.23.9`                                                                                                                                         |
-| Root tooling     | `@types/node@24.13.3`、`eslint@10.8.0`、`prettier@3.9.6`                                                                                                                                                |
-| Web              | `next@16.3.0`、`react@19.2.8`、`react-dom@19.2.8`、`@types/react@19.2.18`、`@types/react-dom@19.2.4`                                                                                                    |
-| Mobile           | `expo@57.0.11`、`expo-router@57.0.11`、`expo-secure-store@57.0.1`、`react-native@0.86.2`、`react-native-web@0.21.2`、`react-native-svg@15.15.5`、`react-native-webview@14.0.1`（仅图表 Spike 失败回退） |
-| Mobile UI        | `@shopify/flash-list@2.3.2`、`react-native-reanimated@4.5.3`、`@wuba/react-native-echarts@3.1.1`                                                                                                        |
-| API/Auth         | `@nestjs/core@11.1.28`、`@nestjs/platform-fastify@11.1.28`、`fastify@5.11.2`；`better-auth@1.6.26` 与 `@thallesp/nestjs-better-auth@2.7.0` 仅在认证 Spike 通过后安装到运行应用                          |
-| API safety       | `@fastify/helmet@13.1.0`、`@fastify/rate-limit@11.2.0`                                                                                                                                                  |
-| Contract/Data    | `zod@4.4.3`、`@ts-rest/core@3.52.1`、`@ts-rest/nest@3.52.1`、`@ts-rest/open-api@3.52.1`、`drizzle-orm@0.45.2`、`drizzle-kit@0.31.10`、`postgres@3.4.9`                                                  |
-| State/Queue      | `@tanstack/react-query@5.101.4`、`zustand@5.0.14`、`bullmq@6.0.9`                                                                                                                                       |
-| Charts/Web UI    | `echarts@6.1.0`、`@radix-ui/react-dialog@1.1.23`、`@radix-ui/react-tabs@1.1.21`、`lucide-react@1.30.0`、`clsx@2.1.1`、`tailwind-merge@3.6.0`                                                            |
-| Tests            | `vitest@4.1.10`、`@playwright/test@1.62.1`、`testcontainers@12.1.0`、`@axe-core/playwright@4.12.1`、`@testing-library/react@16.3.2`、`@testing-library/react-native@14.0.1`                             |
+| 类别 | 精确版本 |
+|---|---|
+| Runtime/Monorepo | `pnpm@11.4.0`、`turbo@2.10.8`、`typescript@6.0.3`、`tsx@4.23.9` |
+| Root tooling | `@types/node@24.13.3`、`eslint@10.8.0`、`prettier@3.9.6` |
+| Web | `next@16.3.0`、`react@19.2.8`、`react-dom@19.2.8`、`@types/react@19.2.18`、`@types/react-dom@19.2.4` |
+| Mobile | `expo@57.0.11`、`expo-router@57.0.11`、`expo-secure-store@57.0.1`、`react-native@0.86.2`、`react-native-web@0.21.2`、`react-native-svg@15.15.5`、`react-native-webview@14.0.1`（仅图表 Spike 失败回退） |
+| Mobile UI | `@shopify/flash-list@2.3.2`、`react-native-reanimated@4.5.3`、`@wuba/react-native-echarts@3.1.1` |
+| API/Auth | `@nestjs/core@11.1.28`、`@nestjs/platform-fastify@11.1.28`、`fastify@5.11.2`；`better-auth@1.6.26` 与 `@thallesp/nestjs-better-auth@2.7.0` 仅在认证 Spike 通过后安装到运行应用 |
+| API safety | `@fastify/helmet@13.1.0`、`@fastify/rate-limit@11.2.0` |
+| Contract/Data | `zod@4.4.3`、`@ts-rest/core@3.52.1`、`@ts-rest/nest@3.52.1`、`@ts-rest/open-api@3.52.1`、`drizzle-orm@0.45.2`、`drizzle-kit@0.31.10`、`postgres@3.4.9` |
+| State/Queue | `@tanstack/react-query@5.101.4`、`zustand@5.0.14`、`bullmq@6.0.9` |
+| Charts/Web UI | `echarts@6.1.0`、`@radix-ui/react-dialog@1.1.23`、`@radix-ui/react-tabs@1.1.21`、`lucide-react@1.30.0`、`clsx@2.1.1`、`tailwind-merge@3.6.0` |
+| Tests | `vitest@4.1.10`、`@playwright/test@1.62.1`、`testcontainers@12.1.0`、`@axe-core/playwright@4.12.1`、`@testing-library/react@16.3.2`、`@testing-library/react-native@14.0.1` |
 
 Keycloak、PostgreSQL、Valkey、Jaeger、Gitleaks、Semgrep、Syft、Trivy、Grype、Maestro 与 k6 使用锁定容器 digest 或工具版本；对应 digest 在首次引入时写入 `security/artifact-inventory.yml`，未登记不得进入 Gate。
 
-根 `pnpm-workspace.yaml` 的 `onlyBuiltDependencies` 只允许 `esbuild` 执行安装脚本；pnpm 11 的 `pnpm approve-builds esbuild` 同时生成的 `allowBuilds.esbuild: true` 是该单包批准的项目内记录。不得以全局配置或临时 minimum-release-age 豁免绕过供应链策略，也不得批准其他构建脚本。
+根 `pnpm-workspace.yaml` 的 `onlyBuiltDependencies` 只允许 `esbuild` 执行安装脚本；pnpm 11 的 `allowBuilds.esbuild: true` 是该单包批准的项目内记录。不得以全局配置或 temporary minimum-release-age 豁免绕过供应链策略，也不得批准其他构建脚本。
 
 ### 3.2 泳道所有权
 
-| 泳道   | 分支格式                | 唯一写入范围                                                                                                                                                                                                                                                         | 必须返回的证据                                   |
-| ------ | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| 主代理 | `agent/root/<cap-id>`   | 根文件与 lockfile、`.github`、`docs/adr`、`infra`、`security`、`packages/config`、`packages/contracts`、`packages/sdk`、`packages/design-tokens`、`packages/testkit`、`quality`、`scripts`、`tests/e2e`、`tests/recovery`、`tests/performance`、`artifacts/evidence` | base SHA、contract SHA、Gate 原始日志            |
-| API    | `agent/api/<cap-id>`    | `apps/api`（含独立 worker entrypoints）、`packages/db`、`packages/domain`、`packages/market-adapters`                                                                                                                                                                | migration replay、API integration/security tests |
-| Web    | `agent/web/<cap-id>`    | `apps/web`、`apps/admin`、`packages/web-ui`                                                                                                                                                                                                                          | component、Playwright、视觉证据                  |
-| Mobile | `agent/mobile/<cap-id>` | `apps/mobile`、`packages/native-ui`                                                                                                                                                                                                                                  | iOS/Android build、component 与 Maestro 原始日志 |
+| 泳道 | 分支格式 | 唯一写入范围 | 必须返回的证据 |
+|---|---|---|---|
+| 主代理 | `agent/root/<cap-id>` | 根文件与 lockfile、`.github`、`docs/adr`、`infra`、`security`、`packages/config`、`packages/contracts`、`packages/sdk`、`packages/design-tokens`、`packages/testkit`、`quality`、`scripts`、`tests/e2e`、`tests/recovery`、`tests/performance`、`artifacts/evidence` | base SHA、contract SHA、Gate 原始日志 |
+| API | `agent/api/<cap-id>` | `apps/api`（含独立 worker entrypoints）、`packages/db`、`packages/domain`、`packages/market-adapters` | migration replay、API integration/security tests |
+| Web | `agent/web/<cap-id>` | `apps/web`、`apps/admin`、`packages/web-ui` | component、Playwright、视觉证据 |
+| Mobile | `agent/mobile/<cap-id>` | `apps/mobile`、`packages/native-ui` | iOS/Android build、component 与 Maestro 原始日志 |
 
 集成只允许主代理在干净 worktree 中按依赖顺序 cherry-pick。子代理可以在自己唯一写入范围内修改 `package.json`，但必须先在任务交接中列出精确版本、许可证、用途和所需 workspace edge；不得运行会修改 lockfile 的安装命令，也不得提交 lockfile。主代理审查依赖申请后集中执行一次 `pnpm install --frozen-lockfile=false`、运行许可证/SCA 与受影响构建，再把唯一 lockfile commit 合入集成分支。
 

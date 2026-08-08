@@ -58,14 +58,8 @@ type CanonicalNotification = {
   sequence: string;
   recipientId: UserId;
   canonicalKey: string;
-  type:
-    | "post_published"
-    | "comment_published"
-    | "reaction_received"
-    | "content_hidden"
-    | "watchlist_changed"
-    | "portfolio_updated";
-  object: { type: "post" | "comment" | "listing" | "portfolio"; id: string };
+  type: 'post_published' | 'comment_published' | 'reaction_received' | 'content_hidden' | 'watchlist_changed' | 'portfolio_updated';
+  object: { type: 'post' | 'comment' | 'listing' | 'portfolio'; id: string };
   deepLink: string;
   createdAt: string;
 };
@@ -187,23 +181,9 @@ git commit -m "feat(mobile): add inbox and notification deep links"
 
 ```ts
 type LedgerCommand =
-  | {
-      type: "buy";
-      listingId: ListingId;
-      quantity: string;
-      price: string;
-      fee: string;
-      occurredAt: string;
-    }
-  | {
-      type: "sell";
-      listingId: ListingId;
-      quantity: string;
-      price: string;
-      fee: string;
-      occurredAt: string;
-    }
-  | { type: "fee"; amount: string; occurredAt: string };
+  | { type: 'buy'; listingId: ListingId; quantity: string; price: string; fee: string; occurredAt: string }
+  | { type: 'sell'; listingId: ListingId; quantity: string; price: string; fee: string; occurredAt: string }
+  | { type: 'fee'; amount: string; occurredAt: string };
 ```
 
 每个 entry 生成至少两条 posting；posting account 只允许 cash、position-cost、fee、opening-equity。

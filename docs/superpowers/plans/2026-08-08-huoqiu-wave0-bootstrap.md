@@ -24,6 +24,7 @@
 - Modify: `.gitignore`
 - Create: `.npmrc`
 - Create: `.nvmrc`
+- Create: `.prettierignore`
 - Create: `package.json`
 - Create: `pnpm-workspace.yaml`
 - Create: `turbo.json`
@@ -71,11 +72,11 @@ git status --short
 
 - [ ] **Step 3: 写 workspace 与 Turbo pipeline**
 
-`pnpm-workspace.yaml` 的 `packages` 列表只包含 `apps/*` 与 `packages/*`，并以 `onlyBuiltDependencies: [esbuild]` 作为唯一项目级安装脚本批准。pnpm 11 使用 `pnpm approve-builds esbuild` 生成对应的 `allowBuilds.esbuild: true` 单包批准记录；不得批准其他构建脚本或使用临时/全局 minimum-release-age 豁免。`turbo.json` 将 `build` 依赖 `^build`，`lint/typecheck/test` 依赖同名上游任务，`dev` 设为 persistent 且不缓存。
+`pnpm-workspace.yaml` 的 `packages` 列表只包含 `apps/*` 与 `packages/*`，并以 `onlyBuiltDependencies: [esbuild]` 和 `allowBuilds.esbuild: true` 作为唯一项目级安装脚本批准；不得批准其他构建脚本或使用全局/临时 minimum-release-age 豁免。`turbo.json` 将 `build` 依赖 `^build`，`lint/typecheck/test` 依赖同名上游任务，`dev` 设为 persistent 且不缓存。
 
 - [ ] **Step 4: 写忽略规则**
 
-保留工作区准备阶段已有的 `.worktrees/`，并忽略 `node_modules`、`.next`、`.expo`、`dist`、`coverage`、`.turbo`、本地 `.env*`、Playwright/Maestro 报告和证据产物；保留 `.env.example` 与 `artifacts/evidence/.gitkeep`。
+保留工作区准备阶段已有的 `.worktrees/`，并忽略 `node_modules`、`.next`、`.expo`、`dist`、`coverage`、`.turbo`、本地 `.env*`、Playwright/Maestro 报告和证据产物；保留 `.env.example` 与 `artifacts/evidence/.gitkeep`。新建 `.prettierignore` 只排除经批准不可机械重排的 `docs/superpowers/**/*.md` 与生成/证据目录；不得忽略未来 `apps/*`、`packages/*` 源码或根 manifests。
 
 - [ ] **Step 5: 安装并验证 lockfile**
 
@@ -87,12 +88,12 @@ pnpm exec turbo --version
 pnpm exec tsx --version
 ```
 
-预期 Turbo 输出 `2.10.8`，且 `esbuild` 只因项目内单包 allowlist 执行安装脚本。
+预期 Turbo 输出 `2.10.8`。
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add .gitignore .npmrc .nvmrc package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json README.md
+git add .gitignore .npmrc .nvmrc .prettierignore package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json README.md
 git commit -m "chore: bootstrap huoqiu monorepo"
 ```
 
@@ -114,10 +115,10 @@ git commit -m "chore: bootstrap huoqiu monorepo"
 - [ ] **Step 1: 写环境变量拒绝未知模式的失败测试**
 
 ```ts
-import { parseRuntimeEnv } from "../src/env";
+import { parseRuntimeEnv } from '../src/env';
 
-it("rejects production mode without explicit environment", () => {
-  expect(() => parseRuntimeEnv({ NODE_ENV: "production" })).toThrow("APP_ENV");
+it('rejects production mode without explicit environment', () => {
+  expect(() => parseRuntimeEnv({ NODE_ENV: 'production' })).toThrow('APP_ENV');
 });
 ```
 
@@ -134,15 +135,14 @@ pnpm --filter @huoqiu/config exec vitest run test/env.spec.ts
 - [ ] **Step 4: 实现 Zod 环境解析**
 
 ```ts
-import { z } from "zod";
+import { z } from 'zod';
 
 const runtimeEnvSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]),
-  APP_ENV: z.enum(["local", "test", "staging", "production"]),
+  NODE_ENV: z.enum(['development', 'test', 'production']),
+  APP_ENV: z.enum(['local', 'test', 'staging', 'production']),
 });
 
-export const parseRuntimeEnv = (input: Record<string, unknown>) =>
-  runtimeEnvSchema.parse(input);
+export const parseRuntimeEnv = (input: Record<string, unknown>) => runtimeEnvSchema.parse(input);
 ```
 
 - [ ] **Step 5: 验证并提交**
@@ -173,10 +173,10 @@ git commit -m "chore(config): add strict shared tooling"
 - [ ] **Step 1: 写定点数和涨跌色失败测试**
 
 ```ts
-expect(addDecimal("0.1", "0.2")).toBe("0.3");
-expect(tokens.market.up).toBe("#F04444");
-expect(tokens.market.down).toBe("#16A37A");
-expect(tokens.brand.primary).not.toBe("#1976D2");
+expect(addDecimal('0.1', '0.2')).toBe('0.3');
+expect(tokens.market.up).toBe('#F04444');
+expect(tokens.market.down).toBe('#16A37A');
+expect(tokens.brand.primary).not.toBe('#1976D2');
 ```
 
 - [ ] **Step 2: 运行并确认失败**
@@ -190,10 +190,10 @@ pnpm --filter @huoqiu/design-tokens test
 
 ```ts
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
-export type UserId = Brand<string, "UserId">;
-export type ListingId = Brand<string, "ListingId">;
-export type PostId = Brand<string, "PostId">;
-export type PortfolioId = Brand<string, "PortfolioId">;
+export type UserId = Brand<string, 'UserId'>;
+export type ListingId = Brand<string, 'ListingId'>;
+export type PostId = Brand<string, 'PostId'>;
+export type PortfolioId = Brand<string, 'PortfolioId'>;
 ```
 
 定点数实现使用字符串输入和 `bigint` scale，不允许 `number` 进入金额、价格或数量构造器。
@@ -232,14 +232,9 @@ git commit -m "feat(shared): add core primitives and brand tokens"
 - [ ] **Step 1: 写统一错误结构和 cursor 测试**
 
 ```ts
-expect(
-  apiErrorSchema.parse({
-    code: "VALIDATION_FAILED",
-    message: "输入不合法",
-    details: { field: "query" },
-    trace_id: "trace_test_1",
-  }).code,
-).toBe("VALIDATION_FAILED");
+expect(apiErrorSchema.parse({
+  code: 'VALIDATION_FAILED', message: '输入不合法', details: { field: 'query' }, trace_id: 'trace_test_1',
+}).code).toBe('VALIDATION_FAILED');
 ```
 
 - [ ] **Step 2: 运行测试确认失败**
@@ -344,11 +339,11 @@ git commit -m "feat(apps): add web and mobile shells"
 Admin 使用独立 Next.js 应用，员工准入 guard 在 M1 foundation 实现前默认 deny。`apps/admin/next.config.ts` 必须固定前缀并由 smoke test 断言 `/admin` 与 `/admin/moderation`，不得依赖未登记的外部 rewrite：
 
 ```ts
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  basePath: "/admin",
-  assetPrefix: "/admin",
+  basePath: '/admin',
+  assetPrefix: '/admin',
 };
 
 export default nextConfig;
@@ -391,41 +386,26 @@ git commit -m "feat(apps): add api and admin shells"
 - [ ] **Step 1: 写 Gate 对范围伪造、旧证据、自审和 skip 失败的测试**
 
 ```ts
-it.each(["skip", "fixme", "todo", "passWithNoTests"])(
-  "rejects %s in required evidence",
-  async (marker) => {
-    await expect(runGate(fixtureWithMarker(marker))).rejects.toThrow(
-      "REQUIRED_TEST_INVALID",
-    );
-  },
-);
-
-it.each([
-  ["empty", []],
-  ["duplicate", ["CAP-ID-001", "CAP-ID-001"]],
-  ["missing", ["CAP-ID-001"]],
-  ["extra", ["CAP-ID-001", "CAP-UNKNOWN-999"]],
-])("rejects %s Required CAP manifest", async (_name, capIds) => {
-  await expect(runGate(fixtureWithCaps(capIds))).rejects.toThrow(
-    "REQUIRED_SCOPE_MISMATCH",
-  );
+it.each(['skip', 'fixme', 'todo', 'passWithNoTests'])('rejects %s in required evidence', async (marker) => {
+  await expect(runGate(fixtureWithMarker(marker))).rejects.toThrow('REQUIRED_TEST_INVALID');
 });
 
-it.each(["commit_sha", "contract_sha", "fixture_sha", "config_sha"])(
-  "rejects stale %s",
-  async (field) => {
-    await expect(runGate(fixtureWithStaleHash(field))).rejects.toThrow(
-      "STALE_EVIDENCE",
-    );
-  },
-);
+it.each([
+  ['empty', []],
+  ['duplicate', ['CAP-ID-001', 'CAP-ID-001']],
+  ['missing', ['CAP-ID-001']],
+  ['extra', ['CAP-ID-001', 'CAP-UNKNOWN-999']],
+])('rejects %s Required CAP manifest', async (_name, capIds) => {
+  await expect(runGate(fixtureWithCaps(capIds))).rejects.toThrow('REQUIRED_SCOPE_MISMATCH');
+});
 
-it("rejects self review", async () => {
-  await expect(
-    runGate(
-      fixtureWithReview({ implementer_ids: ["alice"], reviewer_id: "alice" }),
-    ),
-  ).rejects.toThrow("INDEPENDENT_REVIEW_REQUIRED");
+it.each(['commit_sha', 'contract_sha', 'fixture_sha', 'config_sha'])('rejects stale %s', async (field) => {
+  await expect(runGate(fixtureWithStaleHash(field))).rejects.toThrow('STALE_EVIDENCE');
+});
+
+it('rejects self review', async () => {
+  await expect(runGate(fixtureWithReview({ implementer_ids: ['alice'], reviewer_id: 'alice' })))
+    .rejects.toThrow('INDEPENDENT_REVIEW_REQUIRED');
 });
 ```
 
@@ -444,13 +424,7 @@ pnpm exec vitest run scripts/quality/test/run-gate.spec.ts
 ```json
 {
   "milestone": "d0",
-  "required_cap_ids": [
-    "CAP-ID-001",
-    "CAP-INST-001",
-    "CAP-MD-001",
-    "CAP-FEED-001",
-    "CAP-WATCH-001"
-  ]
+  "required_cap_ids": ["CAP-ID-001", "CAP-INST-001", "CAP-MD-001", "CAP-FEED-001", "CAP-WATCH-001"]
 }
 ```
 
@@ -460,16 +434,8 @@ pnpm exec vitest run scripts/quality/test/run-gate.spec.ts
 {
   "milestone": "m1",
   "required_cap_ids": [
-    "CAP-ID-001",
-    "CAP-INST-001",
-    "CAP-MD-001",
-    "CAP-FEED-001",
-    "CAP-WATCH-001",
-    "CAP-CONTENT-001",
-    "CAP-SOCIAL-001",
-    "CAP-NOTIF-001",
-    "CAP-MOD-001",
-    "CAP-PORT-001"
+    "CAP-ID-001", "CAP-INST-001", "CAP-MD-001", "CAP-FEED-001", "CAP-WATCH-001",
+    "CAP-CONTENT-001", "CAP-SOCIAL-001", "CAP-NOTIF-001", "CAP-MOD-001", "CAP-PORT-001"
   ]
 }
 ```

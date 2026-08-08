@@ -37,53 +37,17 @@ Registry 精确包含 AUTH、HOME、SEARCH、INSTRUMENT、WATCHLIST、COMPOSE、
 
 ```ts
 export const pageRegistry = {
-  "PAGE-AUTH-001": {
-    web: "/login",
-    app: "/(auth)/sign-in",
-    deepLink: "huoqiu://login",
-  },
-  "PAGE-HOME-001": { web: "/", app: "/(tabs)/home", deepLink: "huoqiu://home" },
-  "PAGE-SEARCH-001": {
-    web: "/search",
-    app: "/search",
-    deepLink: "huoqiu://search",
-  },
-  "PAGE-INST-001": {
-    web: "/instruments/:listingId",
-    app: "/instrument/:listingId",
-    deepLink: "huoqiu://instrument/:listingId",
-  },
-  "PAGE-WATCH-001": {
-    web: "/watchlist",
-    app: "/(tabs)/watchlist",
-    deepLink: "huoqiu://watchlist",
-  },
-  "PAGE-COMPOSE-001": {
-    web: "/compose",
-    app: "/compose",
-    deepLink: "huoqiu://compose",
-  },
-  "PAGE-POST-001": {
-    web: "/posts/:postId",
-    app: "/post/:postId",
-    deepLink: "huoqiu://post/:postId",
-  },
-  "PAGE-NOTIF-001": {
-    web: "/notifications",
-    app: "/notifications",
-    deepLink: "huoqiu://notifications",
-  },
-  "PAGE-PORT-LIST-001": {
-    web: "/portfolios",
-    app: "/(tabs)/portfolio",
-    deepLink: "huoqiu://portfolios",
-  },
-  "PAGE-PORT-001": {
-    web: "/portfolios/:portfolioId",
-    app: "/portfolio/:portfolioId",
-    deepLink: "huoqiu://portfolio/:portfolioId",
-  },
-  "PAGE-MOD-001": { web: "/admin/moderation", app: null, deepLink: null },
+  'PAGE-AUTH-001': { web: '/login', app: '/(auth)/sign-in', deepLink: 'huoqiu://login' },
+  'PAGE-HOME-001': { web: '/', app: '/(tabs)/home', deepLink: 'huoqiu://home' },
+  'PAGE-SEARCH-001': { web: '/search', app: '/search', deepLink: 'huoqiu://search' },
+  'PAGE-INST-001': { web: '/instruments/:listingId', app: '/instrument/:listingId', deepLink: 'huoqiu://instrument/:listingId' },
+  'PAGE-WATCH-001': { web: '/watchlist', app: '/(tabs)/watchlist', deepLink: 'huoqiu://watchlist' },
+  'PAGE-COMPOSE-001': { web: '/compose', app: '/compose', deepLink: 'huoqiu://compose' },
+  'PAGE-POST-001': { web: '/posts/:postId', app: '/post/:postId', deepLink: 'huoqiu://post/:postId' },
+  'PAGE-NOTIF-001': { web: '/notifications', app: '/notifications', deepLink: 'huoqiu://notifications' },
+  'PAGE-PORT-LIST-001': { web: '/portfolios', app: '/(tabs)/portfolio', deepLink: 'huoqiu://portfolios' },
+  'PAGE-PORT-001': { web: '/portfolios/:portfolioId', app: '/portfolio/:portfolioId', deepLink: 'huoqiu://portfolio/:portfolioId' },
+  'PAGE-MOD-001': { web: '/admin/moderation', app: null, deepLink: null },
 } as const;
 ```
 
