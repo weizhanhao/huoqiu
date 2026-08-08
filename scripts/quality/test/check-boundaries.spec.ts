@@ -1,7 +1,14 @@
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
@@ -235,6 +242,132 @@ describe("workspace and supply-chain boundaries", () => {
 
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("PACKAGE_DEPENDS_ON_APP");
+  });
+
+  it("rejects a production import through an excluded same-project test trampoline", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "apps/web/tests/trampoline.ts",
+      "export const trampoline = 1;\n",
+    );
+    await writeText(
+      root,
+      "apps/web/src/use-trampoline.ts",
+      'import { trampoline } from "../tests/trampoline";\nvoid trampoline;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+  });
+
+  it("rejects a production import through an excluded declared-workspace docs trampoline", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "packages/ui/docs/trampoline.ts",
+      "export const trampoline = 1;\n",
+    );
+    await writeText(
+      root,
+      "apps/web/src/use-trampoline.ts",
+      'import { trampoline } from "../../../packages/ui/docs/trampoline";\nvoid trampoline;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+  });
+
+  it("rejects a relative import that leaves a project without a workspace owner", async () => {
+    const root = await createRepository();
+    await writeText(root, "shared/trampoline.ts", "export const value = 1;\n");
+    await writeText(
+      root,
+      "apps/web/src/unmapped.ts",
+      'import { value } from "../../../shared/trampoline";\nvoid value;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_RELATIVE_IMPORT_UNMAPPED");
+  });
+
+  it("rejects a relative import that escapes the repository root", async () => {
+    const root = await createRepository();
+    const outsideRoot = await mkdtemp(resolve(tmpdir(), "huoqiu-outside-"));
+    temporaryRoots.push(outsideRoot);
+    await writeText(outsideRoot, "secret.ts", "export const secret = 1;\n");
+    const escapeSpecifier = relative(
+      resolve(root, "apps/web/src"),
+      resolve(outsideRoot, "secret"),
+    )
+      .split("\\")
+      .join("/");
+    await writeText(
+      root,
+      "apps/web/src/escape.ts",
+      `import { secret } from ${JSON.stringify(escapeSpecifier)};\nvoid secret;\n`,
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_PATH_TRAVERSAL");
+  });
+
+  it("rejects an excluded symlink trampoline before skipping its directory", async () => {
+    const root = await createRepository();
+    const outsideRoot = await mkdtemp(resolve(tmpdir(), "huoqiu-symlink-"));
+    temporaryRoots.push(outsideRoot);
+    await writeText(outsideRoot, "secret.ts", "export const secret = 1;\n");
+    await symlink(outsideRoot, resolve(root, "packages/ui/docs"), "dir");
+    await writeText(
+      root,
+      "apps/web/src/symlink.ts",
+      'import { secret } from "../../../packages/ui/docs/secret";\nvoid secret;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_SYMLINK_FORBIDDEN");
+  });
+
+  it("allows a declared cross-workspace relative production import", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "packages/ui/src/button.ts",
+      "export const button = 1;\n",
+    );
+    await writeText(
+      root,
+      "apps/web/src/relative-ui.ts",
+      'import { button } from "../../../packages/ui/src/button";\nvoid button;\n',
+    );
+
+    expect(await runChecker(root)).toEqual({ code: 0, stderr: "" });
+  });
+
+  it("allows a framework declaration to import its generated type output", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "apps/web/.next/types/routes.d.ts",
+      "export type Route = string;\n",
+    );
+    await writeText(
+      root,
+      "apps/web/next-env.d.ts",
+      'import "./.next/types/routes.d.ts";\n',
+    );
+
+    expect(await runChecker(root)).toEqual({ code: 0, stderr: "" });
   });
 
   it("resolves tsconfig aliases to their real workspace owner", async () => {

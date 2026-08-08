@@ -329,6 +329,28 @@ describe("least-privilege CI workflow and artifact inventory", () => {
     expect(result.stderr).toContain(code);
   });
 
+  it.each([
+    ["        shell: bash", '        shell: "bash {0}; exit 0"'],
+    ["          esac", "          esac\n          exit 0"],
+    [
+      '          test "$(pnpm --version)" = "11.4.0"',
+      '          test "$(pnpm --version)" = "11.4.0"\n          echo bypass',
+    ],
+    [
+      "            format) pnpm format:check ;;",
+      "            format) pnpm format:check ;; # appended command text",
+    ],
+    ["      - name: Verify toolchain", "      - name: Looks equivalent"],
+  ])("requires the exact canonical step field values %s", async (from, to) => {
+    const root = await createRepository();
+    await replaceWorkflow(root, from, to);
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("CI_STEP_POLICY_INVALID");
+  });
+
   it("parses the artifact inventory as real YAML 1.2", async () => {
     const root = await createRepository();
     const inventoryYaml = [

@@ -1,6 +1,7 @@
 import type { Dirent } from "node:fs";
 import { lstat, readFile, readdir, realpath } from "node:fs/promises";
 import { dirname, extname, relative, resolve, sep } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 import ts from "typescript";
 
@@ -49,6 +50,12 @@ const EXCLUDED_SOURCE_SEGMENTS = new Set([
   "docs",
   "fixtures",
   "node_modules",
+  "test",
+  "tests",
+]);
+const EXCLUDED_IMPORT_TARGET_SEGMENTS = new Set([
+  "__tests__",
+  "docs",
   "test",
   "tests",
 ]);
@@ -110,6 +117,61 @@ const CI_ARTIFACT: InventoryArtifact = {
   path: "test-results/unit.log",
   retention_days: 7,
 };
+
+const CANONICAL_PREFLIGHT_STEPS: readonly Record<string, unknown>[] = [
+  {
+    name: "Check out repository",
+    uses: `actions/checkout@${CI_ACTIONS[0]?.commit_sha ?? ""}`,
+    with: { "persist-credentials": false },
+  },
+  {
+    name: "Set up pnpm and Node",
+    uses: `pnpm/setup@${CI_ACTIONS[1]?.commit_sha ?? ""}`,
+    with: {
+      version: "11.4.0",
+      runtime: "node@24.15.0",
+      install: false,
+      cache: false,
+    },
+  },
+  {
+    name: "Verify toolchain",
+    shell: "bash",
+    run: 'set -euo pipefail\ntest "$(node --version)" = "v24.15.0"\ntest "$(pnpm --version)" = "11.4.0"\n',
+  },
+  {
+    name: "Install dependencies",
+    shell: "bash",
+    run: "pnpm install --frozen-lockfile --strict-peer-dependencies",
+  },
+  {
+    name: "Verify generated state is clean",
+    shell: "bash",
+    run: "git diff --exit-code",
+  },
+];
+
+const CANONICAL_QUALITY_STEPS: readonly Record<string, unknown>[] = [
+  CANONICAL_PREFLIGHT_STEPS[0] as Record<string, unknown>,
+  CANONICAL_PREFLIGHT_STEPS[1] as Record<string, unknown>,
+  CANONICAL_PREFLIGHT_STEPS[3] as Record<string, unknown>,
+  {
+    name: "Run fixed quality lane",
+    shell: "bash",
+    run: 'set -euo pipefail\ncase "${{ matrix.lane }}" in\n  format) pnpm format:check ;;\n  lint) pnpm lint ;;\n  typecheck) pnpm typecheck ;;\n  test)\n    mkdir -p test-results\n    pnpm test 2>&1 | tee test-results/unit.log\n    ;;\n  build) pnpm build ;;\n  boundaries) pnpm qa:boundaries ;;\n  *) exit 64 ;;\nesac\n',
+  },
+  {
+    name: "Upload unit-test log",
+    if: "${{ always() && matrix.lane == 'test' }}",
+    uses: `actions/upload-artifact@${CI_ACTIONS[2]?.commit_sha ?? ""}`,
+    with: {
+      name: CI_ARTIFACT.name,
+      path: CI_ARTIFACT.path,
+      "if-no-files-found": "error",
+      "retention-days": CI_ARTIFACT.retention_days,
+    },
+  },
+];
 
 const fail = (code: string, detail: string): never => {
   throw new QualityGateError(code, detail);
@@ -498,6 +560,66 @@ const validateSourceImports = async (
     );
   };
 
+  const ownerOf = (path: string): WorkspaceProject | undefined =>
+    projectsByDirectory.find((candidate) => ownsPath(candidate, path));
+
+  const hasExcludedSegment = (
+    project: WorkspaceProject,
+    path: string,
+  ): boolean =>
+    relative(project.directory, path)
+      .toLowerCase()
+      .split(sep)
+      .some((part) => EXCLUDED_IMPORT_TARGET_SEGMENTS.has(part));
+
+  const rejectExcludedTarget = (
+    project: WorkspaceProject | undefined,
+    path: string,
+    file: string,
+  ): void => {
+    if (project !== undefined && hasExcludedSegment(project, path))
+      fail(
+        "WORKSPACE_IMPORT_TARGET_EXCLUDED",
+        `${file}: ${repositoryPath(root, path)}`,
+      );
+  };
+
+  const rejectSymlinkComponents = async (
+    path: string,
+    file: string,
+  ): Promise<void> => {
+    const repositoryRelativePath = repositoryPath(root, path);
+    let candidate = root;
+    for (const segment of repositoryRelativePath.split("/")) {
+      candidate = resolve(candidate, segment);
+      try {
+        if ((await lstat(candidate)).isSymbolicLink())
+          fail(
+            "WORKSPACE_SYMLINK_FORBIDDEN",
+            `${file}: ${repositoryPath(root, candidate)}`,
+          );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw error;
+      }
+    }
+  };
+
+  const canonicalTarget = async (
+    path: string,
+    file: string,
+  ): Promise<string> => {
+    await rejectSymlinkComponents(path, file);
+    const canonical = await realpath(path);
+    repositoryPath(root, canonical);
+    if (canonical !== resolve(path))
+      fail(
+        "WORKSPACE_SYMLINK_FORBIDDEN",
+        `${file}: ${repositoryPath(root, path)}`,
+      );
+    return canonical;
+  };
+
   const validateOwner = (
     source: WorkspaceProject,
     target: WorkspaceProject,
@@ -521,12 +643,12 @@ const validateSourceImports = async (
       );
   };
 
-  const validateSpecifier = (
+  const validateSpecifier = async (
     project: WorkspaceProject,
     absoluteFile: string,
     file: string,
     specifier: string,
-  ): void => {
+  ): Promise<void> => {
     const match = /^(@huoqiu\/[^/]+)/.exec(specifier);
     const namedProject = match?.[1];
     if (namedProject !== undefined) {
@@ -540,7 +662,17 @@ const validateSourceImports = async (
           "UNDECLARED_WORKSPACE_IMPORT",
           `${file}: ${namedProject} is not declared by ${project.name}`,
         );
-      if (target !== undefined) validateOwner(project, target, file);
+      if (target !== undefined) {
+        const subpath = specifier.slice(namedProject.length + 1);
+        if (
+          subpath
+            .toLowerCase()
+            .split("/")
+            .some((part) => EXCLUDED_IMPORT_TARGET_SEGMENTS.has(part))
+        )
+          fail("WORKSPACE_IMPORT_TARGET_EXCLUDED", `${file}: ${specifier}`);
+        validateOwner(project, target, file);
+      }
       return;
     }
 
@@ -550,15 +682,42 @@ const validateSourceImports = async (
       compilerOptions.get(project.name) ?? {},
       ts.sys,
     ).resolvedModule;
-    const lexicalTarget = specifier.startsWith(".")
-      ? resolve(dirname(absoluteFile), specifier)
-      : undefined;
-    const targetPath = resolution?.resolvedFileName ?? lexicalTarget;
-    if (targetPath === undefined) return;
-    const target = projectsByDirectory.find((candidate) =>
-      ownsPath(candidate, targetPath),
-    );
-    if (target !== undefined) validateOwner(project, target, file);
+    if (specifier.startsWith(".")) {
+      const lexicalTarget = resolve(dirname(absoluteFile), specifier);
+      repositoryPath(root, lexicalTarget);
+      await rejectSymlinkComponents(lexicalTarget, file);
+      const lexicalOwner = ownerOf(lexicalTarget);
+
+      let resolvedTarget: string | undefined;
+      if (resolution !== undefined)
+        resolvedTarget = await canonicalTarget(
+          resolution.resolvedFileName,
+          file,
+        );
+      const targetPath = resolvedTarget ?? lexicalTarget;
+      const target = ownerOf(targetPath) ?? lexicalOwner;
+      rejectExcludedTarget(lexicalOwner, lexicalTarget, file);
+      rejectExcludedTarget(target, targetPath, file);
+
+      const leavesProject =
+        !ownsPath(project, lexicalTarget) ||
+        (resolvedTarget !== undefined && !ownsPath(project, resolvedTarget));
+      if (leavesProject && (resolution === undefined || target === undefined))
+        fail("WORKSPACE_RELATIVE_IMPORT_UNMAPPED", `${file}: ${specifier}`);
+      if (target !== undefined) validateOwner(project, target, file);
+      return;
+    }
+
+    if (resolution === undefined) return;
+    const target = ownerOf(resolution.resolvedFileName);
+    if (target === undefined) return;
+    const targetPath = await canonicalTarget(resolution.resolvedFileName, file);
+    const canonicalOwner = ownerOf(targetPath);
+    rejectExcludedTarget(target, resolution.resolvedFileName, file);
+    rejectExcludedTarget(canonicalOwner, targetPath, file);
+    if (canonicalOwner === undefined)
+      return fail("WORKSPACE_IMPORT_TARGET_UNMAPPED", `${file}: ${specifier}`);
+    validateOwner(project, canonicalOwner, file);
   };
 
   const visit = async (
@@ -582,8 +741,8 @@ const validateSourceImports = async (
       const child = resolve(directory, entry.name);
       const path = repositoryPath(root, child);
       const parts = path.toLowerCase().split("/");
-      if (parts.some((part) => EXCLUDED_SOURCE_SEGMENTS.has(part))) continue;
       if (entry.isSymbolicLink()) fail("WORKSPACE_SYMLINK_FORBIDDEN", path);
+      if (parts.some((part) => EXCLUDED_SOURCE_SEGMENTS.has(part))) continue;
       if (entry.isDirectory()) {
         await visit(project, child);
         continue;
@@ -595,7 +754,7 @@ const validateSourceImports = async (
         continue;
       const content = await readUtf8(child, "WORKSPACE_SOURCE_UNREADABLE");
       for (const specifier of sourceImports(path, content))
-        validateSpecifier(project, child, path, specifier);
+        await validateSpecifier(project, child, path, specifier);
     }
   };
 
@@ -1569,6 +1728,19 @@ const validateInventoryArtifact = (
   }
 };
 
+const validateCanonicalSteps = (model: WorkflowModel): void => {
+  const preflight = jobSteps(model.jobs, "preflight");
+  const quality = jobSteps(model.jobs, "quality");
+  if (
+    !isDeepStrictEqual(preflight, CANONICAL_PREFLIGHT_STEPS) ||
+    !isDeepStrictEqual(quality, CANONICAL_QUALITY_STEPS)
+  )
+    fail(
+      "CI_STEP_POLICY_INVALID",
+      "preflight and quality steps must equal the canonical field/value policy",
+    );
+};
+
 export const checkCiWorkflow = async (
   repositoryRoot = process.cwd(),
 ): Promise<void> => {
@@ -1593,6 +1765,7 @@ export const checkCiWorkflow = async (
   validateMatrix(model);
   validateTestArtifact(model);
   validateInventoryArtifact(inventory.artifacts);
+  validateCanonicalSteps(model);
 };
 
 export const main = async (args = process.argv.slice(2)): Promise<void> => {

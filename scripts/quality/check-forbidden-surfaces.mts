@@ -240,9 +240,21 @@ const isRouteSource = (path: string): boolean => {
   if (parts[0] !== "apps" || parts.length < 3) return false;
   return (
     parts[2] === "app" ||
+    parts[2] === "pages" ||
     (parts[2] === "src" && parts[3] === "app") ||
+    (parts[2] === "src" && parts[3] === "pages") ||
     (parts[2] === "src" && parts.includes("routes")) ||
     (parts[2] === "src" && parts.at(-1)?.includes(".controller.") === true)
+  );
+};
+
+const isNestApplicationSource = (path: string): boolean => {
+  const parts = splitPath(path);
+  return (
+    parts[0] === "apps" &&
+    parts[1] === "api" &&
+    parts[2] === "src" &&
+    SOURCE_EXTENSIONS.has(extname(path).toLowerCase())
   );
 };
 
@@ -261,6 +273,7 @@ const isRuntimeCandidate = (path: string): boolean => {
   if (isPositiveRuntimeFixture(path)) return true;
   if (hasRuntimeRegistryName(path)) return true;
   if (isDomainRegistry(path)) return true;
+  if (isNestApplicationSource(path)) return true;
   return (
     isRouteSource(path) && ROUTE_EXTENSIONS.has(extname(path).toLowerCase())
   );
@@ -365,6 +378,24 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       }
       return value;
     }
+    if (
+      ts.isCallExpression(expression) &&
+      ts.isPropertyAccessExpression(expression.expression) &&
+      expression.expression.name.text === "join" &&
+      ts.isArrayLiteralExpression(expression.expression.expression) &&
+      expression.arguments.length <= 1
+    ) {
+      const separatorExpression = expression.arguments[0];
+      const separator =
+        separatorExpression === undefined ? "," : evaluate(separatorExpression);
+      if (separator === undefined) return undefined;
+      const values = expression.expression.expression.elements.map((element) =>
+        ts.isSpreadElement(element) ? undefined : evaluate(element),
+      );
+      return values.some((value) => value === undefined)
+        ? undefined
+        : (values as string[]).join(separator);
+    }
     if (ts.isIdentifier(expression)) {
       if (evaluating.has(expression.text)) return undefined;
       const initializer = constants.get(expression.text);
@@ -389,7 +420,137 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   };
   indexConstants(sourceFile);
 
+  const runtimeField = (name: ts.BindingName | ts.PropertyName): boolean => {
+    const value =
+      ts.isIdentifier(name) || ts.isStringLiteralLike(name)
+        ? name.text
+        : undefined;
+    return (
+      value !== undefined &&
+      /^(?:command|deep[-_]?link|deeplink|href|path|pathname|route|surface)$/i.test(
+        value,
+      )
+    );
+  };
+
+  const runtimeContainerField = (
+    name: ts.BindingName | ts.PropertyName,
+  ): boolean => {
+    const value =
+      ts.isIdentifier(name) || ts.isStringLiteralLike(name)
+        ? name.text
+        : undefined;
+    return (
+      value !== undefined &&
+      /^(?:commands|deep[-_]?links|deeplinks|hrefs|paths|pathnames|routes|surfaces)$/i.test(
+        value,
+      )
+    );
+  };
+
+  const staticRegistryIdentifiers = new Set<string>();
+  const isStaticRegistryValue = (expression: ts.Expression): boolean => {
+    if (evaluate(expression) !== undefined) return true;
+    if (
+      ts.isNumericLiteral(expression) ||
+      expression.kind === ts.SyntaxKind.TrueKeyword ||
+      expression.kind === ts.SyntaxKind.FalseKeyword ||
+      expression.kind === ts.SyntaxKind.NullKeyword
+    )
+      return true;
+    if (
+      ts.isParenthesizedExpression(expression) ||
+      ts.isAsExpression(expression) ||
+      ts.isTypeAssertionExpression(expression) ||
+      ts.isSatisfiesExpression(expression)
+    )
+      return isStaticRegistryValue(expression.expression);
+    if (ts.isArrayLiteralExpression(expression))
+      return expression.elements.every(
+        (element) =>
+          !ts.isSpreadElement(element) && isStaticRegistryValue(element),
+      );
+    if (ts.isObjectLiteralExpression(expression))
+      return expression.properties.every((property) => {
+        if (ts.isPropertyAssignment(property))
+          return isStaticRegistryValue(property.initializer);
+        if (ts.isShorthandPropertyAssignment(property)) {
+          const initializer = constants.get(property.name.text);
+          return (
+            initializer !== undefined && isStaticRegistryValue(initializer)
+          );
+        }
+        return false;
+      });
+    if (ts.isIdentifier(expression)) {
+      if (staticRegistryIdentifiers.has(expression.text)) return false;
+      const initializer = constants.get(expression.text);
+      if (initializer === undefined) return false;
+      staticRegistryIdentifiers.add(expression.text);
+      const result = isStaticRegistryValue(initializer);
+      staticRegistryIdentifiers.delete(expression.text);
+      return result;
+    }
+    return false;
+  };
+
+  const routeDecorator = (expression: ts.LeftHandSideExpression): boolean => {
+    const name = ts.isIdentifier(expression)
+      ? expression.text
+      : ts.isPropertyAccessExpression(expression)
+        ? expression.name.text
+        : undefined;
+    return (
+      name !== undefined &&
+      /^(?:All|Controller|Delete|Get|Head|Options|Patch|Post|Put|Sse)$/.test(
+        name,
+      )
+    );
+  };
+
+  const requireStatic = (expression: ts.Expression, label: string): void => {
+    if (evaluate(expression) === undefined)
+      fail(
+        "RUNTIME_CANDIDATE_UNRESOLVED",
+        `${file}: ${label} is not statically decidable`,
+      );
+  };
+
+  const requireStaticRegistry = (
+    expression: ts.Expression,
+    label: string,
+  ): void => {
+    if (!isStaticRegistryValue(expression))
+      fail(
+        "RUNTIME_CANDIDATE_UNRESOLVED",
+        `${file}: ${label} is not statically decidable`,
+      );
+  };
+
   const visit = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      runtimeField(node.name) &&
+      node.initializer !== undefined
+    )
+      requireStatic(node.initializer, node.name.getText(sourceFile));
+    if (
+      ts.isVariableDeclaration(node) &&
+      runtimeContainerField(node.name) &&
+      node.initializer !== undefined
+    )
+      requireStaticRegistry(node.initializer, node.name.getText(sourceFile));
+    if (ts.isPropertyAssignment(node) && runtimeField(node.name))
+      requireStatic(node.initializer, node.name.getText(sourceFile));
+    if (ts.isPropertyAssignment(node) && runtimeContainerField(node.name))
+      requireStaticRegistry(node.initializer, node.name.getText(sourceFile));
+    if (
+      ts.isCallExpression(node) &&
+      ts.isDecorator(node.parent) &&
+      routeDecorator(node.expression)
+    )
+      for (const [index, argument] of node.arguments.entries())
+        requireStatic(argument, `decorator argument ${index}`);
     if (ts.isIdentifier(node)) surfaces.add(node.text);
     if (ts.isStringLiteralLike(node)) surfaces.add(node.text);
     if (ts.isExpression(node)) {

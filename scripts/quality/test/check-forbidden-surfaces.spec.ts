@@ -212,10 +212,47 @@ describe("forbidden runtime surfaces", () => {
     expect(result.stderr).toContain(relativePath);
   });
 
+  it.each(["apps/web/pages/trade.tsx", "apps/web/src/pages/private-fund.tsx"])(
+    "covers a Next Pages Router runtime route %s",
+    async (relativePath) => {
+      const root = await createRepository();
+      await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+      await writeCandidate(
+        root,
+        "export default function Page() { return null; }",
+        relativePath,
+      );
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("FORBIDDEN_RUNTIME_SURFACE");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it("discovers a Nest decorator route independently of its path", async () => {
+    const root = await createRepository();
+    const relativePath = "apps/api/src/execution/orders.ts";
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      '@Controller("trade")\nexport class Orders {}',
+      relativePath,
+    );
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("FORBIDDEN_RUNTIME_SURFACE");
+    expect(result.stderr).toContain(relativePath);
+  });
+
   it.each([
     ['export const route = "/tr\\u0061de";', "trade"],
     ['export const route = "/tr" + "ade";', "trade"],
     ['export const route = `/tr${"ade"}`;', "trade"],
+    ['export const route = ["/tr", "ade"].join("");', "trade"],
   ])(
     "extracts statically decidable TypeScript surface %s",
     async (source, surface) => {
@@ -230,6 +267,24 @@ describe("forbidden runtime surfaces", () => {
 
       expect(result.code).toBe(1);
       expect(result.stderr).toContain(surface);
+    },
+  );
+
+  it.each([
+    "export const route = resolveRuntimeRoute();",
+    'export const routes = ["/watchlist", resolveRuntimeRoute()];',
+  ])(
+    "fails closed on a runtime registry expression that is not statically decidable %s",
+    async (source) => {
+      const root = await createRepository();
+      const relativePath = "apps/web/src/navigation/route-registry.ts";
+      await writeCandidate(root, source, relativePath);
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
     },
   );
 
