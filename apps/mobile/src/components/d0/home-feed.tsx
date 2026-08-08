@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   kicker: {
-    color: tokens.text.tertiary,
+    color: d0TextColors.inverseMuted,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1,

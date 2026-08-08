@@ -115,6 +115,16 @@ const textColor = (element: ReactElement): string => {
   return flattened.color;
 };
 
+const backgroundColor = (element: ReactElement): string => {
+  const flattened = StyleSheet.flatten(
+    propertiesOf(element).style as Parameters<typeof StyleSheet.flatten>[0],
+  ) as Readonly<{ backgroundColor?: string }> | undefined;
+  if (flattened?.backgroundColor === undefined) {
+    throw new Error("Expected rendered surface to have a background color");
+  }
+  return flattened.backgroundColor;
+};
+
 describe("D0 mobile WCAG AA color use", () => {
   it("keeps every small semantic text color at WCAG AA contrast", () => {
     expect(
@@ -166,6 +176,27 @@ describe("D0 mobile WCAG AA color use", () => {
         propertiesOf(searchInput).placeholderTextColor ?? "",
         tokens.surface.canvas,
       ),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("renders the real hero kicker at AA contrast on its inverse surface", () => {
+    const home = HomeFeed({ fixture: readyFixture(), state: "normal" });
+    const heroKicker = findElement(
+      home,
+      (element) => literalText(element) === "D0 / FIXTURE FEED",
+    );
+    const heroSurface = findElement(home, (element) => {
+      const flattened = StyleSheet.flatten(
+        propertiesOf(element).style as Parameters<typeof StyleSheet.flatten>[0],
+      ) as Readonly<{ backgroundColor?: string }> | undefined;
+      return (
+        flattened?.backgroundColor === tokens.surface.inverse &&
+        literalText(element).includes("D0 / FIXTURE FEED")
+      );
+    });
+
+    expect(
+      contrastRatio(textColor(heroKicker), backgroundColor(heroSurface)),
     ).toBeGreaterThanOrEqual(4.5);
   });
 
