@@ -1,4 +1,18 @@
-import { isAbsolute } from "node:path";
+import { execFile } from "node:child_process";
+import {
+  appendFile,
+  chmod,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -11,6 +25,12 @@ import {
 } from "../mobile-d0-evidence.mts";
 
 const SHA = "a".repeat(40);
+const sourceRoot = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+);
 
 const result = (overrides: Partial<CommandResult> = {}): CommandResult => ({
   exitCode: 0,
@@ -405,6 +425,141 @@ describe("D0 mobile evidence", () => {
       pnpm: { realpath: expect.any(String), sha256: expect.any(String) },
       tar: { realpath: expect.any(String), sha256: expect.any(String) },
     });
+  });
+
+  it("fails closed end-to-end when HOME, PATH, and the runtime directory contain forged tools", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "huoqiu-d0-hostile-"));
+    const repository = join(temporaryRoot, "repository");
+    const fakeHome = join(temporaryRoot, "home");
+    const fakeRuntime = join(temporaryRoot, "runtime");
+    const fakeAdb = join(
+      fakeHome,
+      "Library",
+      "Android",
+      "sdk",
+      "platform-tools",
+      "adb",
+    );
+    const fakeMaestro = join(fakeHome, ".maestro", "bin", "maestro");
+    const fakeNode = join(fakeRuntime, "node");
+    const fakePnpm = join(fakeRuntime, "pnpm");
+    try {
+      await new Promise<void>((resolvePromise, rejectPromise) => {
+        execFile(
+          "/usr/bin/git",
+          ["clone", "-q", "--shared", sourceRoot, repository],
+          (error) => (error === null ? resolvePromise() : rejectPromise(error)),
+        );
+      });
+      const commit = await new Promise<string>((resolvePromise, rejectPromise) => {
+        execFile(
+          "/usr/bin/git",
+          ["-C", repository, "rev-parse", "HEAD"],
+          (error, stdout) =>
+            error === null
+              ? resolvePromise(stdout.trim())
+              : rejectPromise(error),
+        );
+      });
+      await appendFile(join(repository, ".git", "info", "exclude"), "\nnode_modules\n");
+      await symlink(join(sourceRoot, "node_modules"), join(repository, "node_modules"));
+      await mkdir(dirname(fakeAdb), { recursive: true });
+      await mkdir(dirname(fakeMaestro), { recursive: true });
+      await mkdir(fakeRuntime, { recursive: true });
+      await copyFile(process.execPath, fakeNode);
+      await writeFile(
+        fakePnpm,
+        [
+          "const args = process.argv.slice(2);",
+          'process.stdout.write(args[0] === "--version" ? "11.4.0\\n" : "forged pnpm success\\n");',
+          "",
+        ].join("\n"),
+      );
+      await writeFile(
+        fakeAdb,
+        '#!/bin/sh\nif [ "$1" = "version" ]; then echo "Android Debug Bridge version 1.0.41"; else printf "List of devices attached\\nFORGED-DEVICE\\tdevice\\n"; fi\n',
+      );
+      await writeFile(
+        fakeMaestro,
+        '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "2.0.0"; else echo "1 Flow Passed"; fi\n',
+      );
+      await Promise.all([
+        chmod(fakeNode, 0o700),
+        chmod(fakePnpm, 0o600),
+        chmod(fakeAdb, 0o700),
+        chmod(fakeMaestro, 0o700),
+      ]);
+
+      const execution = await new Promise<{
+        exitCode: number;
+        stderr: string;
+        stdout: string;
+      }>((resolvePromise) => {
+        execFile(
+          fakeNode,
+          [
+            join(sourceRoot, "node_modules", "tsx", "dist", "cli.mjs"),
+            join(repository, "scripts", "quality", "mobile-d0-evidence.mts"),
+            "--platform",
+            "android",
+          ],
+          {
+            cwd: repository,
+            env: {
+              HOME: fakeHome,
+              PATH: "/attacker-controlled/bin",
+            },
+          },
+          (error, stdout, stderr) => {
+            resolvePromise({
+              exitCode:
+                error === null
+                  ? 0
+                  : typeof error.code === "number"
+                    ? error.code
+                    : 1,
+              stderr,
+              stdout,
+            });
+          },
+        );
+      });
+
+      expect(execution.exitCode).not.toBe(0);
+      expect(`${execution.stdout}\n${execution.stderr}`).toContain(
+        "D0_MOBILE NOT_VERIFIED",
+      );
+      expect(`${execution.stdout}\n${execution.stderr}`).not.toContain(
+        "D0_MOBILE VERIFIED",
+      );
+      const summary = JSON.parse(
+        await readFile(
+          join(
+            repository,
+            "artifacts",
+            "evidence",
+            commit,
+            "mobile-d0",
+            "android",
+            "summary.json",
+          ),
+          "utf8",
+        ),
+      ) as {
+        reason?: unknown;
+        tool_errors?: unknown;
+        verified?: unknown;
+      };
+      expect(summary).toMatchObject({
+        reason: "tool_identity_missing:pnpm",
+        verified: false,
+      });
+      expect(summary.tool_errors).toEqual(
+        expect.arrayContaining(["adb", "maestro", "pnpm"]),
+      );
+    } finally {
+      await rm(temporaryRoot, { force: true, recursive: true });
+    }
   });
 
   it("fails closed before evidence commands when a core tool version is outside policy", async () => {
