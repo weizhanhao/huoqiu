@@ -20,7 +20,7 @@ describe("D0 instrument search", () => {
     "SYN001",
     "syn001",
     "合成示例一号",
-    "hechengshili",
+    "hechengshiliyihao",
     "合成一号",
     "synthetic one",
   ])("finds the stable listing using %s", (query) => {
