@@ -53,6 +53,38 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
 
+  packages/design-tokens:
+    dependencies:
+      eslint:
+        specifier: 10.8.0
+        version: 10.8.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(tsx@4.23.9))
+    devDependencies:
+      "@huoqiu/config":
+        specifier: workspace:*
+        version: link:../config
+
+  packages/domain:
+    dependencies:
+      eslint:
+        specifier: 10.8.0
+        version: 10.8.0
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(tsx@4.23.9))
+    devDependencies:
+      "@huoqiu/config":
+        specifier: workspace:*
+        version: link:../config
+
 packages:
   "@babel/code-frame@7.29.7":
     resolution:

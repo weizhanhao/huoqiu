@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="demo-avatar-title demo-avatar-desc">
+  <title id="demo-avatar-title">火球演示用户头像</title>
+  <desc id="demo-avatar-desc">暖橙色火球沿深色轨道运行的原创抽象头像</desc>
+  <rect width="96" height="96" rx="48" fill="#FFF7ED"/>
+  <path d="M16 55c11 22 48 27 66 2" fill="none" stroke="#171A21" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="76" cy="58" r="7" fill="#16A37A"/>
+  <path d="M49 16c2 10-7 15-3 22 3 6 11 5 14-1 4 16-2 30-16 30-12 0-21-8-21-20 0-9 6-17 14-23-2 8 2 13 7 10 6-4 2-11 5-18Z" fill="#C2410C"/>
+  <path d="M43 43c4 3 2 7 5 8 3 1 5-2 5-4 2 7-2 13-9 13-6 0-10-4-10-9 0-5 3-8 7-11-1 4 0 6 2 6 2 0 3-1 0-3Z" fill="#F59E0B"/>
+</svg>

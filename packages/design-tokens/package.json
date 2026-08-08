@@ -1,0 +1,26 @@
+{
+  "name": "@huoqiu/design-tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/tokens.ts",
+    "./css": "./src/css.ts",
+    "./assets/huoqiu-mark.svg": "./assets/huoqiu-mark.svg",
+    "./assets/demo-avatar.svg": "./assets/demo-avatar.svg"
+  },
+  "scripts": {
+    "lint": "eslint --config ../config/eslint/base.mjs src test",
+    "test": "vitest run --config ../config/vitest/base.ts test",
+    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals src/tokens.ts src/css.ts test/tokens.spec.ts"
+  },
+  "devDependencies": {
+    "@huoqiu/config": "workspace:*"
+  },
+  "peerDependencies": {
+    "eslint": "10.8.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

@@ -1,0 +1,89 @@
+export const tokens = {
+  brand: {
+    primary: "#C2410C",
+    primaryHover: "#9A3412",
+    secondary: "#F59E0B",
+    accent: "#EA580C",
+    focus: "#FB923C",
+    onPrimary: "#FFFFFF",
+  },
+  surface: {
+    canvas: "#F6F7F9",
+    base: "#FFFFFF",
+    subtle: "#FFF7ED",
+    raised: "#FFFFFF",
+    inverse: "#171A21",
+    divider: "#E4E7EC",
+    scrim: "rgba(23, 26, 33, 0.48)",
+  },
+  text: {
+    primary: "#171A21",
+    secondary: "#525B69",
+    tertiary: "#717B8C",
+    inverse: "#FFFFFF",
+    link: "#9A3412",
+    disabled: "#98A2B3",
+  },
+  market: {
+    up: "#F04444",
+    upSubtle: "#FFF0F0",
+    down: "#16A37A",
+    downSubtle: "#EAF8F3",
+    flat: "#667085",
+    warning: "#D97706",
+  },
+  spacing: {
+    0: "0px",
+    1: "4px",
+    2: "8px",
+    3: "12px",
+    4: "16px",
+    5: "20px",
+    6: "24px",
+    8: "32px",
+    10: "40px",
+    12: "48px",
+  },
+  radius: {
+    control: "8px",
+    card: "12px",
+    sheet: "20px",
+    pill: "999px",
+  },
+  shadow: {
+    card: "0 1px 3px rgba(23, 26, 33, 0.08), 0 8px 24px rgba(23, 26, 33, 0.06)",
+    floating: "0 12px 32px rgba(23, 26, 33, 0.16)",
+    focus: "0 0 0 3px rgba(251, 146, 60, 0.38)",
+  },
+  type: {
+    family: {
+      sans: '"Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
+      mono: '"JetBrains Mono", "SFMono-Regular", Consolas, monospace',
+    },
+    size: {
+      caption: "12px",
+      label: "14px",
+      body: "16px",
+      title: "20px",
+      headline: "28px",
+      quote: "32px",
+    },
+    lineHeight: {
+      compact: "1.25",
+      body: "1.6",
+      reading: "1.75",
+    },
+    weight: {
+      regular: "400",
+      medium: "500",
+      semibold: "600",
+      bold: "700",
+    },
+  },
+  touch: {
+    webMinimum: "44px",
+    appMinimum: "48px",
+  },
+} as const;
+
+export type DesignTokens = typeof tokens;
