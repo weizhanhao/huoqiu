@@ -20,10 +20,10 @@ export const apiErrorCodeSchema = z.enum(errorCodes);
 
 const sensitivePublicContentPatterns = [
   /(?:^|\s)at\s+(?:async\s+)?(?:[^()\s]+\s+\()?(?:(?:file:\/\/)?\/|[A-Za-z]:\\)[^)\r\n]+:\d+:\d+\)?/u,
-  /\bselect\s+(?:\*|[A-Za-z_][A-Za-z0-9_.]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_.]*)*)\s+from\s+[A-Za-z_][A-Za-z0-9_.]*(?=\s*(?:where\b|join\b|order\s+by\b|group\s+by\b|limit\b|;|$))/iu,
+  /\bselect\s+(?:(?:\*|[A-Za-z_][A-Za-z0-9_.]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_.]*)+)\s+from\s+[A-Za-z_][A-Za-z0-9_.]*(?=\s*(?:where\b|join\b|order\s+by\b|group\s+by\b|limit\b|;|$))|[A-Za-z_][A-Za-z0-9_.]*\s+from\s+[A-Za-z_][A-Za-z0-9_.]*(?=\s*(?:where\b|join\b|order\s+by\b|group\s+by\b|limit\b|;)))/iu,
   /\binsert\s+into\s+[A-Za-z_][A-Za-z0-9_.]*\s*(?:\([^)\r\n]{1,128}\)\s*)?values\s*\(/iu,
   /\bupdate\s+[A-Za-z_][A-Za-z0-9_.]*\s+set\s+[A-Za-z_][A-Za-z0-9_.]*\s*=/iu,
-  /\bdelete\s+from\s+[A-Za-z_][A-Za-z0-9_.]*(?=\s*(?:where\b|;|$))/iu,
+  /\bdelete\s+from\s+[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*(?=\s*(?:where\b|;))/iu,
   /(?:^|[\s("'=:[{])\/(?:srv|app|home|users|var|etc|opt|tmp)\/[^\s"'<>]+/iu,
   /(?:^|[\s("'=:[{])[A-Za-z]:\\(?:[^\\\r\n]+\\)*[^\\\r\n]+/u,
   /\bbearer\s+[A-Za-z0-9._~+/=-]{8,}/iu,

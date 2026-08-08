@@ -38,6 +38,10 @@ describe("shared API error contract", () => {
     "Please insert an item into your watchlist.",
     "Please update your profile and set a new nickname.",
     "Please delete the item from your watchlist.",
+    "Select ticker from watchlist",
+    "Unable to select symbol from results",
+    "Unable to delete from watchlist",
+    "Cannot delete from portfolio",
   ])("accepts normal public action copy %j", (message) => {
     expect(apiErrorSchema.parse({ ...validApiError, message }).message).toBe(
       message,
@@ -47,9 +51,13 @@ describe("shared API error contract", () => {
   it.each([
     "Error at handler (/workspace/service.js:42:7)",
     "SELECT password FROM users WHERE id = 1",
+    "SELECT id FROM users;",
+    "SELECT id, password FROM users",
+    "SELECT * FROM users",
     "INSERT INTO audit_log (private_value) VALUES ('hidden')",
     "UPDATE users SET password = hidden",
     "DELETE FROM internal_table WHERE id = 1",
+    "DELETE FROM audit_log;",
     "Failure in /srv/app/private/service.ts:12:2",
     "Failure in C:\\app\\private\\service.ts:12:2",
     "Bearer abcdefghijklmnop",
