@@ -1,5 +1,9 @@
 import { isDirectRun } from "../runtime/direct-run.js";
 import {
+  activeTcpServerCount,
+  reportProcessReady,
+} from "../runtime/process-ready.js";
+import {
   type ConsumerRegistry,
   processConsumerRegistry,
 } from "./consumer-registry.js";
@@ -24,8 +28,19 @@ export const startEventsWorker = async (
 };
 
 if (isDirectRun(import.meta.url)) {
-  void runWorkerProcess(startEventsWorker).catch((error: unknown) => {
-    console.error("Events worker failed", error);
+  void runWorkerProcess(startEventsWorker, {
+    onReady: () => {
+      reportProcessReady({
+        activeConsumers: processConsumerRegistry.activeConsumers(),
+        consumer: "events",
+        event: "worker.ready",
+        tcpServerCount: activeTcpServerCount(),
+      });
+    },
+  }).catch(() => {
+    process.stderr.write(
+      `${JSON.stringify({ consumer: "events", event: "worker.failed" })}\n`,
+    );
     process.exitCode = 1;
   });
 }

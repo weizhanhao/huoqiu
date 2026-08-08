@@ -1,33 +1,26 @@
+import {
+  createShutdownSignalWaiter,
+  type ShutdownSignalSource,
+} from "../runtime/shutdown-signal.js";
 import type { WorkerRuntime } from "./worker-runtime.js";
 
-type ShutdownSignal = "SIGINT" | "SIGTERM";
-
-export type ShutdownSignalSource = Readonly<{
-  off(signal: ShutdownSignal, listener: () => void): unknown;
-  once(signal: ShutdownSignal, listener: () => void): unknown;
+type RunWorkerProcessOptions = Readonly<{
+  onReady?: (worker: WorkerRuntime) => Promise<void> | void;
+  signalSource?: ShutdownSignalSource;
 }>;
-
-export const waitForShutdownSignal = (
-  source: ShutdownSignalSource = process,
-): Promise<ShutdownSignal> =>
-  new Promise((resolve) => {
-    const onInterrupt = (): void => settle("SIGINT");
-    const onTerminate = (): void => settle("SIGTERM");
-
-    function settle(signal: ShutdownSignal): void {
-      source.off("SIGINT", onInterrupt);
-      source.off("SIGTERM", onTerminate);
-      resolve(signal);
-    }
-
-    source.once("SIGINT", onInterrupt);
-    source.once("SIGTERM", onTerminate);
-  });
 
 export const runWorkerProcess = async (
   start: () => Promise<WorkerRuntime>,
+  options: RunWorkerProcessOptions = {},
 ): Promise<void> => {
   const worker = await start();
-  await waitForShutdownSignal();
-  await worker.stop();
+  const shutdown = createShutdownSignalWaiter(options.signalSource ?? process);
+
+  try {
+    await options.onReady?.(worker);
+    await shutdown.promise;
+  } finally {
+    shutdown.dispose();
+    await worker.stop();
+  }
 };

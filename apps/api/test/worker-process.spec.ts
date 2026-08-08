@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, it } from "vitest";
 
-import { waitForShutdownSignal } from "../src/workers/run-worker-process.js";
+import { waitForShutdownSignal } from "../src/runtime/shutdown-signal.js";
 
 it("removes both process signal listeners after the first shutdown signal", async () => {
   const signals = new EventEmitter();

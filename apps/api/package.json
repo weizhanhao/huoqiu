@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node test/verify-built-entrypoints.mjs",
     "dev": "tsx watch src/main.ts",
     "dev:worker:events": "tsx watch src/workers/events.main.ts",
     "dev:worker:market": "tsx watch src/workers/market.main.ts",
