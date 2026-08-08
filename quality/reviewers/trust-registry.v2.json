@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "trust_domain": "huoqiu-quality",
+  "repository_id": "9001",
+  "epoch": 1,
+  "previous_registry_sha256": null,
+  "expires_at": "2099-01-01T00:00:00.000Z",
+  "verifier_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "keys": {},
+  "signature": null
+}

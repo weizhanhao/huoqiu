@@ -18,3 +18,7 @@ pnpm dev
 
 Run the workspace checks with `pnpm lint`, `pnpm typecheck`, `pnpm test`,
 `pnpm build`, and `pnpm format:check`.
+
+The certification boundary, signed authorship/review chain, and detached
+execution invariants are documented in
+[`docs/engineering/quality-trust-model.md`](docs/engineering/quality-trust-model.md).

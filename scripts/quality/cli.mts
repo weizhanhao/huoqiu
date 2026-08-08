@@ -10,7 +10,14 @@ export const parseStrictFlags = (
   allowed: ReadonlySet<string>,
   repeatable: ReadonlySet<string> = new Set(),
 ): Map<string, string[]> => {
-  const normalizedArgs = args[0] === "--" ? args.slice(1) : args;
+  const separatorCount = args.filter((arg) => arg === "--").length;
+  if (separatorCount > 1) {
+    throw new QualityGateError(
+      "CLI_ARGUMENT_INVALID",
+      "at most one pnpm argument separator is allowed",
+    );
+  }
+  const normalizedArgs = args.filter((arg) => arg !== "--");
   const parsed = new Map<string, string[]>();
   for (let index = 0; index < normalizedArgs.length; index += 2) {
     const flag = normalizedArgs[index];

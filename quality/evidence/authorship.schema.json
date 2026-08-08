@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huoqiu.invalid/schemas/authorship.v1.json",
+  "title": "Huoqiu external authorship attestation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "$comment": "Runtime verification additionally checks the detached Ed25519 signature, root-signed registry role, protected derivation pins, repository identity, trusted-base ancestry, exact HEAD/tree, canonical binary diff, tracked-source digest, and exact implementer set.",
+  "required": [
+    "schema_version",
+    "repository_id",
+    "trusted_base_sha",
+    "head_sha",
+    "head_tree_oid",
+    "canonical_diff_sha256",
+    "source_tree_sha256",
+    "trust_registry_sha256",
+    "derivation_policy_version",
+    "attestor_input_sha256",
+    "implementer_ids",
+    "issued_at",
+    "issuer_id",
+    "issuer_source",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "repository_id": { "$ref": "#/$defs/positiveDecimal" },
+    "trusted_base_sha": { "$ref": "#/$defs/gitSha" },
+    "head_sha": { "$ref": "#/$defs/gitSha" },
+    "head_tree_oid": { "$ref": "#/$defs/gitSha" },
+    "canonical_diff_sha256": { "$ref": "#/$defs/sha256" },
+    "source_tree_sha256": { "$ref": "#/$defs/sha256" },
+    "trust_registry_sha256": { "$ref": "#/$defs/sha256" },
+    "derivation_policy_version": { "const": "external-attestor-v1" },
+    "attestor_input_sha256": { "$ref": "#/$defs/sha256" },
+    "implementer_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/githubIdentity" }
+    },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "issuer_id": { "$ref": "#/$defs/githubIdentity" },
+    "issuer_source": { "$ref": "#/$defs/provenance" },
+    "signature": { "$ref": "#/$defs/signature" }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "gitSha40": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "keyId": { "type": "string", "pattern": "^ed25519:[a-f0-9]{64}$" },
+    "positiveDecimal": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+    "githubIdentity": { "type": "string", "pattern": "^github:[1-9][0-9]*$" },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "key_id", "value_base64"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "key_id": { "$ref": "#/$defs/keyId" },
+        "value_base64": { "type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "actor",
+        "actor_id",
+        "repository",
+        "repository_id",
+        "workflow_ref",
+        "workflow_sha",
+        "ref",
+        "ref_protected",
+        "event_name",
+        "run_id",
+        "run_attempt",
+        "job",
+        "protected_environment"
+      ],
+      "properties": {
+        "provider": { "const": "github-actions" },
+        "actor": { "type": "string", "pattern": "^[A-Za-z0-9-]+$" },
+        "actor_id": { "$ref": "#/$defs/positiveDecimal" },
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "repository_id": { "$ref": "#/$defs/positiveDecimal" },
+        "workflow_ref": {
+          "type": "string",
+          "pattern": "^[^\\u0000\\r\\n]+/\\.github/workflows/[^\\u0000\\r\\n]+@refs/[^\\u0000\\r\\n]+$"
+        },
+        "workflow_sha": { "$ref": "#/$defs/gitSha40" },
+        "ref": {
+          "type": "string",
+          "pattern": "^refs/(heads|tags)/[A-Za-z0-9._/-]+$"
+        },
+        "ref_protected": { "const": true },
+        "event_name": { "type": "string", "pattern": "^[A-Za-z0-9_]+$" },
+        "run_id": { "$ref": "#/$defs/positiveDecimal" },
+        "run_attempt": { "$ref": "#/$defs/positiveDecimal" },
+        "job": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "protected_environment": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        }
+      }
+    }
+  }
+}

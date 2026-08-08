@@ -6,5 +6,12 @@
     "CAP-MD-001",
     "CAP-FEED-001",
     "CAP-WATCH-001"
+  ],
+  "pending_cap_ids": [
+    "CAP-ID-001",
+    "CAP-INST-001",
+    "CAP-MD-001",
+    "CAP-FEED-001",
+    "CAP-WATCH-001"
   ]
 }

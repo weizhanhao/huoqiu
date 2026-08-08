@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { main as failNotImplemented } from "../quality/not-implemented-gate.mts";
 
 export const main = async (args = process.argv.slice(2)): Promise<void> =>
-  await failNotImplemented(args, "mobile-artifacts");
+  await failNotImplemented(args, "mobile-artifacts", new Set());
 
 if (
   process.argv[1] !== undefined &&

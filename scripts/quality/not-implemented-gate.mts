@@ -4,11 +4,9 @@ import { QualityGateError } from "./gate-core.mts";
 export const main = async (
   args = process.argv.slice(2),
   fallbackTarget = "unknown",
+  allowedFlags: ReadonlySet<string> = new Set(["--cap"]),
 ): Promise<void> => {
-  const flags = parseStrictFlags(
-    args,
-    new Set(["--gate", "--cap", "--platform", "--milestone"]),
-  );
+  const flags = parseStrictFlags(args, allowedFlags);
   const target =
     flags.get("--gate")?.[0] ??
     flags.get("--cap")?.[0] ??
