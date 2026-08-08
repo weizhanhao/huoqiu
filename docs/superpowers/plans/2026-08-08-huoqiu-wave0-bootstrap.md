@@ -72,7 +72,7 @@ git status --short
 
 - [ ] **Step 3: 写 workspace 与 Turbo pipeline**
 
-`pnpm-workspace.yaml` 的 `packages` 列表只包含 `apps/*` 与 `packages/*`，并以 `onlyBuiltDependencies: [esbuild]` 和 `allowBuilds.esbuild: true` 作为唯一项目级安装脚本批准；不得批准其他构建脚本或使用全局/临时 minimum-release-age 豁免。`turbo.json` 将 `build` 依赖 `^build`，`lint/typecheck/test` 依赖同名上游任务，`dev` 设为 persistent 且不缓存。
+`pnpm-workspace.yaml` 的 `packages` 列表只包含 `apps/*` 与 `packages/*`，并以 pnpm 11 的 `allowBuilds.esbuild: true` 作为唯一项目级安装脚本批准；不得批准其他构建脚本或使用全局/临时 minimum-release-age 豁免。`turbo.json` 将 `build` 依赖 `^build`，`lint/typecheck/test` 依赖同名上游任务，`dev` 设为 persistent 且不缓存。
 
 - [ ] **Step 4: 写忽略规则**
 

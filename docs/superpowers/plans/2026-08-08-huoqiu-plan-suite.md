@@ -98,7 +98,7 @@ artifacts/evidence/.gitkeep
 
 Keycloak、PostgreSQL、Valkey、Jaeger、Gitleaks、Semgrep、Syft、Trivy、Grype、Maestro 与 k6 使用锁定容器 digest 或工具版本；对应 digest 在首次引入时写入 `security/artifact-inventory.yml`，未登记不得进入 Gate。
 
-根 `pnpm-workspace.yaml` 的 `onlyBuiltDependencies` 只允许 `esbuild` 执行安装脚本；pnpm 11 的 `allowBuilds.esbuild: true` 是该单包批准的项目内记录。不得以全局配置或 temporary minimum-release-age 豁免绕过供应链策略，也不得批准其他构建脚本。
+pnpm 11 的根 `pnpm-workspace.yaml` 以 `allowBuilds.esbuild: true` 作为唯一项目级安装脚本批准。不得以全局配置或 temporary minimum-release-age 豁免绕过供应链策略，也不得批准其他构建脚本。
 
 ### 3.2 泳道所有权
 
