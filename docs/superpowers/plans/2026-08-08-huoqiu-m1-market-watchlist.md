@@ -179,8 +179,13 @@ git commit -m "feat(market): serve synthetic quote and bars"
 - [ ] **Step 2: 实现事务内 ensure default**
 
 ```ts
-await tx.insert(watchlists).values(defaultList).onConflictDoNothing({ target: watchlists.ownerId });
-const list = await tx.query.watchlists.findFirst({ where: eq(watchlists.ownerId, actor.id) });
+await tx
+  .insert(watchlists)
+  .values(defaultList)
+  .onConflictDoNothing({ target: watchlists.ownerId });
+const list = await tx.query.watchlists.findFirst({
+  where: eq(watchlists.ownerId, actor.id),
+});
 ```
 
 GET、PUT 都执行 ensure，不依赖 `identity.user_registered` 消费时序。
@@ -222,8 +227,14 @@ git commit -m "feat(watchlist): add idempotent default list"
 - [ ] **Step 2: 实现 Registry**
 
 ```ts
-export const m1Channels = ['home', 'following', 'market', 'news'] as const;
-export const m1CardTypes = ['post', 'news', 'market_strip', 'topic', 'ops_banner'] as const;
+export const m1Channels = ["home", "following", "market", "news"] as const;
+export const m1CardTypes = [
+  "post",
+  "news",
+  "market_strip",
+  "topic",
+  "ops_banner",
+] as const;
 ```
 
 - [ ] **Step 3: 实现 Inbox 去重 projector 与 API-FEED-001**

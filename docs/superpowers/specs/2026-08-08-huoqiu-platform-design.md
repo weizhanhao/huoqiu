@@ -29,15 +29,15 @@
 
 能力总账中的每项能力采用以下状态：
 
-| 状态 | 含义 |
-|---|---|
-| 已发现 | 已从参考产品、业务目标或合规要求识别 |
-| 已设计 | 页面、状态、触点、接口、数据和验收已明确 |
-| 已实现 | 代码和迁移已进入集成主干 |
-| 已验证 | 当前构建在目标环境通过自动化与人工验收 |
-| 已发布 | 已进入目标发布环境并有监控、回滚和负责人 |
-| 资质延期 | 能力属于持牌或受限范围，已隔离且不可达 |
-| 明确排除 | 产品负责人确认不进入产品 |
+| 状态     | 含义                                     |
+| -------- | ---------------------------------------- |
+| 已发现   | 已从参考产品、业务目标或合规要求识别     |
+| 已设计   | 页面、状态、触点、接口、数据和验收已明确 |
+| 已实现   | 代码和迁移已进入集成主干                 |
+| 已验证   | 当前构建在目标环境通过自动化与人工验收   |
+| 已发布   | 已进入目标发布环境并有监控、回滚和负责人 |
+| 资质延期 | 能力属于持牌或受限范围，已隔离且不可达   |
+| 明确排除 | 产品负责人确认不进入产品                 |
 
 只有“已验证”或“已发布”计入功能完成度。未知项、死按钮、仅有静态页面、仅有 Fixture 而未标注、无服务端状态或无验收证据均不计完成。
 
@@ -76,32 +76,32 @@ REQ → CAP → PAGE → STATE → TOUCH → API/EVENT → DATA → TEST → EVI
 
 ### 3.4 合规处置表
 
-| 能力 | 处置 | 首期规则 |
-|---|---|---|
-| 社区内容能力 | Allowed | 最小审核只允许内部 Alpha；公网前必须具备举报、处置、通知、申诉、第二复审、审计、急停和具名运营负责人 |
-| 延迟/合成行情 | Allowed | 显示来源、as_of 和“延迟/演示”标识 |
-| 基金、ETF 公开资料 | Allowed | 只读信息，须有展示权；不承接申购、赎回或适当性流程 |
-| 私募策略研究内容 | Allowed | 只做研究内容和工具，不展示具体私募产品、额度、认购或开户链接 |
-| 私募产品展示、销售 | LicensedOnly | 首期路由、API、导航和搜索均不可达 |
-| 私有模拟组合 | Allowed | 仅本人可见，用于记录和复盘 |
-| 公开组合排行、调仓播报、可复制组合 | FeatureFlagOff | 默认关闭；法律评审和独立规格通过前不可达 |
-| 事实型价格提醒 | Allowed | 只描述阈值触发，不生成买卖指令 |
-| AI 有来源摘要 | FeatureFlagOff | M1 Stretch；通过引用、安全和数据最小化检查后才开启 |
-| AI 个性化买卖、仓位或目标价 | Forbidden | 服务端不得存在相关命令 |
-| 外部开户、交易、申赎导流 | LicensedOnly | 首期默认关闭，不能以中性按钮绕过 |
-| 打赏和付费荐股 | LicensedOnly | 首期不可达 |
+| 能力                               | 处置           | 首期规则                                                                                             |
+| ---------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------- |
+| 社区内容能力                       | Allowed        | 最小审核只允许内部 Alpha；公网前必须具备举报、处置、通知、申诉、第二复审、审计、急停和具名运营负责人 |
+| 延迟/合成行情                      | Allowed        | 显示来源、as_of 和“延迟/演示”标识                                                                    |
+| 基金、ETF 公开资料                 | Allowed        | 只读信息，须有展示权；不承接申购、赎回或适当性流程                                                   |
+| 私募策略研究内容                   | Allowed        | 只做研究内容和工具，不展示具体私募产品、额度、认购或开户链接                                         |
+| 私募产品展示、销售                 | LicensedOnly   | 首期路由、API、导航和搜索均不可达                                                                    |
+| 私有模拟组合                       | Allowed        | 仅本人可见，用于记录和复盘                                                                           |
+| 公开组合排行、调仓播报、可复制组合 | FeatureFlagOff | 默认关闭；法律评审和独立规格通过前不可达                                                             |
+| 事实型价格提醒                     | Allowed        | 只描述阈值触发，不生成买卖指令                                                                       |
+| AI 有来源摘要                      | FeatureFlagOff | M1 Stretch；通过引用、安全和数据最小化检查后才开启                                                   |
+| AI 个性化买卖、仓位或目标价        | Forbidden      | 服务端不得存在相关命令                                                                               |
+| 外部开户、交易、申赎导流           | LicensedOnly   | 首期默认关闭，不能以中性按钮绕过                                                                     |
+| 打赏和付费荐股                     | LicensedOnly   | 首期不可达                                                                                           |
 
 ## 4. 用户角色
 
-| 角色 | 主要能力 |
-|---|---|
-| 游客 | 浏览公开 Feed、标的、资讯、话题和市场榜单；搜索；查看延迟或演示行情；不可查看他人组合 |
-| 注册用户 | 发帖、评论、点赞、收藏、关注、自选、提醒、模拟组合、消息和个性化频道 |
-| 创作者 | 长文、视频、草稿、数据看板、内容申诉和创作者中心 |
-| 运营人员 | 频道配置、推荐位、话题、榜单、活动、公告和内容编排 |
-| 审核人员 | 举报队列、内容处置、用户处置、申诉复审、证据留存和审计 |
-| 系统管理员 | 角色权限、供应商配置、功能开关、数据源状态、审计和应急控制 |
-| 持牌合作方 | 仅通过隔离域和经批准接口承接持牌业务，首期产品不实现该域 |
+| 角色       | 主要能力                                                                              |
+| ---------- | ------------------------------------------------------------------------------------- |
+| 游客       | 浏览公开 Feed、标的、资讯、话题和市场榜单；搜索；查看延迟或演示行情；不可查看他人组合 |
+| 注册用户   | 发帖、评论、点赞、收藏、关注、自选、提醒、模拟组合、消息和个性化频道                  |
+| 创作者     | 长文、视频、草稿、数据看板、内容申诉和创作者中心                                      |
+| 运营人员   | 频道配置、推荐位、话题、榜单、活动、公告和内容编排                                    |
+| 审核人员   | 举报队列、内容处置、用户处置、申诉复审、证据留存和审计                                |
+| 系统管理员 | 角色权限、供应商配置、功能开关、数据源状态、审计和应急控制                            |
+| 持牌合作方 | 仅通过隔离域和经批准接口承接持牌业务，首期产品不实现该域                              |
 
 ## 5. 信息架构与页面清单
 
@@ -130,23 +130,23 @@ App 顶部包含搜索、AI、发布和消息。频道支持管理、排序、�
 
 ### 5.3 首批页面族
 
-| 页面族 | Web | App | 关键状态 |
-|---|---|---|---|
-| 首页 Feed | 三栏 Feed、频道、榜单 | 顶部蓝色区域、频道横滑、底栏 | 加载、空、错误、陈旧、离线、游客、已登录 |
-| 关注/推荐/热门 | 独立频道 | 独立频道 | 无关注、推荐降级、屏蔽内容、刷新 |
-| 7×24 | 时间线 | 快讯卡片 | 实时连接、断线重连、延迟、历史加载 |
-| 视频 | Feed 视频卡 | 视频卡与播放器 | 未自动播放、静音、失败、弱网 |
-| 资讯/达人/基金资料/策略研究/ETF | 频道 Feed | 频道 Feed | 来源、时点、资质隔离、空态 |
-| 自选首页 | 表格与推荐标的 | 热门/最近/全部/市场分组 | 无自选、排序、批量添加、跨端同步 |
-| 行情首页 | 指数、市场宽度、异动 | A/港/美/全球/外汇/基金/期货 | 休市、延迟、部分供应商故障 |
-| 私有组合 | 本人组合列表与复盘 | 本人盈亏概况、持仓和账本 | 无组合、陈旧估值、币种、重放失败；公开榜单和播报关闭 |
-| 标的详情 | 报价、图表、讨论、成分/资料 | 报价、分时/K 线、讨论、成分、资讯、公告、相关 ETF | 交易中、休市、停牌、无数据、受限 |
-| 搜索 | 证券/内容/用户/话题 | 猜你想搜、热股、联想和结果 | 空查询、无结果、输入法、网络失败 |
-| 内容详情 | 短帖/长文/视频 | 正文、作者、互动、讨论 | 已删、审核中、折叠、无权限、申诉 |
-| 发布器 | 短帖与长文 | 发讨论/写长文 | 草稿、上传、失败重试、关联标的、可见性 |
-| 消息 | 回复、@、赞、系统、私信 | 回复我的、提到我的、赞我的、系统 | 未读、已读、深链失效、账户切换 |
-| 我的与设置 | 个人资料、关注、粉丝、收藏、资产、设置 | 我的、设置、通知、隐私、自选、模拟交易 | 游客、权限拒绝、注销、删除请求 |
-| 运营审核台 | 独立管理端 | 不提供 | 队列、证据、处置、恢复、申诉、审计 |
+| 页面族                          | Web                                    | App                                               | 关键状态                                             |
+| ------------------------------- | -------------------------------------- | ------------------------------------------------- | ---------------------------------------------------- |
+| 首页 Feed                       | 三栏 Feed、频道、榜单                  | 顶部蓝色区域、频道横滑、底栏                      | 加载、空、错误、陈旧、离线、游客、已登录             |
+| 关注/推荐/热门                  | 独立频道                               | 独立频道                                          | 无关注、推荐降级、屏蔽内容、刷新                     |
+| 7×24                            | 时间线                                 | 快讯卡片                                          | 实时连接、断线重连、延迟、历史加载                   |
+| 视频                            | Feed 视频卡                            | 视频卡与播放器                                    | 未自动播放、静音、失败、弱网                         |
+| 资讯/达人/基金资料/策略研究/ETF | 频道 Feed                              | 频道 Feed                                         | 来源、时点、资质隔离、空态                           |
+| 自选首页                        | 表格与推荐标的                         | 热门/最近/全部/市场分组                           | 无自选、排序、批量添加、跨端同步                     |
+| 行情首页                        | 指数、市场宽度、异动                   | A/港/美/全球/外汇/基金/期货                       | 休市、延迟、部分供应商故障                           |
+| 私有组合                        | 本人组合列表与复盘                     | 本人盈亏概况、持仓和账本                          | 无组合、陈旧估值、币种、重放失败；公开榜单和播报关闭 |
+| 标的详情                        | 报价、图表、讨论、成分/资料            | 报价、分时/K 线、讨论、成分、资讯、公告、相关 ETF | 交易中、休市、停牌、无数据、受限                     |
+| 搜索                            | 证券/内容/用户/话题                    | 猜你想搜、热股、联想和结果                        | 空查询、无结果、输入法、网络失败                     |
+| 内容详情                        | 短帖/长文/视频                         | 正文、作者、互动、讨论                            | 已删、审核中、折叠、无权限、申诉                     |
+| 发布器                          | 短帖与长文                             | 发讨论/写长文                                     | 草稿、上传、失败重试、关联标的、可见性               |
+| 消息                            | 回复、@、赞、系统、私信                | 回复我的、提到我的、赞我的、系统                  | 未读、已读、深链失效、账户切换                       |
+| 我的与设置                      | 个人资料、关注、粉丝、收藏、资产、设置 | 我的、设置、通知、隐私、自选、模拟交易            | 游客、权限拒绝、注销、删除请求                       |
+| 运营审核台                      | 独立管理端                             | 不提供                                            | 队列、证据、处置、恢复、申诉、审计                   |
 
 ### 5.4 关键触点
 
@@ -197,46 +197,46 @@ V1 公网治理闭环：用户举报 → 生成证据快照 → 审核人员查�
 
 ### 7.2 推荐技术栈
 
-| 层 | 首选 |
-|---|---|
-| Monorepo | pnpm workspace + Turborepo |
-| Web | Next.js、React、TypeScript、Radix UI、shadcn/ui |
-| App | Expo、React Native、TypeScript、Expo Router、FlashList、Reanimated |
-| Auth | Better Auth；H0–H2 验证许可证、NestJS 会话和 Expo 安全存储，失败时唯一回退为独立 Keycloak OIDC |
-| API | NestJS + Fastify + OpenAPI |
-| ORM 与迁移 | Drizzle ORM + drizzle-kit |
-| 数据库 | PostgreSQL |
-| 缓存、队列与定时任务 | Valkey + BullMQ；锁定精确制品并验证 Redis 协议兼容测试 |
-| M1 搜索 | PostgreSQL tsvector + pg_trgm；M2 再评估独立搜索引擎 |
-| M1 实时连接 | API 提供 SSE；行情高频 WebSocket 和 Centrifugo 延后到 M2 |
-| 图表 | Web 使用 Apache ECharts；App 首选 @wuba/react-native-echarts SVG renderer，H0–H2 通过许可证/SCA/Expo spike，失败时 M1 唯一回退为受限 ECharts WebView 图表并在 M2 前替换 |
-| 编辑器 | Tiptap OSS core |
-| M1 媒体 | 测试文件系统适配器；对象存储与媒体流水线进入 M2 |
-| M1 通知 | 内部数据库 Inbox + SSE；APNS/FCM 与 Novu 不进入 Required |
-| 管理端 | React Admin |
-| AI | Vercel AI SDK 接入独立 AI Gateway |
-| 可观测性 | OpenTelemetry、Prometheus、Jaeger；其他仪表盘制品经独立许可证批准后隔离部署 |
-| 测试 | Vitest/Jest、Playwright、Maestro、契约测试和属性测试 |
-| 安全与供应链 | Gitleaks、Semgrep、Syft、Grype/Trivy |
-| 开发与演示部署 | Docker Compose + Linux 容器 Staging；Expo Simulator/Emulator build |
+| 层                   | 首选                                                                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Monorepo             | pnpm workspace + Turborepo                                                                                                                                              |
+| Web                  | Next.js、React、TypeScript、Radix UI、shadcn/ui                                                                                                                         |
+| App                  | Expo、React Native、TypeScript、Expo Router、FlashList、Reanimated                                                                                                      |
+| Auth                 | Better Auth；H0–H2 验证许可证、NestJS 会话和 Expo 安全存储，失败时唯一回退为独立 Keycloak OIDC                                                                          |
+| API                  | NestJS + Fastify + OpenAPI                                                                                                                                              |
+| ORM 与迁移           | Drizzle ORM + drizzle-kit                                                                                                                                               |
+| 数据库               | PostgreSQL                                                                                                                                                              |
+| 缓存、队列与定时任务 | Valkey + BullMQ；锁定精确制品并验证 Redis 协议兼容测试                                                                                                                  |
+| M1 搜索              | PostgreSQL tsvector + pg_trgm；M2 再评估独立搜索引擎                                                                                                                    |
+| M1 实时连接          | API 提供 SSE；行情高频 WebSocket 和 Centrifugo 延后到 M2                                                                                                                |
+| 图表                 | Web 使用 Apache ECharts；App 首选 @wuba/react-native-echarts SVG renderer，H0–H2 通过许可证/SCA/Expo spike，失败时 M1 唯一回退为受限 ECharts WebView 图表并在 M2 前替换 |
+| 编辑器               | Tiptap OSS core                                                                                                                                                         |
+| M1 媒体              | 测试文件系统适配器；对象存储与媒体流水线进入 M2                                                                                                                         |
+| M1 通知              | 内部数据库 Inbox + SSE；APNS/FCM 与 Novu 不进入 Required                                                                                                                |
+| 管理端               | React Admin                                                                                                                                                             |
+| AI                   | Vercel AI SDK 接入独立 AI Gateway                                                                                                                                       |
+| 可观测性             | OpenTelemetry、Prometheus、Jaeger；其他仪表盘制品经独立许可证批准后隔离部署                                                                                             |
+| 测试                 | Vitest/Jest、Playwright、Maestro、契约测试和属性测试                                                                                                                    |
+| 安全与供应链         | Gitleaks、Semgrep、Syft、Grype/Trivy                                                                                                                                    |
+| 开发与演示部署       | Docker Compose + Linux 容器 Staging；Expo Simulator/Emulator build                                                                                                      |
 
 ### 7.3 领域边界
 
-| 领域 | 主要职责 | 核心数据所有权 |
-|---|---|---|
-| Identity | 登录、会话、设备、角色、隐私、注销 | user、identity、session、device、consent |
-| Instrument Reference | 标的、上市地、市场、币种、代码映射、交易日历和公司行动事实 | instrument、listing、exchange、symbol alias、calendar、corporate action |
-| Market Data | 原始供应商观测、行情规范化、快照、K 线、修订和展示授权投影 | provider observation、quote、bar、revision、entitlement projection |
-| Content | 短帖、长文、视频、草稿、媒体、话题 | post、article、draft、media、topic |
-| Social | 关注、评论、点赞、收藏、分享和屏蔽 | follow、comment、reaction、bookmark、block |
-| Moderation | 举报、审核案件、处置、申诉、证据和领域审计 | report、moderation case、decision、appeal、evidence、moderation audit |
-| Feed & Channel | Feed 投影、频道、推荐位、榜单和运营注入 | feed item、channel、ranking snapshot |
-| Watchlist & Alert | 自选组、标的自选、提醒规则和触发 | watchlist、watch item、alert rule、alert trigger |
-| Portfolio Simulation | 组合、追加式账本、订单填充规则、持仓和分析 | portfolio、ledger entry、position projection、valuation |
-| Search | 文档索引、联想、热词和排序 | search document、query signal |
-| Messaging & Notification | 站内通知、私信后续域、推送投递和已读状态 | notification、delivery、conversation、read state |
-| AI | 模型路由、检索、引用、安全决策和评测 | ai run、citation、policy decision、evaluation |
-| Operations | 配置、功能开关、供应商状态、跨系统管理动作审计和应急控制 | config、feature flag、provider state、system admin audit |
+| 领域                     | 主要职责                                                   | 核心数据所有权                                                          |
+| ------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Identity                 | 登录、会话、设备、角色、隐私、注销                         | user、identity、session、device、consent                                |
+| Instrument Reference     | 标的、上市地、市场、币种、代码映射、交易日历和公司行动事实 | instrument、listing、exchange、symbol alias、calendar、corporate action |
+| Market Data              | 原始供应商观测、行情规范化、快照、K 线、修订和展示授权投影 | provider observation、quote、bar、revision、entitlement projection      |
+| Content                  | 短帖、长文、视频、草稿、媒体、话题                         | post、article、draft、media、topic                                      |
+| Social                   | 关注、评论、点赞、收藏、分享和屏蔽                         | follow、comment、reaction、bookmark、block                              |
+| Moderation               | 举报、审核案件、处置、申诉、证据和领域审计                 | report、moderation case、decision、appeal、evidence、moderation audit   |
+| Feed & Channel           | Feed 投影、频道、推荐位、榜单和运营注入                    | feed item、channel、ranking snapshot                                    |
+| Watchlist & Alert        | 自选组、标的自选、提醒规则和触发                           | watchlist、watch item、alert rule、alert trigger                        |
+| Portfolio Simulation     | 组合、追加式账本、订单填充规则、持仓和分析                 | portfolio、ledger entry、position projection、valuation                 |
+| Search                   | 文档索引、联想、热词和排序                                 | search document、query signal                                           |
+| Messaging & Notification | 站内通知、私信后续域、推送投递和已读状态                   | notification、delivery、conversation、read state                        |
+| AI                       | 模型路由、检索、引用、安全决策和评测                       | ai run、citation、policy decision、evaluation                           |
+| Operations               | 配置、功能开关、供应商状态、跨系统管理动作审计和应急控制   | config、feature flag、provider state、system admin audit                |
 
 每张业务表只有一个写入领域。其他领域通过 API、事件或只读投影读取，不跨边界直接更新。
 
@@ -278,14 +278,14 @@ V1 公网治理闭环：用户举报 → 生成证据快照 → 审核人员查�
 
 ### 8.4 一致性等级
 
-| 场景 | 一致性 |
-|---|---|
-| 登录、权限、封禁、隐私设置 | 强一致 |
-| 自选写入与当前用户读取 | 读己之写 |
-| 组合账本和订单录入 | 强一致与串行化约束 |
-| Feed、榜单、搜索索引 | 最终一致，界面展示更新时间 |
-| 点赞数、评论数 | 可最终一致，用户自身操作即时反馈 |
-| 行情 | 以供应商和 as_of 为准，陈旧必须显式 |
+| 场景                       | 一致性                              |
+| -------------------------- | ----------------------------------- |
+| 登录、权限、封禁、隐私设置 | 强一致                              |
+| 自选写入与当前用户读取     | 读己之写                            |
+| 组合账本和订单录入         | 强一致与串行化约束                  |
+| Feed、榜单、搜索索引       | 最终一致，界面展示更新时间          |
+| 点赞数、评论数             | 可最终一致，用户自身操作即时反馈    |
+| 行情                       | 以供应商和 as_of 为准，陈旧必须显式 |
 
 ## 9. 行情与金融数据设计
 
@@ -436,13 +436,13 @@ M1 组合命令锁定 portfolio 聚合行，在同一 PostgreSQL 事务中校验
 
 ### 13.2 分类
 
-| 分类 | 项目或方向 | 用法 |
-|---|---|---|
-| 直接采用 | Next.js、Expo、React Native、NestJS、PostgreSQL、Valkey、Radix、shadcn、Playwright、OpenTelemetry | 产品基础栈；仍须锁版本和许可证 |
-| 精确制品核准后封装 | Centrifugo、独立搜索引擎、通知编排、Uppy、tusd、imgproxy、Vercel AI SDK | M2 候选；逐镜像、edition、版本和传递依赖审查后才可安装 |
-| 算法采用 | Riskfolio-Lib、PyPortfolioOpt | 只用于分析算法，业务账本自建 |
-| 选择性迁移 | 许可证明确且通过代码审查的 MIT/Apache/BSD 模块，例如 PanWatch 的局部模式 | 保留来源、重写适配并测试 |
-| 仅参考 | OpenStock、Ghostfolio、OpenBB、Stocknear，以及未核准的 mixed-license/AGPL/商业制品 | 不进入发布产物或运行时 |
+| 分类               | 项目或方向                                                                                        | 用法                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 直接采用           | Next.js、Expo、React Native、NestJS、PostgreSQL、Valkey、Radix、shadcn、Playwright、OpenTelemetry | 产品基础栈；仍须锁版本和许可证                         |
+| 精确制品核准后封装 | Centrifugo、独立搜索引擎、通知编排、Uppy、tusd、imgproxy、Vercel AI SDK                           | M2 候选；逐镜像、edition、版本和传递依赖审查后才可安装 |
+| 算法采用           | Riskfolio-Lib、PyPortfolioOpt                                                                     | 只用于分析算法，业务账本自建                           |
+| 选择性迁移         | 许可证明确且通过代码审查的 MIT/Apache/BSD 模块，例如 PanWatch 的局部模式                          | 保留来源、重写适配并测试                               |
+| 仅参考             | OpenStock、Ghostfolio、OpenBB、Stocknear，以及未核准的 mixed-license/AGPL/商业制品                | 不进入发布产物或运行时                                 |
 
 最终采用前重新核验当前版本许可证、商标、传递依赖、容器、字体、图标、素材、模型和数据集。未知许可证为零。
 
@@ -452,12 +452,12 @@ M1 组合命令锁定 portfolio 聚合行，在同一 PostgreSQL 事务中校验
 
 当前环境最多允许主代理加三个子代理同时工作。采用高频轮转，不把更多代码产出误认为更多可交付功能。
 
-| 槽位 | 默认职责 |
-|---|---|
-| 主代理 | 契约所有者、架构、任务切片、根配置、集成、全量验证和最终修复 |
-| 子代理 A | API、领域模型、数据库、行情适配和种子数据 |
-| 子代理 B | Web、Web UI、浏览器测试 |
-| 子代理 C | Expo/React Native、原生能力、移动测试 |
+| 槽位     | 默认职责                                                     |
+| -------- | ------------------------------------------------------------ |
+| 主代理   | 契约所有者、架构、任务切片、根配置、集成、全量验证和最终修复 |
+| 子代理 A | API、领域模型、数据库、行情适配和种子数据                    |
+| 子代理 B | Web、Web UI、浏览器测试                                      |
+| 子代理 C | Expo/React Native、原生能力、移动测试                        |
 
 进入验证波次后，完成实现的子代理优先转为其他领域的独立验证者。独立品控有 G0–G6 否决权。
 
@@ -465,12 +465,12 @@ M1 组合命令锁定 portfolio 聚合行，在同一 PostgreSQL 事务中校验
 
 实现阶段必须使用独立 worktree/分支；共享一个目录时只允许一个写代理。
 
-| 所有者 | 路径 |
-|---|---|
+| 所有者 | 路径                                                                                            |
+| ------ | ----------------------------------------------------------------------------------------------- |
 | 主代理 | 根 package、lockfile、workspace、CI、Docker、packages/contracts、生成 SDK、设计 token、跨端 E2E |
-| A | apps/api、packages/domain、packages/market-adapters、migrations、seed、API tests |
-| B | apps/web、packages/web-ui、Web Playwright tests |
-| C | apps/mobile、packages/native-ui、移动测试与构建配置 |
+| A      | apps/api、packages/domain、packages/market-adapters、migrations、seed、API tests                |
+| B      | apps/web、packages/web-ui、Web Playwright tests                                                 |
+| C      | apps/mobile、packages/native-ui、移动测试与构建配置                                             |
 
 规则：
 
@@ -583,15 +583,15 @@ Stretch，不计 M1 通过：
 
 日程：
 
-| 日期 | 可运行增量 |
-|---|---|
-| Day 1 | Monorepo、设计 token、OpenAPI、数据库、Fixture、导航壳 |
-| Day 2 | Web 黄金路径、App 壳、基础 API 和 Seed |
-| Day 3 | 最小审核状态机与 Admin 骨架先行；App 登录、Feed、标的详情、自选 |
-| Day 4 | 经过审核状态机的三端短帖评论与最小模拟组合账本 |
-| Day 5 | 数据库 Inbox、举报、审核、审计；Stretch 只在 Required 全绿后开始 |
+| 日期  | 可运行增量                                                               |
+| ----- | ------------------------------------------------------------------------ |
+| Day 1 | Monorepo、设计 token、OpenAPI、数据库、Fixture、导航壳                   |
+| Day 2 | Web 黄金路径、App 壳、基础 API 和 Seed                                   |
+| Day 3 | 最小审核状态机与 Admin 骨架先行；App 登录、Feed、标的详情、自选          |
+| Day 4 | 经过审核状态机的三端短帖评论与最小模拟组合账本                           |
+| Day 5 | 数据库 Inbox、举报、审核、审计；Stretch 只在 Required 全绿后开始         |
 | Day 6 | 功能冻结；契约、迁移、浏览器、模拟器、可用真机、弱网、权限和定向安全验证 |
-| Day 7 | 只修阻塞缺陷；生成构建、测试、演示和差距证据 |
+| Day 7 | 只修阻塞缺陷；生成构建、测试、演示和差距证据                             |
 
 退出条件：
 
@@ -616,13 +616,13 @@ Stretch，不计 M1 通过：
 
 ## 16. 长期高完整度路线
 
-| 阶段 | 目标 | 现实时间 |
-|---|---|---|
-| D0 | 48 小时 Web 演示 + App 导航壳 | 2 天 |
-| M1 | Web/iOS/Android 员工纵向 Alpha | G0/G1 与环境就绪后 7 天 |
-| M2 | 受控 MVP：真实授权数据、审核后台、安全与真机覆盖 | 数据合同与审批完成后 6–8 周规划假设 |
-| V1 | 可公开 Web/App v1，核心社区、行情、自选、组合和运营稳定 | 4–6 个月 |
-| HC | 高完整度，多市场、推荐、消息、治理、灾备和运营成熟 | 9–12 个月以上 |
+| 阶段 | 目标                                                    | 现实时间                            |
+| ---- | ------------------------------------------------------- | ----------------------------------- |
+| D0   | 48 小时 Web 演示 + App 导航壳                           | 2 天                                |
+| M1   | Web/iOS/Android 员工纵向 Alpha                          | G0/G1 与环境就绪后 7 天             |
+| M2   | 受控 MVP：真实授权数据、审核后台、安全与真机覆盖        | 数据合同与审批完成后 6–8 周规划假设 |
+| V1   | 可公开 Web/App v1，核心社区、行情、自选、组合和运营稳定 | 4–6 个月                            |
+| HC   | 高完整度，多市场、推荐、消息、治理、灾备和运营成熟      | 9–12 个月以上                       |
 
 M2 之后的时间假设有产品、设计、前后端、移动、数据、测试、运维、合规和运营组成的 10 人以上真实团队。只有主代理和三个子代理时可以显著加速编码、调研和验证，但不能压缩所有外部依赖。
 
@@ -646,33 +646,33 @@ M2 之后的时间假设有产品、设计、前后端、移动、数据、测�
 
 ### 17.1 G0–G6
 
-| 门禁 | 通过条件 |
-|---|---|
-| G0 参考基线 | 参考版本、范围、品牌、资质、数据和许可证边界冻结 |
-| G1 规格冻结 | 功能树、页面地图、状态、旅程、后台能力和未知项通过 |
+| 门禁        | 通过条件                                                |
+| ----------- | ------------------------------------------------------- |
+| G0 参考基线 | 参考版本、范围、品牌、资质、数据和许可证边界冻结        |
+| G1 规格冻结 | 功能树、页面地图、状态、旅程、后台能力和未知项通过      |
 | G2 契约冻结 | API、事件、表所有权、数据血缘、权限、测试和性能预算通过 |
-| G3 纵向验证 | Web/App/API/数据库真实闭环通过，不依赖各端独立 Fixture |
-| G4 功能完成 | 首期能力、自动化、人工、视觉和运营验收通过 |
-| G5 发布候选 | 安全、性能、可访问性、恢复、AI 红队、授权和兼容通过 |
-| G6 生产发布 | Go/No-Go、Canary、监控、回滚、值班和供应商状态就绪 |
+| G3 纵向验证 | Web/App/API/数据库真实闭环通过，不依赖各端独立 Fixture  |
+| G4 功能完成 | 首期能力、自动化、人工、视觉和运营验收通过              |
+| G5 发布候选 | 安全、性能、可访问性、恢复、AI 红队、授权和兼容通过     |
+| G6 生产发布 | Go/No-Go、Canary、监控、回滚、值班和供应商状态就绪      |
 
 独立品控可否决任一门禁。P0 不允许豁免；P1 不得进入公开发布。
 
 ### 17.2 质量维度
 
-| 维度 | 核心标准 |
-|---|---|
-| 页面与状态 | 每页登记入口、出口、权限、路由、Screen、Deep Link 和全部适用状态 |
-| Web/App 一致性 | 共享能力 100% 映射；差异必须有平台理由和批准记录 |
-| API | 公开 API 100% 进入 OpenAPI；mutation 有鉴权、幂等和冲突规则 |
-| 数据血缘 | 金融字段 100% 可追溯到来源、转换、单位、精度、币种、时区、延迟和授权 |
-| 权限 | Actor × Resource × Action 正反测试；默认拒绝 |
-| 许可证 | 代码、依赖、容器、字体、图标、素材、模型和数据集识别率 100% |
-| E2E | 关键旅程和负向路径通过，不用代码覆盖率替代需求覆盖 |
-| 视觉 | 支持断点和设备有批准基线；未审核差异为零 |
-| 性能 | 指定设备、网络和数据量有预算；Web Core Web Vitals 以 p75 良好为基础 |
-| 可访问性 | WCAG 2.2 AA；Web 键盘/读屏，App VoiceOver/TalkBack 人工验证 |
-| 运维 | 健康检查、日志、Trace、告警、熔断、备份、恢复、回滚和值班演练 |
+| 维度           | 核心标准                                                             |
+| -------------- | -------------------------------------------------------------------- |
+| 页面与状态     | 每页登记入口、出口、权限、路由、Screen、Deep Link 和全部适用状态     |
+| Web/App 一致性 | 共享能力 100% 映射；差异必须有平台理由和批准记录                     |
+| API            | 公开 API 100% 进入 OpenAPI；mutation 有鉴权、幂等和冲突规则          |
+| 数据血缘       | 金融字段 100% 可追溯到来源、转换、单位、精度、币种、时区、延迟和授权 |
+| 权限           | Actor × Resource × Action 正反测试；默认拒绝                         |
+| 许可证         | 代码、依赖、容器、字体、图标、素材、模型和数据集识别率 100%          |
+| E2E            | 关键旅程和负向路径通过，不用代码覆盖率替代需求覆盖                   |
+| 视觉           | 支持断点和设备有批准基线；未审核差异为零                             |
+| 性能           | 指定设备、网络和数据量有预算；Web Core Web Vitals 以 p75 良好为基础  |
+| 可访问性       | WCAG 2.2 AA；Web 键盘/读屏，App VoiceOver/TalkBack 人工验证          |
+| 运维           | 健康检查、日志、Trace、告警、熔断、备份、恢复、回滚和值班演练        |
 
 ### 17.3 缺陷等级
 
@@ -691,20 +691,20 @@ Commit/Build｜环境｜时间｜完整命令和配置｜Fixture/数据版本｜
 
 ## 18. 关键风险与停止条件
 
-| 风险 | 防线 | 停止条件 |
-|---|---|---|
-| 共享写冲突 | 独立 worktree、路径所有权、single writer | 两个活跃代理写同一文件、表或共享契约 |
-| 伪并行 | 依赖 DAG、契约版本、任务输入冻结 | 消费者需要猜字段或自行复制实体 |
-| 集成拥堵 | 小批次、单个集成 owner、主干全绿 | 待集成超过两项或等待超过半天 |
-| 页面假完整 | 能力追踪链和服务端状态 | 无 E2E 或无异常状态仍继续铺页面 |
-| 行情越权 | 数据源 allowlist 和用途授权 | 出现未批准域名或无展示权 |
-| 资质偷渡 | 服务端 deny-list，不只隐藏按钮 | 出现交易、申赎、跟投、个性化建议命令 |
-| 组合假完成 | 追加式账本、属性测试、确定性重放 | 余额可直接编辑或重放结果不一致 |
-| 社区无治理 | 举报到申诉闭环和急停 | 无审核负责人或无处置状态机 |
-| Mock 全绿 | 适配器契约、真实数据库、Staging E2E | blanket mock、跳过测试或只靠扩大 timeout |
-| OSS 污染 | SBOM 和许可证 allowlist | 未批准 copyleft 或未知许可证进入构建 |
-| AI 风险 | 引用、只读工具、版本记录和 Feature Flag | 无引用、越权数据或买卖仓位输出 |
-| Secret/外部副作用 | 临时环境、禁止生产凭据、出网审计 | 代理接触真实用户、真实 Push/SMS 或提交 Secret |
+| 风险              | 防线                                     | 停止条件                                      |
+| ----------------- | ---------------------------------------- | --------------------------------------------- |
+| 共享写冲突        | 独立 worktree、路径所有权、single writer | 两个活跃代理写同一文件、表或共享契约          |
+| 伪并行            | 依赖 DAG、契约版本、任务输入冻结         | 消费者需要猜字段或自行复制实体                |
+| 集成拥堵          | 小批次、单个集成 owner、主干全绿         | 待集成超过两项或等待超过半天                  |
+| 页面假完整        | 能力追踪链和服务端状态                   | 无 E2E 或无异常状态仍继续铺页面               |
+| 行情越权          | 数据源 allowlist 和用途授权              | 出现未批准域名或无展示权                      |
+| 资质偷渡          | 服务端 deny-list，不只隐藏按钮           | 出现交易、申赎、跟投、个性化建议命令          |
+| 组合假完成        | 追加式账本、属性测试、确定性重放         | 余额可直接编辑或重放结果不一致                |
+| 社区无治理        | 举报到申诉闭环和急停                     | 无审核负责人或无处置状态机                    |
+| Mock 全绿         | 适配器契约、真实数据库、Staging E2E      | blanket mock、跳过测试或只靠扩大 timeout      |
+| OSS 污染          | SBOM 和许可证 allowlist                  | 未批准 copyleft 或未知许可证进入构建          |
+| AI 风险           | 引用、只读工具、版本记录和 Feature Flag  | 无引用、越权数据或买卖仓位输出                |
+| Secret/外部副作用 | 临时环境、禁止生产凭据、出网审计         | 代理接触真实用户、真实 Push/SMS 或提交 Secret |
 
 ## 19. 可执行验收总则
 
@@ -735,132 +735,132 @@ Commit/Build｜环境｜时间｜完整命令和配置｜Fixture/数据版本｜
 
 下表是第一版可计算范围。Required 能力已有最小契约，标记“已设计”；Stretch 只有方向与边界，标记“已发现”；禁用能力标记“隔离已设计”。尚无能力进入实现或验证。
 
-| CAP ID | 能力 | D0 | M1 | Web/App/API/Admin | 合规处置 | 状态 |
-|---|---|---|---|---|---|---|
-| CAP-ID-001 | 种子身份/真实会话 | Required Fixture | Required | W/A/API | Allowed | 已设计 |
-| CAP-INST-001 | 标的搜索与详情 | Required Fixture | Required | W/A/API | Allowed with data gate | 已设计 |
-| CAP-MD-001 | 报价与 K 线 | Required Synthetic | Required Synthetic | W/A/API | Allowed with as_of | 已设计 |
-| CAP-FEED-001 | 规则 Feed | Required Fixture | Required | W/A/API | Allowed internal only | 已设计 |
-| CAP-WATCH-001 | 加减自选与同步 | Required Fixture | Required | W/A/API | Allowed | 已设计 |
-| CAP-CONTENT-001 | 短帖创建与详情 | Out | Required | W/A/API/Admin | Allowed internal only | 已设计 |
-| CAP-SOCIAL-001 | 评论与点赞 | Out | Required | W/A/API/Admin | Allowed internal only | 已设计 |
-| CAP-NOTIF-001 | 数据库站内 Inbox | Out | Required | W/A/API | Allowed | 已设计 |
-| CAP-MOD-001 | 举报、隐藏、恢复、封禁、审计 | Out | Required before UGC | W/API/Admin | Required control | 已设计 |
-| CAP-PORT-001 | 私有单币种模拟账本 | Stretch Fixture | Required | W/A/API | Allowed private only | 已设计 |
-| CAP-ALERT-001 | last price 穿越提醒 | Out | Stretch | W/A/API | Allowed factual only | 已发现 |
-| CAP-FOLLOW-001 | 关注与收藏 | Out | Stretch | W/A/API/Admin | Allowed | 已发现 |
-| CAP-AI-001 | 有来源摘要 | Out | Stretch Off | W/A/API/Admin | FeatureFlagOff | 已发现 |
-| CAP-PUSH-001 | APNS/FCM | Out | Out | A/API/Admin | M2 | 已发现 |
-| CAP-PUBLIC-PORT-001 | 组合排行、播报、复制 | Out | Out | None | FeatureFlagOff | 隔离已设计 |
-| CAP-PRIVATE-FUND-001 | 私募产品与认购 | Out | Out | None | LicensedOnly | 隔离已设计 |
+| CAP ID               | 能力                         | D0                 | M1                  | Web/App/API/Admin | 合规处置               | 状态       |
+| -------------------- | ---------------------------- | ------------------ | ------------------- | ----------------- | ---------------------- | ---------- |
+| CAP-ID-001           | 种子身份/真实会话            | Required Fixture   | Required            | W/A/API           | Allowed                | 已设计     |
+| CAP-INST-001         | 标的搜索与详情               | Required Fixture   | Required            | W/A/API           | Allowed with data gate | 已设计     |
+| CAP-MD-001           | 报价与 K 线                  | Required Synthetic | Required Synthetic  | W/A/API           | Allowed with as_of     | 已设计     |
+| CAP-FEED-001         | 规则 Feed                    | Required Fixture   | Required            | W/A/API           | Allowed internal only  | 已设计     |
+| CAP-WATCH-001        | 加减自选与同步               | Required Fixture   | Required            | W/A/API           | Allowed                | 已设计     |
+| CAP-CONTENT-001      | 短帖创建与详情               | Out                | Required            | W/A/API/Admin     | Allowed internal only  | 已设计     |
+| CAP-SOCIAL-001       | 评论与点赞                   | Out                | Required            | W/A/API/Admin     | Allowed internal only  | 已设计     |
+| CAP-NOTIF-001        | 数据库站内 Inbox             | Out                | Required            | W/A/API           | Allowed                | 已设计     |
+| CAP-MOD-001          | 举报、隐藏、恢复、封禁、审计 | Out                | Required before UGC | W/API/Admin       | Required control       | 已设计     |
+| CAP-PORT-001         | 私有单币种模拟账本           | Stretch Fixture    | Required            | W/A/API           | Allowed private only   | 已设计     |
+| CAP-ALERT-001        | last price 穿越提醒          | Out                | Stretch             | W/A/API           | Allowed factual only   | 已发现     |
+| CAP-FOLLOW-001       | 关注与收藏                   | Out                | Stretch             | W/A/API/Admin     | Allowed                | 已发现     |
+| CAP-AI-001           | 有来源摘要                   | Out                | Stretch Off         | W/A/API/Admin     | FeatureFlagOff         | 已发现     |
+| CAP-PUSH-001         | APNS/FCM                     | Out                | Out                 | A/API/Admin       | M2                     | 已发现     |
+| CAP-PUBLIC-PORT-001  | 组合排行、播报、复制         | Out                | Out                 | None              | FeatureFlagOff         | 隔离已设计 |
+| CAP-PRIVATE-FUND-001 | 私募产品与认购               | Out                | Out                 | None              | LicensedOnly           | 隔离已设计 |
 
 D0 Required 只计算 CAP-ID-001、CAP-INST-001、CAP-MD-001、CAP-FEED-001、CAP-WATCH-001 的 Fixture 演示。M1 Required 只计算表中明确标记 Required 的能力；Stretch 不影响通过。
 
 ### 21.1 Required 能力追踪映射
 
-| CAP ID | PAGE | TOUCH | API | EVENT | DATA | TEST/EVIDENCE |
-|---|---|---|---|---|---|---|
-| CAP-ID-001 | PAGE-AUTH-001 | 登录/退出 | API-AUTH-001..004 | identity.user_registered、identity.user_suspended | identity_*、auth_* | 会话、邀请、撤销、跨账号 E2E |
-| CAP-INST-001 | PAGE-SEARCH-001、PAGE-INST-001 | TOUCH-SEARCH-001 | API-INST-001..002 | None | instruments、listings、exchanges | 搜索黄金样例、市场/币种对账 |
-| CAP-MD-001 | PAGE-INST-001 | 周期切换 | API-MD-001..002 | market.quote_revised | market_* | as_of、陈旧、序列/修订契约 |
-| CAP-FEED-001 | PAGE-HOME-001 | 分页、刷新 | API-FEED-001 | content.post_published/hidden/restored | feed_channels、feed_items | 卡片联合、删除传播、浏览器 E2E |
-| CAP-WATCH-001 | PAGE-WATCH-001、PAGE-INST-001 | TOUCH-WATCH-001 | API-WATCH-001..003 | watchlist.item_changed | watchlists、watchlist_items | 幂等、读己之写、三端同步 |
-| CAP-CONTENT-001 | PAGE-COMPOSE-001、PAGE-POST-001 | TOUCH-POST-001 | API-POST-001..002 | content.post_submitted/published | content_posts、revisions | 草稿恢复、审核状态、XSS、E2E |
-| CAP-SOCIAL-001 | PAGE-POST-001 | TOUCH-COMMENT-001、TOUCH-REACTION-001 | API-COMMENT-000..001、API-REACTION-001..002 | social.comment_submitted/published/hidden/restored、reaction_changed | social_comments、reactions | 幂等、权限、审核可见性、viewer_reaction |
-| CAP-NOTIF-001 | PAGE-NOTIF-001 | TOUCH-NOTIF-001 | API-NOTIF-001..003 | notification.created/read_watermark_advanced | notifications、read_state | recipient、单调已读、SSE 恢复、失效深链 |
-| CAP-MOD-001 | PAGE-MOD-001 | TOUCH-REPORT-001、TOUCH-MOD-001 | API-REPORT-001、API-MOD-001..002 | moderation.report_submitted、moderation.decision_recorded、content.post_published/hidden/restored、identity.user_suspended | moderation_* | 决定事务、下架、恢复、封禁回归 |
-| CAP-PORT-001 | PAGE-PORT-LIST-001、PAGE-PORT-001 | TOUCH-PORT-001..002 | API-PORT-000..006 | portfolio.ledger_entry_posted | portfolio_* | 列表发现、账本分页、属性测试、版本、重放、三端一致 |
+| CAP ID          | PAGE                              | TOUCH                                 | API                                         | EVENT                                                                                                                      | DATA                             | TEST/EVIDENCE                                      |
+| --------------- | --------------------------------- | ------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | -------------------------------------------------- |
+| CAP-ID-001      | PAGE-AUTH-001                     | 登录/退出                             | API-AUTH-001..004                           | identity.user_registered、identity.user_suspended                                                                          | identity__、auth__               | 会话、邀请、撤销、跨账号 E2E                       |
+| CAP-INST-001    | PAGE-SEARCH-001、PAGE-INST-001    | TOUCH-SEARCH-001                      | API-INST-001..002                           | None                                                                                                                       | instruments、listings、exchanges | 搜索黄金样例、市场/币种对账                        |
+| CAP-MD-001      | PAGE-INST-001                     | 周期切换                              | API-MD-001..002                             | market.quote_revised                                                                                                       | market_*                         | as_of、陈旧、序列/修订契约                         |
+| CAP-FEED-001    | PAGE-HOME-001                     | 分页、刷新                            | API-FEED-001                                | content.post_published/hidden/restored                                                                                     | feed_channels、feed_items        | 卡片联合、删除传播、浏览器 E2E                     |
+| CAP-WATCH-001   | PAGE-WATCH-001、PAGE-INST-001     | TOUCH-WATCH-001                       | API-WATCH-001..003                          | watchlist.item_changed                                                                                                     | watchlists、watchlist_items      | 幂等、读己之写、三端同步                           |
+| CAP-CONTENT-001 | PAGE-COMPOSE-001、PAGE-POST-001   | TOUCH-POST-001                        | API-POST-001..002                           | content.post_submitted/published                                                                                           | content_posts、revisions         | 草稿恢复、审核状态、XSS、E2E                       |
+| CAP-SOCIAL-001  | PAGE-POST-001                     | TOUCH-COMMENT-001、TOUCH-REACTION-001 | API-COMMENT-000..001、API-REACTION-001..002 | social.comment_submitted/published/hidden/restored、reaction_changed                                                       | social_comments、reactions       | 幂等、权限、审核可见性、viewer_reaction            |
+| CAP-NOTIF-001   | PAGE-NOTIF-001                    | TOUCH-NOTIF-001                       | API-NOTIF-001..003                          | notification.created/read_watermark_advanced                                                                               | notifications、read_state        | recipient、单调已读、SSE 恢复、失效深链            |
+| CAP-MOD-001     | PAGE-MOD-001                      | TOUCH-REPORT-001、TOUCH-MOD-001       | API-REPORT-001、API-MOD-001..002            | moderation.report_submitted、moderation.decision_recorded、content.post_published/hidden/restored、identity.user_suspended | moderation_*                     | 决定事务、下架、恢复、封禁回归                     |
+| CAP-PORT-001    | PAGE-PORT-LIST-001、PAGE-PORT-001 | TOUCH-PORT-001..002                   | API-PORT-000..006                           | portfolio.ledger_entry_posted                                                                                              | portfolio_*                      | 列表发现、账本分页、属性测试、版本、重放、三端一致 |
 
 ## 22. 页面、状态与触点注册表
 
 ### 22.1 Route / Screen / Deep Link
 
-| PAGE ID | 能力 | Web Route | App Screen | Deep Link | D0/M1 |
-|---|---|---|---|---|---|
-| PAGE-AUTH-001 | 登录 | /login | /(auth)/sign-in | huoqiu://login | D0 Fixture / M1 |
-| PAGE-HOME-001 | 首页 Feed | / | /(tabs)/home | huoqiu://home | D0/M1 |
-| PAGE-SEARCH-001 | 搜索 | /search?q= | /search | huoqiu://search?q= | D0/M1 |
-| PAGE-INST-001 | 标的详情 | /instruments/[listingId] | /instrument/[listingId] | huoqiu://instrument/:listingId | D0/M1 |
-| PAGE-WATCH-001 | 自选 | /watchlist | /(tabs)/watchlist | huoqiu://watchlist | D0/M1 |
-| PAGE-COMPOSE-001 | 发布短帖 | /compose | /compose | huoqiu://compose | M1 |
-| PAGE-POST-001 | 帖子详情 | /posts/[postId] | /post/[postId] | huoqiu://post/:postId | M1 |
-| PAGE-NOTIF-001 | 站内消息 | /notifications | /notifications | huoqiu://notifications | M1 |
-| PAGE-PORT-LIST-001 | 私有组合列表 | /portfolios | /(tabs)/portfolio | huoqiu://portfolios | M1 |
-| PAGE-PORT-001 | 私有组合 | /portfolios/[portfolioId] | /portfolio/[portfolioId] | huoqiu://portfolio/:portfolioId | M1 |
-| PAGE-MOD-001 | 审核队列 | /admin/moderation | None | None | M1 Admin |
+| PAGE ID            | 能力         | Web Route                 | App Screen               | Deep Link                       | D0/M1           |
+| ------------------ | ------------ | ------------------------- | ------------------------ | ------------------------------- | --------------- |
+| PAGE-AUTH-001      | 登录         | /login                    | /(auth)/sign-in          | huoqiu://login                  | D0 Fixture / M1 |
+| PAGE-HOME-001      | 首页 Feed    | /                         | /(tabs)/home             | huoqiu://home                   | D0/M1           |
+| PAGE-SEARCH-001    | 搜索         | /search?q=                | /search                  | huoqiu://search?q=              | D0/M1           |
+| PAGE-INST-001      | 标的详情     | /instruments/[listingId]  | /instrument/[listingId]  | huoqiu://instrument/:listingId  | D0/M1           |
+| PAGE-WATCH-001     | 自选         | /watchlist                | /(tabs)/watchlist        | huoqiu://watchlist              | D0/M1           |
+| PAGE-COMPOSE-001   | 发布短帖     | /compose                  | /compose                 | huoqiu://compose                | M1              |
+| PAGE-POST-001      | 帖子详情     | /posts/[postId]           | /post/[postId]           | huoqiu://post/:postId           | M1              |
+| PAGE-NOTIF-001     | 站内消息     | /notifications            | /notifications           | huoqiu://notifications          | M1              |
+| PAGE-PORT-LIST-001 | 私有组合列表 | /portfolios               | /(tabs)/portfolio        | huoqiu://portfolios             | M1              |
+| PAGE-PORT-001      | 私有组合     | /portfolios/[portfolioId] | /portfolio/[portfolioId] | huoqiu://portfolio/:portfolioId | M1              |
+| PAGE-MOD-001       | 审核队列     | /admin/moderation         | None                     | None                            | M1 Admin        |
 
 App Deep Link 落地后必须重新鉴权，不能仅依赖链接中携带的 ID。
 
 ### 22.2 标准状态
 
-| STATE ID | 状态 | 适用规则 |
-|---|---|---|
-| STATE-LOAD | 加载 | 所有数据页 |
-| STATE-EMPTY | 空 | Feed、自选、搜索、通知、组合 |
-| STATE-ERROR | 可恢复错误 | 所有网络读取 |
-| STATE-OFFLINE | 离线 | App 与可安装 Web |
-| STATE-STALE | 陈旧 | 行情、Feed 投影、组合估值 |
-| STATE-UNAUTH | 未登录/会话过期 | 所有用户数据和 mutation |
+| STATE ID        | 状态              | 适用规则                     |
+| --------------- | ----------------- | ---------------------------- |
+| STATE-LOAD      | 加载              | 所有数据页                   |
+| STATE-EMPTY     | 空                | Feed、自选、搜索、通知、组合 |
+| STATE-ERROR     | 可恢复错误        | 所有网络读取                 |
+| STATE-OFFLINE   | 离线              | App 与可安装 Web             |
+| STATE-STALE     | 陈旧              | 行情、Feed 投影、组合估值    |
+| STATE-UNAUTH    | 未登录/会话过期   | 所有用户数据和 mutation      |
 | STATE-FORBIDDEN | 无权限/资质不可达 | 审核、他人私有组合、持牌能力 |
-| STATE-CONFLICT | 版本或幂等冲突 | 编辑、反应、账本、审核 |
-| STATE-REVIEW | 审核中/受限 | 帖子和评论 |
-| STATE-DELETED | 已删除/已下架 | 内容、通知深链 |
-| STATE-SUCCESS | 成功与可撤销反馈 | 自选、互动、审核和组合录入 |
+| STATE-CONFLICT  | 版本或幂等冲突    | 编辑、反应、账本、审核       |
+| STATE-REVIEW    | 审核中/受限       | 帖子和评论                   |
+| STATE-DELETED   | 已删除/已下架     | 内容、通知深链               |
+| STATE-SUCCESS   | 成功与可撤销反馈  | 自选、互动、审核和组合录入   |
 
 D0 Required 页面至少实现 STATE-LOAD、STATE-EMPTY、STATE-ERROR 和正常态。M1 每个页面实现全部适用状态；N/A 必须在能力总账中写出理由。
 
 ### 22.3 M1 关键触点
 
-| TOUCH ID | 操作 | 前置条件 | 失败恢复 | 最终状态 |
-|---|---|---|---|---|
-| TOUCH-SEARCH-001 | 提交搜索 | 查询已规范化 | 保留输入并重试 | PAGE-SEARCH-001 结果 |
-| TOUCH-WATCH-001 | 加/减自选 | 已登录、listing 可见 | 幂等重放、乐观回滚 | 自选与详情一致 |
-| TOUCH-POST-001 | 创建短帖 | 已登录、内容通过校验 | 保留本地草稿 | STATE-REVIEW 或 published |
-| TOUCH-COMMENT-001 | 创建评论 | 内容可评论 | 幂等重放、保留输入 | 评论列表包含唯一评论 |
-| TOUCH-REACTION-001 | 点赞切换 | 内容可见 | 条件更新与回滚 | 自身状态即时、计数最终一致 |
-| TOUCH-NOTIF-001 | 打开通知 | recipient 匹配 | 对象失效时显示 STATE-DELETED | 已读 watermark 前进 |
-| TOUCH-REPORT-001 | 举报内容 | 内容可见 | 重复举报合并 | 唯一 report/case |
-| TOUCH-MOD-001 | 隐藏/恢复 | 审核角色、版本匹配 | STATE-CONFLICT 后刷新 | Feed/Search 同步处置 |
-| TOUCH-PORT-001 | 录入模拟成交 | 本人、余额和持仓有效 | 幂等重放或拒绝 | 账本、现金、持仓同版本 |
-| TOUCH-PORT-002 | 冲正账本条目 | 本人、原条目可冲正 | 拒绝重复冲正 | 新冲正条目，不改历史 |
+| TOUCH ID           | 操作         | 前置条件             | 失败恢复                     | 最终状态                   |
+| ------------------ | ------------ | -------------------- | ---------------------------- | -------------------------- |
+| TOUCH-SEARCH-001   | 提交搜索     | 查询已规范化         | 保留输入并重试               | PAGE-SEARCH-001 结果       |
+| TOUCH-WATCH-001    | 加/减自选    | 已登录、listing 可见 | 幂等重放、乐观回滚           | 自选与详情一致             |
+| TOUCH-POST-001     | 创建短帖     | 已登录、内容通过校验 | 保留本地草稿                 | STATE-REVIEW 或 published  |
+| TOUCH-COMMENT-001  | 创建评论     | 内容可评论           | 幂等重放、保留输入           | 评论列表包含唯一评论       |
+| TOUCH-REACTION-001 | 点赞切换     | 内容可见             | 条件更新与回滚               | 自身状态即时、计数最终一致 |
+| TOUCH-NOTIF-001    | 打开通知     | recipient 匹配       | 对象失效时显示 STATE-DELETED | 已读 watermark 前进        |
+| TOUCH-REPORT-001   | 举报内容     | 内容可见             | 重复举报合并                 | 唯一 report/case           |
+| TOUCH-MOD-001      | 隐藏/恢复    | 审核角色、版本匹配   | STATE-CONFLICT 后刷新        | Feed/Search 同步处置       |
+| TOUCH-PORT-001     | 录入模拟成交 | 本人、余额和持仓有效 | 幂等重放或拒绝               | 账本、现金、持仓同版本     |
+| TOUCH-PORT-002     | 冲正账本条目 | 本人、原条目可冲正   | 拒绝重复冲正                 | 新冲正条目，不改历史       |
 
 ## 23. M1 API 与错误契约目录
 
 所有 POST 命令要求 Idempotency-Key；PUT/DELETE 使用确定资源键或 If-Match。响应包含 request_id 和 trace_id。
 
-| API ID | Method & Path | 权限 | 关键语义 |
-|---|---|---|---|
-| API-AUTH-001 | POST /v1/auth/register | Invited Guest | M1 公开注册关闭；校验一次性邀请/employee claim 后创建 identity、app user 与 Profile |
-| API-AUTH-002 | POST /v1/auth/login | Guest | 建立 HttpOnly Web session / App secure token |
-| API-AUTH-003 | GET /v1/auth/session | User | 返回 actor、roles、consent version |
-| API-AUTH-004 | POST /v1/auth/logout | User | 撤销会话与当前设备绑定 |
-| API-INST-001 | GET /v1/instruments/search | Public | cursor；名称、代码、拼音和别名 |
-| API-INST-002 | GET /v1/listings/:id | Public | 标的、市场、币种和交易状态 |
-| API-MD-001 | GET /v1/listings/:id/quote | Public | synthetic source、as_of、stale、entitlement |
-| API-MD-002 | GET /v1/listings/:id/bars | Public | interval、复权语义、cursor |
-| API-FEED-001 | GET /v1/feed | Public | channel、cursor、判别联合卡片 |
-| API-WATCH-001 | GET /v1/me/watchlist | User | M1 仅默认列表；事务内幂等 ensure default；读己之写 |
-| API-WATCH-002 | PUT /v1/me/watchlist/items/:listingId | User | 同一事务 ensure default 并幂等添加，不能依赖注册事件时序 |
-| API-WATCH-003 | DELETE /v1/me/watchlist/items/:listingId | User | 幂等删除 |
-| API-POST-001 | POST /v1/posts | User | 创建短帖，默认进入审核状态 |
-| API-POST-002 | GET /v1/posts/:id | Public/Owner | 依据状态与权限返回 |
-| API-COMMENT-000 | GET /v1/posts/:id/comments | Public/Owner | cursor；隐藏内容不可见；返回 viewer_reaction |
-| API-COMMENT-001 | POST /v1/posts/:id/comments | User | 幂等评论；返回 reviewing，审核后才对他人可见 |
-| API-REACTION-001 | PUT /v1/posts/:id/reactions/like | User | 确定资源键 |
-| API-REACTION-002 | DELETE /v1/posts/:id/reactions/like | User | 幂等取消 |
-| API-NOTIF-001 | GET /v1/me/notifications | User | recipient 过滤、cursor |
-| API-NOTIF-002 | POST /v1/me/notifications/read-watermark | User | 单调递增 |
-| API-NOTIF-003 | GET /v1/me/events | User | text/event-stream；Cookie/Bearer 鉴权；Last-Event-ID 或 cursor 恢复 |
-| API-REPORT-001 | POST /v1/reports | User | Moderation 单写；重复合并 |
-| API-MOD-001 | GET /v1/admin/moderation/cases | Reviewer | 版本、队列、证据摘要 |
-| API-MOD-002 | POST /v1/admin/moderation/cases/:id/decisions | Reviewer | If-Match；approve/reject/hide/restore/ban |
-| API-PORT-000 | GET /v1/me/portfolios | User | cursor；跨端发现本人组合 |
-| API-PORT-001 | POST /v1/portfolios | User | 创建本人私有组合 |
-| API-PORT-002 | GET /v1/portfolios/:id | Owner | 私有资源，默认拒绝他人 |
-| API-PORT-003 | POST /v1/portfolios/:id/ledger-entries | Owner | 买/卖/费用；校验余额持仓 |
-| API-PORT-004 | POST /v1/portfolios/:id/reversals | Owner | 新建冲正，不改原条目 |
-| API-PORT-005 | GET /v1/portfolios/:id/positions | Owner | 指定 valuation_as_of |
-| API-PORT-006 | GET /v1/portfolios/:id/ledger-entries | Owner | cursor；返回可冲正状态和 committed_version |
+| API ID           | Method & Path                                 | 权限          | 关键语义                                                                            |
+| ---------------- | --------------------------------------------- | ------------- | ----------------------------------------------------------------------------------- |
+| API-AUTH-001     | POST /v1/auth/register                        | Invited Guest | M1 公开注册关闭；校验一次性邀请/employee claim 后创建 identity、app user 与 Profile |
+| API-AUTH-002     | POST /v1/auth/login                           | Guest         | 建立 HttpOnly Web session / App secure token                                        |
+| API-AUTH-003     | GET /v1/auth/session                          | User          | 返回 actor、roles、consent version                                                  |
+| API-AUTH-004     | POST /v1/auth/logout                          | User          | 撤销会话与当前设备绑定                                                              |
+| API-INST-001     | GET /v1/instruments/search                    | Public        | cursor；名称、代码、拼音和别名                                                      |
+| API-INST-002     | GET /v1/listings/:id                          | Public        | 标的、市场、币种和交易状态                                                          |
+| API-MD-001       | GET /v1/listings/:id/quote                    | Public        | synthetic source、as_of、stale、entitlement                                         |
+| API-MD-002       | GET /v1/listings/:id/bars                     | Public        | interval、复权语义、cursor                                                          |
+| API-FEED-001     | GET /v1/feed                                  | Public        | channel、cursor、判别联合卡片                                                       |
+| API-WATCH-001    | GET /v1/me/watchlist                          | User          | M1 仅默认列表；事务内幂等 ensure default；读己之写                                  |
+| API-WATCH-002    | PUT /v1/me/watchlist/items/:listingId         | User          | 同一事务 ensure default 并幂等添加，不能依赖注册事件时序                            |
+| API-WATCH-003    | DELETE /v1/me/watchlist/items/:listingId      | User          | 幂等删除                                                                            |
+| API-POST-001     | POST /v1/posts                                | User          | 创建短帖，默认进入审核状态                                                          |
+| API-POST-002     | GET /v1/posts/:id                             | Public/Owner  | 依据状态与权限返回                                                                  |
+| API-COMMENT-000  | GET /v1/posts/:id/comments                    | Public/Owner  | cursor；隐藏内容不可见；返回 viewer_reaction                                        |
+| API-COMMENT-001  | POST /v1/posts/:id/comments                   | User          | 幂等评论；返回 reviewing，审核后才对他人可见                                        |
+| API-REACTION-001 | PUT /v1/posts/:id/reactions/like              | User          | 确定资源键                                                                          |
+| API-REACTION-002 | DELETE /v1/posts/:id/reactions/like           | User          | 幂等取消                                                                            |
+| API-NOTIF-001    | GET /v1/me/notifications                      | User          | recipient 过滤、cursor                                                              |
+| API-NOTIF-002    | POST /v1/me/notifications/read-watermark      | User          | 单调递增                                                                            |
+| API-NOTIF-003    | GET /v1/me/events                             | User          | text/event-stream；Cookie/Bearer 鉴权；Last-Event-ID 或 cursor 恢复                 |
+| API-REPORT-001   | POST /v1/reports                              | User          | Moderation 单写；重复合并                                                           |
+| API-MOD-001      | GET /v1/admin/moderation/cases                | Reviewer      | 版本、队列、证据摘要                                                                |
+| API-MOD-002      | POST /v1/admin/moderation/cases/:id/decisions | Reviewer      | If-Match；approve/reject/hide/restore/ban                                           |
+| API-PORT-000     | GET /v1/me/portfolios                         | User          | cursor；跨端发现本人组合                                                            |
+| API-PORT-001     | POST /v1/portfolios                           | User          | 创建本人私有组合                                                                    |
+| API-PORT-002     | GET /v1/portfolios/:id                        | Owner         | 私有资源，默认拒绝他人                                                              |
+| API-PORT-003     | POST /v1/portfolios/:id/ledger-entries        | Owner         | 买/卖/费用；校验余额持仓                                                            |
+| API-PORT-004     | POST /v1/portfolios/:id/reversals             | Owner         | 新建冲正，不改原条目                                                                |
+| API-PORT-005     | GET /v1/portfolios/:id/positions              | Owner         | 指定 valuation_as_of                                                                |
+| API-PORT-006     | GET /v1/portfolios/:id/ledger-entries         | Owner         | cursor；返回可冲正状态和 committed_version                                          |
 
 统一错误码：AUTH_REQUIRED、SESSION_EXPIRED、FORBIDDEN、NOT_FOUND、VALIDATION_FAILED、CONFLICT、RATE_LIMITED、DATA_STALE、DATA_UNAVAILABLE、ENTITLEMENT_DENIED、CONTENT_UNAVAILABLE、LEDGER_INVARIANT_FAILED、STREAM_CURSOR_EXPIRED。
 
@@ -870,44 +870,44 @@ Feed Card v1 的公共字段为 type、schema_version、card_id、published_at�
 
 ## 24. M1 事件目录
 
-| EVENT ID / v1 | 生产者 | 消费者 | 作用 |
-|---|---|---|---|
-| identity.user_registered | Identity | Watchlist、Operations | Identity 已在注册事务创建 Profile；Watchlist 可预建默认列表但读写接口仍事务内 ensure，Operations 记审计 |
-| content.post_submitted | Content | Moderation | 创建审核案件 |
-| moderation.decision_recorded | Moderation | Operations | 管理动作审计；权威状态由同步模块命令应用 |
-| content.post_published | Content | Feed、Search、Notification | 建立公开投影 |
-| content.post_hidden | Content | Feed、Search、Notification | 删除公开投影并通知作者 |
-| content.post_restored | Content | Feed、Search、Notification | 恢复允许的公开投影 |
-| identity.user_suspended | Identity | Content、Social、Notification、Operations | 新写入已由同步 auth guard 阻断；事件仅更新可见性、通知和审计投影 |
-| social.comment_submitted | Social | Moderation | 创建评论审核案件 |
-| social.comment_published | Social | Notification、Feed | 互动通知与计数投影 |
-| social.comment_hidden | Social | Notification、Feed、Search | 删除评论投影 |
-| social.comment_restored | Social | Notification、Feed、Search | 恢复允许的评论投影 |
-| social.reaction_changed | Social | Notification、Feed | 点赞通知与计数投影 |
-| watchlist.item_changed | Watchlist | Feed、Operations | 自选同步和审计 |
-| notification.created | Notification | SSE | 建立 recipient Inbox |
-| notification.read_watermark_advanced | Notification | Operations | 已读审计 |
-| moderation.report_submitted | Moderation | Moderation queue | 报告入队 |
-| portfolio.ledger_entry_posted | Portfolio | Valuation、Notification、Operations | 核心现金/持仓已同事务提交；异步重估、通知和审计 |
-| market.quote_revised | Market Data | Portfolio、Alert Stretch | 重估或重新判断 crossing |
+| EVENT ID / v1                        | 生产者       | 消费者                                    | 作用                                                                                                    |
+| ------------------------------------ | ------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| identity.user_registered             | Identity     | Watchlist、Operations                     | Identity 已在注册事务创建 Profile；Watchlist 可预建默认列表但读写接口仍事务内 ensure，Operations 记审计 |
+| content.post_submitted               | Content      | Moderation                                | 创建审核案件                                                                                            |
+| moderation.decision_recorded         | Moderation   | Operations                                | 管理动作审计；权威状态由同步模块命令应用                                                                |
+| content.post_published               | Content      | Feed、Search、Notification                | 建立公开投影                                                                                            |
+| content.post_hidden                  | Content      | Feed、Search、Notification                | 删除公开投影并通知作者                                                                                  |
+| content.post_restored                | Content      | Feed、Search、Notification                | 恢复允许的公开投影                                                                                      |
+| identity.user_suspended              | Identity     | Content、Social、Notification、Operations | 新写入已由同步 auth guard 阻断；事件仅更新可见性、通知和审计投影                                        |
+| social.comment_submitted             | Social       | Moderation                                | 创建评论审核案件                                                                                        |
+| social.comment_published             | Social       | Notification、Feed                        | 互动通知与计数投影                                                                                      |
+| social.comment_hidden                | Social       | Notification、Feed、Search                | 删除评论投影                                                                                            |
+| social.comment_restored              | Social       | Notification、Feed、Search                | 恢复允许的评论投影                                                                                      |
+| social.reaction_changed              | Social       | Notification、Feed                        | 点赞通知与计数投影                                                                                      |
+| watchlist.item_changed               | Watchlist    | Feed、Operations                          | 自选同步和审计                                                                                          |
+| notification.created                 | Notification | SSE                                       | 建立 recipient Inbox                                                                                    |
+| notification.read_watermark_advanced | Notification | Operations                                | 已读审计                                                                                                |
+| moderation.report_submitted          | Moderation   | Moderation queue                          | 报告入队                                                                                                |
+| portfolio.ledger_entry_posted        | Portfolio    | Valuation、Notification、Operations       | 核心现金/持仓已同事务提交；异步重估、通知和审计                                                         |
+| market.quote_revised                 | Market Data  | Portfolio、Alert Stretch                  | 重估或重新判断 crossing                                                                                 |
 
 所有事件使用第 8.3 节信封。Search、Feed、Notification 和 Portfolio consumer 保存 Inbox receipt；重复 event_id 不得产生第二次副作用。
 
 ## 25. 物理表所有权候选
 
-| 领域 | M1 owned tables | 关键约束 |
-|---|---|---|
-| Identity | identity_users、identity_profiles；auth_accounts/auth_sessions/auth_verifications 为 Better Auth 私有表 | email 规范化唯一；其他域只引用 identity_users.id，不连接 Auth 私表 |
-| Instrument Reference | instruments、listings、exchanges、exchange_calendars | market+symbol 唯一；listing 指向 instrument；公司行动表 M2 |
-| Market Data | market_observations、market_quotes、market_bars、market_entitlement_projection | provider+listing+sequence+revision 唯一；旧版本不可覆盖新版本 |
-| Content | content_posts、content_post_revisions | author+client_request_id 唯一；status/version |
-| Social | social_comments、social_reactions、social_follows、social_bookmarks、social_blocks | reaction actor+target+type 唯一；comment status/version |
-| Moderation | moderation_reports、moderation_cases、moderation_evidence、moderation_decisions、moderation_appeals、moderation_audit | target+reporter+reason 合并；decision 追加；evidence 受限 |
-| Feed & Channel | feed_channels、feed_items、feed_ranking_snapshots | channel+source_event 唯一；只存投影 |
-| Watchlist | watchlists、watchlist_items | M1 每个 owner 一个 default 列表；list+listing 唯一；自定义列表 M2 |
-| Notification | notifications、notification_read_state、notification_delivery_attempts | recipient+canonical_key 唯一；watermark 单调 |
-| Portfolio | portfolios、portfolio_ledger_entries、portfolio_position_projection、portfolio_valuation_snapshots | owner 私有；client_request_id 唯一；ledger 追加且可冲正 |
-| Platform Events | outbox_events、inbox_receipts | event_id 唯一；consumer+event 唯一 |
+| 领域                 | M1 owned tables                                                                                                       | 关键约束                                                           |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Identity             | identity_users、identity_profiles；auth_accounts/auth_sessions/auth_verifications 为 Better Auth 私有表               | email 规范化唯一；其他域只引用 identity_users.id，不连接 Auth 私表 |
+| Instrument Reference | instruments、listings、exchanges、exchange_calendars                                                                  | market+symbol 唯一；listing 指向 instrument；公司行动表 M2         |
+| Market Data          | market_observations、market_quotes、market_bars、market_entitlement_projection                                        | provider+listing+sequence+revision 唯一；旧版本不可覆盖新版本      |
+| Content              | content_posts、content_post_revisions                                                                                 | author+client_request_id 唯一；status/version                      |
+| Social               | social_comments、social_reactions、social_follows、social_bookmarks、social_blocks                                    | reaction actor+target+type 唯一；comment status/version            |
+| Moderation           | moderation_reports、moderation_cases、moderation_evidence、moderation_decisions、moderation_appeals、moderation_audit | target+reporter+reason 合并；decision 追加；evidence 受限          |
+| Feed & Channel       | feed_channels、feed_items、feed_ranking_snapshots                                                                     | channel+source_event 唯一；只存投影                                |
+| Watchlist            | watchlists、watchlist_items                                                                                           | M1 每个 owner 一个 default 列表；list+listing 唯一；自定义列表 M2  |
+| Notification         | notifications、notification_read_state、notification_delivery_attempts                                                | recipient+canonical_key 唯一；watermark 单调                       |
+| Portfolio            | portfolios、portfolio_ledger_entries、portfolio_position_projection、portfolio_valuation_snapshots                    | owner 私有；client_request_id 唯一；ledger 追加且可冲正            |
+| Platform Events      | outbox_events、inbox_receipts                                                                                         | event_id 唯一；consumer+event 唯一                                 |
 
 所有可变聚合含 version bigint；所有表含 created_at，适用表含 updated_at 与 deleted_at。Moderation API 在同一领域事务内写 report 与 case；Social 不写举报表。Operations 只消费跨系统管理事件生成 system admin audit，不修改 Moderation 的证据或决定。
 
@@ -915,23 +915,23 @@ Feed Card v1 的公共字段为 type、schema_version、card_id、published_at�
 
 符号：A 允许，I 仅受邀 Alpha Guest，O 仅本人，R 审核角色，M 系统管理员，— 默认拒绝。
 
-| Action | Guest | User | Creator | Operator | Reviewer | Admin |
-|---|---:|---:|---:|---:|---:|---:|
-| 受邀注册 | I | — | — | — | — | — |
-| 登录、查询或注销自己的会话 | A | O | O | O | O | O |
-| 浏览已发布公开内容/合成行情 | A | A | A | A | A | A |
-| 搜索公开标的 | A | A | A | A | A | A |
-| 管理自选 | — | O | O | O | O | O |
-| 创建短帖/评论/点赞 | — | O | O | O | O | O |
-| 编辑或删除自己的草稿 | — | O | O | O | O | O |
-| 读取自己的 Inbox/SSE 与推进已读 | — | O | O | O | O | O |
-| 查看/写入私有组合 | — | O | O | O | O | O |
-| 查看他人私有组合 | — | — | — | — | — | — |
-| 举报公开内容 | — | A | A | A | A | A |
-| 查看审核证据 | — | — | — | — | R | M |
-| approve/reject/hide/restore/ban | — | — | — | — | R | M |
-| 配置频道与运营位 | — | — | — | A | — | M |
-| 开启持牌能力或公开组合 | — | — | — | — | — | — |
+| Action                          | Guest | User | Creator | Operator | Reviewer | Admin |
+| ------------------------------- | ----: | ---: | ------: | -------: | -------: | ----: |
+| 受邀注册                        |     I |    — |       — |        — |        — |     — |
+| 登录、查询或注销自己的会话      |     A |    O |       O |        O |        O |     O |
+| 浏览已发布公开内容/合成行情     |     A |    A |       A |        A |        A |     A |
+| 搜索公开标的                    |     A |    A |       A |        A |        A |     A |
+| 管理自选                        |     — |    O |       O |        O |        O |     O |
+| 创建短帖/评论/点赞              |     — |    O |       O |        O |        O |     O |
+| 编辑或删除自己的草稿            |     — |    O |       O |        O |        O |     O |
+| 读取自己的 Inbox/SSE 与推进已读 |     — |    O |       O |        O |        O |     O |
+| 查看/写入私有组合               |     — |    O |       O |        O |        O |     O |
+| 查看他人私有组合                |     — |    — |       — |        — |        — |     — |
+| 举报公开内容                    |     — |    A |       A |        A |        A |     A |
+| 查看审核证据                    |     — |    — |       — |        — |        R |     M |
+| approve/reject/hide/restore/ban |     — |    — |       — |        — |        R |     M |
+| 配置频道与运营位                |     — |    — |       — |        A |        — |     M |
+| 开启持牌能力或公开组合          |     — |    — |       — |        — |        — |     — |
 
 每个 API 必须在 OpenAPI 中引用本矩阵的 Action；没有映射 Action 的 API 默认拒绝。Operator 不能修改审核决定；Reviewer 不能修改运营排序。
 
@@ -947,27 +947,27 @@ M1 Card Registry 只允许 post、news、market_strip、topic 和 ops_banner。�
 
 ## 28. Gate 与证据现状
 
-| Gate | 当前状态 | 尚缺证据 |
-|---|---|---|
-| G0 | 部分满足 | 将用户截图归档为稳定证据、记录参考产品版本；数据与法务负责人签署权利/合规矩阵 |
-| G1 | 已通过 | 产品负责人已批准本规格；逐页视觉基线和完整状态矩阵已在执行计划中实例化 |
-| G2 | 未通过 | 生成实际 OpenAPI、DDL、Event Schema、Fixture、性能预算和 contract tests |
-| G3 | 未开始 | 三端纵向 Alpha 尚未实现 |
-| G4 | 未开始 | 首期能力未实现 |
-| G5 | 未开始 | 数据授权、安全、性能、无障碍、恢复和 AI 红队未完成 |
-| G6 | 未开始 | Canary、监控、回滚、值班与生产签字未完成 |
+| Gate | 当前状态 | 尚缺证据                                                                      |
+| ---- | -------- | ----------------------------------------------------------------------------- |
+| G0   | 部分满足 | 将用户截图归档为稳定证据、记录参考产品版本；数据与法务负责人签署权利/合规矩阵 |
+| G1   | 已通过   | 产品负责人已批准本规格；逐页视觉基线和完整状态矩阵已在执行计划中实例化        |
+| G2   | 未通过   | 生成实际 OpenAPI、DDL、Event Schema、Fixture、性能预算和 contract tests       |
+| G3   | 未开始   | 三端纵向 Alpha 尚未实现                                                       |
+| G4   | 未开始   | 首期能力未实现                                                                |
+| G5   | 未开始   | 数据授权、安全、性能、无障碍、恢复和 AI 红队未完成                            |
+| G6   | 未开始   | Canary、监控、回滚、值班与生产签字未完成                                      |
 
 G2 候选性能预算将在实施计划中绑定固定数据量与环境，至少覆盖 API p95/p99、Feed 首屏、搜索、SSE 通知、synthetic quote 新鲜度、提醒延迟、数据库恢复 RPO/RTO 和移动冷启动。没有数值、环境和原始报告时不得宣称 G2 通过。
 
 ### 28.1 参考截图索引
 
-| REF ID | 用户提供的参考批次 | 覆盖 |
-|---|---|---|
-| REF-APP-HOME-001 | 首张 App 首页 | 顶部搜索、频道、空关注、底部导航 |
-| REF-APP-TABS-001 | 自选、基金、策略/私募参考、我的 | App 一级页与业务入口 |
-| REF-APP-MARKET-001 | 行情与组合两页 | 行情总览、组合概况与卡片 |
-| REF-APP-CHANNEL-001 | 推荐、热门、视频、自选、基金、资讯、达人、ETF、频道管理 | Feed 卡片、频道排序和内容密度 |
-| REF-WEB-HOME-001 | 八张 Web 页面 | 三栏框架、频道 Feed、榜单侧栏 |
-| REF-APP-DETAIL-001 | 标的详情、长文、搜索、发布、消息、设置、组合十七张 | 详情子页、创作、消息、设置和组合交互 |
+| REF ID              | 用户提供的参考批次                                      | 覆盖                                 |
+| ------------------- | ------------------------------------------------------- | ------------------------------------ |
+| REF-APP-HOME-001    | 首张 App 首页                                           | 顶部搜索、频道、空关注、底部导航     |
+| REF-APP-TABS-001    | 自选、基金、策略/私募参考、我的                         | App 一级页与业务入口                 |
+| REF-APP-MARKET-001  | 行情与组合两页                                          | 行情总览、组合概况与卡片             |
+| REF-APP-CHANNEL-001 | 推荐、热门、视频、自选、基金、资讯、达人、ETF、频道管理 | Feed 卡片、频道排序和内容密度        |
+| REF-WEB-HOME-001    | 八张 Web 页面                                           | 三栏框架、频道 Feed、榜单侧栏        |
+| REF-APP-DETAIL-001  | 标的详情、长文、搜索、发布、消息、设置、组合十七张      | 详情子页、创作、消息、设置和组合交互 |
 
 以上截图目前仅存在于本次会话附件；进入 G0 完成态前必须在得到用户授权后归档原图、哈希、采集日期、平台版本和观察备注。

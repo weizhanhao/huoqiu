@@ -15,11 +15,11 @@
     "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "@types/node": "26.2.0",
-    "eslint": "10.8.1",
+    "@types/node": "24.13.3",
+    "eslint": "10.8.0",
     "prettier": "3.9.6",
     "turbo": "2.10.8",
-    "tsx": "4.23.11",
+    "tsx": "4.23.9",
     "typescript": "6.0.3",
     "vitest": "4.1.10"
   }

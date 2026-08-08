@@ -56,10 +56,10 @@ POST 接收正文、可选 `listing_id`、`client_request_id`，写 post/revisio
 - [ ] **Step 4: 实现权威域受控命令**
 
 ```ts
-publishPost(tx, actor, postId, expectedVersion)
-rejectPost(tx, actor, postId, expectedVersion, reasonCode)
-hidePost(tx, actor, postId, expectedVersion)
-restorePost(tx, actor, postId, expectedVersion)
+publishPost(tx, actor, postId, expectedVersion);
+rejectPost(tx, actor, postId, expectedVersion, reasonCode);
+hidePost(tx, actor, postId, expectedVersion);
+restorePost(tx, actor, postId, expectedVersion);
 ```
 
 命令更新 Content 表并由 Content 写 approved event 目录中已有的 published/hidden/restored Outbox；reject 只持久化 `rejected` 状态，由稍后的 Moderation coordinator 发布 `moderation.decision_recorded`，不得私自新增第 19 个事件。Moderation 不直接 update Content 表。`AppModule` 必须 import `ContentModule`，架构测试发现孤儿 controller/module 时失败。

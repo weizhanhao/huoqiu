@@ -126,13 +126,17 @@ git commit -m "test(quality): approve independent M1 contract oracles"
 - [ ] **Step 1: 写数量、ID、权限和禁用 surface 的失败测试**
 
 ```ts
-import { m1OperationRegistry } from '../src/m1/operation-registry';
+import { m1OperationRegistry } from "../src/m1/operation-registry";
 
-it('contains exactly the approved M1 surface', () => {
+it("contains exactly the approved M1 surface", () => {
   expect(m1OperationRegistry).toHaveLength(31);
   expect(new Set(m1OperationRegistry.map((item) => item.apiId)).size).toBe(31);
-  expect(m1OperationRegistry.every((item) => item.capId && item.action)).toBe(true);
-  expect(JSON.stringify(m1OperationRegistry)).not.toMatch(/trade|private_fund|public_portfolio|push|target_price/i);
+  expect(m1OperationRegistry.every((item) => item.capId && item.action)).toBe(
+    true,
+  );
+  expect(JSON.stringify(m1OperationRegistry)).not.toMatch(
+    /trade|private_fund|public_portfolio|push|target_price/i,
+  );
 });
 ```
 
@@ -153,16 +157,26 @@ export const requestMetaSchema = z.object({
 });
 
 export const idempotencyHeaderSchema = z.object({
-  'idempotency-key': z.string().min(8).max(128),
+  "idempotency-key": z.string().min(8).max(128),
 });
 
 export const versionStringSchema = z.string().regex(/^\d+$/);
 export const decimalStringSchema = z.string().regex(/^-?\d+(\.\d+)?$/);
 
 export const errorCodes = [
-  'AUTH_REQUIRED', 'SESSION_EXPIRED', 'FORBIDDEN', 'NOT_FOUND', 'VALIDATION_FAILED',
-  'CONFLICT', 'RATE_LIMITED', 'DATA_STALE', 'DATA_UNAVAILABLE', 'ENTITLEMENT_DENIED',
-  'CONTENT_UNAVAILABLE', 'LEDGER_INVARIANT_FAILED', 'STREAM_CURSOR_EXPIRED',
+  "AUTH_REQUIRED",
+  "SESSION_EXPIRED",
+  "FORBIDDEN",
+  "NOT_FOUND",
+  "VALIDATION_FAILED",
+  "CONFLICT",
+  "RATE_LIMITED",
+  "DATA_STALE",
+  "DATA_UNAVAILABLE",
+  "ENTITLEMENT_DENIED",
+  "CONTENT_UNAVAILABLE",
+  "LEDGER_INVARIANT_FAILED",
+  "STREAM_CURSOR_EXPIRED",
 ] as const;
 ```
 
@@ -172,37 +186,82 @@ Registry 必须包含下列精确记录，并补充对应 CAP ID、Action、权�
 
 ```ts
 export const approvedOperations = [
-  ['API-AUTH-001', 'authRegister', 'POST', '/v1/auth/register'],
-  ['API-AUTH-002', 'authLogin', 'POST', '/v1/auth/login'],
-  ['API-AUTH-003', 'authGetSession', 'GET', '/v1/auth/session'],
-  ['API-AUTH-004', 'authLogout', 'POST', '/v1/auth/logout'],
-  ['API-INST-001', 'instrumentSearch', 'GET', '/v1/instruments/search'],
-  ['API-INST-002', 'listingGet', 'GET', '/v1/listings/:id'],
-  ['API-MD-001', 'listingGetQuote', 'GET', '/v1/listings/:id/quote'],
-  ['API-MD-002', 'listingGetBars', 'GET', '/v1/listings/:id/bars'],
-  ['API-FEED-001', 'feedGet', 'GET', '/v1/feed'],
-  ['API-WATCH-001', 'watchlistGetDefault', 'GET', '/v1/me/watchlist'],
-  ['API-WATCH-002', 'watchlistPutItem', 'PUT', '/v1/me/watchlist/items/:listingId'],
-  ['API-WATCH-003', 'watchlistDeleteItem', 'DELETE', '/v1/me/watchlist/items/:listingId'],
-  ['API-POST-001', 'postCreate', 'POST', '/v1/posts'],
-  ['API-POST-002', 'postGet', 'GET', '/v1/posts/:id'],
-  ['API-COMMENT-000', 'commentList', 'GET', '/v1/posts/:id/comments'],
-  ['API-COMMENT-001', 'commentCreate', 'POST', '/v1/posts/:id/comments'],
-  ['API-REACTION-001', 'postPutLike', 'PUT', '/v1/posts/:id/reactions/like'],
-  ['API-REACTION-002', 'postDeleteLike', 'DELETE', '/v1/posts/:id/reactions/like'],
-  ['API-NOTIF-001', 'notificationList', 'GET', '/v1/me/notifications'],
-  ['API-NOTIF-002', 'notificationAdvanceReadWatermark', 'POST', '/v1/me/notifications/read-watermark'],
-  ['API-NOTIF-003', 'notificationStream', 'GET', '/v1/me/events'],
-  ['API-REPORT-001', 'reportCreate', 'POST', '/v1/reports'],
-  ['API-MOD-001', 'moderationCaseList', 'GET', '/v1/admin/moderation/cases'],
-  ['API-MOD-002', 'moderationDecisionCreate', 'POST', '/v1/admin/moderation/cases/:id/decisions'],
-  ['API-PORT-000', 'portfolioListMine', 'GET', '/v1/me/portfolios'],
-  ['API-PORT-001', 'portfolioCreate', 'POST', '/v1/portfolios'],
-  ['API-PORT-002', 'portfolioGet', 'GET', '/v1/portfolios/:id'],
-  ['API-PORT-003', 'portfolioCreateLedgerEntry', 'POST', '/v1/portfolios/:id/ledger-entries'],
-  ['API-PORT-004', 'portfolioCreateReversal', 'POST', '/v1/portfolios/:id/reversals'],
-  ['API-PORT-005', 'portfolioListPositions', 'GET', '/v1/portfolios/:id/positions'],
-  ['API-PORT-006', 'portfolioListLedgerEntries', 'GET', '/v1/portfolios/:id/ledger-entries'],
+  ["API-AUTH-001", "authRegister", "POST", "/v1/auth/register"],
+  ["API-AUTH-002", "authLogin", "POST", "/v1/auth/login"],
+  ["API-AUTH-003", "authGetSession", "GET", "/v1/auth/session"],
+  ["API-AUTH-004", "authLogout", "POST", "/v1/auth/logout"],
+  ["API-INST-001", "instrumentSearch", "GET", "/v1/instruments/search"],
+  ["API-INST-002", "listingGet", "GET", "/v1/listings/:id"],
+  ["API-MD-001", "listingGetQuote", "GET", "/v1/listings/:id/quote"],
+  ["API-MD-002", "listingGetBars", "GET", "/v1/listings/:id/bars"],
+  ["API-FEED-001", "feedGet", "GET", "/v1/feed"],
+  ["API-WATCH-001", "watchlistGetDefault", "GET", "/v1/me/watchlist"],
+  [
+    "API-WATCH-002",
+    "watchlistPutItem",
+    "PUT",
+    "/v1/me/watchlist/items/:listingId",
+  ],
+  [
+    "API-WATCH-003",
+    "watchlistDeleteItem",
+    "DELETE",
+    "/v1/me/watchlist/items/:listingId",
+  ],
+  ["API-POST-001", "postCreate", "POST", "/v1/posts"],
+  ["API-POST-002", "postGet", "GET", "/v1/posts/:id"],
+  ["API-COMMENT-000", "commentList", "GET", "/v1/posts/:id/comments"],
+  ["API-COMMENT-001", "commentCreate", "POST", "/v1/posts/:id/comments"],
+  ["API-REACTION-001", "postPutLike", "PUT", "/v1/posts/:id/reactions/like"],
+  [
+    "API-REACTION-002",
+    "postDeleteLike",
+    "DELETE",
+    "/v1/posts/:id/reactions/like",
+  ],
+  ["API-NOTIF-001", "notificationList", "GET", "/v1/me/notifications"],
+  [
+    "API-NOTIF-002",
+    "notificationAdvanceReadWatermark",
+    "POST",
+    "/v1/me/notifications/read-watermark",
+  ],
+  ["API-NOTIF-003", "notificationStream", "GET", "/v1/me/events"],
+  ["API-REPORT-001", "reportCreate", "POST", "/v1/reports"],
+  ["API-MOD-001", "moderationCaseList", "GET", "/v1/admin/moderation/cases"],
+  [
+    "API-MOD-002",
+    "moderationDecisionCreate",
+    "POST",
+    "/v1/admin/moderation/cases/:id/decisions",
+  ],
+  ["API-PORT-000", "portfolioListMine", "GET", "/v1/me/portfolios"],
+  ["API-PORT-001", "portfolioCreate", "POST", "/v1/portfolios"],
+  ["API-PORT-002", "portfolioGet", "GET", "/v1/portfolios/:id"],
+  [
+    "API-PORT-003",
+    "portfolioCreateLedgerEntry",
+    "POST",
+    "/v1/portfolios/:id/ledger-entries",
+  ],
+  [
+    "API-PORT-004",
+    "portfolioCreateReversal",
+    "POST",
+    "/v1/portfolios/:id/reversals",
+  ],
+  [
+    "API-PORT-005",
+    "portfolioListPositions",
+    "GET",
+    "/v1/portfolios/:id/positions",
+  ],
+  [
+    "API-PORT-006",
+    "portfolioListLedgerEntries",
+    "GET",
+    "/v1/portfolios/:id/ledger-entries",
+  ],
 ] as const;
 ```
 
@@ -314,7 +373,16 @@ export const eventEnvelopeSchema = z.object({
   event_type: z.string().min(1),
   version: z.literal(1),
   occurred_at: z.string().datetime({ offset: true }),
-  producer: z.enum(['identity', 'content', 'social', 'moderation', 'watchlist', 'notification', 'portfolio', 'market']),
+  producer: z.enum([
+    "identity",
+    "content",
+    "social",
+    "moderation",
+    "watchlist",
+    "notification",
+    "portfolio",
+    "market",
+  ]),
   aggregate_id: z.string().min(1),
   sequence: versionStringSchema,
   trace_id: z.string().min(1),
@@ -330,24 +398,24 @@ Registry 必须逐字包含：
 
 ```ts
 export const approvedEventTypes = [
-  'identity.user_registered',
-  'content.post_submitted',
-  'moderation.decision_recorded',
-  'content.post_published',
-  'content.post_hidden',
-  'content.post_restored',
-  'identity.user_suspended',
-  'social.comment_submitted',
-  'social.comment_published',
-  'social.comment_hidden',
-  'social.comment_restored',
-  'social.reaction_changed',
-  'watchlist.item_changed',
-  'notification.created',
-  'notification.read_watermark_advanced',
-  'moderation.report_submitted',
-  'portfolio.ledger_entry_posted',
-  'market.quote_revised',
+  "identity.user_registered",
+  "content.post_submitted",
+  "moderation.decision_recorded",
+  "content.post_published",
+  "content.post_hidden",
+  "content.post_restored",
+  "identity.user_suspended",
+  "social.comment_submitted",
+  "social.comment_published",
+  "social.comment_hidden",
+  "social.comment_restored",
+  "social.reaction_changed",
+  "watchlist.item_changed",
+  "notification.created",
+  "notification.read_watermark_advanced",
+  "moderation.report_submitted",
+  "portfolio.ledger_entry_posted",
+  "market.quote_revised",
 ] as const;
 ```
 
@@ -390,8 +458,15 @@ git commit -m "feat(contracts): define M1 event schemas"
 - [ ] **Step 2: 实现 ts-rest client factory**
 
 ```ts
-export const createHuoqiuClient = (baseUrl: string, fetcher = globalThis.fetch) =>
-  initClient(m1Router, { baseUrl, baseHeaders: {}, api: async (args) => fetcher(args.path, args) });
+export const createHuoqiuClient = (
+  baseUrl: string,
+  fetcher = globalThis.fetch,
+) =>
+  initClient(m1Router, {
+    baseUrl,
+    baseHeaders: {},
+    api: async (args) => fetcher(args.path, args),
+  });
 ```
 
 - [ ] **Step 3: 生成稳定 types manifest**
@@ -619,9 +694,13 @@ git commit -m "feat(identity): enforce closed alpha access"
 
 ```ts
 export interface MarketDataProvider {
-  readonly source: 'huoqiu-synthetic';
+  readonly source: "huoqiu-synthetic";
   getQuote(listingId: ListingId, asOf: string): Promise<NormalizedQuote>;
-  getBars(listingId: ListingId, interval: '1d', cursor?: string): Promise<CursorPage<NormalizedBar>>;
+  getBars(
+    listingId: ListingId,
+    interval: "1d",
+    cursor?: string,
+  ): Promise<CursorPage<NormalizedBar>>;
 }
 ```
 
