@@ -9,7 +9,8 @@ export class DesignTokenCssError extends Error {
 }
 
 const SAFE_VARIABLE_NAME = /^--hq-[a-z0-9]+(?:-[a-z0-9]+)*$/u;
-const SAFE_VARIABLE_VALUE = /^[^\n\r;{}]+$/u;
+const UNSAFE_VARIABLE_VALUE =
+  /[\n\r;{}<>\\]|\/\*|\*\/|(?:url|expression)\s*\(/iu;
 
 const kebabCase = (value: string): string =>
   value
@@ -41,7 +42,7 @@ const collectVariables = (
         `Expected a safe CSS token name, received ${variableName}`,
       );
     }
-    if (value.trim().length === 0 || !SAFE_VARIABLE_VALUE.test(value)) {
+    if (value.trim().length === 0 || UNSAFE_VARIABLE_VALUE.test(value)) {
       throw new DesignTokenCssError(
         `Expected a safe CSS token value for ${variableName}`,
       );

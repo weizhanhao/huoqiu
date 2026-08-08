@@ -119,6 +119,19 @@ describe("Huoqiu design tokens", () => {
     ).toThrow("Duplicate CSS variable");
   });
 
+  it.each([
+    "red/* swallow following declarations */",
+    "*/ resume escaped declaration",
+    "</style><script>alert(1)</script>",
+    "URL  (javascript:alert(1))",
+    "ExPrEsSiOn (alert(1))",
+    "red\\00000a",
+  ])("rejects CSS or inline-style escape value %j", (value) => {
+    expect(() => tokensToCssVariables({ safe: value })).toThrow(
+      "safe CSS token value",
+    );
+  });
+
   it.each(["huoqiu-mark.svg", "demo-avatar.svg"])(
     "ships accessible original artwork in %s",
     (fileName) => {
