@@ -100,15 +100,14 @@ const createRepository = async (): Promise<string> => {
       "react-native-gesture-handler": "2.32.0",
     }),
   );
-  await writeJson(
-    root,
-    "packages/ui/package.json",
-    workspacePackage(
+  await writeJson(root, "packages/ui/package.json", {
+    ...workspacePackage(
       "@huoqiu/ui",
       {},
       { "@huoqiu/config": "workspace:*", typescript: "6.0.3" },
     ),
-  );
+    exports: { "./button": "./src/button.ts" },
+  });
   await writeJson(
     root,
     "packages/config/package.json",
@@ -118,6 +117,11 @@ const createRepository = async (): Promise<string> => {
     root,
     "apps/web/src/index.ts",
     'export { Button } from "@huoqiu/ui/button";\n',
+  );
+  await writeText(
+    root,
+    "packages/ui/src/button.ts",
+    "export const Button = 1;\n",
   );
   await writeText(
     root,
@@ -223,6 +227,116 @@ describe("workspace and supply-chain boundaries", () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("UNDECLARED_WORKSPACE_IMPORT");
     expect(result.stderr).toContain("apps/admin/src/index.ts");
+  });
+
+  it("resolves a workspace package export before rejecting a docs trampoline", async () => {
+    const root = await createRepository();
+    const path = "packages/ui/package.json";
+    const manifest = await readManifest(root, path);
+    manifest.exports = { "./button": "./docs/trampoline.ts" };
+    await writeJson(root, path, manifest);
+    await writeText(
+      root,
+      "packages/ui/docs/trampoline.ts",
+      "export const Button = 1;\n",
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+    expect(result.stderr).toContain("packages/ui/docs/trampoline.ts");
+  });
+
+  it("rejects a workspace export that traverses a nested docs symlink", async () => {
+    const root = await createRepository();
+    const outsideRoot = await mkdtemp(resolve(tmpdir(), "huoqiu-export-"));
+    temporaryRoots.push(outsideRoot);
+    await writeText(outsideRoot, "secret.ts", "export const Button = 1;\n");
+    await mkdir(resolve(root, "packages/ui/docs"), { recursive: true });
+    await symlink(outsideRoot, resolve(root, "packages/ui/docs/escape"), "dir");
+    const path = "packages/ui/package.json";
+    const manifest = await readManifest(root, path);
+    manifest.exports = { "./button": "./docs/escape/secret.ts" };
+    await writeJson(root, path, manifest);
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_SYMLINK_FORBIDDEN");
+    expect(result.stderr).toContain("packages/ui/docs/escape");
+  });
+
+  it("rejects a workspace import whose tsconfig path resolves outside the repository", async () => {
+    const root = await createRepository();
+    const outsideRoot = await mkdtemp(resolve(tmpdir(), "huoqiu-paths-"));
+    temporaryRoots.push(outsideRoot);
+    await writeText(outsideRoot, "button.ts", "export const Button = 1;\n");
+    await writeJson(root, "apps/web/tsconfig.json", {
+      compilerOptions: {
+        baseUrl: ".",
+        paths: { "@huoqiu/ui/*": [`${outsideRoot}/*`] },
+      },
+    });
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_PATH_TRAVERSAL");
+  });
+
+  it("rejects a workspace import whose tsconfig path resolves to a sibling app", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "apps/admin/src/button.ts",
+      "export const Button = 1;\n",
+    );
+    await writeJson(root, "apps/web/tsconfig.json", {
+      compilerOptions: {
+        baseUrl: ".",
+        paths: { "@huoqiu/ui/*": ["../admin/src/*"] },
+      },
+    });
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("APP_DEPENDS_ON_SIBLING_APP");
+  });
+
+  it("rejects a workspace package export through a fixtures trampoline", async () => {
+    const root = await createRepository();
+    const path = "packages/ui/package.json";
+    const manifest = await readManifest(root, path);
+    manifest.exports = { "./button": "./fixtures/trampoline.ts" };
+    await writeJson(root, path, manifest);
+    await writeText(
+      root,
+      "packages/ui/fixtures/trampoline.ts",
+      "export const Button = 1;\n",
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+    expect(result.stderr).toContain("packages/ui/fixtures/trampoline.ts");
+  });
+
+  it("fails closed when a declared workspace import cannot be resolved", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "apps/web/src/missing.ts",
+      'import "@huoqiu/ui/missing";\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_UNRESOLVED");
+    expect(result.stderr).toContain("@huoqiu/ui/missing");
   });
 
   it("rejects a package importing an app through a relative path", async () => {

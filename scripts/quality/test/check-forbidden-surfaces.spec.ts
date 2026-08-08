@@ -249,6 +249,54 @@ describe("forbidden runtime surfaces", () => {
   });
 
   it.each([
+    [
+      "Controller",
+      "RouteController",
+      "@RouteController(resolveRoute())\nclass Orders {}",
+    ],
+    [
+      "Get",
+      "ReadRoute",
+      "class Orders { @ReadRoute(resolveRoute()) list() {} }",
+    ],
+    [
+      "Post",
+      "CreateRoute",
+      "class Orders { @CreateRoute(resolveRoute()) create() {} }",
+    ],
+  ])(
+    "fails closed for an aliased @nestjs/common %s decorator with a dynamic route",
+    async (imported, local, declaration) => {
+      const root = await createRepository();
+      const relativePath = "apps/api/src/execution/orders.ts";
+      await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+      await writeCandidate(
+        root,
+        `import { ${imported} as ${local} } from "@nestjs/common";\n${declaration}`,
+        relativePath,
+      );
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it("accepts an aliased Nest decorator with a static clean route", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      'import { Get as ReadRoute } from "@nestjs/common";\nclass Orders { @ReadRoute("watchlist") list() {} }',
+      "apps/api/src/execution/orders.ts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it.each([
     ['export const route = "/tr\\u0061de";', "trade"],
     ['export const route = "/tr" + "ade";', "trade"],
     ['export const route = `/tr${"ade"}`;', "trade"],
@@ -285,6 +333,65 @@ describe("forbidden runtime surfaces", () => {
       expect(result.code).toBe(1);
       expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
       expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it.each([
+    "export default resolveRuntimeRegistry();",
+    "export const registry = resolveRuntimeRegistry();",
+    'export const registry = { ["routes"]: resolveRuntimeRoutes() };',
+    "export function registry() { return resolveRuntimeRoutes(); }",
+    "const registry = resolveRuntimeRegistry(); export { registry };",
+  ])(
+    "requires every top-level runtime registry export to satisfy the static schema %s",
+    async (source) => {
+      const root = await createRepository();
+      const relativePath = "apps/web/src/navigation/route-registry.ts";
+      await writeCandidate(root, source, relativePath);
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it.each([
+    "const registry = resolveRuntimeRegistry(); function shadow() { const registry = []; } export { registry };",
+    "const runtime = resolveRuntimeRegistry(); function shadow() { const runtime = []; } export { runtime as registry };",
+    "const runtime = resolveRuntimeRegistry(); function shadow() { const runtime = []; } export { runtime as default };",
+  ])(
+    "resolves an exported registry alias from its top-level lexical binding %s",
+    async (source) => {
+      const root = await createRepository();
+      const relativePath = "apps/web/src/navigation/route-registry.ts";
+      await writeCandidate(root, source, relativePath);
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it.each([
+    'export const registry = { routes: ["/watchlist"] };',
+    'export function registry() { return { routes: ["/watchlist"] }; }',
+    'const registry = { routes: ["/watchlist"] }; export { registry as routeRegistry };',
+    'const registry = { routes: ["/watchlist"] }; export { registry as default };',
+  ])(
+    "accepts a statically decidable top-level registry export %s",
+    async (source) => {
+      const root = await createRepository();
+      await writeCandidate(
+        root,
+        source,
+        "apps/web/src/navigation/route-registry.ts",
+      );
+
+      expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
     },
   );
 

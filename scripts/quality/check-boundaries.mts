@@ -19,6 +19,7 @@ type WorkspaceKind = "app" | "package";
 interface WorkspaceProject {
   dependencies: Map<string, string>;
   directory: string;
+  exports: unknown;
   kind: WorkspaceKind;
   manifestPath: string;
   name: string;
@@ -56,6 +57,7 @@ const EXCLUDED_SOURCE_SEGMENTS = new Set([
 const EXCLUDED_IMPORT_TARGET_SEGMENTS = new Set([
   "__tests__",
   "docs",
+  "fixtures",
   "test",
   "tests",
 ]);
@@ -267,6 +269,7 @@ const parseManifest = async (
   return {
     dependencies,
     directory: resolve(manifestPath, ".."),
+    exports: record.exports,
     kind,
     manifestPath: path,
     name: record.name as string,
@@ -620,6 +623,83 @@ const validateSourceImports = async (
     return canonical;
   };
 
+  const resolveExportStrings = (
+    value: unknown,
+    replacement: string | undefined,
+    file: string,
+    specifier: string,
+  ): string[] => {
+    if (typeof value === "string")
+      return [
+        replacement === undefined ? value : value.replaceAll("*", replacement),
+      ];
+    if (Array.isArray(value)) {
+      const targets = value.flatMap((item) =>
+        resolveExportStrings(item, replacement, file, specifier),
+      );
+      if (targets.length > 0) return targets;
+    } else if (typeof value === "object" && value !== null) {
+      const targets = Object.values(value).flatMap((item) =>
+        resolveExportStrings(item, replacement, file, specifier),
+      );
+      if (targets.length > 0) return targets;
+    }
+    return fail(
+      "WORKSPACE_IMPORT_UNRESOLVED",
+      `${file}: ${specifier} has no static package export target`,
+    );
+  };
+
+  const packageExportTargets = (
+    target: WorkspaceProject,
+    specifier: string,
+    file: string,
+  ): string[] => {
+    const importSuffix = specifier.slice(target.name.length);
+    const exportKey = importSuffix.length === 0 ? "." : `.${importSuffix}`;
+    const exportsValue = target.exports;
+    let selected: unknown;
+    let replacement: string | undefined;
+
+    if (typeof exportsValue === "string" || Array.isArray(exportsValue)) {
+      if (exportKey === ".") selected = exportsValue;
+    } else if (typeof exportsValue === "object" && exportsValue !== null) {
+      const exportsRecord = exportsValue as Record<string, unknown>;
+      const subpathMap = Object.keys(exportsRecord).some((key) =>
+        key.startsWith("."),
+      );
+      if (!subpathMap && exportKey === ".") selected = exportsRecord;
+      else {
+        selected = exportsRecord[exportKey];
+        if (selected === undefined)
+          for (const [pattern, value] of Object.entries(exportsRecord)) {
+            const star = pattern.indexOf("*");
+            if (star < 0 || pattern.indexOf("*", star + 1) >= 0) continue;
+            const prefix = pattern.slice(0, star);
+            const patternSuffix = pattern.slice(star + 1);
+            if (
+              exportKey.startsWith(prefix) &&
+              exportKey.endsWith(patternSuffix) &&
+              exportKey.length >= prefix.length + patternSuffix.length
+            ) {
+              selected = value;
+              replacement = exportKey.slice(
+                prefix.length,
+                exportKey.length - patternSuffix.length,
+              );
+              break;
+            }
+          }
+      }
+    }
+    if (selected === undefined)
+      fail(
+        "WORKSPACE_IMPORT_UNRESOLVED",
+        `${file}: ${specifier} is not exported by ${target.name}`,
+      );
+    return resolveExportStrings(selected, replacement, file, specifier);
+  };
+
   const validateOwner = (
     source: WorkspaceProject,
     target: WorkspaceProject,
@@ -643,6 +723,39 @@ const validateSourceImports = async (
       );
   };
 
+  const validateWorkspaceImportTarget = async (
+    source: WorkspaceProject,
+    namedTarget: WorkspaceProject,
+    targetPath: string,
+    file: string,
+    specifier: string,
+  ): Promise<void> => {
+    let canonical: string;
+    try {
+      canonical = await canonicalTarget(targetPath, file);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT")
+        return fail(
+          "WORKSPACE_IMPORT_UNRESOLVED",
+          `${file}: ${specifier} -> ${targetPath}`,
+        );
+      throw error;
+    }
+    const owner = ownerOf(canonical);
+    if (owner === undefined)
+      return fail(
+        "WORKSPACE_IMPORT_TARGET_UNMAPPED",
+        `${file}: ${specifier} -> ${repositoryPath(root, canonical)}`,
+      );
+    rejectExcludedTarget(owner, canonical, file);
+    validateOwner(source, owner, file);
+    if (owner.name !== namedTarget.name)
+      fail(
+        "WORKSPACE_IMPORT_OWNER_MISMATCH",
+        `${file}: ${specifier} resolved to ${owner.name}`,
+      );
+  };
+
   const validateSpecifier = async (
     project: WorkspaceProject,
     absoluteFile: string,
@@ -662,17 +775,37 @@ const validateSourceImports = async (
           "UNDECLARED_WORKSPACE_IMPORT",
           `${file}: ${namedProject} is not declared by ${project.name}`,
         );
-      if (target !== undefined) {
-        const subpath = specifier.slice(namedProject.length + 1);
-        if (
-          subpath
-            .toLowerCase()
-            .split("/")
-            .some((part) => EXCLUDED_IMPORT_TARGET_SEGMENTS.has(part))
-        )
-          fail("WORKSPACE_IMPORT_TARGET_EXCLUDED", `${file}: ${specifier}`);
-        validateOwner(project, target, file);
+      if (target === undefined)
+        return fail(
+          "WORKSPACE_IMPORT_UNRESOLVED",
+          `${file}: ${specifier} has no workspace project`,
+        );
+      validateOwner(project, target, file);
+
+      const resolution = ts.resolveModuleName(
+        specifier,
+        absoluteFile,
+        compilerOptions.get(project.name) ?? {},
+        ts.sys,
+      ).resolvedModule;
+      if (resolution !== undefined) {
+        await validateWorkspaceImportTarget(
+          project,
+          target,
+          resolution.resolvedFileName,
+          file,
+          specifier,
+        );
+        return;
       }
+      for (const exportTarget of packageExportTargets(target, specifier, file))
+        await validateWorkspaceImportTarget(
+          project,
+          target,
+          resolve(target.directory, exportTarget),
+          file,
+          specifier,
+        );
       return;
     }
 

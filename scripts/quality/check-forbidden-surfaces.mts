@@ -182,6 +182,8 @@ const ROUTE_EXTENSIONS = new Set([
 
 const runtimeRegistryName =
   /(?:^|[._+-])(card|cards|channel|channels|deep[-_]?link|deeplink|linking|navigation|navigator|openapi|registr(?:y|ies)|route|router|routes)(?:[._+-]|$)/i;
+const NEST_ROUTE_DECORATOR =
+  /^(?:All|Controller|Delete|Get|Head|Options|Patch|Post|Put|Sse)$/;
 
 const fail = (code: string, detail: string): never => {
   throw new QualityGateError(code, detail);
@@ -268,6 +270,19 @@ const isDomainRegistry = (path: string): boolean => {
   );
 };
 
+const isStaticSurfaceRegistry = (path: string): boolean => {
+  const parts = splitPath(path);
+  const hasRegistry = parts.some((part) =>
+    /(?:^|[._+-])registr(?:y|ies)(?:[._+-]|$)/i.test(part),
+  );
+  const hasSurfaceContext = parts.some((part) =>
+    /(?:^|[._+-])(?:card|cards|channel|channels|deep[-_]?link|deeplink|linking|navigation|navigator|openapi|route|router|routes)(?:[._+-]|$)/i.test(
+      part,
+    ),
+  );
+  return isDomainRegistry(path) || (hasRegistry && hasSurfaceContext);
+};
+
 const isRuntimeCandidate = (path: string): boolean => {
   if (isExcluded(path)) return false;
   if (isPositiveRuntimeFixture(path)) return true;
@@ -347,10 +362,17 @@ const parseSourceFile = (file: string, content: string): ts.SourceFile => {
 const sourceSurfaces = (file: string, content: string): string[] => {
   const sourceFile = parseSourceFile(file, content);
   const constants = new Map<string, ts.Expression>();
+  const topLevelConstants = new Map<string, ts.Expression>();
+  const nestRouteDecoratorAliases = new Set<string>();
+  const nestNamespaces = new Set<string>();
   const surfaces = new Set<string>();
   const evaluating = new Set<string>();
 
-  const evaluate = (expression: ts.Expression): string | undefined => {
+  const evaluate = (
+    expression: ts.Expression,
+    bindings: ReadonlyMap<string, ts.Expression> = constants,
+    active: Set<string> = evaluating,
+  ): string | undefined => {
     if (ts.isStringLiteralLike(expression)) return expression.text;
     if (
       ts.isParenthesizedExpression(expression) ||
@@ -358,13 +380,13 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       ts.isTypeAssertionExpression(expression) ||
       ts.isSatisfiesExpression(expression)
     )
-      return evaluate(expression.expression);
+      return evaluate(expression.expression, bindings, active);
     if (
       ts.isBinaryExpression(expression) &&
       expression.operatorToken.kind === ts.SyntaxKind.PlusToken
     ) {
-      const left = evaluate(expression.left);
-      const right = evaluate(expression.right);
+      const left = evaluate(expression.left, bindings, active);
+      const right = evaluate(expression.right, bindings, active);
       return left === undefined || right === undefined
         ? undefined
         : `${left}${right}`;
@@ -372,7 +394,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     if (ts.isTemplateExpression(expression)) {
       let value = expression.head.text;
       for (const span of expression.templateSpans) {
-        const substitution = evaluate(span.expression);
+        const substitution = evaluate(span.expression, bindings, active);
         if (substitution === undefined) return undefined;
         value += substitution + span.literal.text;
       }
@@ -387,22 +409,26 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     ) {
       const separatorExpression = expression.arguments[0];
       const separator =
-        separatorExpression === undefined ? "," : evaluate(separatorExpression);
+        separatorExpression === undefined
+          ? ","
+          : evaluate(separatorExpression, bindings, active);
       if (separator === undefined) return undefined;
       const values = expression.expression.expression.elements.map((element) =>
-        ts.isSpreadElement(element) ? undefined : evaluate(element),
+        ts.isSpreadElement(element)
+          ? undefined
+          : evaluate(element, bindings, active),
       );
       return values.some((value) => value === undefined)
         ? undefined
         : (values as string[]).join(separator);
     }
     if (ts.isIdentifier(expression)) {
-      if (evaluating.has(expression.text)) return undefined;
-      const initializer = constants.get(expression.text);
+      if (active.has(expression.text)) return undefined;
+      const initializer = bindings.get(expression.text);
       if (initializer === undefined) return undefined;
-      evaluating.add(expression.text);
-      const value = evaluate(initializer);
-      evaluating.delete(expression.text);
+      active.add(expression.text);
+      const value = evaluate(initializer, bindings, active);
+      active.delete(expression.text);
       return value;
     }
     return undefined;
@@ -419,6 +445,40 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     ts.forEachChild(node, indexConstants);
   };
   indexConstants(sourceFile);
+
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isVariableStatement(statement) ||
+      (statement.declarationList.flags & ts.NodeFlags.Const) === 0
+    )
+      continue;
+    for (const declaration of statement.declarationList.declarations)
+      if (
+        ts.isIdentifier(declaration.name) &&
+        declaration.initializer !== undefined
+      )
+        topLevelConstants.set(declaration.name.text, declaration.initializer);
+  }
+
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteralLike(statement.moduleSpecifier) ||
+      statement.moduleSpecifier.text !== "@nestjs/common"
+    )
+      continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings === undefined) continue;
+    if (ts.isNamespaceImport(bindings)) {
+      nestNamespaces.add(bindings.name.text);
+      continue;
+    }
+    for (const element of bindings.elements) {
+      const imported = (element.propertyName ?? element.name).text;
+      if (NEST_ROUTE_DECORATOR.test(imported))
+        nestRouteDecoratorAliases.add(element.name.text);
+    }
+  }
 
   const runtimeField = (name: ts.BindingName | ts.PropertyName): boolean => {
     const value =
@@ -449,8 +509,13 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   };
 
   const staticRegistryIdentifiers = new Set<string>();
-  const isStaticRegistryValue = (expression: ts.Expression): boolean => {
-    if (evaluate(expression) !== undefined) return true;
+  const registryStringIdentifiers = new Set<string>();
+  const isStaticRegistryValue = (
+    expression: ts.Expression,
+    bindings: ReadonlyMap<string, ts.Expression> = topLevelConstants,
+  ): boolean => {
+    if (evaluate(expression, bindings, registryStringIdentifiers) !== undefined)
+      return true;
     if (
       ts.isNumericLiteral(expression) ||
       expression.kind === ts.SyntaxKind.TrueKeyword ||
@@ -464,30 +529,38 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       ts.isTypeAssertionExpression(expression) ||
       ts.isSatisfiesExpression(expression)
     )
-      return isStaticRegistryValue(expression.expression);
+      return isStaticRegistryValue(expression.expression, bindings);
     if (ts.isArrayLiteralExpression(expression))
       return expression.elements.every(
         (element) =>
-          !ts.isSpreadElement(element) && isStaticRegistryValue(element),
+          !ts.isSpreadElement(element) &&
+          isStaticRegistryValue(element, bindings),
       );
     if (ts.isObjectLiteralExpression(expression))
       return expression.properties.every((property) => {
-        if (ts.isPropertyAssignment(property))
-          return isStaticRegistryValue(property.initializer);
+        if (ts.isPropertyAssignment(property)) {
+          if (
+            ts.isComputedPropertyName(property.name) &&
+            !isStaticRegistryValue(property.name.expression, bindings)
+          )
+            return false;
+          return isStaticRegistryValue(property.initializer, bindings);
+        }
         if (ts.isShorthandPropertyAssignment(property)) {
-          const initializer = constants.get(property.name.text);
+          const initializer = bindings.get(property.name.text);
           return (
-            initializer !== undefined && isStaticRegistryValue(initializer)
+            initializer !== undefined &&
+            isStaticRegistryValue(initializer, bindings)
           );
         }
         return false;
       });
     if (ts.isIdentifier(expression)) {
       if (staticRegistryIdentifiers.has(expression.text)) return false;
-      const initializer = constants.get(expression.text);
+      const initializer = bindings.get(expression.text);
       if (initializer === undefined) return false;
       staticRegistryIdentifiers.add(expression.text);
-      const result = isStaticRegistryValue(initializer);
+      const result = isStaticRegistryValue(initializer, bindings);
       staticRegistryIdentifiers.delete(expression.text);
       return result;
     }
@@ -495,16 +568,16 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   };
 
   const routeDecorator = (expression: ts.LeftHandSideExpression): boolean => {
-    const name = ts.isIdentifier(expression)
-      ? expression.text
-      : ts.isPropertyAccessExpression(expression)
-        ? expression.name.text
-        : undefined;
+    if (ts.isIdentifier(expression))
+      return (
+        NEST_ROUTE_DECORATOR.test(expression.text) ||
+        nestRouteDecoratorAliases.has(expression.text)
+      );
+    if (!ts.isPropertyAccessExpression(expression)) return false;
     return (
-      name !== undefined &&
-      /^(?:All|Controller|Delete|Get|Head|Options|Patch|Post|Put|Sse)$/.test(
-        name,
-      )
+      NEST_ROUTE_DECORATOR.test(expression.name.text) &&
+      ts.isIdentifier(expression.expression) &&
+      nestNamespaces.has(expression.expression.text)
     );
   };
 
@@ -519,13 +592,184 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   const requireStaticRegistry = (
     expression: ts.Expression,
     label: string,
+    bindings: ReadonlyMap<string, ts.Expression> = topLevelConstants,
   ): void => {
-    if (!isStaticRegistryValue(expression))
+    if (!isStaticRegistryValue(expression, bindings))
       fail(
         "RUNTIME_CANDIDATE_UNRESOLVED",
         `${file}: ${label} is not statically decidable`,
       );
   };
+
+  const hasModifier = (node: ts.Node, kind: ts.SyntaxKind): boolean =>
+    ts.canHaveModifiers(node) &&
+    ts.getModifiers(node)?.some((modifier) => modifier.kind === kind) === true;
+
+  const requireStaticRegistryFunction = (
+    declaration: ts.FunctionDeclaration,
+  ): void => {
+    const label = declaration.name?.text ?? "default function";
+    const body = declaration.body;
+    if (
+      body === undefined ||
+      declaration.asteriskToken !== undefined ||
+      hasModifier(declaration, ts.SyntaxKind.AsyncKeyword)
+    )
+      return fail(
+        "RUNTIME_CANDIDATE_UNRESOLVED",
+        `${file}: ${label} is not a synchronous static registry function`,
+      );
+    const functionBindings = new Map(topLevelConstants);
+    const removeBinding = (name: ts.BindingName): void => {
+      if (ts.isIdentifier(name)) {
+        functionBindings.delete(name.text);
+        return;
+      }
+      for (const element of name.elements)
+        if (!ts.isOmittedExpression(element)) removeBinding(element.name);
+    };
+    for (const parameter of declaration.parameters)
+      removeBinding(parameter.name);
+    for (const statement of body.statements) {
+      if (!ts.isVariableStatement(statement)) continue;
+      for (const local of statement.declarationList.declarations) {
+        removeBinding(local.name);
+        if (
+          (statement.declarationList.flags & ts.NodeFlags.Const) !== 0 &&
+          ts.isIdentifier(local.name) &&
+          local.initializer !== undefined
+        )
+          functionBindings.set(local.name.text, local.initializer);
+      }
+    }
+    let returns = 0;
+    for (const statement of body.statements) {
+      if (ts.isReturnStatement(statement)) {
+        const registryReturn = statement.expression;
+        if (registryReturn === undefined)
+          return fail(
+            "RUNTIME_CANDIDATE_UNRESOLVED",
+            `${file}: ${label} has an empty registry return`,
+          );
+        requireStaticRegistry(
+          registryReturn,
+          `${label} return`,
+          functionBindings,
+        );
+        returns += 1;
+        continue;
+      }
+      if (
+        ts.isVariableStatement(statement) &&
+        (statement.declarationList.flags & ts.NodeFlags.Const) !== 0
+      ) {
+        for (const declaration of statement.declarationList.declarations) {
+          if (!ts.isIdentifier(declaration.name))
+            return fail(
+              "RUNTIME_CANDIDATE_UNRESOLVED",
+              `${file}: ${label} has a non-identifier registry binding`,
+            );
+          const initializer = declaration.initializer;
+          if (initializer === undefined)
+            return fail(
+              "RUNTIME_CANDIDATE_UNRESOLVED",
+              `${file}: ${label} has an uninitialized registry constant`,
+            );
+          requireStaticRegistry(
+            initializer,
+            `${label} local ${declaration.name.getText(sourceFile)}`,
+            functionBindings,
+          );
+        }
+        continue;
+      }
+      fail(
+        "RUNTIME_CANDIDATE_UNRESOLVED",
+        `${file}: ${label} contains runtime registry logic`,
+      );
+    }
+    if (returns === 0)
+      fail(
+        "RUNTIME_CANDIDATE_UNRESOLVED",
+        `${file}: ${label} has no static registry return`,
+      );
+  };
+
+  const validateTopLevelRegistryExports = (): void => {
+    if (!isStaticSurfaceRegistry(file)) return;
+    for (const statement of sourceFile.statements) {
+      if (ts.isExportAssignment(statement)) {
+        requireStaticRegistry(statement.expression, "default export");
+        continue;
+      }
+      if (
+        ts.isVariableStatement(statement) &&
+        hasModifier(statement, ts.SyntaxKind.ExportKeyword)
+      ) {
+        if ((statement.declarationList.flags & ts.NodeFlags.Const) === 0)
+          fail(
+            "RUNTIME_CANDIDATE_UNRESOLVED",
+            `${file}: exported registry bindings must be const`,
+          );
+        for (const declaration of statement.declarationList.declarations) {
+          const initializer = declaration.initializer;
+          if (initializer === undefined)
+            return fail(
+              "RUNTIME_CANDIDATE_UNRESOLVED",
+              `${file}: ${declaration.name.getText(sourceFile)} is uninitialized`,
+            );
+          requireStaticRegistry(
+            initializer,
+            declaration.name.getText(sourceFile),
+          );
+        }
+        continue;
+      }
+      if (
+        ts.isFunctionDeclaration(statement) &&
+        hasModifier(statement, ts.SyntaxKind.ExportKeyword)
+      ) {
+        requireStaticRegistryFunction(statement);
+        continue;
+      }
+      if (ts.isExportDeclaration(statement)) {
+        if (statement.isTypeOnly) continue;
+        const exportClause = statement.exportClause;
+        if (
+          statement.moduleSpecifier !== undefined ||
+          exportClause === undefined ||
+          !ts.isNamedExports(exportClause)
+        )
+          return fail(
+            "RUNTIME_CANDIDATE_UNRESOLVED",
+            `${file}: re-exported runtime registries are not statically decidable`,
+          );
+        for (const element of exportClause.elements) {
+          if (element.isTypeOnly) continue;
+          const localName = (element.propertyName ?? element.name).text;
+          const initializer = topLevelConstants.get(localName);
+          if (initializer === undefined)
+            return fail(
+              "RUNTIME_CANDIDATE_UNRESOLVED",
+              `${file}: exported ${localName} has no static initializer`,
+            );
+          requireStaticRegistry(initializer, localName);
+        }
+        continue;
+      }
+      if (
+        hasModifier(statement, ts.SyntaxKind.ExportKeyword) &&
+        !ts.isInterfaceDeclaration(statement) &&
+        !ts.isTypeAliasDeclaration(statement)
+      )
+        fail(
+          "RUNTIME_CANDIDATE_UNRESOLVED",
+          `${file}: unsupported runtime registry export ${ts.SyntaxKind[statement.kind]}`,
+        );
+    }
+  };
+
+  validateTopLevelRegistryExports();
 
   const visit = (node: ts.Node): void => {
     if (
