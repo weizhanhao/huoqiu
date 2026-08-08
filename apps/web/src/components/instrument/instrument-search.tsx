@@ -1,4 +1,5 @@
 import type { D0Fixture } from "@huoqiu/contracts/d0";
+import Link from "next/link";
 
 import { PageState } from "../system/page-state";
 
@@ -80,7 +81,7 @@ export function InstrumentSearch({
             );
             return (
               <li key={instrument.listing_id}>
-                <a href={`/instruments/${instrument.listing_id}`}>
+                <Link href={`/instruments/${instrument.listing_id}`}>
                   <span>
                     <strong>{instrument.name}</strong>
                     <small>
@@ -92,7 +93,7 @@ export function InstrumentSearch({
                     <strong>{quote?.last ?? "--"}</strong>
                     <small>+{quote?.change_pct ?? "--"}%</small>
                   </span>
-                </a>
+                </Link>
               </li>
             );
           })}

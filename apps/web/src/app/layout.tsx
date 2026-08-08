@@ -2,6 +2,9 @@ import { cssVariables } from "@huoqiu/web-ui";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { loadD0Fixture } from "../lib/d0-fixture";
+import { D0WatchlistProvider } from "../stores/d0-watchlist";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,12 +17,27 @@ type RootLayoutProperties = Readonly<{
 }>;
 
 export default function RootLayout({ children }: RootLayoutProperties) {
+  const fixtureResult = loadD0Fixture();
+  const knownListingIds =
+    fixtureResult.status === "ready"
+      ? fixtureResult.data.instruments.map(
+          (instrument) => instrument.listing_id,
+        )
+      : [];
+
   return (
     <html lang="zh-CN">
       <head>
         <style dangerouslySetInnerHTML={{ __html: cssVariables }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <D0WatchlistProvider knownListingIds={knownListingIds}>
+          <span className="visually-hidden">
+            自选数据仅当前会话保存，刷新后重置
+          </span>
+          {children}
+        </D0WatchlistProvider>
+      </body>
     </html>
   );
 }

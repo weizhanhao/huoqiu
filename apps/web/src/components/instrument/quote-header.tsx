@@ -1,6 +1,7 @@
 import type { D0Fixture } from "@huoqiu/contracts/d0";
 
 import { DemoDataBadge } from "../system/demo-data-badge";
+import { WatchlistToggle } from "../watchlist/watchlist-toggle";
 
 type D0Instrument = D0Fixture["instruments"][number];
 type D0Quote = D0Fixture["quotes"][number];
@@ -30,7 +31,10 @@ export function QuoteHeader({ instrument, quote }: QuoteHeaderProperties) {
             {instrument.symbol} · {instrument.market} · {instrument.currency}
           </p>
         </div>
-        <DemoDataBadge />
+        <div className="quote-actions">
+          <DemoDataBadge />
+          <WatchlistToggle listingId={instrument.listing_id} />
+        </div>
       </div>
       <div className="quote-primary">
         <strong className={isUp ? "market-up" : "market-down"}>

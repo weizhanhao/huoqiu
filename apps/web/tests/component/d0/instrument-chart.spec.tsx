@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { PriceChart } from "../../../src/components/instrument/price-chart";
 import { QuoteHeader } from "../../../src/components/instrument/quote-header";
 import { loadD0Fixture } from "../../../src/lib/d0-fixture";
+import { D0WatchlistProvider } from "../../../src/stores/d0-watchlist";
 
 const readyFixture = () => {
   const result = loadD0Fixture();
@@ -23,7 +24,9 @@ describe("D0 instrument detail", () => {
     }
 
     const markup = renderToStaticMarkup(
-      <QuoteHeader instrument={instrument} quote={quote} />,
+      <D0WatchlistProvider knownListingIds={[instrument.listing_id]}>
+        <QuoteHeader instrument={instrument} quote={quote} />
+      </D0WatchlistProvider>,
     );
 
     expect(markup).toContain("合成示例一号");

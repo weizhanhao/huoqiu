@@ -22,6 +22,22 @@ export const d0WatchlistInitialState: D0WatchlistState = Object.freeze({
   listingIds: Object.freeze([]),
 });
 
+export const createD0WatchlistState = (
+  initialListingIds: readonly string[],
+  knownListingIds: readonly string[],
+): D0WatchlistState => {
+  const knownListingIdSet = new Set(knownListingIds);
+  return {
+    listingIds: [
+      ...new Set(
+        initialListingIds.filter((listingId) =>
+          knownListingIdSet.has(listingId),
+        ),
+      ),
+    ],
+  };
+};
+
 export const d0WatchlistReducer = (
   state: D0WatchlistState,
   action: D0WatchlistAction,
@@ -69,9 +85,10 @@ export function D0WatchlistProvider({
   knownListingIds,
   initialListingIds = d0WatchlistInitialState.listingIds,
 }: D0WatchlistProviderProperties) {
-  const [state, dispatch] = useReducer(d0WatchlistReducer, {
-    listingIds: [...new Set(initialListingIds)],
-  });
+  const [state, dispatch] = useReducer(
+    d0WatchlistReducer,
+    createD0WatchlistState(initialListingIds, knownListingIds),
+  );
   const knownListingIdSet = useMemo(
     () => new Set(knownListingIds),
     [knownListingIds],
