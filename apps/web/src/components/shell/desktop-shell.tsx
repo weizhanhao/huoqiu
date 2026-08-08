@@ -26,7 +26,7 @@ export function DesktopShell({
             <span className="brand-mark" aria-hidden="true">
               火
             </span>
-            <span>火球</span>
+            <h1>火球</h1>
           </a>
           <form className="global-search" action="/search" method="get">
             <label className="visually-hidden" htmlFor="global-search-query">
