@@ -7,12 +7,14 @@
   "scripts": {
     "build": "expo export --platform web",
     "dev": "expo start",
-    "lint": "eslint --config ../../packages/config/eslint/react.mjs app tests vitest.config.ts",
+    "lint": "eslint --config ../../packages/config/eslint/react.mjs app src tests vitest.config.ts",
     "test": "vitest run --config vitest.config.ts tests",
+    "test:d0": "vitest run --config vitest.config.ts tests/component/d0",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@expo/metro-runtime": "57.0.8",
+    "@huoqiu/contracts": "workspace:*",
     "@huoqiu/native-ui": "workspace:*",
     "expo": "57.0.11",
     "expo-constants": "57.0.9",

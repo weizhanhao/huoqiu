@@ -7,7 +7,9 @@ import {
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import HomeScreen from "../app/index";
+import { HomeFeed } from "../src/components/d0/home-feed";
+import { ScreenHeader } from "../src/components/d0/screen-header";
+import { loadD0Fixture } from "../src/lib/d0-fixture";
 
 const forbiddenProductLanguage = ["雪球", "开户", "认购", "交易下单"];
 
@@ -136,7 +138,16 @@ const findDecorativeBrandMark = (node: ReactNode): ReactElement => {
   throw new Error("Expected the decorative 火 mark");
 };
 
-const renderShell = (): string => renderToStaticMarkup(<HomeScreen />);
+const readyFixture = () => {
+  const result = loadD0Fixture();
+  if (result.status !== "ready") {
+    throw new Error("Expected checked-in D0 fixture to parse");
+  }
+  return result.data;
+};
+
+const renderShell = (): string =>
+  renderToStaticMarkup(<HomeFeed fixture={readyFixture()} state="normal" />);
 
 describe("mobile shell", () => {
   it("renders exactly one level-one heading named 火球", () => {
@@ -157,7 +168,12 @@ describe("mobile shell", () => {
   });
 
   it("hides the decorative 火 mark from Web, iOS, and Android accessibility", () => {
-    const brandMark = findDecorativeBrandMark(HomeScreen());
+    const brandMark = findDecorativeBrandMark(
+      ScreenHeader({
+        title: "火球",
+        subtitle: "公开市场信息的观察与整理",
+      }),
+    );
     const properties = brandMark.props as Readonly<{
       "aria-hidden"?: boolean;
       accessibilityElementsHidden?: boolean;
