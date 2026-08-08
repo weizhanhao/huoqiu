@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "milestones": {
+    "d0": {
+      "oracle_path": "quality/oracles/d0-required.json",
+      "manifest_path": "quality/manifests/d0-required.json",
+      "fixture_path": "packages/contracts/fixtures/d0.v1.json",
+      "contract_inputs": [
+        { "kind": "directory", "path": "packages/contracts/src/d0" },
+        { "kind": "file", "path": "packages/contracts/src/feed/card-v1.ts" }
+      ]
+    },
+    "m1": {
+      "oracle_path": "quality/oracles/m1-required.json",
+      "manifest_path": "quality/manifests/m1-required.json",
+      "fixture_path": "packages/contracts/fixtures/m1.v1.json",
+      "contract_inputs": [
+        { "kind": "file", "path": "packages/contracts/openapi/huoqiu.v1.yaml" },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/identity.user_registered.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/content.post_submitted.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/moderation.decision_recorded.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/content.post_published.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/content.post_hidden.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/content.post_restored.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/identity.user_suspended.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/social.comment_submitted.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/social.comment_published.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/social.comment_hidden.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/social.comment_restored.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/social.reaction_changed.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/watchlist.item_changed.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/notification.created.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/notification.read_watermark_advanced.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/moderation.report_submitted.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/portfolio.ledger_entry_posted.v1.schema.json"
+        },
+        {
+          "kind": "file",
+          "path": "packages/contracts/events/market.quote_revised.v1.schema.json"
+        },
+        { "kind": "file", "path": "packages/sdk/generated-manifest.json" }
+      ]
+    }
+  },
+  "config_inputs": [
+    "quality/gate-config.v1.json",
+    "quality/evidence/evidence.schema.json",
+    "quality/evidence/review.schema.json"
+  ]
+}

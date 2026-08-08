@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huoqiu.invalid/schemas/review.v1.json",
+  "title": "Huoqiu independent review v1",
+  "type": "object",
+  "additionalProperties": false,
+  "x-huoqiu-not-in": {
+    "valuePointer": "/reviewer_id",
+    "arrayPointer": "/implementer_ids",
+    "error": "INDEPENDENT_REVIEW_REQUIRED"
+  },
+  "required": [
+    "schema_version",
+    "milestone",
+    "commit_sha",
+    "contract_sha",
+    "fixture_sha",
+    "config_sha",
+    "reviewer_id",
+    "reviewer_source",
+    "reviewed_at",
+    "p0",
+    "p1",
+    "implementer_ids",
+    "checklist",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "milestone": { "enum": ["d0", "m1"] },
+    "commit_sha": { "$ref": "#/$defs/gitSha" },
+    "contract_sha": { "$ref": "#/$defs/sha256" },
+    "fixture_sha": { "$ref": "#/$defs/sha256" },
+    "config_sha": { "$ref": "#/$defs/sha256" },
+    "reviewer_id": { "type": "string", "pattern": "^github:[0-9]+$" },
+    "reviewer_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "actor", "actor_id"],
+      "properties": {
+        "provider": { "const": "github-actions" },
+        "actor": { "type": "string", "minLength": 1 },
+        "actor_id": { "type": "string", "pattern": "^[0-9]+$" }
+      }
+    },
+    "reviewed_at": { "type": "string", "format": "date-time" },
+    "p0": { "type": "integer", "minimum": 0 },
+    "p1": { "type": "integer", "minimum": 0 },
+    "implementer_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "checklist": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^artifacts/evidence/" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "signed_by", "statement_sha256"],
+      "properties": {
+        "method": { "const": "github-actions-identity-v1" },
+        "signed_by": { "type": "string", "pattern": "^github:[0-9]+$" },
+        "statement_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huoqiu.invalid/schemas/evidence.v1.json",
+  "title": "Huoqiu capability evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "milestone",
+    "cap_id",
+    "commit_sha",
+    "base_sha",
+    "contract_sha",
+    "fixture_sha",
+    "config_sha",
+    "environment",
+    "started_at",
+    "finished_at",
+    "command",
+    "fixture_version",
+    "passed",
+    "failed",
+    "skipped",
+    "invalid_test_markers",
+    "exit_code",
+    "raw_report",
+    "p0",
+    "p1",
+    "implementer_ids"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "milestone": { "enum": ["d0", "m1"] },
+    "cap_id": { "type": "string", "pattern": "^CAP-[A-Z]+-[0-9]{3}$" },
+    "commit_sha": { "$ref": "#/$defs/gitSha" },
+    "base_sha": { "$ref": "#/$defs/gitSha" },
+    "contract_sha": { "$ref": "#/$defs/sha256" },
+    "fixture_sha": { "$ref": "#/$defs/sha256" },
+    "config_sha": { "$ref": "#/$defs/sha256" },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "arch", "node_version", "ci"],
+      "properties": {
+        "platform": { "type": "string", "minLength": 1 },
+        "arch": { "type": "string", "minLength": 1 },
+        "node_version": { "type": "string", "minLength": 1 },
+        "ci": { "type": "boolean" }
+      }
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "command": { "$ref": "#/$defs/command" },
+    "fixture_version": { "type": "string", "minLength": 1 },
+    "passed": { "type": "integer", "minimum": 0 },
+    "failed": { "type": "integer", "minimum": 0 },
+    "skipped": { "type": "integer", "minimum": 0 },
+    "invalid_test_markers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["skip", "fixme", "todo", "passWithNoTests"] }
+    },
+    "exit_code": { "type": "integer" },
+    "raw_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^artifacts/evidence/" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "p0": { "type": "integer", "minimum": 0 },
+    "p1": { "type": "integer", "minimum": 0 },
+    "implementer_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executable", "args"],
+      "properties": {
+        "executable": { "type": "string", "minLength": 1 },
+        "args": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

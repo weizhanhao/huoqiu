@@ -1,0 +1,15 @@
+{
+  "milestone": "m1",
+  "required_cap_ids": [
+    "CAP-ID-001",
+    "CAP-INST-001",
+    "CAP-MD-001",
+    "CAP-FEED-001",
+    "CAP-WATCH-001",
+    "CAP-CONTENT-001",
+    "CAP-SOCIAL-001",
+    "CAP-NOTIF-001",
+    "CAP-MOD-001",
+    "CAP-PORT-001"
+  ]
+}

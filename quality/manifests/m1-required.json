@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "milestone": "m1",
+  "fixture_version": "m1.v1",
+  "required_caps": [
+    {
+      "cap_id": "CAP-ID-001",
+      "command": {
+        "executable": "pnpm",
+        "args": [
+          "exec",
+          "tsx",
+          "scripts/quality/not-implemented-gate.mts",
+          "--cap",
+          "CAP-ID-001"
+        ]
+      },
+      "implementer_ids": ["pending:capability-implementation"]
+    },
+    {
+      "cap_id": "CAP-INST-001",
+      "command": {
+        "executable": "pnpm",
+        "args": [
+          "exec",
+          "tsx",
+          "scripts/quality/not-implemented-gate.mts",
+          "--cap",
+          "CAP-INST-001"
+        ]
+      },
+      "implementer_ids": ["pending:capability-implementation"]
+    },
+    {
+      "cap_id": "CAP-MD-001",
+      "command": {
+        "executable": "pnpm",
+        "args": [
+          "exec",
+          "tsx",
+          "scripts/quality/not-implemented-gate.mts",
+          "--cap",
+          "CAP-MD-001"
+        ]
+      },
+      "implementer_ids": ["pending:capability-implementation"]
+    },
+    {
+      "cap_id": "CAP-FEED-001",
+      "command": {
+        "executable": "pnpm",
+        "args": [
+          "exec",
+          "tsx",
+          "scripts/quality/not-implemented-gate.mts",
+          "--cap",
+          "CAP-FEED-001"
+        ]
+      },
+      "implementer_ids": ["pending:capability-implementation"]
+    },
+    {
+      "cap_id": "CAP-WATCH-001",
+      "command": {
+        "executable": "pnpm",
+        "args": [
+          "exec",
+          "tsx",
+          "scripts/quality/not-implemented-gate.mts",
+          "--cap",
+          "CAP-WATCH-001"
+        ]
+      },
+      "implementer_ids": ["pending:capability-implementation"]
+    },
+    {
+      "cap_id": "CAP-CONTENT-001",
+      "command": {
+        "executable": "pnpm",
+        "args": [
+          "exec",
+          "tsx",
+          "scripts/quality/not-implemented-gate.mts",
+          "--cap",
+          "CAP-CONTENT-001"
+        ]
+      },
+      "implementer_ids": ["pending:capability-implementation"]
+    },
+    {
+      "cap_id": "CAP-SOCIAL-001",
+      "command": {
+        "executable": "pnpm",
+        "args": [
+          "exec",
+          "tsx",
+          "scripts/quality/not-implemented-gate.mts",
+          "--cap",
+          "CAP-SOCIAL-001"
+        ]
+      },
+      "implementer_ids": ["pending:capability-implementation"]
+    },
+    {
+      "cap_id": "CAP-NOTIF-001",
+      "command": {
+        "executable": "pnpm",
+        "args": [
+          "exec",
+          "tsx",
+          "scripts/quality/not-implemented-gate.mts",
+          "--cap",
+          "CAP-NOTIF-001"
+        ]
+      },
+      "implementer_ids": ["pending:capability-implementation"]
+    },
+    {
+      "cap_id": "CAP-MOD-001",
+      "command": {
+        "executable": "pnpm",
+        "args": [
+          "exec",
+          "tsx",
+          "scripts/quality/not-implemented-gate.mts",
+          "--cap",
+          "CAP-MOD-001"
+        ]
+      },
+      "implementer_ids": ["pending:capability-implementation"]
+    },
+    {
+      "cap_id": "CAP-PORT-001",
+      "command": {
+        "executable": "pnpm",
+        "args": [
+          "exec",
+          "tsx",
+          "scripts/quality/not-implemented-gate.mts",
+          "--cap",
+          "CAP-PORT-001"
+        ]
+      },
+      "implementer_ids": ["pending:capability-implementation"]
+    }
+  ],
+  "stretch_cap_ids": []
+}
