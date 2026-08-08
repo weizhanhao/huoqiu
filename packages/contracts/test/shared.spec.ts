@@ -34,6 +34,17 @@ describe("shared API error contract", () => {
   });
 
   it.each([
+    "Please select a listing from the search results.",
+    "Please insert an item into your watchlist.",
+    "Please update your profile and set a new nickname.",
+    "Please delete the item from your watchlist.",
+  ])("accepts normal public action copy %j", (message) => {
+    expect(apiErrorSchema.parse({ ...validApiError, message }).message).toBe(
+      message,
+    );
+  });
+
+  it.each([
     "Error at handler (/workspace/service.js:42:7)",
     "SELECT password FROM users WHERE id = 1",
     "INSERT INTO audit_log (private_value) VALUES ('hidden')",
