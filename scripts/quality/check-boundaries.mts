@@ -1,11 +1,12 @@
 import type { Dirent } from "node:fs";
 import { lstat, readFile, readdir, realpath } from "node:fs/promises";
-import { extname, relative, resolve, sep } from "node:path";
+import { dirname, extname, relative, resolve, sep } from "node:path";
 
 import ts from "typescript";
 
 import { isMainModule, runCli } from "./cli.mts";
 import { QualityGateError } from "./gate-core.mts";
+import { parseYaml12 } from "./yaml.mts";
 
 type DependencySection =
   | "dependencies"
@@ -352,26 +353,87 @@ const sourceImports = (file: string, content: string): string[] => {
     );
   }
 
+  const constants = new Map<string, ts.Expression>();
+  const evaluating = new Set<string>();
+  const indexConstants = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      (node.parent.flags & ts.NodeFlags.Const) !== 0
+    )
+      constants.set(node.name.text, node.initializer);
+    ts.forEachChild(node, indexConstants);
+  };
+  indexConstants(sourceFile);
+
+  const evaluate = (expression: ts.Expression): string | undefined => {
+    if (ts.isStringLiteralLike(expression)) return expression.text;
+    if (
+      ts.isParenthesizedExpression(expression) ||
+      ts.isAsExpression(expression) ||
+      ts.isTypeAssertionExpression(expression) ||
+      ts.isSatisfiesExpression(expression)
+    )
+      return evaluate(expression.expression);
+    if (
+      ts.isBinaryExpression(expression) &&
+      expression.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+      const left = evaluate(expression.left);
+      const right = evaluate(expression.right);
+      return left === undefined || right === undefined
+        ? undefined
+        : `${left}${right}`;
+    }
+    if (ts.isTemplateExpression(expression)) {
+      let value = expression.head.text;
+      for (const span of expression.templateSpans) {
+        const substitution = evaluate(span.expression);
+        if (substitution === undefined) return undefined;
+        value += substitution + span.literal.text;
+      }
+      return value;
+    }
+    if (ts.isIdentifier(expression)) {
+      if (evaluating.has(expression.text)) return undefined;
+      const initializer = constants.get(expression.text);
+      if (initializer === undefined) return undefined;
+      evaluating.add(expression.text);
+      const value = evaluate(initializer);
+      evaluating.delete(expression.text);
+      return value;
+    }
+    return undefined;
+  };
+
   const imports: string[] = [];
-  const recordSpecifier = (node: ts.Expression | undefined): void => {
+  const recordStaticSpecifier = (node: ts.Expression | undefined): void => {
     if (node !== undefined && ts.isStringLiteralLike(node))
       imports.push(node.text);
   };
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
-      recordSpecifier(node.moduleSpecifier);
+      recordStaticSpecifier(node.moduleSpecifier);
     } else if (
       ts.isImportEqualsDeclaration(node) &&
       ts.isExternalModuleReference(node.moduleReference)
     ) {
-      recordSpecifier(node.moduleReference.expression);
+      recordStaticSpecifier(node.moduleReference.expression);
     } else if (
       ts.isCallExpression(node) &&
       (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
         (ts.isIdentifier(node.expression) &&
           node.expression.text === "require"))
     ) {
-      recordSpecifier(node.arguments[0]);
+      const argument = node.arguments[0];
+      const specifier = argument === undefined ? undefined : evaluate(argument);
+      if (specifier === undefined)
+        return fail(
+          "WORKSPACE_DYNAMIC_IMPORT_UNRESOLVED",
+          `${file}: dynamic module target is not statically decidable`,
+        );
+      imports.push(specifier);
     }
     ts.forEachChild(node, visit);
   };
@@ -383,6 +445,122 @@ const validateSourceImports = async (
   root: string,
   projects: readonly WorkspaceProject[],
 ): Promise<void> => {
+  const projectsByName = new Map(
+    projects.map((project) => [project.name, project] as const),
+  );
+  const projectsByDirectory = [...projects].sort(
+    (left, right) => right.directory.length - left.directory.length,
+  );
+  const compilerOptions = new Map<string, ts.CompilerOptions>();
+  for (const project of projects) {
+    const configPath = ts.findConfigFile(
+      project.directory,
+      ts.sys.fileExists,
+      "tsconfig.json",
+    );
+    if (configPath === undefined) {
+      compilerOptions.set(project.name, {
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+      });
+      continue;
+    }
+    const loaded = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (loaded.error !== undefined)
+      fail(
+        "WORKSPACE_TSCONFIG_MALFORMED",
+        `${repositoryPath(root, configPath)}: ${ts.flattenDiagnosticMessageText(loaded.error.messageText, " ")}`,
+      );
+    const parsed = ts.parseJsonConfigFileContent(
+      loaded.config as object,
+      ts.sys,
+      dirname(configPath),
+      undefined,
+      configPath,
+    );
+    const error = parsed.errors.find(
+      (diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error,
+    );
+    if (error !== undefined)
+      fail(
+        "WORKSPACE_TSCONFIG_MALFORMED",
+        `${repositoryPath(root, configPath)}: ${ts.flattenDiagnosticMessageText(error.messageText, " ")}`,
+      );
+    compilerOptions.set(project.name, parsed.options);
+  }
+
+  const ownsPath = (project: WorkspaceProject, path: string): boolean => {
+    const child = relative(project.directory, path);
+    return (
+      child === "" ||
+      (child !== ".." &&
+        !child.startsWith(`..${sep}`) &&
+        !child.startsWith("/"))
+    );
+  };
+
+  const validateOwner = (
+    source: WorkspaceProject,
+    target: WorkspaceProject,
+    file: string,
+  ): void => {
+    if (source.name === target.name) return;
+    if (source.kind === "package" && target.kind === "app")
+      fail(
+        "PACKAGE_DEPENDS_ON_APP",
+        `${source.name} -> ${target.name} in ${file}`,
+      );
+    if (source.kind === "app" && target.kind === "app")
+      fail(
+        "APP_DEPENDS_ON_SIBLING_APP",
+        `${source.name} -> ${target.name} in ${file}`,
+      );
+    if (!source.dependencies.has(target.name))
+      fail(
+        "UNDECLARED_WORKSPACE_IMPORT",
+        `${file}: ${target.name} is not declared by ${source.name}`,
+      );
+  };
+
+  const validateSpecifier = (
+    project: WorkspaceProject,
+    absoluteFile: string,
+    file: string,
+    specifier: string,
+  ): void => {
+    const match = /^(@huoqiu\/[^/]+)/.exec(specifier);
+    const namedProject = match?.[1];
+    if (namedProject !== undefined) {
+      const target = projectsByName.get(namedProject);
+      if (
+        target === undefined &&
+        namedProject !== project.name &&
+        !project.dependencies.has(namedProject)
+      )
+        fail(
+          "UNDECLARED_WORKSPACE_IMPORT",
+          `${file}: ${namedProject} is not declared by ${project.name}`,
+        );
+      if (target !== undefined) validateOwner(project, target, file);
+      return;
+    }
+
+    const resolution = ts.resolveModuleName(
+      specifier,
+      absoluteFile,
+      compilerOptions.get(project.name) ?? {},
+      ts.sys,
+    ).resolvedModule;
+    const lexicalTarget = specifier.startsWith(".")
+      ? resolve(dirname(absoluteFile), specifier)
+      : undefined;
+    const targetPath = resolution?.resolvedFileName ?? lexicalTarget;
+    if (targetPath === undefined) return;
+    const target = projectsByDirectory.find((candidate) =>
+      ownsPath(candidate, targetPath),
+    );
+    if (target !== undefined) validateOwner(project, target, file);
+  };
+
   const visit = async (
     project: WorkspaceProject,
     directory: string,
@@ -416,28 +594,12 @@ const validateSourceImports = async (
       )
         continue;
       const content = await readUtf8(child, "WORKSPACE_SOURCE_UNREADABLE");
-      for (const specifier of sourceImports(path, content)) {
-        const match = /^(@huoqiu\/[^/]+)/.exec(specifier);
-        const importedPackage = match?.[1];
-        if (
-          importedPackage !== undefined &&
-          importedPackage !== project.name &&
-          !project.dependencies.has(importedPackage)
-        ) {
-          fail(
-            "UNDECLARED_WORKSPACE_IMPORT",
-            `${path}: ${importedPackage} is not declared by ${project.name}`,
-          );
-        }
-      }
+      for (const specifier of sourceImports(path, content))
+        validateSpecifier(project, child, path, specifier);
     }
   };
 
-  for (const project of projects) {
-    for (const sourceRoot of ["src", "app"]) {
-      await visit(project, resolve(project.directory, sourceRoot));
-    }
-  }
+  for (const project of projects) await visit(project, project.directory);
 };
 
 interface WorkspaceYaml {
@@ -670,14 +832,14 @@ const parseArtifactInventory = async (
   let parsed: unknown;
   try {
     const content = await readUtf8(path, "ARTIFACT_INVENTORY_UNREADABLE");
-    const json = content.startsWith("# prettier-ignore\n")
-      ? content.slice("# prettier-ignore\n".length)
-      : content;
-    parsed = JSON.parse(json);
+    parsed = parseYaml12(
+      content,
+      "ARTIFACT_INVENTORY_SCHEMA_INVALID",
+      "security/artifact-inventory.yml",
+    );
   } catch (error) {
     if (error instanceof QualityGateError) throw error;
-    const detail =
-      error instanceof Error ? error.message : "invalid JSON-compatible YAML";
+    const detail = error instanceof Error ? error.message : "invalid YAML";
     fail("ARTIFACT_INVENTORY_SCHEMA_INVALID", detail);
   }
   const inventory = requireRecord(
@@ -852,172 +1014,419 @@ const parseArtifactInventory = async (
   return { actions, artifacts };
 };
 
-const countExactLine = (lines: readonly string[], expected: string): number =>
-  lines.filter((line) => line.trim() === expected).length;
+interface WorkflowModel {
+  jobs: Record<string, unknown>;
+  root: Record<string, unknown>;
+  steps: Record<string, unknown>[];
+}
 
-const topLevelBlock = (lines: readonly string[], name: string): string[] => {
-  const start = lines.findIndex((line) => line === `${name}:`);
-  if (start < 0) return [];
-  const end = lines.findIndex(
-    (line, index) => index > start && /^\S[^:]*:/.test(line),
-  );
-  return lines.slice(start + 1, end < 0 ? undefined : end);
+const requireArray = (
+  value: unknown,
+  code: string,
+  detail: string,
+): unknown[] => {
+  if (!Array.isArray(value)) fail(code, detail);
+  return value as unknown[];
 };
 
-const jobBlocks = (lines: readonly string[]): Map<string, string[]> => {
-  const jobsStart = lines.findIndex((line) => line === "jobs:");
-  if (jobsStart < 0) return new Map();
-  const blocks = new Map<string, string[]>();
-  let activeName: string | undefined;
-  for (let index = jobsStart + 1; index < lines.length; index += 1) {
-    const line = lines[index] as string;
-    if (/^\S/.test(line)) break;
-    const job = /^ {2}([A-Za-z][A-Za-z0-9_-]*):\s*$/.exec(line)?.[1];
-    if (job !== undefined) {
-      activeName = job;
-      blocks.set(job, []);
-      continue;
+const semanticEntries = (value: unknown): { key: string; value: unknown }[] => {
+  const entries: { key: string; value: unknown }[] = [];
+  const seen = new WeakSet<object>();
+  const visit = (candidate: unknown): void => {
+    if (typeof candidate !== "object" || candidate === null) return;
+    if (seen.has(candidate)) return;
+    seen.add(candidate);
+    if (Array.isArray(candidate)) {
+      for (const item of candidate) visit(item);
+      return;
     }
-    if (activeName !== undefined) blocks.get(activeName)?.push(line);
-  }
-  return blocks;
+    for (const [key, child] of Object.entries(candidate)) {
+      entries.push({ key, value: child });
+      visit(child);
+    }
+  };
+  visit(value);
+  return entries;
 };
 
-const validateWorkflowSafety = (workflow: string): void => {
-  if (/^\s*pull_request_target\s*:/m.test(workflow))
-    fail("CI_TRIGGER_INVALID", "pull_request_target is forbidden");
-  if (/\bcontinue-on-error\s*:/i.test(workflow))
-    fail("CI_CONTINUE_ON_ERROR_FORBIDDEN", "continue-on-error is forbidden");
-  if (/\|\|\s*true\b/i.test(workflow))
+const workflowStrings = (value: unknown): string[] =>
+  semanticEntries(value)
+    .map((entry) => entry.value)
+    .filter((candidate): candidate is string => typeof candidate === "string");
+
+const workflowModel = (parsed: unknown): WorkflowModel => {
+  const root = requireRecord(
+    parsed,
+    "CI_WORKFLOW_SCHEMA_INVALID",
+    "workflow must be a mapping",
+  );
+  const jobs = requireRecord(
+    root.jobs,
+    "CI_JOB_POLICY_INVALID",
+    "jobs must be a mapping",
+  );
+  const steps: Record<string, unknown>[] = [];
+  for (const [jobName, jobValue] of Object.entries(jobs)) {
+    const job = requireRecord(
+      jobValue,
+      "CI_JOB_POLICY_INVALID",
+      `${jobName} must be a mapping`,
+    );
+    const values = requireArray(
+      job.steps,
+      "CI_JOB_POLICY_INVALID",
+      `${jobName}.steps must be a sequence`,
+    );
+    for (const [index, value] of values.entries()) {
+      steps.push(
+        requireRecord(
+          value,
+          "CI_JOB_POLICY_INVALID",
+          `${jobName}.steps[${index}] must be a mapping`,
+        ),
+      );
+    }
+  }
+  return { jobs, root, steps };
+};
+
+const validateWorkflowSafety = (model: WorkflowModel): void => {
+  for (const { key } of semanticEntries(model.root)) {
+    if (key.toLowerCase() === "continue-on-error")
+      fail("CI_CONTINUE_ON_ERROR_FORBIDDEN", "continue-on-error is forbidden");
+  }
+  const strings = workflowStrings(model.root);
+  if (strings.some((value) => /\|\|\s*true\b/i.test(value)))
     fail("CI_ERROR_SUPPRESSION_FORBIDDEN", "|| true is forbidden");
-  if (/\$\{\{\s*secrets\./i.test(workflow))
+  if (strings.some((value) => /\$\{\{\s*secrets\./i.test(value)))
     fail("CI_SECRET_FORBIDDEN", "repository secrets are forbidden");
-  if (/--(?:no-frozen-lockfile|trust-lockfile)\b/i.test(workflow))
+  if (
+    strings.some((value) =>
+      /--(?:no-frozen-lockfile|trust-lockfile)\b/i.test(value),
+    )
+  )
     fail("CI_INSTALL_INVALID", "lockfile trust/frozen bypass is forbidden");
-  if (/minimum[-A-Za-z]*release[-A-Za-z]*age[-A-Za-z]*exclude/i.test(workflow))
+  if (
+    strings.some((value) =>
+      /minimum[-A-Za-z]*release[-A-Za-z]*age[-A-Za-z]*exclude/i.test(value),
+    )
+  )
     fail("CI_INSTALL_INVALID", "release-age exemptions are forbidden");
 };
 
-const validateTriggersAndPermissions = (lines: readonly string[]): void => {
-  const triggerKeys = topLevelBlock(lines, "on")
-    .map((line) => /^ {2}([A-Za-z_][A-Za-z0-9_-]*):\s*$/.exec(line)?.[1])
-    .filter((value): value is string => value !== undefined);
+const rejectUnknownKeys = (
+  record: Record<string, unknown>,
+  allowed: readonly string[],
+  code: string,
+  label: string,
+): void => {
+  const allowedKeys = new Set(allowed);
+  const unknown = Object.keys(record).filter((key) => !allowedKeys.has(key));
+  if (unknown.length > 0)
+    fail(code, `${label} contains unknown fields: ${unknown.sort().join(",")}`);
+};
+
+const validateWorkflowSchema = (model: WorkflowModel): void => {
+  exactKeys(
+    model.root,
+    ["name", "on", "permissions", "concurrency", "env", "jobs"],
+    "CI_WORKFLOW_SCHEMA_INVALID",
+    "workflow",
+  );
+  const preflight = requireRecord(
+    model.jobs.preflight,
+    "CI_JOB_POLICY_INVALID",
+    "preflight must be a mapping",
+  );
+  exactKeys(
+    preflight,
+    ["runs-on", "timeout-minutes", "steps"],
+    "CI_JOB_POLICY_INVALID",
+    "preflight",
+  );
+  const quality = requireRecord(
+    model.jobs.quality,
+    "CI_JOB_POLICY_INVALID",
+    "quality must be a mapping",
+  );
+  exactKeys(
+    quality,
+    ["name", "needs", "runs-on", "timeout-minutes", "strategy", "steps"],
+    "CI_JOB_POLICY_INVALID",
+    "quality",
+  );
+  const strategy = requireRecord(
+    quality.strategy,
+    "CI_JOB_POLICY_INVALID",
+    "quality.strategy must be a mapping",
+  );
+  exactKeys(
+    strategy,
+    ["fail-fast", "matrix"],
+    "CI_JOB_POLICY_INVALID",
+    "quality.strategy",
+  );
+  const matrix = requireRecord(
+    strategy.matrix,
+    "CI_JOB_POLICY_INVALID",
+    "quality.strategy.matrix must be a mapping",
+  );
+  exactKeys(
+    matrix,
+    ["lane"],
+    "CI_JOB_POLICY_INVALID",
+    "quality.strategy.matrix",
+  );
+  for (const [index, step] of model.steps.entries()) {
+    rejectUnknownKeys(
+      step,
+      step.uses === undefined
+        ? ["name", "run", "shell"]
+        : ["if", "name", "uses", "with"],
+      "CI_JOB_POLICY_INVALID",
+      `steps[${index}]`,
+    );
+  }
+};
+
+const validateTriggersAndPermissions = (model: WorkflowModel): void => {
+  const triggers = requireRecord(
+    model.root.on,
+    "CI_TRIGGER_INVALID",
+    "on must be a mapping",
+  );
+  const triggerKeys = Object.keys(triggers);
   if (
     triggerKeys.length !== 2 ||
-    triggerKeys[0] !== "push" ||
-    triggerKeys[1] !== "pull_request"
-  ) {
+    !triggerKeys.includes("push") ||
+    !triggerKeys.includes("pull_request") ||
+    triggers.push !== null ||
+    triggers.pull_request !== null
+  )
     fail(
       "CI_TRIGGER_INVALID",
       "triggers must be exactly push and pull_request",
     );
-  }
-  const permissionLines = topLevelBlock(lines, "permissions").filter(
-    (line) => line.trim().length > 0,
+
+  const permissions = requireRecord(
+    model.root.permissions,
+    "CI_PERMISSIONS_EXCESS",
+    "permissions must be a mapping",
   );
   if (
-    permissionLines.length !== 1 ||
-    permissionLines[0]?.trim() !== "contents: read" ||
-    lines.some((line) => /^\s+permissions\s*:/.test(line))
-  ) {
+    Object.keys(permissions).length !== 1 ||
+    permissions.contents !== "read" ||
+    semanticEntries(model.jobs).some(
+      ({ key }) => key === "permissions" || key === "id-token",
+    )
+  )
     fail(
       "CI_PERMISSIONS_EXCESS",
       "permissions must be top-level contents: read only",
     );
-  }
 };
 
-const validateConcurrencyAndTelemetry = (lines: readonly string[]): void => {
-  const concurrency = topLevelBlock(lines, "concurrency")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+const validateConcurrencyAndTelemetry = (model: WorkflowModel): void => {
+  const concurrency = requireRecord(
+    model.root.concurrency,
+    "CI_CONCURRENCY_INVALID",
+    "concurrency must be a mapping",
+  );
   if (
-    concurrency.length !== 2 ||
-    concurrency[0] !==
-      "group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}" ||
-    concurrency[1] !==
-      "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
-  ) {
+    Object.keys(concurrency).length !== 2 ||
+    concurrency.group !==
+      "ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}" ||
+    concurrency["cancel-in-progress"] !==
+      "${{ github.event_name == 'pull_request' }}"
+  )
     fail(
       "CI_CONCURRENCY_INVALID",
       "PR-aware concurrency cancellation is required",
     );
-  }
-  for (const setting of [
-    'NEXT_TELEMETRY_DISABLED: "1"',
-    'EXPO_NO_TELEMETRY: "1"',
-    'TURBO_TELEMETRY_DISABLED: "1"',
-  ]) {
-    if (countExactLine(lines, setting) !== 1)
-      fail("CI_TELEMETRY_INVALID", `${setting} is required exactly once`);
-  }
+
+  const env = requireRecord(
+    model.root.env,
+    "CI_TELEMETRY_INVALID",
+    "env must be a mapping",
+  );
+  const expected = [
+    "NEXT_TELEMETRY_DISABLED",
+    "EXPO_NO_TELEMETRY",
+    "TURBO_TELEMETRY_DISABLED",
+  ];
+  if (
+    Object.keys(env).length !== expected.length ||
+    expected.some((key) => env[key] !== "1")
+  )
+    fail("CI_TELEMETRY_INVALID", "all telemetry controls are required");
 };
 
-const validateJobsAndBootstrap = (lines: readonly string[]): void => {
-  const jobs = jobBlocks(lines);
-  if (jobs.size !== 2 || !jobs.has("preflight") || !jobs.has("quality")) {
+const jobSteps = (
+  jobs: Record<string, unknown>,
+  jobName: string,
+): Record<string, unknown>[] => {
+  const job = requireRecord(
+    jobs[jobName],
+    "CI_JOB_POLICY_INVALID",
+    `${jobName} must be a mapping`,
+  );
+  return requireArray(
+    job.steps,
+    "CI_JOB_POLICY_INVALID",
+    `${jobName}.steps must be a sequence`,
+  ).map((value, index) =>
+    requireRecord(
+      value,
+      "CI_JOB_POLICY_INVALID",
+      `${jobName}.steps[${index}] must be a mapping`,
+    ),
+  );
+};
+
+const runCommands = (steps: readonly Record<string, unknown>[]): string[] =>
+  steps
+    .map((step) => step.run)
+    .filter((value): value is string => typeof value === "string");
+
+const validateJobsAndBootstrap = (model: WorkflowModel): void => {
+  if (
+    Object.keys(model.jobs).length !== 2 ||
+    model.jobs.preflight === undefined ||
+    model.jobs.quality === undefined
+  )
     fail("CI_JOB_POLICY_INVALID", "jobs must be exactly preflight and quality");
-  }
-  const preflight = jobs.get("preflight") ?? [];
-  const quality = jobs.get("quality") ?? [];
+  const preflight = requireRecord(
+    model.jobs.preflight,
+    "CI_JOB_POLICY_INVALID",
+    "preflight must be a mapping",
+  );
+  const quality = requireRecord(
+    model.jobs.quality,
+    "CI_JOB_POLICY_INVALID",
+    "quality must be a mapping",
+  );
   if (
-    countExactLine(preflight, "runs-on: ubuntu-24.04") !== 1 ||
-    countExactLine(quality, "runs-on: ubuntu-24.04") !== 1 ||
-    countExactLine(preflight, "timeout-minutes: 20") !== 1 ||
-    countExactLine(quality, "timeout-minutes: 30") !== 1
-  ) {
+    preflight["runs-on"] !== "ubuntu-24.04" ||
+    quality["runs-on"] !== "ubuntu-24.04" ||
+    preflight["timeout-minutes"] !== 20 ||
+    quality["timeout-minutes"] !== 30 ||
+    quality.needs !== "preflight"
+  )
     fail("CI_JOB_POLICY_INVALID", "both jobs need fixed runners and timeouts");
-  }
-  const requiredBootstrapLines = new Map([
-    ["persist-credentials: false", 2],
-    ["version: 11.4.0", 2],
-    ["runtime: node@24.15.0", 2],
-    ["install: false", 2],
-    ["cache: false", 2],
-  ]);
-  for (const [line, expectedCount] of requiredBootstrapLines) {
-    if (countExactLine(lines, line) !== expectedCount)
-      fail("CI_BOOTSTRAP_INVALID", `${line} must occur ${expectedCount} times`);
-  }
-  if (
-    countExactLine(
-      lines,
-      "run: pnpm install --frozen-lockfile --strict-peer-dependencies",
-    ) !== 2
-  ) {
+
+  const installCommand =
+    "pnpm install --frozen-lockfile --strict-peer-dependencies";
+  const allRuns = runCommands(model.steps);
+  if (allRuns.filter((run) => run === installCommand).length !== 2)
     fail(
       "CI_INSTALL_INVALID",
       "each job must run the exact strict frozen install",
     );
-  }
-  for (const command of [
-    'test "$(node --version)" = "v24.15.0"',
-    'test "$(pnpm --version)" = "11.4.0"',
-    "run: git diff --exit-code",
-  ]) {
-    if (countExactLine(preflight, command) !== 1)
-      fail("CI_PREFLIGHT_INVALID", `${command} is required in preflight`);
-  }
+
+  const checkoutSteps = model.steps.filter(
+    (step) =>
+      typeof step.uses === "string" &&
+      step.uses.startsWith("actions/checkout@"),
+  );
+  const setupSteps = model.steps.filter(
+    (step) =>
+      typeof step.uses === "string" && step.uses.startsWith("pnpm/setup@"),
+  );
+  if (
+    checkoutSteps.length !== 2 ||
+    checkoutSteps.some((step) => {
+      const withInputs = requireRecord(
+        step.with,
+        "CI_BOOTSTRAP_INVALID",
+        "checkout.with must be a mapping",
+      );
+      return (
+        Object.keys(withInputs).length !== 1 ||
+        withInputs["persist-credentials"] !== false
+      );
+    }) ||
+    setupSteps.length !== 2 ||
+    setupSteps.some((step) => {
+      const withInputs = requireRecord(
+        step.with,
+        "CI_BOOTSTRAP_INVALID",
+        "setup.with must be a mapping",
+      );
+      return (
+        Object.keys(withInputs).length !== 4 ||
+        withInputs.version !== "11.4.0" ||
+        withInputs.runtime !== "node@24.15.0" ||
+        withInputs.install !== false ||
+        withInputs.cache !== false
+      );
+    })
+  )
+    fail("CI_BOOTSTRAP_INVALID", "checkout and setup inputs must be exact");
+
+  const preflightRuns = runCommands(jobSteps(model.jobs, "preflight"));
+  if (
+    !preflightRuns.some(
+      (run) =>
+        run.includes('test "$(node --version)" = "v24.15.0"') &&
+        run.includes('test "$(pnpm --version)" = "11.4.0"'),
+    ) ||
+    !preflightRuns.includes("git diff --exit-code")
+  )
+    fail(
+      "CI_PREFLIGHT_INVALID",
+      "toolchain verification and clean diff are required",
+    );
 };
 
-const validateMatrix = (lines: readonly string[], workflow: string): void => {
+const validateMatrix = (model: WorkflowModel): void => {
+  const quality = requireRecord(
+    model.jobs.quality,
+    "CI_MATRIX_INVALID",
+    "quality must be a mapping",
+  );
+  const strategy = requireRecord(
+    quality.strategy,
+    "CI_MATRIX_INVALID",
+    "quality.strategy must be a mapping",
+  );
+  const matrix = requireRecord(
+    strategy.matrix,
+    "CI_MATRIX_INVALID",
+    "quality.strategy.matrix must be a mapping",
+  );
+  const lanes = requireArray(
+    matrix.lane,
+    "CI_MATRIX_INVALID",
+    "matrix.lane must be a sequence",
+  );
+  const expectedLanes = [
+    "format",
+    "lint",
+    "typecheck",
+    "test",
+    "build",
+    "boundaries",
+  ];
   if (
-    countExactLine(
-      lines,
-      "lane: [format, lint, typecheck, test, build, boundaries]",
-    ) !== 1
-  ) {
+    strategy["fail-fast"] !== false ||
+    Object.keys(matrix).length !== 1 ||
+    lanes.length !== expectedLanes.length ||
+    lanes.some((lane, index) => lane !== expectedLanes[index])
+  )
     fail("CI_MATRIX_INVALID", "matrix must contain the six fixed lanes");
-  }
+  const qualityRuns = runCommands(jobSteps(model.jobs, "quality"));
+  const script = qualityRuns.find((run) => run.includes("matrix.lane"));
   if (
-    /(?:eval|pnpm|npm|npx|bash|sh)\s+[^\n]*\$\{\{\s*matrix\./i.test(workflow) ||
-    countExactLine(lines, 'case "${{ matrix.lane }}" in') !== 1
-  ) {
+    script === undefined ||
+    /(?:eval|pnpm|npm|npx|bash|sh)\s+[^\n]*\$\{\{\s*matrix\./i.test(script) ||
+    !script.includes('case "${{ matrix.lane }}" in')
+  )
     fail(
       "CI_MATRIX_COMMAND_UNSAFE",
       "matrix expressions must only select a fixed case",
     );
-  }
+  const fixedScript =
+    script ?? fail("CI_MATRIX_COMMAND_UNSAFE", "matrix script is missing");
   for (const command of [
     "format) pnpm format:check ;;",
     "lint) pnpm lint ;;",
@@ -1025,69 +1434,90 @@ const validateMatrix = (lines: readonly string[], workflow: string): void => {
     "build) pnpm build ;;",
     "boundaries) pnpm qa:boundaries ;;",
     "*) exit 64 ;;",
-  ]) {
-    if (countExactLine(lines, command) !== 1)
+  ])
+    if (!fixedScript.includes(command))
       fail("CI_MATRIX_INVALID", `${command} is required exactly once`);
-  }
 };
 
-const validateTestArtifact = (
-  lines: readonly string[],
-  workflow: string,
-): void => {
+const validateTestArtifact = (model: WorkflowModel): void => {
+  const allRuns = runCommands(model.steps);
+  const lines = allRuns.flatMap((run) =>
+    run.split(/\r?\n/).map((line) => line.trim()),
+  );
   if (
-    countExactLine(lines, "set -euo pipefail") !== 2 ||
-    countExactLine(lines, "pnpm test 2>&1 | tee test-results/unit.log") !== 1 ||
-    (workflow.match(/\btee\s+/g) ?? []).length !== 1
-  ) {
+    lines.filter((line) => line === "set -euo pipefail").length !== 2 ||
+    lines.filter(
+      (line) => line === "pnpm test 2>&1 | tee test-results/unit.log",
+    ).length !== 1 ||
+    allRuns.reduce(
+      (count, run) => count + (run.match(/\btee\s+/g) ?? []).length,
+      0,
+    ) !== 1
+  )
     fail(
       "CI_TEST_LOG_INVALID",
       "the test lane must preserve pipefail and tee only test-results/unit.log",
     );
-  }
-  const uploadPaths = lines
-    .map((line) => /^\s+path:\s*(.+?)\s*$/.exec(line)?.[1])
-    .filter((value): value is string => value !== undefined);
-  const uploadPath = uploadPaths[0];
-  if (uploadPaths.length !== 1 || uploadPath !== CI_ARTIFACT.path) {
-    return fail(
+  const uploadSteps = model.steps.filter(
+    (step) =>
+      typeof step.uses === "string" &&
+      step.uses.startsWith("actions/upload-artifact@"),
+  );
+  const upload = uploadSteps[0];
+  const withInputs = requireRecord(
+    upload?.with,
+    "CI_ARTIFACT_POLICY_INVALID",
+    "upload.with must be a mapping",
+  );
+  const uploadPath = withInputs.path;
+  if (uploadSteps.length !== 1 || uploadPath !== CI_ARTIFACT.path)
+    fail(
       "CI_ARTIFACT_PATH_FORBIDDEN",
       "the only upload path is test-results/unit.log",
     );
-  }
-  for (const forbidden of [
-    /(?:^|\/)\.env/i,
-    /(?:^|\/)(?:database|db)[._-]?(?:dump|sql)/i,
-    /(?:^|\/)(?:node_modules|\.next|dist|evidence)(?:\/|$)/i,
-    /[*?{}[\]]/,
-  ]) {
-    if (forbidden.test(uploadPath))
-      fail("CI_ARTIFACT_PATH_FORBIDDEN", uploadPath);
-  }
-  for (const setting of [
-    "if: ${{ always() && matrix.lane == 'test' }}",
-    `name: ${CI_ARTIFACT.name}`,
-    "if-no-files-found: error",
-    `retention-days: ${CI_ARTIFACT.retention_days}`,
-  ]) {
-    if (countExactLine(lines, setting) !== 1)
-      fail("CI_ARTIFACT_POLICY_INVALID", `${setting} is required exactly once`);
-  }
+  if (
+    withInputs.name !== CI_ARTIFACT.name ||
+    withInputs["if-no-files-found"] !== "error" ||
+    withInputs["retention-days"] !== CI_ARTIFACT.retention_days ||
+    upload?.if !== "${{ always() && matrix.lane == 'test' }}"
+  )
+    fail("CI_ARTIFACT_POLICY_INVALID", "artifact policy must remain exact");
 };
 
 const validateWorkflowActions = (
-  lines: readonly string[],
+  steps: readonly Record<string, unknown>[],
   inventoryActions: readonly InventoryAction[],
 ): void => {
-  const uses = lines
-    .map((line) =>
-      /^\s*-?\s*uses:\s*([^@\s]+)@([^\s#]+)(?:\s+#.*)?$/.exec(line),
-    )
-    .filter((match): match is RegExpExecArray => match !== null)
-    .map((match) => ({ name: match[1] as string, ref: match[2] as string }));
+  const uses = steps
+    .filter((step) => step.uses !== undefined)
+    .map((step) => {
+      if (typeof step.uses !== "string")
+        fail("CI_ACTION_UNPINNED", "uses must be a string");
+      const separator = (step.uses as string).lastIndexOf("@");
+      if (separator <= 0) fail("CI_ACTION_UNPINNED", step.uses as string);
+      return {
+        name: (step.uses as string).slice(0, separator),
+        ref: (step.uses as string).slice(separator + 1),
+      };
+    });
   for (const action of uses) {
     if (!/^[a-f\d]{40}$/.test(action.ref))
       fail("CI_ACTION_UNPINNED", `${action.name}@${action.ref}`);
+  }
+  for (const action of uses) {
+    const separator = action.name.indexOf("/");
+    const owner = action.name.slice(0, separator);
+    const repository = action.name.slice(separator + 1);
+    if (
+      separator <= 0 ||
+      !inventoryActions.some(
+        (inventoryAction) =>
+          inventoryAction.owner === owner &&
+          inventoryAction.repository === repository &&
+          inventoryAction.commit_sha === action.ref,
+      )
+    )
+      fail("CI_ACTION_NOT_IN_INVENTORY", `${action.name}@${action.ref}`);
   }
   const expectedCounts = new Map([
     ["actions/checkout", 2],
@@ -1108,22 +1538,6 @@ const validateWorkflowActions = (
         "CI_ACTION_PIN_INVALID",
         `${name} must use its approved immutable SHA`,
       );
-    }
-  }
-  for (const action of uses) {
-    const separator = action.name.indexOf("/");
-    const owner = action.name.slice(0, separator);
-    const repository = action.name.slice(separator + 1);
-    if (
-      separator <= 0 ||
-      !inventoryActions.some(
-        (inventoryAction) =>
-          inventoryAction.owner === owner &&
-          inventoryAction.repository === repository &&
-          inventoryAction.commit_sha === action.ref,
-      )
-    ) {
-      fail("CI_ACTION_NOT_IN_INVENTORY", `${action.name}@${action.ref}`);
     }
   }
   const usedNames = new Set(uses.map((action) => action.name));
@@ -1159,21 +1573,25 @@ export const checkCiWorkflow = async (
   repositoryRoot = process.cwd(),
 ): Promise<void> => {
   const root = resolve(repositoryRoot);
-  const workflow = await readUtf8(
+  const workflowContent = await readUtf8(
     resolve(root, ".github/workflows/ci.yml"),
     "CI_WORKFLOW_UNREADABLE",
   );
-  validateWorkflowSafety(workflow);
-  const lines = workflow
-    .split(/\r?\n/)
-    .map((line) => line.replace(/\s+#.*$/, "").replace(/\s+$/, ""));
-  validateTriggersAndPermissions(lines);
-  validateConcurrencyAndTelemetry(lines);
-  validateJobsAndBootstrap(lines);
-  validateMatrix(lines, workflow);
-  validateTestArtifact(lines, workflow);
+  const parsedWorkflow = parseYaml12(
+    workflowContent,
+    "CI_WORKFLOW_MALFORMED",
+    ".github/workflows/ci.yml",
+  );
+  const model = workflowModel(parsedWorkflow);
+  validateWorkflowSafety(model);
+  validateTriggersAndPermissions(model);
+  validateWorkflowSchema(model);
+  validateConcurrencyAndTelemetry(model);
   const inventory = await parseArtifactInventory(root);
-  validateWorkflowActions(lines, inventory.actions);
+  validateWorkflowActions(model.steps, inventory.actions);
+  validateJobsAndBootstrap(model);
+  validateMatrix(model);
+  validateTestArtifact(model);
   validateInventoryArtifact(inventory.artifacts);
 };
 

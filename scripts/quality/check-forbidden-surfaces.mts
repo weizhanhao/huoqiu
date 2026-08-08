@@ -6,6 +6,7 @@ import ts from "typescript";
 
 import { isMainModule, runCli } from "./cli.mts";
 import { QualityGateError } from "./gate-core.mts";
+import { parseYaml12 } from "./yaml.mts";
 
 interface ForbiddenSurfaceRule {
   category: string;
@@ -49,6 +50,11 @@ const FORBIDDEN_SURFACES: readonly ForbiddenSurfaceRule[] = [
     category: "portfolio-privacy",
     surface: "public_portfolio",
     tokens: ["public", "portfolio"],
+  },
+  {
+    category: "portfolio-privacy",
+    surface: "public_portfolio",
+    tokens: ["portfolio", "public"],
   },
   {
     category: "portfolio-copying",
@@ -97,22 +103,40 @@ const FORBIDDEN_SURFACES: readonly ForbiddenSurfaceRule[] = [
   },
   {
     category: "product-command",
+    surface: "subscription",
+    tokens: ["subscribe"],
+  },
+  {
+    category: "product-command",
+    surface: "subscription",
+    tokens: ["fund", "subscribe"],
+  },
+  {
+    category: "product-command",
     surface: "redemption",
     tokens: ["redemption"],
+  },
+  {
+    category: "product-command",
+    surface: "redemption",
+    tokens: ["redeem"],
+  },
+  {
+    category: "product-command",
+    surface: "redemption",
+    tokens: ["redeem", "fund"],
   },
   { category: "execution", surface: "trade", tokens: ["trade"] },
 ] as const;
 
-const EXCLUDED_SEGMENTS = new Set([
+const ROOT_EXCLUDED_SEGMENTS = new Set([
   ".cache",
   ".next",
   ".turbo",
-  "__tests__",
   "build",
   "cache",
   "coverage",
   "dist",
-  "doc",
   "docs",
   "evidence",
   "node_modules",
@@ -120,6 +144,22 @@ const EXCLUDED_SEGMENTS = new Set([
   "playwright-report",
   "quality",
   "scripts",
+  "test",
+  "test-results",
+  "tests",
+]);
+const PROJECT_EXCLUDED_SEGMENTS = new Set([
+  ".cache",
+  ".next",
+  ".turbo",
+  "__tests__",
+  "build",
+  "coverage",
+  "dist",
+  "doc",
+  "docs",
+  "node_modules",
+  "out",
   "test",
   "test-results",
   "tests",
@@ -165,10 +205,17 @@ const splitPath = (path: string): string[] => path.toLowerCase().split("/");
 
 const isExcluded = (path: string): boolean => {
   const parts = splitPath(path);
-  if (parts.some((part) => EXCLUDED_SEGMENTS.has(part))) return true;
-  const fixtureIndex = parts.findIndex(
-    (part) => part === "fixture" || part === "fixtures",
-  );
+  if (ROOT_EXCLUDED_SEGMENTS.has(parts[0] ?? "")) return true;
+  if (
+    (parts[0] === "apps" || parts[0] === "packages") &&
+    PROJECT_EXCLUDED_SEGMENTS.has(parts[2] ?? "")
+  )
+    return true;
+  const fixtureIndex =
+    (parts[0] === "apps" || parts[0] === "packages") &&
+    (parts[2] === "fixture" || parts[2] === "fixtures")
+      ? 2
+      : -1;
   return (
     fixtureIndex >= 0 &&
     parts[fixtureIndex + 1] !== undefined &&
@@ -190,15 +237,30 @@ const isPositiveRuntimeFixture = (path: string): boolean => {
 
 const isRouteSource = (path: string): boolean => {
   const parts = splitPath(path);
-  if (parts[0] !== "apps" || parts.length < 4) return false;
-  const sourceOffset = parts[2] === "src" ? 3 : 2;
-  return parts[sourceOffset] === "app";
+  if (parts[0] !== "apps" || parts.length < 3) return false;
+  return (
+    parts[2] === "app" ||
+    (parts[2] === "src" && parts[3] === "app") ||
+    (parts[2] === "src" && parts.includes("routes")) ||
+    (parts[2] === "src" && parts.at(-1)?.includes(".controller.") === true)
+  );
+};
+
+const isDomainRegistry = (path: string): boolean => {
+  const parts = splitPath(path);
+  return (
+    parts[0] === "packages" &&
+    parts[2] === "src" &&
+    (parts[1] === "domain" || parts[1] === "contracts") &&
+    hasRuntimeRegistryName(path)
+  );
 };
 
 const isRuntimeCandidate = (path: string): boolean => {
   if (isExcluded(path)) return false;
   if (isPositiveRuntimeFixture(path)) return true;
   if (hasRuntimeRegistryName(path)) return true;
+  if (isDomainRegistry(path)) return true;
   return (
     isRouteSource(path) && ROUTE_EXTENSIONS.has(extname(path).toLowerCase())
   );
@@ -242,88 +304,126 @@ const collectJsonStrings = (value: unknown, output: string[]): void => {
   }
 };
 
-const validateYaml = (content: string, file: string): void => {
-  if (content.includes("\0") || content.includes("\t")) {
+const parseSourceFile = (file: string, content: string): ts.SourceFile => {
+  const scriptKind = [".tsx", ".jsx"].includes(extname(file).toLowerCase())
+    ? ts.ScriptKind.TSX
+    : ts.ScriptKind.TS;
+  const sourceFile = ts.createSourceFile(
+    file,
+    content,
+    ts.ScriptTarget.ES2023,
+    true,
+    scriptKind,
+  );
+  const diagnostics = (
+    sourceFile as ts.SourceFile & {
+      parseDiagnostics?: readonly ts.Diagnostic[];
+    }
+  ).parseDiagnostics;
+  const error = diagnostics?.find(
+    (diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error,
+  );
+  if (error !== undefined)
     fail(
       "RUNTIME_CANDIDATE_MALFORMED",
-      `${file}: invalid YAML control character`,
+      `${file}: ${ts.flattenDiagnosticMessageText(error.messageText, " ")}`,
     );
-  }
-  const delimiters: string[] = [];
-  let quote: '"' | "'" | undefined;
-  let escaped = false;
-  for (const character of content) {
-    if (escaped) {
-      escaped = false;
-      continue;
+  return sourceFile;
+};
+
+const sourceSurfaces = (file: string, content: string): string[] => {
+  const sourceFile = parseSourceFile(file, content);
+  const constants = new Map<string, ts.Expression>();
+  const surfaces = new Set<string>();
+  const evaluating = new Set<string>();
+
+  const evaluate = (expression: ts.Expression): string | undefined => {
+    if (ts.isStringLiteralLike(expression)) return expression.text;
+    if (
+      ts.isParenthesizedExpression(expression) ||
+      ts.isAsExpression(expression) ||
+      ts.isTypeAssertionExpression(expression) ||
+      ts.isSatisfiesExpression(expression)
+    )
+      return evaluate(expression.expression);
+    if (
+      ts.isBinaryExpression(expression) &&
+      expression.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+      const left = evaluate(expression.left);
+      const right = evaluate(expression.right);
+      return left === undefined || right === undefined
+        ? undefined
+        : `${left}${right}`;
     }
-    if (quote === '"' && character === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      if (quote === character) quote = undefined;
-      else if (quote === undefined) quote = character;
-      continue;
-    }
-    if (quote !== undefined) continue;
-    if (character === "[" || character === "{") delimiters.push(character);
-    if (character === "]" || character === "}") {
-      const opening = delimiters.pop();
-      if (
-        (character === "]" && opening !== "[") ||
-        (character === "}" && opening !== "{")
-      ) {
-        fail(
-          "RUNTIME_CANDIDATE_MALFORMED",
-          `${file}: unbalanced YAML flow value`,
-        );
+    if (ts.isTemplateExpression(expression)) {
+      let value = expression.head.text;
+      for (const span of expression.templateSpans) {
+        const substitution = evaluate(span.expression);
+        if (substitution === undefined) return undefined;
+        value += substitution + span.literal.text;
       }
+      return value;
     }
-  }
-  if (quote !== undefined || delimiters.length > 0) {
-    fail("RUNTIME_CANDIDATE_MALFORMED", `${file}: unterminated YAML value`);
-  }
+    if (ts.isIdentifier(expression)) {
+      if (evaluating.has(expression.text)) return undefined;
+      const initializer = constants.get(expression.text);
+      if (initializer === undefined) return undefined;
+      evaluating.add(expression.text);
+      const value = evaluate(initializer);
+      evaluating.delete(expression.text);
+      return value;
+    }
+    return undefined;
+  };
+
+  const indexConstants = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      (node.parent.flags & ts.NodeFlags.Const) !== 0
+    )
+      constants.set(node.name.text, node.initializer);
+    ts.forEachChild(node, indexConstants);
+  };
+  indexConstants(sourceFile);
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isIdentifier(node)) surfaces.add(node.text);
+    if (ts.isStringLiteralLike(node)) surfaces.add(node.text);
+    if (ts.isExpression(node)) {
+      const value = evaluate(node);
+      if (value !== undefined) surfaces.add(value);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return [...surfaces];
 };
 
 const contentSurfaces = (file: string, content: string): string[] => {
   const extension = extname(file).toLowerCase();
   if (extension === ".json") {
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(content) as unknown;
-      const strings: string[] = [];
-      collectJsonStrings(parsed, strings);
-      return strings;
+      parsed = JSON.parse(content) as unknown;
     } catch (error) {
       const detail = error instanceof Error ? error.message : "invalid JSON";
       return fail("RUNTIME_CANDIDATE_MALFORMED", `${file}: ${detail}`);
     }
+    parseYaml12(content, "RUNTIME_CANDIDATE_MALFORMED", file);
+    const strings: string[] = [];
+    collectJsonStrings(parsed, strings);
+    return strings;
   }
   if (extension === ".yaml" || extension === ".yml") {
-    validateYaml(content, file);
-    return [content];
+    const parsed = parseYaml12(content, "RUNTIME_CANDIDATE_MALFORMED", file);
+    const strings: string[] = [];
+    collectJsonStrings(parsed, strings);
+    return strings;
   }
-  if (SOURCE_EXTENSIONS.has(extension)) {
-    const result = ts.transpileModule(content, {
-      compilerOptions: {
-        jsx: ts.JsxEmit.ReactJSX,
-        module: ts.ModuleKind.ESNext,
-        target: ts.ScriptTarget.ES2023,
-      },
-      fileName: file,
-      reportDiagnostics: true,
-    });
-    const parseErrors = (result.diagnostics ?? []).filter(
-      (diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error,
-    );
-    if (parseErrors.length > 0) {
-      fail(
-        "RUNTIME_CANDIDATE_MALFORMED",
-        `${file}: ${ts.flattenDiagnosticMessageText(parseErrors[0]?.messageText ?? "syntax error", " ")}`,
-      );
-    }
-    return [content];
-  }
+  if (SOURCE_EXTENSIONS.has(extension)) return sourceSurfaces(file, content);
   return fail("RUNTIME_CANDIDATE_UNSUPPORTED", file);
 };
 
@@ -369,8 +469,8 @@ const discoverRuntimeCandidates = async (root: string): Promise<string[]> => {
     for (const entry of entries) {
       const child = resolve(absolutePath, entry.name);
       const childPath = normalizedRepositoryPath(root, child);
-      if (isExcluded(childPath)) continue;
       if (entry.isSymbolicLink()) fail("RUNTIME_CANDIDATE_SYMLINK", childPath);
+      if (isExcluded(childPath)) continue;
       if (entry.isDirectory()) {
         await visit(child);
         continue;

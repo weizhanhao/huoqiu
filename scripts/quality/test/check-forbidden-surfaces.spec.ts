@@ -188,6 +188,92 @@ describe("forbidden runtime surfaces", () => {
     expect(result.stderr).toContain("trade");
   });
 
+  it.each([
+    [
+      "apps/mobile/app/trade.tsx",
+      "export default function Trade() { return null; }",
+    ],
+    [
+      "apps/api/src/trading/execution.controller.ts",
+      '@Controller("trade")\nexport class ExecutionController {}',
+    ],
+    [
+      "packages/domain/src/capabilities/registry.ts",
+      'export const capability = "fundSubscribe";',
+    ],
+  ])("covers runtime surface %s", async (relativePath, source) => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(root, source, relativePath);
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(relativePath);
+  });
+
+  it.each([
+    ['export const route = "/tr\\u0061de";', "trade"],
+    ['export const route = "/tr" + "ade";', "trade"],
+    ['export const route = `/tr${"ade"}`;', "trade"],
+  ])(
+    "extracts statically decidable TypeScript surface %s",
+    async (source, surface) => {
+      const root = await createRepository();
+      await writeCandidate(
+        root,
+        source,
+        "apps/web/src/navigation/route-registry.ts",
+      );
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain(surface);
+    },
+  );
+
+  it.each([
+    [JSON.stringify({ route: "/portfolio/public" }), "public_portfolio"],
+    [JSON.stringify({ command: "fundSubscribe" }), "subscription"],
+    [JSON.stringify({ command: "redeemFund" }), "redemption"],
+  ])("rejects semantic product surface %s", async (content, surface) => {
+    const root = await createRepository();
+    await writeCandidate(root, content);
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(surface);
+  });
+
+  it("does not treat comments as runtime surfaces", async () => {
+    const root = await createRepository();
+    await writeCandidate(
+      root,
+      "// real trade is intentionally absent\nexport const routes = ['/watchlist'];",
+      "apps/web/src/navigation/route-registry.ts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it("does not let a runtime docs segment hide a route", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    const relativePath = "apps/web/src/app/docs/trade/page.tsx";
+    await writeCandidate(
+      root,
+      "export default function Page() { return null; }",
+      relativePath,
+    );
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(relativePath);
+  });
+
   it("does not reject mere substrings", async () => {
     const root = await createRepository();
     await writeCandidate(
@@ -284,6 +370,25 @@ describe("forbidden runtime surfaces", () => {
     expect(result.stderr).toContain("RUNTIME_CANDIDATE_MALFORMED");
   });
 
+  it.each([
+    ['{"route":"/watchlist","route":"/market"}', "JSON"],
+    ["routes:\n  clean: /watchlist\n malformed: value", "YAML"],
+    ["route: /watchlist\nroute: /market", "YAML"],
+  ])("fails closed on malformed or duplicate %s", async (content) => {
+    const root = await createRepository();
+    const extension = content.startsWith("{") ? "json" : "yaml";
+    await writeCandidate(
+      root,
+      content,
+      `apps/web/src/navigation/route-registry.${extension}`,
+    );
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("RUNTIME_CANDIDATE_MALFORMED");
+  });
+
   it("fails closed on malformed TypeScript", async () => {
     const root = await createRepository();
     await writeCandidate(
@@ -348,6 +453,23 @@ describe("forbidden runtime surfaces", () => {
     );
     temporaryRoots.push(outside);
     const linkPath = resolve(root, "apps/web/src/shared.link");
+    await mkdir(dirname(linkPath), { recursive: true });
+    await symlink(outside, linkPath);
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("RUNTIME_CANDIDATE_SYMLINK");
+  });
+
+  it("checks a symlink before applying an anchored docs exclusion", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    const outside = await mkdtemp(
+      resolve(tmpdir(), "huoqiu-surfaces-outside-"),
+    );
+    temporaryRoots.push(outside);
+    const linkPath = resolve(root, "apps/web/docs");
     await mkdir(dirname(linkPath), { recursive: true });
     await symlink(outside, linkPath);
 

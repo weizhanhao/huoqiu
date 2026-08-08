@@ -218,6 +218,93 @@ describe("workspace and supply-chain boundaries", () => {
     expect(result.stderr).toContain("apps/admin/src/index.ts");
   });
 
+  it("rejects a package importing an app through a relative path", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "apps/web/src/secret.ts",
+      "export const secret = 1;\n",
+    );
+    await writeText(
+      root,
+      "packages/ui/src/cross-boundary.ts",
+      'import { secret } from "../../../apps/web/src/secret";\nvoid secret;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("PACKAGE_DEPENDS_ON_APP");
+  });
+
+  it("resolves tsconfig aliases to their real workspace owner", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "packages/ui/src/button.ts",
+      "export const button = 1;\n",
+    );
+    await writeJson(root, "apps/admin/tsconfig.json", {
+      compilerOptions: {
+        baseUrl: ".",
+        paths: { "@ui/*": ["../../packages/ui/src/*"] },
+      },
+    });
+    await writeText(
+      root,
+      "apps/admin/src/alias.ts",
+      'import { button } from "@ui/button";\nvoid button;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("UNDECLARED_WORKSPACE_IMPORT");
+  });
+
+  it("fails closed on a non-literal dynamic import", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "apps/admin/src/dynamic.ts",
+      "const target = process.env.MODULE_NAME;\nvoid import(target);\n",
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_DYNAMIC_IMPORT_UNRESOLVED");
+  });
+
+  it("evaluates a constant dynamic import before checking ownership", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "apps/admin/src/dynamic.ts",
+      'const target = "@huoqiu/" + "ui";\nvoid import(target);\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("UNDECLARED_WORKSPACE_IMPORT");
+  });
+
+  it("checks project-root runtime configuration files", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "apps/admin/next.config.ts",
+      'import { Button } from "@huoqiu/ui/button";\nvoid Button;\nexport default {};\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("UNDECLARED_WORKSPACE_IMPORT");
+    expect(result.stderr).toContain("apps/admin/next.config.ts");
+  });
+
   it("rejects an import of an unknown @huoqiu package even when declared", async () => {
     const root = await createRepository();
     const path = "apps/web/package.json";

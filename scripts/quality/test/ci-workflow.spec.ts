@@ -235,6 +235,139 @@ describe("least-privilege CI workflow and artifact inventory", () => {
   });
 
   it.each([
+    ["permissions:\n  contents: read", '"permissions": {"contents": read}'],
+    [
+      "permissions:\n  contents: read",
+      "permissions: &least_privilege\n  contents: read",
+    ],
+  ])(
+    "accepts YAML 1.2 syntax with the same least-privilege meaning",
+    async (from, to) => {
+      const root = await createRepository();
+      await replaceWorkflow(root, from, to);
+
+      expect(await runChecker(root)).toEqual({ code: 0, stderr: "" });
+    },
+  );
+
+  it("rejects a quoted uses key that text matching cannot see", async () => {
+    const root = await createRepository();
+    await replaceWorkflow(
+      root,
+      "      - name: Verify toolchain",
+      `      - name: Hidden Action\n        "uses": example/tool@${"a".repeat(40)}\n      - name: Verify toolchain`,
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("CI_ACTION_NOT_IN_INVENTORY");
+  });
+
+  it.each([
+    [
+      "  contents: read",
+      '  "contents": read\n  "id-token": write',
+      "CI_PERMISSIONS_EXCESS",
+    ],
+    [
+      "      - name: Install dependencies",
+      '      - "continue-on-error": true\n      - name: Install dependencies',
+      "CI_CONTINUE_ON_ERROR_FORBIDDEN",
+    ],
+    [
+      "      - name: Install dependencies",
+      "      - continue-on-error: &bypass true\n      - name: Alias bypass\n        continue-on-error: *bypass\n      - name: Install dependencies",
+      "CI_CONTINUE_ON_ERROR_FORBIDDEN",
+    ],
+  ])("rejects semantic YAML bypass %s", async (from, to, code) => {
+    const root = await createRepository();
+    await replaceWorkflow(root, from, to);
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(code);
+  });
+
+  it.each([
+    "permissions:\n  contents: read\npermissions:\n  contents: read",
+    "permissions:\n contents: read\n  malformed: value",
+  ])("fails closed on malformed or duplicate workflow YAML", async (yaml) => {
+    const root = await createRepository();
+    await writeText(root, ".github/workflows/ci.yml", yaml);
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("CI_WORKFLOW_MALFORMED");
+  });
+
+  it.each([
+    [
+      "name: CI",
+      "name: CI\nunexpected-root-policy: true",
+      "CI_WORKFLOW_SCHEMA_INVALID",
+    ],
+    [
+      "    runs-on: ubuntu-24.04",
+      "    unexpected-job-policy: true\n    runs-on: ubuntu-24.04",
+      "CI_JOB_POLICY_INVALID",
+    ],
+    [
+      "      - name: Verify toolchain",
+      "      - name: Verify toolchain\n        unexpected-step-policy: true",
+      "CI_JOB_POLICY_INVALID",
+    ],
+  ])("fails closed on unknown workflow fields %s", async (from, to, code) => {
+    const root = await createRepository();
+    await replaceWorkflow(root, from, to);
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(code);
+  });
+
+  it("parses the artifact inventory as real YAML 1.2", async () => {
+    const root = await createRepository();
+    const inventoryYaml = [
+      "schema_version: 1",
+      "actions:",
+      "  - owner: actions",
+      "    repository: checkout",
+      "    release: v7.0.1",
+      `    commit_sha: ${CHECKOUT_SHA}`,
+      "    source_url: https://github.com/actions/checkout",
+      "    license: MIT",
+      "    platform_owner: platform-engineering",
+      "  - owner: pnpm",
+      "    repository: setup",
+      "    release: v2.0.0",
+      `    commit_sha: ${PNPM_SETUP_SHA}`,
+      "    source_url: https://github.com/pnpm/setup",
+      "    license: MIT",
+      "    platform_owner: platform-engineering",
+      "  - owner: actions",
+      "    repository: upload-artifact",
+      "    release: v7.0.1",
+      `    commit_sha: ${UPLOAD_SHA}`,
+      "    source_url: https://github.com/actions/upload-artifact",
+      "    license: MIT",
+      "    platform_owner: platform-engineering",
+      "artifacts:",
+      "  - name: unit-test-log-${{ github.run_id }}-${{ github.run_attempt }}",
+      "    path: test-results/unit.log",
+      "    classification: internal-ci-test-log",
+      "    retention_days: 7",
+      "",
+    ].join("\n");
+    await writeText(root, "security/artifact-inventory.yml", inventoryYaml);
+
+    expect(await runChecker(root)).toEqual({ code: 0, stderr: "" });
+  });
+
+  it.each([
     [`actions/checkout@${CHECKOUT_SHA}`, "actions/checkout@v7.0.1"],
     [`pnpm/setup@${PNPM_SETUP_SHA}`, "pnpm/setup@main"],
     [`actions/upload-artifact@${UPLOAD_SHA}`, "actions/upload-artifact@v7"],
