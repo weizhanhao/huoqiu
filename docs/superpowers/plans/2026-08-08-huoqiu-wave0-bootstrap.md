@@ -21,7 +21,7 @@
 
 **Files:**
 
-- Create: `.gitignore`
+- Modify: `.gitignore`
 - Create: `.npmrc`
 - Create: `.nvmrc`
 - Create: `package.json`
@@ -73,7 +73,7 @@ git status --short
 
 - [ ] **Step 4: 写忽略规则**
 
-忽略 `node_modules`、`.next`、`.expo`、`dist`、`coverage`、`.turbo`、本地 `.env*`、Playwright/Maestro 报告和证据产物；保留 `.env.example` 与 `artifacts/evidence/.gitkeep`。
+保留工作区准备阶段已有的 `.worktrees/`，并忽略 `node_modules`、`.next`、`.expo`、`dist`、`coverage`、`.turbo`、本地 `.env*`、Playwright/Maestro 报告和证据产物；保留 `.env.example` 与 `artifacts/evidence/.gitkeep`。
 
 - [ ] **Step 5: 安装并验证 lockfile**
 
