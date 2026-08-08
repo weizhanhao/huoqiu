@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { feedCardV1Schema } from "../feed/card-v1.js";
+import { feedCardV1Schema } from "@huoqiu/contracts/feed/card-v1";
 
 const STABLE_ID_PATTERN = /^[a-z][a-z0-9_]*$/u;
 const SYMBOL_PATTERN = /^[A-Z][A-Z0-9]{1,15}$/u;

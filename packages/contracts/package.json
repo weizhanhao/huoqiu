@@ -6,7 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./d0": "./src/d0/index.ts",
+    "./d0": "./src/d0/schema.ts",
     "./d0/fixture": "./fixtures/d0.v1.json",
     "./feed/card-v1": "./src/feed/card-v1.ts",
     "./shared/error": "./src/shared/error.ts",
