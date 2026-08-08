@@ -81,6 +81,12 @@ describe("Huoqiu design tokens", () => {
     expect(
       contrastRatio(tokens.text.inverse, tokens.surface.inverse),
     ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrastRatio(tokens.text.inverseMuted, tokens.surface.inverse),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrastRatio(tokens.brand.secondary, tokens.surface.inverse),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 
   it("provides AA-safe market text colors without changing chart semantics", () => {

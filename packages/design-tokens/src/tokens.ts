@@ -21,6 +21,7 @@ export const tokens = {
     secondary: "#525B69",
     tertiary: "#667085",
     inverse: "#FFFFFF",
+    inverseMuted: "#D0D5DD",
     link: "#9A3412",
     disabled: "#98A2B3",
   },

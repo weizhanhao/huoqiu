@@ -603,7 +603,7 @@ h3 {
 }
 
 .feed-intro > p {
-  color: var(--hq-text-secondary);
+  color: var(--hq-text-inverse-muted);
   line-height: var(--hq-type-line-height-body);
   max-width: 220px;
   position: relative;
@@ -1173,9 +1173,13 @@ h3 {
 }
 
 .watchlist-heading > div > p:last-child {
-  color: var(--hq-text-secondary);
+  color: var(--hq-text-inverse-muted);
   line-height: var(--hq-type-line-height-body);
   max-width: 520px;
+}
+
+.watchlist-heading .card-kicker {
+  color: var(--hq-brand-secondary);
 }
 
 .watchlist-table-wrap {
