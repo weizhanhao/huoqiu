@@ -19,7 +19,7 @@ export const tokens = {
   text: {
     primary: "#171A21",
     secondary: "#525B69",
-    tertiary: "#717B8C",
+    tertiary: "#667085",
     inverse: "#FFFFFF",
     link: "#9A3412",
     disabled: "#98A2B3",

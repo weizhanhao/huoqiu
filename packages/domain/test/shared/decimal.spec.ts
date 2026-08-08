@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DECIMAL_LIMITS,
   addDecimal,
   createMoney,
   createPrice,
@@ -48,6 +49,39 @@ describe("fixed-point decimal arithmetic", () => {
     expect(() => createMoney(12 as never)).toThrow("decimal string");
     expect(() => createPrice(Number.NaN as never)).toThrow("decimal string");
     expect(() => createQuantity(3 as never)).toThrow("decimal string");
+  });
+
+  it("enforces raw input, precision, and scale limits before bigint parsing", () => {
+    expect(DECIMAL_LIMITS).toEqual({
+      precision: 38,
+      scale: 18,
+      integerDigits: 20,
+      rawLength: 40,
+    });
+    const boundary = `-${"9".repeat(20)}.${"9".repeat(18)}`;
+    expect(formatDecimal(parseDecimal(boundary))).toBe(boundary);
+    expect(() => parseDecimal(`${"1".repeat(21)}.${"1".repeat(18)}`)).toThrow(
+      "precision",
+    );
+    expect(() => parseDecimal("1".repeat(21))).toThrow("integer digits");
+    expect(() => parseDecimal(`0.${"1".repeat(19)}`)).toThrow("scale");
+    expect(() => parseDecimal(`+${"0".repeat(40)}`)).toThrow("raw length");
+    expect(() => parseDecimal(`0.${"0".repeat(39)}`)).toThrow("raw length");
+  });
+
+  it("rejects forged or overflowed decimals outside the bounded domain", () => {
+    expect(() => formatDecimal({ coefficient: 1n, scale: 19 })).toThrow(
+      "scale",
+    );
+    expect(() =>
+      formatDecimal({ coefficient: BigInt("1".repeat(39)), scale: 0 }),
+    ).toThrow("precision");
+    expect(() => formatDecimal({ coefficient: 1 as never, scale: 0 })).toThrow(
+      "bigint",
+    );
+    const boundary = `${"9".repeat(20)}.${"9".repeat(18)}`;
+    expect(() => addDecimal(boundary, boundary)).toThrow("precision");
+    expect(() => addDecimal("9".repeat(20), "1")).toThrow("integer digits");
   });
 });
 

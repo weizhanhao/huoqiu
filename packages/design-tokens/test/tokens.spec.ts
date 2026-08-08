@@ -60,12 +60,26 @@ describe("Huoqiu design tokens", () => {
     expect(tokens.touch.appMinimum).toBe("48px");
   });
 
-  it("maintains AA contrast for primary text and brand buttons", () => {
-    expect(
-      contrastRatio(tokens.text.primary, tokens.surface.base),
-    ).toBeGreaterThanOrEqual(4.5);
+  it("maintains AA contrast for normal text hierarchy and brand buttons", () => {
+    const normalTextColors = [
+      tokens.text.primary,
+      tokens.text.secondary,
+      tokens.text.tertiary,
+      tokens.text.link,
+    ];
+
+    const normalSurfaces = [tokens.surface.base, tokens.surface.canvas];
+    // Disabled text is intentionally excluded because it is non-interactive state copy.
+    for (const color of normalTextColors) {
+      for (const surface of normalSurfaces) {
+        expect(contrastRatio(color, surface)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
     expect(
       contrastRatio(tokens.brand.onPrimary, tokens.brand.primary),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrastRatio(tokens.text.inverse, tokens.surface.inverse),
     ).toBeGreaterThanOrEqual(4.5);
   });
 
@@ -78,7 +92,31 @@ describe("Huoqiu design tokens", () => {
     const names = [...cssVariables.matchAll(/--hq-[a-z0-9-]+/gu)].map(
       ([name]) => name,
     );
+    const declarationLines = cssVariables
+      .split("\n")
+      .filter((line) => line.startsWith("  --hq-"));
+
+    for (const line of declarationLines) {
+      expect(line).toMatch(
+        /^ {2}--hq-[a-z0-9]+(?:-[a-z0-9]+)*: [^\n\r;{}]+;$/u,
+      );
+    }
     expect(names).toEqual([...names].sort());
+    expect(declarationLines).toHaveLength(names.length);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("rejects unsafe, empty, or colliding CSS variable input", () => {
+    expect(() => tokensToCssVariables({})).toThrow("at least one");
+    expect(() => tokensToCssVariables({ "unsafe key": "value" })).toThrow(
+      "safe CSS token name",
+    );
+    expect(() => tokensToCssVariables({ safe: "red; color: blue" })).toThrow(
+      "safe CSS token value",
+    );
+    expect(() =>
+      tokensToCssVariables({ Primary: "one", primary: "two" }),
+    ).toThrow("Duplicate CSS variable");
   });
 
   it.each(["huoqiu-mark.svg", "demo-avatar.svg"])(

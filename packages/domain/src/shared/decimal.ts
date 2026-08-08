@@ -9,12 +9,64 @@ export type Money = Decimal & { readonly [monetaryKind]: "Money" };
 export type Price = Decimal & { readonly [monetaryKind]: "Price" };
 export type Quantity = Decimal & { readonly [monetaryKind]: "Quantity" };
 
-const DECIMAL_PATTERN = /^[+-]?\d+(?:\.\d+)?$/u;
+export const MAX_PRECISION = 38;
+export const MAX_SCALE = 18;
+export const MAX_INTEGER_DIGITS = 20;
+export const MAX_RAW_LENGTH = 40;
 
-const normalizeDecimal = (coefficient: bigint, scale: number): Decimal => {
+export const DECIMAL_LIMITS = {
+  precision: MAX_PRECISION,
+  scale: MAX_SCALE,
+  integerDigits: MAX_INTEGER_DIGITS,
+  rawLength: MAX_RAW_LENGTH,
+} as const;
+
+const DECIMAL_PATTERN = /^[+-]?\d+(?:\.\d+)?$/u;
+const MAX_COEFFICIENT_MAGNITUDE = 10n ** BigInt(MAX_PRECISION) - 1n;
+
+const decimalMagnitude = (coefficient: bigint): bigint =>
+  coefficient < 0n ? -coefficient : coefficient;
+
+const assertScale = (scale: number): void => {
   if (!Number.isSafeInteger(scale) || scale < 0) {
     throw new RangeError("Decimal scale must be a non-negative safe integer");
   }
+  if (scale > MAX_SCALE) {
+    throw new RangeError(`Decimal scale exceeds MAX_SCALE (${MAX_SCALE})`);
+  }
+};
+
+const assertCoefficient = (coefficient: bigint, scale: number): void => {
+  if (typeof coefficient !== "bigint") {
+    throw new TypeError("Decimal coefficient must be a bigint");
+  }
+
+  const magnitude = decimalMagnitude(coefficient);
+  if (magnitude > MAX_COEFFICIENT_MAGNITUDE) {
+    throw new RangeError(
+      `Decimal precision exceeds MAX_PRECISION (${MAX_PRECISION})`,
+    );
+  }
+
+  const coefficientDigits = magnitude === 0n ? 0 : magnitude.toString().length;
+  const precision = Math.max(coefficientDigits, scale);
+  const integerDigits = Math.max(coefficientDigits - scale, 0);
+
+  if (precision > MAX_PRECISION) {
+    throw new RangeError(
+      `Decimal precision exceeds MAX_PRECISION (${MAX_PRECISION})`,
+    );
+  }
+  if (integerDigits > MAX_INTEGER_DIGITS) {
+    throw new RangeError(
+      `Decimal integer digits exceed MAX_INTEGER_DIGITS (${MAX_INTEGER_DIGITS})`,
+    );
+  }
+};
+
+const normalizeDecimal = (coefficient: bigint, scale: number): Decimal => {
+  assertScale(scale);
+  assertCoefficient(coefficient, scale);
 
   if (coefficient === 0n) {
     return { coefficient: 0n, scale: 0 };
@@ -28,15 +80,26 @@ const normalizeDecimal = (coefficient: bigint, scale: number): Decimal => {
     normalizedScale -= 1;
   }
 
-  return {
+  const normalized = {
     coefficient: normalizedCoefficient,
     scale: normalizedScale,
   };
+
+  assertCoefficient(normalized.coefficient, normalized.scale);
+  return normalized;
 };
 
 export const parseDecimal = (value: string): Decimal => {
-  if (typeof value !== "string" || !DECIMAL_PATTERN.test(value)) {
+  if (typeof value !== "string") {
     throw new TypeError(`Expected a decimal string, received ${String(value)}`);
+  }
+  if (value.length > MAX_RAW_LENGTH) {
+    throw new RangeError(
+      `Decimal raw length exceeds MAX_RAW_LENGTH (${MAX_RAW_LENGTH})`,
+    );
+  }
+  if (!DECIMAL_PATTERN.test(value)) {
+    throw new TypeError(`Expected a decimal string, received ${value}`);
   }
 
   const negative = value.startsWith("-");
@@ -47,6 +110,23 @@ export const parseDecimal = (value: string): Decimal => {
     decimalIndex === -1 ? unsigned : unsigned.slice(0, decimalIndex);
   const fractionPart =
     decimalIndex === -1 ? "" : unsigned.slice(decimalIndex + 1);
+  const significantIntegerDigits = integerPart.replace(/^0+/u, "").length;
+  const precision = significantIntegerDigits + fractionPart.length;
+
+  if (precision > MAX_PRECISION) {
+    throw new RangeError(
+      `Decimal precision exceeds MAX_PRECISION (${MAX_PRECISION})`,
+    );
+  }
+  if (significantIntegerDigits > MAX_INTEGER_DIGITS) {
+    throw new RangeError(
+      `Decimal integer digits exceed MAX_INTEGER_DIGITS (${MAX_INTEGER_DIGITS})`,
+    );
+  }
+  if (fractionPart.length > MAX_SCALE) {
+    throw new RangeError(`Decimal scale exceeds MAX_SCALE (${MAX_SCALE})`);
+  }
+
   const magnitude = BigInt(`${integerPart}${fractionPart}`);
   const coefficient = negative ? -magnitude : magnitude;
 
@@ -54,13 +134,6 @@ export const parseDecimal = (value: string): Decimal => {
 };
 
 export const formatDecimal = ({ coefficient, scale }: Decimal): string => {
-  if (typeof coefficient !== "bigint") {
-    throw new TypeError("Decimal coefficient must be a bigint");
-  }
-  if (!Number.isSafeInteger(scale) || scale < 0) {
-    throw new RangeError("Decimal scale must be a non-negative safe integer");
-  }
-
   const normalized = normalizeDecimal(coefficient, scale);
   if (normalized.coefficient === 0n) {
     return "0";
