@@ -10,6 +10,8 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
+  rename,
   rm,
   symlink,
   writeFile,
@@ -62,6 +64,7 @@ import { main as buildMobileArtifactsMain } from "../../release/build-mobile-art
 
 const execFile = promisify(execFileCallback);
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const gateCorePath = resolve(sourceRoot, "scripts/quality/gate-core.mts");
 const temporaryRoots: string[] = [];
 const reviewEnvironments = new Map<string, NodeJS.ProcessEnv>();
 const authorshipEnvironments = new Map<string, NodeJS.ProcessEnv>();
@@ -81,6 +84,26 @@ const canonicalJsonForTesting = (value: unknown): string => {
       .join(",")}}`;
   }
   return JSON.stringify(value);
+};
+
+const verifierBundleSha256ForTesting = (
+  entrypointBytes: Uint8Array,
+  loadedCoreBytes: Uint8Array,
+): string => {
+  const hash = createHash("sha256");
+  hash.update("HUOQIU-VERIFIER-BUNDLE\0v1\0");
+  for (const [label, bytes] of [
+    ["ENTRYPOINT", entrypointBytes],
+    ["LOADED_CORE", loadedCoreBytes],
+  ] as const) {
+    hash.update(label);
+    hash.update("\0SIZE\0");
+    hash.update(String(bytes.byteLength));
+    hash.update("\0CONTENT\0");
+    hash.update(bytes);
+    hash.update("\0END\0");
+  }
+  return hash.digest("hex");
 };
 
 const installEphemeralReviewTrust = async (root: string): Promise<void> => {
@@ -104,9 +127,10 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
   if (verifierArgument === undefined)
     throw new Error("missing test verifier entrypoint");
   const verifierEntrypoint = resolve(verifierArgument);
-  const verifierSha = createHash("sha256")
-    .update(await readFile(verifierEntrypoint))
-    .digest("hex");
+  const verifierSha = verifierBundleSha256ForTesting(
+    await readFile(verifierEntrypoint),
+    await readFile(gateCorePath),
+  );
   const launcherRoot = await mkdtemp(
     resolve(tmpdir(), "huoqiu-protected-launcher-"),
   );
@@ -117,11 +141,11 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
     [
       "#!/usr/bin/env node",
       "import { spawn } from 'node:child_process';",
-      "const marker = process.argv[2];",
-      "const encoded = process.argv[3];",
+      "const marker = process.argv[1];",
+      "const encoded = process.argv[2];",
       "if (marker !== '--huoqiu-request-v1' || encoded === undefined) process.exit(90);",
       "const request = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));",
-      "const environment = { PATH: process.env.PATH, LANG: 'C', LC_ALL: 'C', TZ: 'UTC' };",
+      "const environment = { PATH: process.env.PATH, LANG: 'C', LC_ALL: 'C', TZ: 'UTC', HUOQIU_PROCESS_TREE_TOKEN: process.env.HUOQIU_PROCESS_TREE_TOKEN };",
       "const run = (command) => new Promise((resolve, reject) => {",
       "  const child = spawn(command.executable, command.args, { cwd: request.workspace, env: environment, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });",
       "  let stdout = ''; let stderr = '';",
@@ -305,6 +329,45 @@ const writeJson = async (path: string, value: unknown): Promise<void> => {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 };
 
+const resignTrustRegistry = async (
+  root: string,
+  mutate: (unsigned: Record<string, unknown>) => void,
+): Promise<void> => {
+  const registryPath = resolve(
+    root,
+    "quality/reviewers/trust-registry.v2.json",
+  );
+  const registry = await json(registryPath);
+  const unsigned = { ...registry };
+  delete unsigned.signature;
+  mutate(unsigned);
+  const signer = registrySigners.get(root);
+  const reviewEnvironment = reviewEnvironments.get(root);
+  const authorshipEnvironment = authorshipEnvironments.get(root);
+  const rootKeyId = reviewEnvironment?.HUOQIU_VERIFIER_ROOT_KEY_ID;
+  if (
+    signer === undefined ||
+    reviewEnvironment === undefined ||
+    authorshipEnvironment === undefined ||
+    rootKeyId === undefined
+  ) {
+    throw new Error("missing trust-registry signing fixture");
+  }
+  await writeJson(registryPath, {
+    ...unsigned,
+    signature: {
+      algorithm: "Ed25519",
+      key_id: rootKeyId,
+      value_base64: signer(unsigned),
+    },
+  });
+  const registrySha = createHash("sha256")
+    .update(await readFile(registryPath))
+    .digest("hex");
+  reviewEnvironment.HUOQIU_TRUST_REGISTRY_SHA256 = registrySha;
+  authorshipEnvironment.HUOQIU_TRUST_REGISTRY_SHA256 = registrySha;
+};
+
 const installAuthorshipArchive = (
   root: string,
   headSha: string,
@@ -370,6 +433,41 @@ const rewriteSignedRegistry = async (
     .digest("hex");
 };
 
+const signedRegistryBytes = async (
+  root: string,
+  mutate: (unsigned: Record<string, unknown>) => void = () => undefined,
+): Promise<Buffer> => {
+  const path = resolve(root, "quality/reviewers/trust-registry.v2.json");
+  const registry = await json(path);
+  const signature = registry.signature as Record<string, unknown>;
+  const unsigned = { ...registry };
+  delete unsigned.signature;
+  mutate(unsigned);
+  const signer = registrySigners.get(root);
+  if (signer === undefined) throw new Error("missing registry signer");
+  return Buffer.from(
+    `${JSON.stringify(
+      {
+        ...unsigned,
+        signature: {
+          algorithm: "Ed25519",
+          key_id: signature.key_id,
+          value_base64: signer(unsigned),
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+};
+
+const registryHistoryEnvironment = (registries: readonly Buffer[]): string =>
+  Buffer.from(
+    JSON.stringify(registries.map((registry) => registry.toString("base64"))),
+    "utf8",
+  ).toString("base64");
+
 const copyRepositoryFile = async (
   root: string,
   path: string,
@@ -382,22 +480,25 @@ const copyRepositoryFile = async (
 const successCommand = (
   fixtureVersion: string,
 ): { executable: string; args: string[] } => {
-  const summary = {
-    fixture_version: fixtureVersion,
-    passed: 7,
-    failed: 0,
-    skipped: 0,
-    invalid_test_markers: [],
-    p0: 0,
-    p1: 0,
-  };
   return {
     executable: process.execPath,
-    args: [
-      "-e",
-      `console.log(${JSON.stringify(`HUOQIU_CAPABILITY_RESULT ${JSON.stringify(summary)}`)})`,
-    ],
+    args: ["scripts/quality/test-capability.mjs", fixtureVersion],
   };
+};
+
+const capabilityProgram = (summary: Record<string, unknown>): string =>
+  `console.log(${JSON.stringify(`HUOQIU_CAPABILITY_RESULT ${JSON.stringify(summary)}`)});\n`;
+
+const writeCapabilityProgram = async (
+  root: string,
+  name: string,
+  source: string,
+): Promise<{ executable: string; args: string[] }> => {
+  const relativePath = `scripts/quality/${name}.mjs`;
+  const absolutePath = resolve(root, relativePath);
+  await mkdir(dirname(absolutePath), { recursive: true });
+  await writeFile(absolutePath, source, "utf8");
+  return { executable: process.execPath, args: [relativePath] };
 };
 
 const setupRepository = async (
@@ -444,6 +545,17 @@ const setupRepository = async (
     version: `${milestone}.v1`,
     source: "huoqiu-synthetic",
   });
+  await mkdir(resolve(root, "scripts/quality"), { recursive: true });
+  await writeFile(
+    resolve(root, "scripts/quality/test-capability.mjs"),
+    [
+      "const fixtureVersion = process.argv[2];",
+      "const summary = { fixture_version: fixtureVersion, passed: 7, failed: 0, skipped: 0, invalid_test_markers: [], p0: 0, p1: 0 };",
+      "console.log(`HUOQIU_CAPABILITY_RESULT ${JSON.stringify(summary)}`);",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
   const capIds = milestone === "d0" ? D0_REQUIRED_CAP_IDS : M1_REQUIRED_CAP_IDS;
   await writeJson(
     resolve(root, `quality/manifests/${milestone}-required.json`),
@@ -653,9 +765,9 @@ describe("independent required scope", () => {
     const oracle = await json(oraclePath);
     oracle.pending_cap_ids = ["CAP-ID-001"];
     await writeJson(oraclePath, oracle);
-    await expect(runCapability(root, "d0", "CAP-ID-001")).rejects.toThrow(
-      "ORACLE_INTEGRITY_FAILURE",
-    );
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("ORACLE_INTEGRITY_FAILURE");
   });
 
   it("rejects non-canonical implementer aliases for implemented capabilities", () => {
@@ -786,17 +898,21 @@ describe("required test validity", () => {
     };
     const firstCap = requiredCaps[0];
     if (firstCap === undefined) throw new Error("missing test capability");
-    firstCap.command = {
-      executable: process.execPath,
-      args: [
-        "-e",
-        `console.log(${JSON.stringify(`HUOQIU_CAPABILITY_RESULT ${JSON.stringify(skippedSummary)}`)})`,
-      ],
-    };
+    firstCap.command = await writeCapabilityProgram(
+      root,
+      "skipped-capability",
+      capabilityProgram(skippedSummary),
+    );
     await writeJson(manifestPath, manifest);
-    await execFile("git", ["add", "quality/manifests/d0-required.json"], {
-      cwd: root,
-    });
+    await execFile(
+      "git",
+      [
+        "add",
+        "quality/manifests/d0-required.json",
+        "scripts/quality/skipped-capability.mjs",
+      ],
+      { cwd: root },
+    );
     await execFile("git", ["commit", "-q", "-m", "exercise skipped result"], {
       cwd: root,
     });
@@ -946,14 +1062,36 @@ describe("argv-only capability execution", () => {
     ).toThrow("COMMAND_INVALID");
   });
 
+  it.each([
+    { executable: "pnpm", args: ["exec", "sh", "-c", "printf attacker"] },
+    {
+      executable: "/opt/pnpm/bin/pnpm",
+      args: ["exec", "--", "bash", "-c", "printf attacker"],
+    },
+    { executable: process.execPath, args: ["-e", "console.log('attack')"] },
+    {
+      executable: process.execPath,
+      args: ["--eval=console.log('attack')"],
+    },
+    { executable: process.execPath, args: ["--print", "process.pid"] },
+    {
+      executable: "pnpm",
+      args: ["exec", "node", "--eval", "console.log('attack')"],
+    },
+  ])("rejects eval and shell-wrapper command $executable $args", (command) => {
+    expect(() => validateCommand(command)).toThrow("COMMAND_INVALID");
+  });
+
   it("passes metacharacters as a literal argv value and never invokes a shell", async () => {
     const root = await mkdtemp(resolve(tmpdir(), "huoqiu-argv-"));
     temporaryRoots.push(root);
     const marker = resolve(root, "injected");
     const injected = `;require('node:fs').writeFileSync(${JSON.stringify(marker)},'bad')`;
+    const program = resolve(root, "print-argument.mjs");
+    await writeFile(program, "console.log(process.argv[2]);\n", "utf8");
     const result = await executeCommand(root, {
       executable: process.execPath,
-      args: ["-e", "console.log(process.argv[1])", injected],
+      args: [program, injected],
     });
     expect(result.stdout.trim()).toBe(injected);
     await expect(readFile(marker)).rejects.toThrow();
@@ -962,11 +1100,17 @@ describe("argv-only capability execution", () => {
   it("does not inherit caller secrets into executed commands", async () => {
     const root = await mkdtemp(resolve(tmpdir(), "huoqiu-env-"));
     temporaryRoots.push(root);
+    const program = resolve(root, "print-secret.mjs");
+    await writeFile(
+      program,
+      "console.log(process.env.HUOQIU_SECRET_SENTINEL);\n",
+      "utf8",
+    );
     const result = await executeCommand(
       root,
       {
         executable: process.execPath,
-        args: ["-e", "console.log(process.env.HUOQIU_SECRET_SENTINEL)"],
+        args: [program],
       },
       {
         environment: {
@@ -983,14 +1127,25 @@ describe("argv-only capability execution", () => {
     const root = await mkdtemp(resolve(tmpdir(), "huoqiu-orphan-"));
     temporaryRoots.push(root);
     const marker = resolve(root, "orphan-wrote-after-parent-exit");
-    const childProgram = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'escaped'), 350)`;
-    const parentProgram = [
-      "const { spawn } = require('node:child_process');",
-      `spawn(process.execPath, ['-e', ${JSON.stringify(childProgram)}], { stdio: 'ignore' }).unref();`,
-    ].join("\n");
+    const childPath = resolve(root, "orphan-child.cjs");
+    const parentPath = resolve(root, "orphan-parent.cjs");
+    await writeFile(
+      childPath,
+      `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'escaped'), 350);\n`,
+      "utf8",
+    );
+    await writeFile(
+      parentPath,
+      [
+        "const { spawn } = require('node:child_process');",
+        `spawn(process.execPath, [${JSON.stringify(childPath)}], { stdio: 'ignore' }).unref();`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
     const result = await executeCommand(root, {
       executable: process.execPath,
-      args: ["-e", parentProgram],
+      args: [parentPath],
     });
     expect(result.exit_code).toBe(0);
     await new Promise<void>((resolvePromise) =>
@@ -999,15 +1154,100 @@ describe("argv-only capability execution", () => {
     await expect(readFile(marker)).rejects.toThrow();
   });
 
+  it("kills a detached double-fork that escapes the original process group", async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "huoqiu-double-fork-"));
+    temporaryRoots.push(root);
+    const marker = resolve(root, "detached-double-fork-marker");
+    const grandchildPath = resolve(root, "grandchild.cjs");
+    const middlePath = resolve(root, "middle.cjs");
+    const parentPath = resolve(root, "parent.cjs");
+    await writeFile(
+      grandchildPath,
+      `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'escaped'), 500);\n`,
+      "utf8",
+    );
+    await writeFile(
+      middlePath,
+      [
+        "const { spawn } = require('node:child_process');",
+        `spawn(process.execPath, [${JSON.stringify(grandchildPath)}], { detached: true, stdio: 'ignore' }).unref();`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await writeFile(
+      parentPath,
+      [
+        "const { spawn } = require('node:child_process');",
+        `spawn(process.execPath, [${JSON.stringify(middlePath)}], { detached: true, stdio: 'ignore' }).unref();`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const result = await executeCommand(root, {
+      executable: process.execPath,
+      args: [parentPath],
+    });
+    expect(result.exit_code).toBe(0);
+    await new Promise<void>((resolvePromise) =>
+      setTimeout(resolvePromise, 800),
+    );
+    await expect(readFile(marker)).rejects.toThrow();
+  });
+
+  it("kills a detached double-fork even after the command deletes its ownership token", async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "huoqiu-tokenless-fork-"));
+    temporaryRoots.push(root);
+    const marker = resolve(root, "tokenless-double-fork-marker");
+    const grandchildPath = resolve(root, "tokenless-grandchild.cjs");
+    const middlePath = resolve(root, "tokenless-middle.cjs");
+    const parentPath = resolve(root, "tokenless-parent.cjs");
+    await writeFile(
+      grandchildPath,
+      `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'escaped'), 500);\n`,
+      "utf8",
+    );
+    await writeFile(
+      middlePath,
+      [
+        "const { spawn } = require('node:child_process');",
+        `spawn(process.execPath, [${JSON.stringify(grandchildPath)}], { detached: true, stdio: 'ignore' }).unref();`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await writeFile(
+      parentPath,
+      [
+        "const { spawn } = require('node:child_process');",
+        "delete process.env.HUOQIU_PROCESS_TREE_TOKEN;",
+        `spawn(process.execPath, [${JSON.stringify(middlePath)}], { detached: true, stdio: 'ignore' }).unref();`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const result = await executeCommand(root, {
+      executable: process.execPath,
+      args: [parentPath],
+    });
+    expect(result.exit_code).toBe(0);
+    await new Promise<void>((resolvePromise) =>
+      setTimeout(resolvePromise, 800),
+    );
+    await expect(readFile(marker)).rejects.toThrow();
+  });
+
   it("terminates a hung process at the configured timeout", async () => {
     const root = await mkdtemp(resolve(tmpdir(), "huoqiu-timeout-"));
     temporaryRoots.push(root);
+    const program = resolve(root, "hang.mjs");
+    await writeFile(program, "setInterval(() => {}, 1000);\n", "utf8");
     await expect(
       executeCommand(
         root,
         {
           executable: process.execPath,
-          args: ["-e", "setInterval(() => {}, 1000)"],
+          args: [program],
         },
         { timeoutMs: 80 },
       ),
@@ -1017,12 +1257,14 @@ describe("argv-only capability execution", () => {
   it("kills a command that exceeds the combined stdout/stderr limit", async () => {
     const root = await mkdtemp(resolve(tmpdir(), "huoqiu-output-"));
     temporaryRoots.push(root);
+    const program = resolve(root, "large-output.mjs");
+    await writeFile(program, "console.log('x'.repeat(10000));\n", "utf8");
     await expect(
       executeCommand(
         root,
         {
           executable: process.execPath,
-          args: ["-e", "console.log('x'.repeat(10000))"],
+          args: [program],
         },
         { maxOutputBytes: 128 },
       ),
@@ -1200,6 +1442,50 @@ describe("strict CLI normalization", () => {
 });
 
 describe("current evidence and independent review binding", () => {
+  it.skipIf(process.platform === "win32")(
+    "verifies protected trust before any PATH-resolved Git can execute",
+    async () => {
+      const root = await setupRepository();
+      const hostileBin = await mkdtemp(
+        resolve(tmpdir(), "huoqiu-hostile-git-"),
+      );
+      temporaryRoots.push(hostileBin);
+      const marker = resolve(hostileBin, "fake-git-executed");
+      const fakeGit = resolve(hostileBin, "git");
+      await writeFile(
+        fakeGit,
+        [
+          "#!/bin/sh",
+          `printf escaped > ${JSON.stringify(marker)}`,
+          'exec /usr/bin/git "$@"',
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      await chmod(fakeGit, 0o700);
+      const environment = reviewEnvironments.get(root);
+      const launcherPath = environment?.HUOQIU_EXECUTION_LAUNCHER_PATH;
+      if (launcherPath === undefined)
+        throw new Error("missing protected launcher path");
+      await writeFile(
+        launcherPath,
+        `${await readFile(launcherPath, "utf8")}\n// tampered\n`,
+        "utf8",
+      );
+      const originalPath = process.env.PATH;
+      process.env.PATH = `${hostileBin}:${originalPath ?? ""}`;
+      try {
+        await expect(
+          runTrustedCapability(root, "d0", "CAP-ID-001"),
+        ).rejects.toThrow("PROTECTED_EXECUTION_LAUNCHER_REQUIRED");
+        await expect(readFile(marker)).rejects.toThrow();
+      } finally {
+        if (originalPath === undefined) delete process.env.PATH;
+        else process.env.PATH = originalPath;
+      }
+    },
+  );
+
   it("fails closed without a pinned protected launcher before network or external writes", async () => {
     const root = await setupRepository();
     const marker = resolve(root, "artifacts/external-write");
@@ -1229,17 +1515,17 @@ describe("current evidence and independent review binding", () => {
         p0: 0,
         p1: 0,
       })}`;
-      first.command = {
-        executable: process.execPath,
-        args: [
-          "-e",
-          [
-            `fetch('http://127.0.0.1:${address.port}')`,
-            `.then(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'escaped'))`,
-            `.then(() => console.log(${JSON.stringify(summary)}))`,
-          ].join(""),
-        ],
-      };
+      first.command = await writeCapabilityProgram(
+        root,
+        "network-escape",
+        [
+          `fetch('http://127.0.0.1:${address.port}')`,
+          `.then(() => import('node:fs'))`,
+          `.then(({ writeFileSync }) => writeFileSync(${JSON.stringify(marker)}, 'escaped'))`,
+          `.then(() => console.log(${JSON.stringify(summary)}));`,
+          "",
+        ].join(""),
+      );
       await writeJson(manifestPath, manifest);
       await execFile("git", ["add", "quality/manifests/d0-required.json"], {
         cwd: root,
@@ -1277,6 +1563,195 @@ describe("current evidence and independent review binding", () => {
     ).rejects.toThrow("PROTECTED_EXECUTION_LAUNCHER_REQUIRED");
   });
 
+  it("rejects a verifier pin that covers only the bootstrap entry and not the loaded core", async () => {
+    const root = await setupRepository();
+    const environment = reviewEnvironments.get(root);
+    const entrypoint = environment?.HUOQIU_VERIFIER_ENTRYPOINT_PATH;
+    if (environment === undefined || entrypoint === undefined)
+      throw new Error("missing protected verifier environment");
+    const entrypointOnlySha = createHash("sha256")
+      .update(await readFile(entrypoint))
+      .digest("hex");
+    await resignTrustRegistry(root, (unsigned) => {
+      unsigned.verifier_sha256 = entrypointOnlySha;
+    });
+    environment.HUOQIU_VERIFIER_SHA256 = entrypointOnlySha;
+    const authorshipEnvironment = authorshipEnvironments.get(root);
+    if (authorshipEnvironment === undefined)
+      throw new Error("missing protected authorship environment");
+    authorshipEnvironment.HUOQIU_VERIFIER_SHA256 = entrypointOnlySha;
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("VERIFIER_TRUST_ROOT_REQUIRED");
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "rejects a protected launcher writable by another principal",
+    async () => {
+      const root = await setupRepository();
+      const environment = reviewEnvironments.get(root);
+      const launcherPath = environment?.HUOQIU_EXECUTION_LAUNCHER_PATH;
+      if (launcherPath === undefined)
+        throw new Error("missing protected launcher path");
+      await chmod(launcherPath, 0o722);
+      await expect(
+        runTrustedCapability(root, "d0", "CAP-ID-001"),
+      ).rejects.toThrow("PROTECTED_EXECUTION_LAUNCHER_REQUIRED");
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "rejects a protected launcher whose parent is writable by another principal",
+    async () => {
+      const root = await setupRepository();
+      const environment = reviewEnvironments.get(root);
+      const launcherPath = environment?.HUOQIU_EXECUTION_LAUNCHER_PATH;
+      if (launcherPath === undefined)
+        throw new Error("missing protected launcher path");
+      await chmod(dirname(launcherPath), 0o733);
+      await expect(
+        runTrustedCapability(root, "d0", "CAP-ID-001"),
+      ).rejects.toThrow("PROTECTED_EXECUTION_LAUNCHER_REQUIRED");
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "executes the verified launcher bytes even if its path is replaced and restored",
+    async () => {
+      const root = await setupRepository();
+      await writeFile(
+        resolve(root, "snapshot-padding.bin"),
+        Buffer.alloc(8 * 1024 * 1024, 0x5a),
+      );
+      await execFile("git", ["add", "snapshot-padding.bin"], { cwd: root });
+      await execFile("git", ["commit", "-q", "-m", "snapshot padding"], {
+        cwd: root,
+      });
+      const environment = reviewEnvironments.get(root);
+      const launcherPath = environment?.HUOQIU_EXECUTION_LAUNCHER_PATH;
+      if (launcherPath === undefined)
+        throw new Error("missing protected launcher path");
+      const launcherDirectory = dirname(launcherPath);
+      const originalBytes = await readFile(launcherPath, "utf8");
+      const marker = resolve(root, "replacement-launcher-executed");
+      const maliciousPath = resolve(
+        launcherDirectory,
+        "malicious-launcher.mjs",
+      );
+      const originalPath = resolve(launcherDirectory, "original-launcher.mjs");
+      const maliciousBytes = originalBytes.replace(
+        "import { spawn } from 'node:child_process';",
+        [
+          "import { spawn } from 'node:child_process';",
+          "import { writeFileSync } from 'node:fs';",
+          `writeFileSync(${JSON.stringify(marker)}, 'escaped');`,
+        ].join("\n"),
+      );
+      await writeFile(maliciousPath, maliciousBytes, "utf8");
+      await chmod(maliciousPath, 0o700);
+      const snapshotDirectories = new Set(
+        (await readdir(tmpdir())).filter((name) =>
+          name.startsWith("huoqiu-snapshot-"),
+        ),
+      );
+      const resultPromise = runTrustedCapability(root, "d0", "CAP-ID-001");
+      let snapshotReady = false;
+      for (let attempt = 0; attempt < 1_000; attempt += 1) {
+        const current = (await readdir(tmpdir())).find(
+          (name) =>
+            name.startsWith("huoqiu-snapshot-") &&
+            !snapshotDirectories.has(name),
+        );
+        if (current !== undefined) {
+          snapshotReady = await readdir(resolve(tmpdir(), current, "worktree"))
+            .then(() => true)
+            .catch(() => false);
+        }
+        if (snapshotReady) break;
+        await new Promise<void>((resolvePromise) =>
+          setTimeout(resolvePromise, 2),
+        );
+      }
+      expect(snapshotReady).toBe(true);
+      await rename(launcherPath, originalPath);
+      await rename(maliciousPath, launcherPath);
+      try {
+        await resultPromise.catch(() => undefined);
+      } finally {
+        await rename(launcherPath, maliciousPath);
+        await rename(originalPath, launcherPath);
+        await chmod(launcherPath, 0o700);
+      }
+      await expect(readFile(marker)).rejects.toThrow();
+    },
+  );
+
+  it("does not execute repository-local Git hooks while preparing a snapshot", async () => {
+    const root = await setupRepository();
+    const marker = resolve(root, "candidate-git-hook-executed");
+    const hookPath = resolve(root, ".git/hooks/post-checkout");
+    await writeFile(
+      hookPath,
+      [
+        "#!/usr/bin/env node",
+        `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'escaped');`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await chmod(hookPath, 0o700);
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).resolves.toMatchObject({ cap_id: "CAP-ID-001" });
+    await expect(readFile(marker)).rejects.toThrow();
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "does not execute repository-local Git smudge filters while preparing a snapshot",
+    async () => {
+      const root = await setupRepository();
+      const marker = resolve(root, ".git/candidate-smudge-filter-executed");
+      const filterPath = resolve(root, ".git/candidate-smudge-filter.cjs");
+      await writeFile(
+        filterPath,
+        [
+          "const { writeFileSync } = require('node:fs');",
+          `writeFileSync(${JSON.stringify(marker)}, 'escaped');`,
+          "process.stdin.pipe(process.stdout);",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      await writeFile(
+        resolve(root, ".gitattributes"),
+        "filtered.txt filter=attack\n",
+        "utf8",
+      );
+      await writeFile(
+        resolve(root, "filtered.txt"),
+        "candidate bytes\n",
+        "utf8",
+      );
+      await execFile(
+        "git",
+        ["config", "filter.attack.smudge", `${process.execPath} ${filterPath}`],
+        {
+          cwd: root,
+        },
+      );
+      await execFile("git", ["add", ".gitattributes", "filtered.txt"], {
+        cwd: root,
+      });
+      await execFile("git", ["commit", "-q", "-m", "candidate smudge filter"], {
+        cwd: root,
+      });
+      await expect(
+        runTrustedCapability(root, "d0", "CAP-ID-001"),
+      ).resolves.toMatchObject({ cap_id: "CAP-ID-001" });
+      await expect(readFile(marker)).rejects.toThrow();
+    },
+  );
+
   it("rechecks repository context after a capability command before writing evidence", async () => {
     const root = await setupRepository();
     const manifestPath = resolve(root, "quality/manifests/d0-required.json");
@@ -1293,17 +1768,26 @@ describe("current evidence and independent review binding", () => {
       p0: 0,
       p1: 0,
     })}`;
-    firstCap.command = {
-      executable: process.execPath,
-      args: [
-        "-e",
-        `require('node:fs').appendFileSync('packages/contracts/src/d0/contract.ts',' '); console.log(${JSON.stringify(summary)})`,
-      ],
-    };
+    firstCap.command = await writeCapabilityProgram(
+      root,
+      "mutating-capability",
+      [
+        "import { appendFileSync } from 'node:fs';",
+        "appendFileSync('packages/contracts/src/d0/contract.ts', ' ');",
+        `console.log(${JSON.stringify(summary)});`,
+        "",
+      ].join("\n"),
+    );
     await writeJson(manifestPath, manifest);
-    await execFile("git", ["add", "quality/manifests/d0-required.json"], {
-      cwd: root,
-    });
+    await execFile(
+      "git",
+      [
+        "add",
+        "quality/manifests/d0-required.json",
+        "scripts/quality/mutating-capability.mjs",
+      ],
+      { cwd: root },
+    );
     await execFile("git", ["commit", "-q", "-m", "mutating capability"], {
       cwd: root,
     });
@@ -1328,17 +1812,29 @@ describe("current evidence and independent review binding", () => {
       p0: 0,
       p1: 0,
     })}`;
-    firstCap.command = {
-      executable: process.execPath,
-      args: [
-        "-e",
-        `const fs=require('node:fs'); const p='packages/contracts/src/d0/contract.ts'; const b=fs.readFileSync(p); fs.appendFileSync(p,'attack'); fs.writeFileSync(p,b); console.log(${JSON.stringify(summary)})`,
-      ],
-    };
+    firstCap.command = await writeCapabilityProgram(
+      root,
+      "restoring-capability",
+      [
+        "import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';",
+        "const path = 'packages/contracts/src/d0/contract.ts';",
+        "const before = readFileSync(path);",
+        "appendFileSync(path, 'attack');",
+        "writeFileSync(path, before);",
+        `console.log(${JSON.stringify(summary)});`,
+        "",
+      ].join("\n"),
+    );
     await writeJson(manifestPath, manifest);
-    await execFile("git", ["add", "quality/manifests/d0-required.json"], {
-      cwd: root,
-    });
+    await execFile(
+      "git",
+      [
+        "add",
+        "quality/manifests/d0-required.json",
+        "scripts/quality/restoring-capability.mjs",
+      ],
+      { cwd: root },
+    );
     await execFile("git", ["commit", "-q", "-m", "restore mutation attack"], {
       cwd: root,
     });
@@ -1680,9 +2176,15 @@ describe("trusted reviewer identity boundary", () => {
 
   it("validates the protected previous digest for an epoch transition", async () => {
     const root = await setupRepository();
+    const previousBytes = await readFile(
+      resolve(root, "quality/reviewers/trust-registry.v2.json"),
+    );
+    const previousDigest = createHash("sha256")
+      .update(previousBytes)
+      .digest("hex");
     const currentDigest = await rewriteSignedRegistry(root, (registry) => {
       registry.epoch = 2;
-      registry.previous_registry_sha256 = "1".repeat(64);
+      registry.previous_registry_sha256 = previousDigest;
     });
     const environment = reviewEnvironments.get(root);
     if (environment === undefined)
@@ -1690,9 +2192,97 @@ describe("trusted reviewer identity boundary", () => {
     environment.HUOQIU_TRUST_REGISTRY_EPOCH = "2";
     environment.HUOQIU_TRUST_REGISTRY_SHA256 = currentDigest;
     environment.HUOQIU_TRUST_REGISTRY_PREVIOUS_SHA256 = "2".repeat(64);
+    environment.HUOQIU_TRUST_REGISTRY_HISTORY_B64 = registryHistoryEnvironment([
+      previousBytes,
+    ]);
     await expect(
       runTrustedCapability(root, "d0", "CAP-ID-001"),
     ).rejects.toThrow("VERIFIER_TRUST_ROOT_REQUIRED");
+  });
+
+  it("rejects epoch 2 when only a matching digest pin is supplied without previous registry bytes", async () => {
+    const root = await setupRepository();
+    const previousBytes = await readFile(
+      resolve(root, "quality/reviewers/trust-registry.v2.json"),
+    );
+    const previousDigest = createHash("sha256")
+      .update(previousBytes)
+      .digest("hex");
+    const currentDigest = await rewriteSignedRegistry(root, (registry) => {
+      registry.epoch = 2;
+      registry.previous_registry_sha256 = previousDigest;
+    });
+    const environment = reviewEnvironments.get(root);
+    if (environment === undefined)
+      throw new Error("missing review environment");
+    environment.HUOQIU_TRUST_REGISTRY_EPOCH = "2";
+    environment.HUOQIU_TRUST_REGISTRY_SHA256 = currentDigest;
+    environment.HUOQIU_TRUST_REGISTRY_PREVIOUS_SHA256 = previousDigest;
+    delete environment.HUOQIU_TRUST_REGISTRY_HISTORY_B64;
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("REVIEW_TRUST_REGISTRY_INVALID");
+  });
+
+  it("accepts an exact signed epoch chain whose raw bytes link through N-1", async () => {
+    const root = await setupRepository();
+    const epoch1Bytes = await readFile(
+      resolve(root, "quality/reviewers/trust-registry.v2.json"),
+    );
+    const epoch1Digest = createHash("sha256").update(epoch1Bytes).digest("hex");
+    await rewriteSignedRegistry(root, (registry) => {
+      registry.epoch = 2;
+      registry.previous_registry_sha256 = epoch1Digest;
+    });
+    const epoch2Bytes = await readFile(
+      resolve(root, "quality/reviewers/trust-registry.v2.json"),
+    );
+    const epoch2Digest = createHash("sha256").update(epoch2Bytes).digest("hex");
+    const currentDigest = await rewriteSignedRegistry(root, (registry) => {
+      registry.epoch = 3;
+      registry.previous_registry_sha256 = epoch2Digest;
+    });
+    const environment = reviewEnvironments.get(root);
+    if (environment === undefined)
+      throw new Error("missing review environment");
+    environment.HUOQIU_TRUST_REGISTRY_EPOCH = "3";
+    environment.HUOQIU_TRUST_REGISTRY_SHA256 = currentDigest;
+    environment.HUOQIU_TRUST_REGISTRY_PREVIOUS_SHA256 = epoch2Digest;
+    environment.HUOQIU_TRUST_REGISTRY_HISTORY_B64 = registryHistoryEnvironment([
+      epoch1Bytes,
+      epoch2Bytes,
+    ]);
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).resolves.toMatchObject({ cap_id: "CAP-ID-001" });
+  });
+
+  it("rejects a root-signed previous registry from another repository", async () => {
+    const root = await setupRepository();
+    const foreignEpoch1 = await signedRegistryBytes(root, (registry) => {
+      registry.repository_id = "9002";
+      const keys = registry.keys as Record<string, Record<string, unknown>>;
+      for (const policy of Object.values(keys)) policy.repository_id = "9002";
+    });
+    const foreignDigest = createHash("sha256")
+      .update(foreignEpoch1)
+      .digest("hex");
+    const currentDigest = await rewriteSignedRegistry(root, (registry) => {
+      registry.epoch = 2;
+      registry.previous_registry_sha256 = foreignDigest;
+    });
+    const environment = reviewEnvironments.get(root);
+    if (environment === undefined)
+      throw new Error("missing review environment");
+    environment.HUOQIU_TRUST_REGISTRY_EPOCH = "2";
+    environment.HUOQIU_TRUST_REGISTRY_SHA256 = currentDigest;
+    environment.HUOQIU_TRUST_REGISTRY_PREVIOUS_SHA256 = foreignDigest;
+    environment.HUOQIU_TRUST_REGISTRY_HISTORY_B64 = registryHistoryEnvironment([
+      foreignEpoch1,
+    ]);
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("REVIEW_TRUST_REGISTRY_INVALID");
   });
 
   it("measures the actual verifier entrypoint instead of trusting a digest string", async () => {
@@ -1712,6 +2302,34 @@ describe("trusted reviewer identity boundary", () => {
       ),
     ).rejects.toThrow("VERIFIER_TRUST_ROOT_REQUIRED");
   });
+
+  it.skipIf(process.platform === "win32")(
+    "rejects a symbolic alias for the protected verifier entrypoint",
+    async () => {
+      const root = await setupRepository();
+      const context = await prepareReviewInputs(root, "d0");
+      const environment = reviewEnvironments.get(root);
+      const actualPath = environment?.HUOQIU_VERIFIER_ENTRYPOINT_PATH;
+      if (actualPath === undefined)
+        throw new Error("missing protected verifier entrypoint");
+      const aliasRoot = await mkdtemp(
+        resolve(tmpdir(), "huoqiu-verifier-alias-"),
+      );
+      temporaryRoots.push(aliasRoot);
+      const aliasPath = resolve(aliasRoot, "verifier-entrypoint");
+      await symlink(actualPath, aliasPath, "file");
+      await expect(
+        recordReview(
+          root,
+          "d0",
+          context.commit_sha,
+          signingOptions(root, {
+            HUOQIU_VERIFIER_ENTRYPOINT_PATH: aliasPath,
+          }),
+        ),
+      ).rejects.toThrow("VERIFIER_TRUST_ROOT_REQUIRED");
+    },
+  );
 
   it("requires a signed authorship statement for the exact reviewed commit", async () => {
     const root = await setupRepository();
@@ -1996,9 +2614,9 @@ describe("milestone results and explicit not-ready behavior", () => {
       recursive: true,
       force: true,
     });
-    await expect(runCapability(root, "d0", "CAP-ID-001")).rejects.toThrow(
-      "NOT_IMPLEMENTED",
-    );
+    await expect(
+      runTrustedCapability(root, "d0", "CAP-ID-001"),
+    ).rejects.toThrow("NOT_IMPLEMENTED");
   });
   it("executes D0 commands and prints the exact successful line", async () => {
     const root = await prepareReviewedGate("d0");

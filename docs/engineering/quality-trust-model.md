@@ -9,19 +9,24 @@ boundary described below.
 ## Production trust chain
 
 1. A protected launcher runs a pinned verifier distribution outside the
-   candidate checkout. The verifier resolves and hashes its actual executing
-   entrypoint, requires that entrypoint to equal the protected absolute path,
-   and rejects an entrypoint inside the candidate repository. The protected
-   system injects the repository ID, exact current-registry digest, accepted
-   registry epoch, previous-registry digest for epochs after 1, root Ed25519
-   SPKI, and root key ID. Candidate-provided `HUOQIU_*` variables are not a
-   substitute for this external boundary.
+   candidate checkout. The verifier binds one domain-separated digest to both
+   its actual bootstrap entrypoint and the loaded, built-in-only verifier core;
+   both are opened without following the leaf path, checked for trusted
+   ownership and permissions, measured through stable file handles, and
+   required to live outside the candidate repository. The protected system
+   injects the repository ID, exact current-registry digest, accepted registry
+   epoch, exact raw registry history for epochs after 1, the N-1 digest, root
+   Ed25519 SPKI, and root key ID. Candidate-provided `HUOQIU_*` variables are
+   not a substitute for this external boundary.
 2. The root key verifies `quality/reviewers/trust-registry.v2.json`. Registry
    v2 binds the trust domain, immutable repository ID, actual verifier digest,
    protected execution-launcher digest, epoch, previous-registry digest,
    expiry, key roles, exact workflow provenance, and public keys. The verifier
    also compares the exact registry file bytes with the protected digest pin,
-   preventing same-epoch substitution. The committed registry is intentionally
+   preventing same-epoch substitution. For epoch N, it verifies every
+   root-signed raw registry from 1 through N-1, including repository,
+   trust-domain, epoch, and byte-digest linkage; a matching N-1 string without
+   those bytes is insufficient. The committed registry is intentionally
    unsigned and empty, so an unconfigured production run fails closed.
 3. A protected external authorship attestor derives canonical `github:<id>`
    implementer identities from exact archived bytes obtained independently of
@@ -61,19 +66,26 @@ not from a candidate-controlled install.
 
 The repository verifier does not directly execute a capability command. It
 first requires an absolute, executable launcher outside the candidate tree,
-hashes its actual bytes before and after execution, and matches that digest to
-both protected configuration and the root-signed registry. It also requires
-the exact isolation profile
+opens and measures a non-symlink, singly-linked launcher with trusted ownership
+and permissions, and matches that digest to both protected configuration and
+the root-signed registry. The measured launcher source must be a self-contained
+built-in-only module. The verifier executes those already-measured bytes via
+the trusted runtime rather than reopening the launcher path, then checks that
+the path still names the same filesystem identity. It also requires the exact
+isolation profile
 `container-v1:no-network,read-only-source,owned-process-tree`. Absence or any
 mismatch fails before candidate code runs.
 
 The trusted external launcher is responsible for implementing that profile
 with an OS security boundary (for example, a no-network container with a
 read-only source mount and a cgroup, namespace, or Windows Job Object that owns
-the complete process tree). The verifier creates a temporary detached worktree
-at the exact commit; the launcher runs the requested command inside the
-protected view of that workspace and returns the closed v1 result envelope.
-The verifier additionally:
+the complete process tree). After checking a clean index and tracked-source
+digest, the verifier copies only singly-linked tracked regular files through
+stable handles into a new private snapshot. It never performs a candidate Git
+checkout, so repository-local hooks and clean/smudge filters cannot execute
+during snapshot creation. The launcher runs the requested command inside the
+protected view of that snapshot and returns the closed v1 result envelope. The
+verifier additionally:
 
 - rejects dirty trees, symlinks/submodules, and tracked files hidden with
   `assume-unchanged` or `skip-worktree`;
@@ -82,16 +94,23 @@ The verifier additionally:
 --strict-peer-dependencies` inside the protected boundary when a package and
   lockfile are present, honoring the tracked workspace build allowlist;
 - watches tracked paths for writes (including modify-then-restore attacks),
-  recomputes the source digest afterward, and discards the worktree; and
-- rejects shell/wrapper executables, strips caller secrets and hostile `GIT_*`
-  state, kills the launched process group on every exit path, and rejects
-  skipped/TODO/FIXME/no-test results or caller-supplied raw reports.
+  recomputes the source digest afterward, and discards the snapshot;
+- invokes a fixed absolute, trusted system Git with a fixed system `PATH`, no
+  global/system configuration, disabled hooks, and disabled fsmonitor for the
+  small set of read-only context operations;
+- rejects direct and `pnpm exec` shell wrappers plus Node eval/print forms,
+  strips caller secrets and hostile `GIT_*` state, kills the launched process
+  group on every exit path, and performs ownership-token and new-workspace-PID
+  cleanup as defense in depth; and
+- rejects skipped/TODO/FIXME/no-test results or caller-supplied raw reports.
 
 The repository test suite uses a byte-pinned protocol harness to test this
 handshake. That harness is not a production isolation implementation and must
-never be used as certification evidence. The file watchers and post-run hash
-are defense in depth; only the protected OS launcher establishes no-network,
-read-only-source, and complete descendant cleanup guarantees.
+never be used as certification evidence. Process groups, ownership-token and
+workspace scans, file watchers, and post-run hashes are defense in depth; only
+the protected OS launcher establishes no-network, read-only-source, and
+complete descendant cleanup guarantees. In particular, an environment token
+is not treated as the kernel ownership boundary.
 
 The protected oracle contains both the exact required capability order and the
 exact set currently allowed to report `NOT_IMPLEMENTED`. Updating either set
@@ -101,7 +120,10 @@ requires a verifier/oracle release; a manifest alone cannot downgrade a gate.
 
 The protected system supplies all root, registry, repository, actual-verifier,
 execution-launcher, authorship-archive, workflow-provenance, and signing-key
-variables. For authorship, `HUOQIU_AUTHORSHIP_ARCHIVE_B64` is the exact
+variables. For epoch N greater than 1,
+`HUOQIU_TRUST_REGISTRY_HISTORY_B64` is canonical base64 of a JSON array whose
+items are canonical base64 for the exact raw registry bytes from epochs 1
+through N-1. For authorship, `HUOQIU_AUTHORSHIP_ARCHIVE_B64` is the exact
 canonical-base64 archive and `HUOQIU_AUTHORSHIP_INPUT_SHA256` is the SHA-256 of
 those decoded bytes. It then runs:
 

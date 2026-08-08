@@ -2,23 +2,29 @@ import {
   createHash,
   createPrivateKey,
   createPublicKey,
+  randomUUID,
   sign as signBytes,
   verify as verifyBytes,
 } from "node:crypto";
 import {
+  chmod,
   lstat,
   mkdir,
   mkdtemp,
+  open,
   readFile,
+  readlink,
   readdir,
   realpath,
   rm,
   writeFile,
 } from "node:fs/promises";
-import { watch as watchFiles, type FSWatcher } from "node:fs";
+import { watch as watchFiles, type FSWatcher, type Stats } from "node:fs";
+import { constants as fsConstants } from "node:fs";
 import { arch, platform, tmpdir } from "node:os";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 export type Milestone = "d0" | "m1";
 
@@ -330,6 +336,55 @@ const FORBIDDEN_EXECUTABLES = new Set([
   "zsh",
 ]);
 
+const executableBasename = (executable: string): string | undefined =>
+  executable.replaceAll("\\", "/").split("/").at(-1)?.toLowerCase();
+
+const NODE_EXECUTABLES = new Set(["node", "node.exe"]);
+const PNPM_EXECUTABLES = new Set(["pnpm", "pnpm.cmd", "pnpm.exe"]);
+
+const isNodeEvalArgument = (argument: string): boolean =>
+  argument === "-e" ||
+  argument === "-p" ||
+  argument === "--eval" ||
+  argument === "--print" ||
+  argument.startsWith("--eval=") ||
+  argument.startsWith("--print=") ||
+  /^-[^-]*[ep][^-]*$/u.test(argument);
+
+const assertNoSemanticShellWrapper = (
+  executable: string,
+  args: readonly string[],
+  code: string,
+): void => {
+  const basename = executableBasename(executable);
+  if (basename !== undefined && NODE_EXECUTABLES.has(basename)) {
+    if (args.some(isNodeEvalArgument))
+      fail(code, "Node eval/print commands are forbidden");
+    return;
+  }
+  if (basename === undefined || !PNPM_EXECUTABLES.has(basename)) return;
+  if (args.includes("--shell-mode")) fail(code, "pnpm shell mode is forbidden");
+  const execIndex = args.indexOf("exec");
+  if (execIndex < 0) return;
+  let targetIndex = execIndex + 1;
+  while (args[targetIndex] === "--") targetIndex += 1;
+  const target =
+    args[targetIndex] ??
+    fail(code, "pnpm exec requires a non-shell executable");
+  const targetBasename =
+    executableBasename(target) ??
+    fail(code, "pnpm exec requires a non-shell executable");
+  if (FORBIDDEN_EXECUTABLES.has(targetBasename)) {
+    fail(code, "pnpm exec shell wrappers are forbidden");
+  }
+  if (
+    NODE_EXECUTABLES.has(targetBasename) &&
+    args.slice(targetIndex + 1).some(isNodeEvalArgument)
+  ) {
+    fail(code, "Node eval/print commands are forbidden through pnpm exec");
+  }
+};
+
 export const validateCommand = (
   value: unknown,
   code = "COMMAND_INVALID",
@@ -341,15 +396,11 @@ export const validateCommand = (
     code,
     "command.executable",
   );
-  const executableBasename = executable
-    .replaceAll("\\", "/")
-    .split("/")
-    .at(-1)
-    ?.toLowerCase();
+  const basename = executableBasename(executable);
   if (
     /\s/.test(executable) ||
-    executableBasename === undefined ||
-    FORBIDDEN_EXECUTABLES.has(executableBasename)
+    basename === undefined ||
+    FORBIDDEN_EXECUTABLES.has(basename)
   ) {
     fail(code, "command executable must be a non-shell argv token");
   }
@@ -357,6 +408,7 @@ export const validateCommand = (
   const args = (command.args as unknown[]).map((arg, index) =>
     requireString(arg, code, `command.args[${index}]`),
   );
+  assertNoSemanticShellWrapper(executable, args, code);
   return { executable, args };
 };
 
@@ -913,6 +965,11 @@ export interface ExecuteCommandOptions {
 const DEFAULT_COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 
+const fixedSystemPath = (): string =>
+  process.platform === "win32"
+    ? "C:\\Windows\\System32;C:\\Windows"
+    : "/usr/bin:/bin";
+
 const minimalChildEnvironment = (
   source: NodeJS.ProcessEnv,
   profile: "minimal" | "git" = "minimal",
@@ -932,6 +989,7 @@ const minimalChildEnvironment = (
   environment.TMP = temporaryDirectory;
   if (source.CI === "true") environment.CI = "true";
   if (profile === "git") {
+    environment.PATH = fixedSystemPath();
     environment.GIT_CONFIG_NOSYSTEM = "1";
     environment.GIT_CONFIG_GLOBAL =
       process.platform === "win32" ? "NUL" : "/dev/null";
@@ -939,6 +997,190 @@ const minimalChildEnvironment = (
     environment.GIT_OPTIONAL_LOCKS = "0";
   }
   return environment;
+};
+
+interface ProtectedFileIdentity {
+  device: number;
+  inode: number;
+  mode: number;
+  owner: number;
+  size: number;
+}
+
+interface ProtectedFileSnapshot {
+  path: string;
+  bytes: Buffer;
+  identity: ProtectedFileIdentity;
+}
+
+const verifierBundleSha256 = (
+  entrypointBytes: Uint8Array,
+  loadedCoreBytes: Uint8Array,
+): string => {
+  const hash = createHash("sha256");
+  hash.update("HUOQIU-VERIFIER-BUNDLE\0v1\0");
+  for (const [label, bytes] of [
+    ["ENTRYPOINT", entrypointBytes],
+    ["LOADED_CORE", loadedCoreBytes],
+  ] as const) {
+    hash.update(label);
+    hash.update("\0SIZE\0");
+    hash.update(String(bytes.byteLength));
+    hash.update("\0CONTENT\0");
+    hash.update(bytes);
+    hash.update("\0END\0");
+  }
+  return hash.digest("hex");
+};
+
+const assertSelfContainedBuiltInModule = (
+  bytes: Buffer,
+  code: string,
+  label: string,
+): string => {
+  const source = bytes.toString("utf8");
+  if (!Buffer.from(source, "utf8").equals(bytes) || source.includes("\0"))
+    fail(code, `${label} must be canonical UTF-8 JavaScript`);
+  const importedDependencies = [
+    ...source.matchAll(/\bfrom\s+["']([^"']+)["']/gu),
+    ...source.matchAll(/\bimport\s+["']([^"']+)["']/gu),
+  ].map((match) => match[1]);
+  if (
+    importedDependencies.some(
+      (dependency) =>
+        dependency === undefined || !dependency.startsWith("node:"),
+    ) ||
+    /\bimport\s*\(/u.test(source) ||
+    /\brequire\s*\(/u.test(source)
+  ) {
+    fail(code, `${label} must be a self-contained built-in-only module`);
+  }
+  return source;
+};
+
+const sameProtectedFileIdentity = (
+  left: ProtectedFileIdentity,
+  right: ProtectedFileIdentity,
+): boolean =>
+  left.device === right.device &&
+  left.inode === right.inode &&
+  left.mode === right.mode &&
+  left.owner === right.owner &&
+  left.size === right.size;
+
+const protectedFileIdentity = (metadata: Stats): ProtectedFileIdentity => ({
+  device: metadata.dev,
+  inode: metadata.ino,
+  mode: metadata.mode,
+  owner: metadata.uid,
+  size: metadata.size,
+});
+
+const assertProtectedOwnership = (
+  metadata: Stats,
+  code: string,
+  label: string,
+  requireSingleLink = true,
+): void => {
+  if (!metadata.isFile()) fail(code, `${label} is not a regular file`);
+  if (requireSingleLink && metadata.nlink !== 1)
+    fail(code, `${label} must have exactly one filesystem link`);
+  if (process.platform !== "win32") {
+    const currentUid = process.getuid?.();
+    if (
+      currentUid !== undefined &&
+      metadata.uid !== 0 &&
+      metadata.uid !== currentUid
+    ) {
+      fail(code, `${label} has an untrusted owner`);
+    }
+    if ((metadata.mode & 0o022) !== 0)
+      fail(code, `${label} is writable by another principal`);
+  }
+};
+
+const readProtectedFile = async (
+  configuredPath: string,
+  repositoryRoot: string,
+  code: string,
+  label: string,
+  executable: boolean,
+): Promise<ProtectedFileSnapshot> => {
+  if (!isAbsolute(configuredPath)) fail(code, `${label} path must be absolute`);
+  const configuredMetadata = await lstat(configuredPath).catch(() =>
+    fail(code, `${label} cannot be inspected`),
+  );
+  if (configuredMetadata.isSymbolicLink())
+    fail(code, `${label} path must not be a symbolic link`);
+  const [path, repositoryPath] = await Promise.all([
+    realpath(configuredPath).catch(() =>
+      fail(code, `${label} cannot be resolved`),
+    ),
+    realpath(repositoryRoot).catch(() =>
+      fail(code, "repository root cannot be resolved"),
+    ),
+  ]);
+  const fromRepository = relative(repositoryPath, path);
+  if (
+    fromRepository === "" ||
+    (!fromRepository.startsWith(`..${sep}`) && fromRepository !== "..")
+  ) {
+    fail(code, `${label} must be outside the candidate repository`);
+  }
+  const parent = await lstat(dirname(path)).catch(() =>
+    fail(code, `${label} parent cannot be inspected`),
+  );
+  if (!parent.isDirectory()) fail(code, `${label} parent is not a directory`);
+  if (process.platform !== "win32") {
+    const currentUid = process.getuid?.();
+    if (
+      currentUid !== undefined &&
+      parent.uid !== 0 &&
+      parent.uid !== currentUid
+    ) {
+      fail(code, `${label} parent has an untrusted owner`);
+    }
+    if ((parent.mode & 0o022) !== 0)
+      fail(code, `${label} parent is writable by another principal`);
+  }
+  const flags =
+    fsConstants.O_RDONLY |
+    (process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW);
+  const handle = await open(path, flags).catch(() =>
+    fail(code, `${label} cannot be opened without following links`),
+  );
+  try {
+    const before = await handle.stat();
+    assertProtectedOwnership(before, code, label);
+    if (
+      executable &&
+      process.platform !== "win32" &&
+      (before.mode & 0o111) === 0
+    ) {
+      fail(code, `${label} is not executable`);
+    }
+    const bytes = await handle.readFile();
+    const after = await handle.stat();
+    const pathMetadata = await lstat(path).catch(() =>
+      fail(code, `${label} path disappeared during measurement`),
+    );
+    const beforeIdentity = protectedFileIdentity(before);
+    if (
+      !sameProtectedFileIdentity(
+        beforeIdentity,
+        protectedFileIdentity(after),
+      ) ||
+      !sameProtectedFileIdentity(
+        beforeIdentity,
+        protectedFileIdentity(pathMetadata),
+      )
+    ) {
+      fail(code, `${label} identity changed during measurement`);
+    }
+    return { path, bytes, identity: beforeIdentity };
+  } finally {
+    await handle.close();
+  }
 };
 
 const processGroupExists = (pid: number): boolean => {
@@ -997,12 +1239,174 @@ const terminateProcessGroup = async (
   }
 };
 
-export const executeCommand = async (
+const processIdsWithToken = async (token: string): Promise<number[]> => {
+  if (process.platform === "linux") {
+    const entries = await readdir("/proc").catch(() => []);
+    const matches: number[] = [];
+    await Promise.all(
+      entries
+        .filter((entry) => /^[1-9][0-9]*$/u.test(entry))
+        .map(async (entry) => {
+          const environment = await readFile(`/proc/${entry}/environ`).catch(
+            () => undefined,
+          );
+          if (
+            environment?.includes(
+              Buffer.from(`HUOQIU_PROCESS_TREE_TOKEN=${token}\0`, "utf8"),
+            )
+          ) {
+            matches.push(Number(entry));
+          }
+        }),
+    );
+    return matches;
+  }
+  if (process.platform !== "darwin") return [];
+  return await new Promise<number[]>((resolvePromise) => {
+    const child = spawn("/bin/ps", ["eww", "-axo", "pid=,command="], {
+      env: {
+        LANG: "C",
+        LC_ALL: "C",
+        PATH: fixedSystemPath(),
+      },
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let output = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      if (output.length < DEFAULT_MAX_OUTPUT_BYTES) output += chunk;
+    });
+    child.once("error", () => resolvePromise([]));
+    child.once("close", () => {
+      resolvePromise(
+        output
+          .split(/\r?\n/u)
+          .filter((line) => line.includes(`HUOQIU_PROCESS_TREE_TOKEN=${token}`))
+          .map((line) => Number(/^\s*([1-9][0-9]*)/u.exec(line)?.[1]))
+          .filter((pid) => Number.isSafeInteger(pid) && pid !== process.pid),
+      );
+    });
+  });
+};
+
+const processIdsUsingWorkspace = async (root: string): Promise<number[]> => {
+  const workspace = resolve(root);
+  if (process.platform === "linux") {
+    const entries = await readdir("/proc").catch(() => []);
+    const matches: number[] = [];
+    await Promise.all(
+      entries
+        .filter((entry) => /^[1-9][0-9]*$/u.test(entry))
+        .map(async (entry) => {
+          const pid = Number(entry);
+          if (pid === process.pid) return;
+          const [commandLine, cwd] = await Promise.all([
+            readFile(`/proc/${entry}/cmdline`).catch(() => undefined),
+            readlink(`/proc/${entry}/cwd`).catch(() => undefined),
+          ]);
+          const commandUsesWorkspace = commandLine
+            ?.toString("utf8")
+            .split("\0")
+            .some(
+              (argument) =>
+                argument === workspace ||
+                argument.startsWith(`${workspace}${sep}`),
+            );
+          const cwdUsesWorkspace =
+            cwd === workspace || cwd?.startsWith(`${workspace}${sep}`);
+          if (commandUsesWorkspace === true || cwdUsesWorkspace === true)
+            matches.push(pid);
+        }),
+    );
+    return matches;
+  }
+  if (process.platform !== "darwin") return [];
+  return await new Promise<number[]>((resolvePromise) => {
+    const child = spawn("/bin/ps", ["-axo", "pid=,command="], {
+      env: {
+        LANG: "C",
+        LC_ALL: "C",
+        PATH: fixedSystemPath(),
+      },
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let output = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      if (output.length < DEFAULT_MAX_OUTPUT_BYTES) output += chunk;
+    });
+    child.once("error", () => resolvePromise([]));
+    child.once("close", () => {
+      resolvePromise(
+        output
+          .split(/\r?\n/u)
+          .map((line) => /^\s*([1-9][0-9]*)\s+([\s\S]*)$/u.exec(line))
+          .filter(
+            (match): match is RegExpExecArray =>
+              match !== null &&
+              (match[2]?.includes(`${workspace}${sep}`) === true ||
+                match[2]?.endsWith(` ${workspace}`) === true ||
+                match[2] === workspace) &&
+              Number(match[1]) !== process.pid &&
+              Number(match[1]) !== child.pid,
+          )
+          .map((match) => Number(match[1]))
+          .filter((pid) => Number.isSafeInteger(pid)),
+      );
+    });
+  });
+};
+
+const terminateEscapedProcesses = async (
+  token: string,
+  root: string | undefined,
+  baselineWorkspacePids: ReadonlySet<number>,
+): Promise<void> => {
+  if (process.platform === "win32") return;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const tokenMatches = await processIdsWithToken(token);
+    const workspaceMatches =
+      root === undefined ? [] : await processIdsUsingWorkspace(root);
+    const escaped = [
+      ...new Set([
+        ...tokenMatches,
+        ...workspaceMatches.filter((pid) => !baselineWorkspacePids.has(pid)),
+      ]),
+    ];
+    for (const pid of escaped) {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        // The process exited between enumeration and termination.
+      }
+    }
+    if (escaped.length === 0) return;
+    await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 10));
+  }
+  const survivors = [
+    ...(await processIdsWithToken(token)),
+    ...(root === undefined
+      ? []
+      : (await processIdsUsingWorkspace(root)).filter(
+          (pid) => !baselineWorkspacePids.has(pid),
+        )),
+  ];
+  if (survivors.length > 0)
+    fail(
+      "PROCESS_TREE_CLEANUP_FAILED",
+      "detached descendants survived ownership-token termination",
+    );
+};
+
+const executeSpawn = async (
   root: string,
-  command: RunCommand,
-  options: ExecuteCommandOptions = {},
+  reportCommand: RunCommand,
+  executable: string,
+  args: string[],
+  options: ExecuteCommandOptions,
 ): Promise<SpawnResult> => {
-  const safeCommand = validateCommand(command);
   const clock = options.clock ?? (() => new Date());
   const timeoutMs = options.timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS;
   const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
@@ -1018,14 +1422,21 @@ export const executeCommand = async (
     );
   }
   const startedAt = clock().toISOString();
+  const ownershipToken = randomUUID();
+  const gitExecution = executableBasename(executable) === "git";
+  const baselineWorkspacePids = gitExecution
+    ? new Set<number>()
+    : new Set(await processIdsUsingWorkspace(root));
   return await new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(safeCommand.executable, safeCommand.args, {
+    const childEnvironment = minimalChildEnvironment(
+      options.environment ?? process.env,
+      options.environmentProfile,
+    );
+    childEnvironment.HUOQIU_PROCESS_TREE_TOKEN = ownershipToken;
+    const child = spawn(executable, args, {
       cwd: root,
       detached: process.platform !== "win32",
-      env: minimalChildEnvironment(
-        options.environment ?? process.env,
-        options.environmentProfile,
-      ),
+      env: childEnvironment,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -1034,12 +1445,20 @@ export const executeCommand = async (
     let outputBytes = 0;
     let terminalError: QualityGateError | undefined;
     let settled = false;
+    const cleanup = async (): Promise<void> => {
+      await terminateProcessGroup(child);
+      await terminateEscapedProcesses(
+        ownershipToken,
+        gitExecution ? undefined : root,
+        baselineWorkspacePids,
+      );
+    };
     const timeout = setTimeout(() => {
       terminalError = new QualityGateError(
         "COMMAND_TIMEOUT",
         `exceeded ${timeoutMs}ms`,
       );
-      void terminateProcessGroup(child);
+      void cleanup();
     }, timeoutMs);
     timeout.unref();
     const appendOutput = (stream: "stdout" | "stderr", chunk: string): void => {
@@ -1049,7 +1468,7 @@ export const executeCommand = async (
           "COMMAND_OUTPUT_LIMIT",
           `exceeded ${maxOutputBytes} bytes`,
         );
-        void terminateProcessGroup(child);
+        void cleanup();
         return;
       }
       if (stream === "stdout") stdout += chunk;
@@ -1067,7 +1486,7 @@ export const executeCommand = async (
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      void terminateProcessGroup(child).then(
+      void cleanup().then(
         () =>
           rejectPromise(
             new QualityGateError("COMMAND_EXECUTION_FAILED", error.message),
@@ -1079,13 +1498,13 @@ export const executeCommand = async (
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      void terminateProcessGroup(child).then(() => {
+      void cleanup().then(() => {
         if (terminalError !== undefined) {
           rejectPromise(terminalError);
           return;
         }
         resolvePromise({
-          command: safeCommand,
+          command: reportCommand,
           started_at: startedAt,
           finished_at: clock().toISOString(),
           exit_code: code ?? -1,
@@ -1098,12 +1517,77 @@ export const executeCommand = async (
   });
 };
 
-const runGitRaw = async (root: string, args: string[]): Promise<string> => {
-  const result = await executeCommand(
+export const executeCommand = async (
+  root: string,
+  command: RunCommand,
+  options: ExecuteCommandOptions = {},
+): Promise<SpawnResult> => {
+  const safeCommand = validateCommand(command);
+  return await executeSpawn(
     root,
-    { executable: "git", args },
+    safeCommand,
+    safeCommand.executable,
+    safeCommand.args,
+    options,
+  );
+};
+
+let trustedGitExecutablePromise: Promise<string> | undefined;
+
+const trustedGitExecutable = async (): Promise<string> => {
+  trustedGitExecutablePromise ??= (async () => {
+    const candidates =
+      process.platform === "win32"
+        ? ["C:\\Program Files\\Git\\cmd\\git.exe"]
+        : ["/usr/bin/git"];
+    for (const candidate of candidates) {
+      const metadata = await lstat(candidate).catch(() => undefined);
+      if (metadata === undefined || !metadata.isFile()) continue;
+      // macOS system executables are commonly hard-linked instances of the
+      // immutable dyld stub. The root-owned, non-writable system path remains
+      // the trust boundary; launcher and verifier files still require one link.
+      assertProtectedOwnership(
+        metadata,
+        "GIT_CONTEXT_UNAVAILABLE",
+        "Git executable",
+        false,
+      );
+      if (process.platform !== "win32" && (metadata.mode & 0o111) === 0)
+        continue;
+      return await realpath(candidate);
+    }
+    return fail(
+      "GIT_CONTEXT_UNAVAILABLE",
+      "no trusted absolute system Git executable is available",
+    );
+  })();
+  return await trustedGitExecutablePromise;
+};
+
+const executeGit = async (
+  root: string,
+  args: string[],
+): Promise<SpawnResult> => {
+  const executable = await trustedGitExecutable();
+  const nullDevice = process.platform === "win32" ? "NUL" : "/dev/null";
+  return await executeCommand(
+    root,
+    {
+      executable,
+      args: [
+        "-c",
+        `core.hooksPath=${nullDevice}`,
+        "-c",
+        "core.fsmonitor=false",
+        ...args,
+      ],
+    },
     { environmentProfile: "git" },
   );
+};
+
+const runGitRaw = async (root: string, args: string[]): Promise<string> => {
+  const result = await executeGit(root, args);
   if (result.exit_code !== 0)
     fail("GIT_CONTEXT_UNAVAILABLE", result.stderr.trim());
   return result.stdout;
@@ -1115,7 +1599,36 @@ const runGit = async (root: string, args: string[]): Promise<string> =>
 interface TrackedSourceSnapshot {
   sha256: string;
   paths: string[];
+  entries: TrackedSourceEntry[];
 }
+
+interface TrackedSourceEntry {
+  mode: "100644" | "100755";
+  path: string;
+}
+
+const hashTrackedSourceEntries = async (
+  root: string,
+  entries: readonly TrackedSourceEntry[],
+): Promise<string> => {
+  const hash = createHash("sha256");
+  hash.update("HUOQIU-TRACKED-SOURCE\0v1\0");
+  for (const entry of entries) {
+    const absolute = safeRepositoryPath(root, entry.path, "GATE_INPUT_INVALID");
+    await assertNoSymlinkSegments(root, absolute, false, "GATE_INPUT_INVALID");
+    const contents = await readFile(absolute);
+    hash.update("MODE\0");
+    hash.update(entry.mode);
+    hash.update("\0PATH\0");
+    hash.update(entry.path);
+    hash.update("\0SIZE\0");
+    hash.update(String(contents.byteLength));
+    hash.update("\0CONTENT\0");
+    hash.update(contents);
+    hash.update("\0END\0");
+  }
+  return hash.digest("hex");
+};
 
 export const computeTrackedSourceSnapshot = async (
   root: string,
@@ -1138,7 +1651,7 @@ export const computeTrackedSourceSnapshot = async (
     .filter(Boolean);
   if (records.length === 0)
     fail("GIT_CONTEXT_UNAVAILABLE", "repository has no tracked files");
-  const entries = records.map((record) => {
+  const entries: TrackedSourceEntry[] = records.map((record) => {
     const match =
       /^([0-7]{6}) [a-f0-9]{40,64} ([0-3])\t([\s\S]+)$/u.exec(record) ??
       fail("GIT_CONTEXT_UNAVAILABLE", "tracked index entry is malformed");
@@ -1152,26 +1665,14 @@ export const computeTrackedSourceSnapshot = async (
     if (mode !== "100644" && mode !== "100755")
       fail("GATE_INPUT_INVALID", `${path} is not a regular tracked file`);
     safeRepositoryPath(root, path, "GATE_INPUT_INVALID");
-    return { mode, path };
+    return { mode: mode as TrackedSourceEntry["mode"], path };
   });
   entries.sort((left, right) => left.path.localeCompare(right.path));
-  const hash = createHash("sha256");
-  hash.update("HUOQIU-TRACKED-SOURCE\0v1\0");
-  for (const entry of entries) {
-    const absolute = safeRepositoryPath(root, entry.path, "GATE_INPUT_INVALID");
-    await assertNoSymlinkSegments(root, absolute, false, "GATE_INPUT_INVALID");
-    const contents = await readFile(absolute);
-    hash.update("MODE\0");
-    hash.update(entry.mode);
-    hash.update("\0PATH\0");
-    hash.update(entry.path);
-    hash.update("\0SIZE\0");
-    hash.update(String(contents.byteLength));
-    hash.update("\0CONTENT\0");
-    hash.update(contents);
-    hash.update("\0END\0");
-  }
-  return { sha256: hash.digest("hex"), paths: entries.map(({ path }) => path) };
+  return {
+    sha256: await hashTrackedSourceEntries(root, entries),
+    paths: entries.map(({ path }) => path),
+    entries,
+  };
 };
 
 export const computeCurrentContext = async (
@@ -1699,6 +2200,8 @@ const loadMilestoneInputs = async (
 interface ProtectedExecutionLauncher {
   path: string;
   sha256: string;
+  source: string;
+  identity: ProtectedFileIdentity;
 }
 
 const PROTECTED_ISOLATION_PROFILE =
@@ -1726,44 +2229,30 @@ const protectedExecutionLauncher = async (
     PROTECTED_ISOLATION_PROFILE
   )
     fail(code, "the protected execution isolation profile is missing");
-  if (!isAbsolute(configuredPath))
-    fail(code, "protected execution launcher path must be absolute");
-  const [launcherPath, repositoryPath] = await Promise.all([
-    realpath(configuredPath).catch(() =>
-      fail(code, "protected execution launcher cannot be resolved"),
-    ),
-    realpath(root).catch(() =>
-      fail(code, "repository root cannot be resolved"),
-    ),
-  ]);
-  const fromRepository = relative(repositoryPath, launcherPath);
-  if (
-    fromRepository === "" ||
-    (!fromRepository.startsWith(`..${sep}`) && fromRepository !== "..")
-  ) {
-    fail(
-      code,
-      "protected execution launcher must be outside the candidate repository",
-    );
-  }
-  const metadata = await lstat(launcherPath).catch(() =>
-    fail(code, "protected execution launcher cannot be inspected"),
+  const snapshot = await readProtectedFile(
+    configuredPath,
+    root,
+    code,
+    "protected execution launcher",
+    true,
   );
-  if (!metadata.isFile())
-    fail(code, "protected execution launcher is not a file");
-  if (process.platform !== "win32" && (metadata.mode & 0o111) === 0)
-    fail(code, "protected execution launcher is not executable");
-  const measuredSha = sha256(
-    await readFile(launcherPath).catch(() =>
-      fail(code, "protected execution launcher cannot be read"),
-    ),
-  );
+  const measuredSha = sha256(snapshot.bytes);
   if (measuredSha !== configuredSha)
     fail(code, "protected execution launcher digest mismatch");
   const registry = await loadTrustRegistry(root, environment);
   if (registry.registry.execution_launcher_sha256 !== measuredSha)
     fail(code, "launcher digest is not authorized by the trust registry");
-  return { path: launcherPath, sha256: measuredSha };
+  const source = assertSelfContainedBuiltInModule(
+    snapshot.bytes,
+    code,
+    "protected execution launcher",
+  );
+  return {
+    path: snapshot.path,
+    sha256: measuredSha,
+    source,
+    identity: snapshot.identity,
+  };
 };
 
 const executeWithProtectedLauncher = async (
@@ -1784,12 +2273,21 @@ const executeWithProtectedLauncher = async (
     }),
     "utf8",
   ).toString("base64");
-  const launcherResult = await executeCommand(
+  const launcherCommand = {
+    executable: launcher.path,
+    args: ["--huoqiu-request-v1", request],
+  };
+  const launcherResult = await executeSpawn(
     root,
-    {
-      executable: launcher.path,
-      args: ["--huoqiu-request-v1", request],
-    },
+    launcherCommand,
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      launcher.source,
+      "--",
+      ...launcherCommand.args,
+    ],
     {
       ...(options.timeoutMs === undefined
         ? {}
@@ -1837,18 +2335,21 @@ const executeWithProtectedLauncher = async (
   ) {
     fail("COMMAND_OUTPUT_LIMIT", `exceeded ${DEFAULT_MAX_OUTPUT_BYTES} bytes`);
   }
-  const postExecutionSha = sha256(
-    await readFile(launcher.path).catch(() =>
-      fail(
-        "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
-        "launcher disappeared during execution",
-      ),
-    ),
-  );
-  if (postExecutionSha !== launcher.sha256)
+  const postExecutionMetadata = await lstat(launcher.path).catch(() =>
     fail(
       "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
-      "launcher bytes changed during execution",
+      "launcher disappeared during execution",
+    ),
+  );
+  if (
+    !sameProtectedFileIdentity(
+      launcher.identity,
+      protectedFileIdentity(postExecutionMetadata),
+    )
+  )
+    fail(
+      "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
+      "launcher filesystem identity changed during execution",
     );
   return result;
 };
@@ -1862,20 +2363,94 @@ const executeInDetachedSnapshot = async (
 ): Promise<SpawnResult> => {
   const temporaryParent = await mkdtemp(resolve(tmpdir(), "huoqiu-snapshot-"));
   const snapshotRoot = resolve(temporaryParent, "worktree");
-  let added = false;
   const watchers: FSWatcher[] = [];
   let trackedWrite = false;
   try {
-    const add = await executeCommand(root, {
-      executable: "git",
-      args: ["worktree", "add", "--detach", snapshotRoot, context.commit_sha],
-    });
-    if (add.exit_code !== 0)
-      fail("SNAPSHOT_PREPARATION_FAILED", add.stderr.trim());
-    added = true;
-    const before = await computeTrackedSourceSnapshot(snapshotRoot);
+    // Materialize the already-hashed, regular tracked files directly. A Git
+    // checkout would execute candidate-controlled smudge filters and checkout
+    // hooks from .git/config/.gitattributes before the protected launcher runs.
+    const before = await computeTrackedSourceSnapshot(root);
     if (before.sha256 !== context.source_tree_sha256)
-      fail("SNAPSHOT_PREPARATION_FAILED", "detached source digest mismatch");
+      fail(
+        "SNAPSHOT_PREPARATION_FAILED",
+        "source digest changed before snapshot",
+      );
+    await mkdir(snapshotRoot, { recursive: true });
+    for (const entry of before.entries) {
+      const source = safeRepositoryPath(
+        root,
+        entry.path,
+        "SNAPSHOT_PREPARATION_FAILED",
+      );
+      const destination = safeRepositoryPath(
+        snapshotRoot,
+        entry.path,
+        "SNAPSHOT_PREPARATION_FAILED",
+      );
+      await assertNoSymlinkSegments(
+        root,
+        source,
+        false,
+        "SNAPSHOT_PREPARATION_FAILED",
+      );
+      const sourceHandle = await open(
+        source,
+        fsConstants.O_RDONLY |
+          (process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW),
+      ).catch(() =>
+        fail("SNAPSHOT_PREPARATION_FAILED", `${entry.path} cannot be opened`),
+      );
+      let contents: Buffer;
+      try {
+        const beforeRead = await sourceHandle.stat();
+        if (!beforeRead.isFile() || beforeRead.nlink !== 1)
+          fail(
+            "SNAPSHOT_PREPARATION_FAILED",
+            `${entry.path} must be a singly-linked regular file`,
+          );
+        contents = await sourceHandle.readFile();
+        const [afterRead, pathAfterRead] = await Promise.all([
+          sourceHandle.stat(),
+          lstat(source),
+        ]);
+        const identity = protectedFileIdentity(beforeRead);
+        if (
+          !sameProtectedFileIdentity(
+            identity,
+            protectedFileIdentity(afterRead),
+          ) ||
+          !sameProtectedFileIdentity(
+            identity,
+            protectedFileIdentity(pathAfterRead),
+          )
+        ) {
+          fail(
+            "SNAPSHOT_PREPARATION_FAILED",
+            `${entry.path} changed while being copied`,
+          );
+        }
+      } finally {
+        await sourceHandle.close();
+      }
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, contents, {
+        flag: "wx",
+        mode: entry.mode === "100755" ? 0o755 : 0o644,
+      });
+      await chmod(destination, entry.mode === "100755" ? 0o755 : 0o644);
+    }
+    const materializedDigest = await hashTrackedSourceEntries(
+      snapshotRoot,
+      before.entries,
+    );
+    if (materializedDigest !== before.sha256)
+      fail(
+        "SNAPSHOT_PREPARATION_FAILED",
+        "materialized source digest mismatch",
+      );
+    // Let filesystem notifications caused by our own materialization drain
+    // before watchers begin attributing writes to the candidate command.
+    await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 20));
     const tracked = new Set(before.paths);
     const directories = new Set(before.paths.map((path) => dirname(path)));
     for (const directory of directories) {
@@ -1919,8 +2494,11 @@ const executeInDetachedSnapshot = async (
       options,
     );
     await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 50));
-    const after = await computeTrackedSourceSnapshot(snapshotRoot);
-    if (trackedWrite || after.sha256 !== before.sha256)
+    const afterSha256 = await hashTrackedSourceEntries(
+      snapshotRoot,
+      before.entries,
+    );
+    if (trackedWrite || afterSha256 !== before.sha256)
       fail(
         "CONTEXT_CHANGED_DURING_EXECUTION",
         "tracked source was written inside the execution snapshot",
@@ -1928,12 +2506,6 @@ const executeInDetachedSnapshot = async (
     return execution;
   } finally {
     for (const watcher of watchers) watcher.close();
-    if (added) {
-      await executeCommand(root, {
-        executable: "git",
-        args: ["worktree", "remove", "--force", snapshotRoot],
-      }).catch(() => undefined);
-    }
     await rm(temporaryParent, { recursive: true, force: true });
   }
 };
@@ -1944,6 +2516,10 @@ export const runCapability = async (
   capId: string,
   options: { clock?: () => Date; environment?: NodeJS.ProcessEnv } = {},
 ): Promise<Evidence> => {
+  const environment = options.environment ?? process.env;
+  // Establish both protected code identities before parsing candidate
+  // manifests or invoking any host tool on behalf of the candidate.
+  const launcher = await protectedExecutionLauncher(root, environment);
   const manifest = await loadMilestoneDefinition(root, milestone);
   const item =
     manifest.required_caps.find((candidate) => candidate.cap_id === capId) ??
@@ -1958,8 +2534,6 @@ export const runCapability = async (
     );
   }
   const context = await computeCurrentContext(root, milestone);
-  const environment = options.environment ?? process.env;
-  const launcher = await protectedExecutionLauncher(root, environment);
   const commandOptions: ExecuteCommandOptions = {};
   if (options.clock !== undefined) commandOptions.clock = options.clock;
   if (options.environment !== undefined)
@@ -2474,9 +3048,33 @@ const trustRegistrySigningBytes = (registry: TrustRegistry): Uint8Array =>
     "utf8",
   );
 
-const verifierRoot = (
-  environment: NodeJS.ProcessEnv,
-): { keyId: string; publicKey: ReturnType<typeof createPublicKey> } => {
+interface VerifierRootAnchor {
+  keyId: string;
+  publicKey: ReturnType<typeof createPublicKey>;
+}
+
+const verifyRegistryRootSignature = (
+  registry: TrustRegistry,
+  rootAnchor: VerifierRootAnchor,
+): void => {
+  const signature =
+    registry.signature ??
+    fail("REVIEW_TRUST_REQUIRED", "trust registry is not root-signed");
+  if (signature.key_id !== rootAnchor.keyId)
+    fail("REVIEW_TRUST_REGISTRY_INVALID", "registry root key ID mismatch");
+  if (
+    !verifyBytes(
+      null,
+      trustRegistrySigningBytes(registry),
+      rootAnchor.publicKey,
+      Buffer.from(signature.value_base64, "base64"),
+    )
+  ) {
+    fail("REVIEW_TRUST_REGISTRY_INVALID", "registry root signature invalid");
+  }
+};
+
+const verifierRoot = (environment: NodeJS.ProcessEnv): VerifierRootAnchor => {
   const encoded =
     environment.HUOQIU_VERIFIER_ROOT_PUBLIC_KEY_SPKI_B64 ??
     fail(
@@ -2507,6 +3105,70 @@ const verifierRoot = (
   return { keyId, publicKey };
 };
 
+const verifyTrustRegistryHistory = (
+  current: TrustRegistry,
+  rootAnchor: VerifierRootAnchor,
+  environment: NodeJS.ProcessEnv,
+): string | undefined => {
+  const code = "REVIEW_TRUST_REGISTRY_INVALID";
+  const encodedHistory = environment.HUOQIU_TRUST_REGISTRY_HISTORY_B64;
+  if (current.epoch === 1) {
+    if (encodedHistory !== undefined)
+      fail(code, "epoch 1 must not carry registry history bytes");
+    return undefined;
+  }
+  const encoded =
+    encodedHistory ??
+    fail(code, "epochs after 1 require exact previous registry bytes");
+  const historyBytes = Buffer.from(encoded, "base64");
+  if (historyBytes.toString("base64") !== encoded)
+    fail(code, "registry history is not canonical base64");
+  const parsedHistory = parseJson(
+    historyBytes.toString("utf8"),
+    code,
+    "protected registry history",
+  );
+  if (!Array.isArray(parsedHistory))
+    fail(code, "registry history must be an array");
+  const history = parsedHistory as unknown[];
+  if (history.length !== current.epoch - 1)
+    fail(code, "registry history must contain every epoch before current");
+  let previousDigest: string | null = null;
+  for (let index = 0; index < history.length; index += 1) {
+    const encodedRegistry = requireString(
+      history[index],
+      code,
+      `registry history epoch ${index + 1}`,
+    );
+    const rawRegistry = Buffer.from(encodedRegistry, "base64");
+    if (rawRegistry.toString("base64") !== encodedRegistry)
+      fail(code, `registry history epoch ${index + 1} is not canonical base64`);
+    const registry = validateTrustRegistry(
+      parseJson(
+        rawRegistry.toString("utf8"),
+        code,
+        `registry history epoch ${index + 1}`,
+      ),
+    );
+    verifyRegistryRootSignature(registry, rootAnchor);
+    if (
+      registry.epoch !== index + 1 ||
+      registry.repository_id !== current.repository_id ||
+      registry.trust_domain !== current.trust_domain ||
+      registry.previous_registry_sha256 !== previousDigest
+    ) {
+      fail(
+        code,
+        `registry history epoch ${index + 1} breaks repository/trust-domain/epoch linkage`,
+      );
+    }
+    previousDigest = sha256(rawRegistry);
+  }
+  if (current.previous_registry_sha256 !== previousDigest)
+    fail(code, "current registry does not link to the exact N-1 bytes");
+  return previousDigest ?? undefined;
+};
+
 const measuredVerifierSha256 = async (
   root: string,
   environment: NodeJS.ProcessEnv,
@@ -2517,39 +3179,33 @@ const measuredVerifierSha256 = async (
     fail(code, "protected verifier entrypoint path is required");
   const actualArgument =
     process.argv[1] ?? fail(code, "actual verifier entrypoint is unavailable");
-  if (!isAbsolute(configuredPath))
-    fail(code, "protected verifier entrypoint path must be absolute");
-  const [configuredRealPath, actualRealPath, repositoryRealPath] =
-    await Promise.all([
-      realpath(configuredPath).catch(() =>
-        fail(code, "protected verifier entrypoint cannot be resolved"),
-      ),
-      realpath(resolve(actualArgument)).catch(() =>
-        fail(code, "actual verifier entrypoint cannot be resolved"),
-      ),
-      realpath(root).catch(() =>
-        fail(code, "repository root cannot be resolved"),
-      ),
-    ]);
-  if (configuredRealPath !== actualRealPath)
-    fail(code, "configured verifier is not the executing entrypoint");
-  const fromRepository = relative(repositoryRealPath, actualRealPath);
-  if (
-    fromRepository === "" ||
-    (!fromRepository.startsWith(`..${sep}`) && fromRepository !== "..")
-  ) {
-    fail(code, "verifier entrypoint must be outside the candidate repository");
-  }
-  const entrypoint = await lstat(actualRealPath).catch(() =>
-    fail(code, "actual verifier entrypoint cannot be inspected"),
-  );
-  if (!entrypoint.isFile())
-    fail(code, "actual verifier entrypoint is not a file");
-  return sha256(
-    await readFile(actualRealPath).catch(() =>
-      fail(code, "actual verifier entrypoint cannot be read"),
+  const [snapshot, loadedCore] = await Promise.all([
+    readProtectedFile(
+      configuredPath,
+      root,
+      code,
+      "protected verifier entrypoint",
+      false,
     ),
+    readProtectedFile(
+      fileURLToPath(import.meta.url),
+      root,
+      code,
+      "loaded verifier core",
+      false,
+    ),
+  ]);
+  const actualRealPath = await realpath(resolve(actualArgument)).catch(() =>
+    fail(code, "actual verifier entrypoint cannot be resolved"),
   );
+  if (snapshot.path !== actualRealPath)
+    fail(code, "configured verifier is not the executing entrypoint");
+  assertSelfContainedBuiltInModule(
+    loadedCore.bytes,
+    code,
+    "loaded verifier core",
+  );
+  return verifierBundleSha256(snapshot.bytes, loadedCore.bytes);
 };
 
 const loadTrustRegistry = async (
@@ -2590,19 +3246,7 @@ const loadTrustRegistry = async (
         TRUST_REGISTRY_PATH,
       ),
     );
-    const signature =
-      registry.signature ??
-      fail("REVIEW_TRUST_REQUIRED", "trust registry is not root-signed");
-    if (signature.key_id !== rootAnchor.keyId)
-      fail("REVIEW_TRUST_REGISTRY_INVALID", "registry root key ID mismatch");
-    const verified = verifyBytes(
-      null,
-      trustRegistrySigningBytes(registry),
-      rootAnchor.publicKey,
-      Buffer.from(signature.value_base64, "base64"),
-    );
-    if (!verified)
-      fail("REVIEW_TRUST_REGISTRY_INVALID", "registry root signature invalid");
+    verifyRegistryRootSignature(registry, rootAnchor);
     const expectedRepositoryId = environment.HUOQIU_REPOSITORY_ID;
     const expectedVerifierSha = environment.HUOQIU_VERIFIER_SHA256;
     const expectedEpoch = environment.HUOQIU_TRUST_REGISTRY_EPOCH;
@@ -2623,6 +3267,11 @@ const loadTrustRegistry = async (
     }
     const protectedPreviousSha =
       environment.HUOQIU_TRUST_REGISTRY_PREVIOUS_SHA256;
+    const verifiedPreviousSha = verifyTrustRegistryHistory(
+      registry,
+      rootAnchor,
+      environment,
+    );
     if (registry.epoch === 1) {
       if (protectedPreviousSha !== undefined)
         fail(
@@ -2636,7 +3285,10 @@ const loadTrustRegistry = async (
         "HUOQIU_TRUST_REGISTRY_PREVIOUS_SHA256",
         /^[a-f0-9]{64}$/,
       );
-      if (registry.previous_registry_sha256 !== expectedPreviousSha)
+      if (
+        registry.previous_registry_sha256 !== expectedPreviousSha ||
+        verifiedPreviousSha !== expectedPreviousSha
+      )
         fail(
           "VERIFIER_TRUST_ROOT_REQUIRED",
           "previous trust registry digest does not match the protected chain pin",
@@ -3080,10 +3732,12 @@ const canonicalDiffSha256 = async (
   trustedBaseSha: string,
   headSha: string,
 ): Promise<string> => {
-  const ancestry = await executeCommand(root, {
-    executable: "git",
-    args: ["merge-base", "--is-ancestor", trustedBaseSha, headSha],
-  });
+  const ancestry = await executeGit(root, [
+    "merge-base",
+    "--is-ancestor",
+    trustedBaseSha,
+    headSha,
+  ]);
   if (ancestry.exit_code !== 0)
     fail("AUTHORSHIP_ATTESTATION_INVALID", "trusted base is not an ancestor");
   const diff = await runGitRaw(root, [
@@ -3143,13 +3797,13 @@ export const recordAuthorship = async (
   } = {},
 ): Promise<AuthorshipAttestation> => {
   const environment = options.environment ?? process.env;
+  const registry = await loadTrustRegistry(root, environment);
   const context = await computeCurrentContext(root, options.milestone ?? "d0");
   if (context.commit_sha !== commitSha)
     fail(
       "AUTHORSHIP_ATTESTATION_INVALID",
       "authorship only accepts current HEAD",
     );
-  const registry = await loadTrustRegistry(root, environment);
   const identity = resolveTrustedReviewerIdentity(environment);
   const { keyId, policy } = policyForKey(
     registry.registry,
@@ -4020,16 +4674,16 @@ export const recordReview = async (
       "REVIEW_DIMENSION_INVALID",
       `${milestone} requires ${expectedDimension ?? "default"}`,
     );
+  const environment = options.environment ?? process.env;
+  // Verify the external verifier/root/registry identity before Git or any
+  // candidate-controlled artifact is consumed.
+  const loadedRegistry = await loadTrustRegistry(root, environment);
   const { manifest, context } = await loadMilestoneInputs(root, milestone);
   if (commitSha !== context.commit_sha)
     fail("STALE_EVIDENCE", "record-review only accepts current HEAD");
   const artifacts = await loadAllEvidence(root, manifest, context);
   const currentEvidenceSet = evidenceSet(artifacts);
   const implementerIds = sortedImplementers(artifacts);
-  const environment = options.environment ?? process.env;
-  // Establish the protected root of trust before consuming any candidate
-  // authorship artifact. This also makes an unconfigured registry fail closed.
-  const loadedRegistry = await loadTrustRegistry(root, environment);
   const authorship = await verifyAuthorship(
     root,
     context,
@@ -4137,6 +4791,8 @@ export const runGate = async (
   milestone: Milestone,
   options: { environment?: NodeJS.ProcessEnv } = {},
 ): Promise<string> => {
+  const environment = options.environment ?? process.env;
+  await loadTrustRegistry(root, environment);
   const { manifest, context } = await loadMilestoneInputs(root, milestone);
   const artifacts = await loadAllEvidence(root, manifest, context);
   const unknownReview = await readEvidenceJson(
@@ -4162,14 +4818,7 @@ export const runGate = async (
     }
   }
   const review = validateReview(unknownReview);
-  await verifyReview(
-    root,
-    review,
-    milestone,
-    context,
-    artifacts,
-    options.environment ?? process.env,
-  );
+  await verifyReview(root, review, milestone, context, artifacts, environment);
   const totals = artifacts.reduce(
     (current, artifact) => ({
       failed: current.failed + artifact.evidence.failed,

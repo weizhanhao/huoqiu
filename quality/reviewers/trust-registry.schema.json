@@ -4,7 +4,7 @@
   "title": "Huoqiu root-signed trust registry v2",
   "type": "object",
   "additionalProperties": false,
-  "$comment": "Runtime verification additionally validates root SPKI/key-ID pins from a protected channel, the exact current registry digest, detached root signature, actual verifier and protected execution-launcher bytes, repository and accepted-epoch pins, policy/repository consistency, key-ID derivation, epoch linkage, and expiry.",
+  "$comment": "Runtime verification additionally validates root SPKI/key-ID pins from a protected channel, the exact current registry digest, detached root signature, a composite digest of the actual verifier entrypoint plus loaded built-in-only core, stable protected execution-launcher bytes and filesystem identity, repository and accepted-epoch pins, the complete root-signed raw registry chain through N-1, policy/repository consistency, key-ID derivation, and expiry.",
   "required": [
     "schema_version",
     "trust_domain",
