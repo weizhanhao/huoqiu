@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": ["expo/tsconfig.base", "@huoqiu/config/tsconfig/react-native"],
+  "compilerOptions": {
+    "strict": true,
+    "types": ["react", "react-native"]
+  },
+  "include": [
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "vitest.config.ts"
+  ]
+}

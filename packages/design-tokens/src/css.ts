@@ -1,4 +1,4 @@
-import { tokens } from "./tokens.js";
+import { tokens } from "@huoqiu/design-tokens";
 
 type TokenTree = Readonly<{
   [key: string]: string | TokenTree;

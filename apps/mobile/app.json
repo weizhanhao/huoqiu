@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "火球",
+    "slug": "huoqiu",
+    "scheme": "huoqiu",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router"],
+    "ios": {
+      "bundleIdentifier": "com.huoqiu.alpha",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.huoqiu.alpha",
+      "permissions": [],
+      "blockedPermissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    }
+  }
+}

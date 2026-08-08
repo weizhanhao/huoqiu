@@ -1,0 +1,28 @@
+{
+  "name": "@huoqiu/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "lint": "eslint --config ../../packages/config/eslint/react.mjs src tests next.config.ts vitest.config.ts",
+    "start": "next start",
+    "test": "vitest run --config vitest.config.ts tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@huoqiu/web-ui": "workspace:*",
+    "next": "16.3.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@huoqiu/config": "workspace:*",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "eslint": "10.8.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

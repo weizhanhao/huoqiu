@@ -1,0 +1,36 @@
+{
+  "name": "@huoqiu/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "expo-router/entry",
+  "scripts": {
+    "build": "expo export --platform web",
+    "dev": "expo start",
+    "lint": "eslint --config ../../packages/config/eslint/react.mjs app tests vitest.config.ts",
+    "test": "vitest run --config vitest.config.ts tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "57.0.8",
+    "@huoqiu/native-ui": "workspace:*",
+    "expo": "57.0.11",
+    "expo-constants": "57.0.9",
+    "expo-linking": "57.0.5",
+    "expo-router": "57.0.11",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.26.2",
+    "react-native-web": "0.21.2"
+  },
+  "devDependencies": {
+    "@huoqiu/config": "workspace:*",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "eslint": "10.8.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
