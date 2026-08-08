@@ -53,6 +53,12 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
 
+  packages/contracts:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+
   packages/design-tokens:
     dependencies:
       eslint:
@@ -84,6 +90,24 @@ importers:
       "@huoqiu/config":
         specifier: workspace:*
         version: link:../config
+
+  packages/native-ui:
+    dependencies:
+      "@huoqiu/design-tokens":
+        specifier: workspace:*
+        version: link:../design-tokens
+
+  packages/testkit:
+    dependencies:
+      "@huoqiu/contracts":
+        specifier: workspace:*
+        version: link:../contracts
+
+  packages/web-ui:
+    dependencies:
+      "@huoqiu/design-tokens":
+        specifier: workspace:*
+        version: link:../design-tokens
 
 packages:
   "@babel/code-frame@7.29.7":

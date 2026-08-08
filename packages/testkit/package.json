@@ -1,0 +1,17 @@
+{
+  "name": "@huoqiu/testkit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint --config ../config/eslint/base.mjs src",
+    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node src/index.ts"
+  },
+  "dependencies": {
+    "@huoqiu/contracts": "workspace:*"
+  }
+}

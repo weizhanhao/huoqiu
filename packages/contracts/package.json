@@ -1,0 +1,20 @@
+{
+  "name": "@huoqiu/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./shared/error": "./src/shared/error.ts",
+    "./shared/page": "./src/shared/page.ts"
+  },
+  "scripts": {
+    "lint": "eslint --config ../config/eslint/base.mjs src test",
+    "test": "vitest run --config ../config/vitest/base.ts test",
+    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals src/index.ts src/shared/error.ts src/shared/page.ts test/shared.spec.ts"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  }
+}
