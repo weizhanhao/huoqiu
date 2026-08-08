@@ -1,3 +1,5 @@
+import { isAbsolute } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -233,6 +235,116 @@ describe("D0 mobile evidence", () => {
       testHarness.requests.find(({ label }) => label === "app-launch")?.args,
     ).toContain("emulator-5554");
     expect(testHarness.cleanup).toHaveBeenCalledOnce();
+  });
+
+  it("rejects exit-zero output containing one passed and one failed flow", async () => {
+    const testHarness = harness({
+      "git-head": result({ stdout: `${SHA}\n` }),
+      "git-status": result(),
+      "android-probe": result({
+        stdout: "List of devices attached\nemulator-5554\tdevice\n",
+      }),
+      "maestro-probe": result({ stdout: "2.0.0\n" }),
+      "snapshot-install": result(),
+      "expo-export": result(),
+      "expo-prebuild": result(),
+      "app-launch": result(),
+      "maestro-flow": result({
+        stdout: "1 Flow Passed\n1 Flow Failed\n0 Flows Skipped\n",
+      }),
+    });
+
+    await expect(
+      runMobileD0Evidence(["--platform", "android"], testHarness.dependencies),
+    ).rejects.toThrow("D0_MOBILE_NOT_VERIFIED");
+    expect(testHarness.output).toEqual([
+      "D0_MOBILE NOT_VERIFIED platform=android reason=maestro_flow_result_invalid",
+    ]);
+  });
+
+  it("logs git head/status and snapshot archive/extract after establishing artifacts", async () => {
+    const events: string[] = [];
+    const testHarness = harness({
+      "git-head": result({ stdout: `${SHA}\n` }),
+      "git-status": result(),
+      "ios-probe": result({ exitCode: 72, stderr: "unavailable\n" }),
+      "snapshot-archive": result(),
+      "snapshot-extract": result(),
+      "snapshot-install": result(),
+      "expo-export": result(),
+      "expo-prebuild": result(),
+    });
+    const originalRun = testHarness.dependencies.runCommand;
+    testHarness.dependencies.runCommand = vi.fn(async (request) => {
+      events.push(`run:${request.label}`);
+      return await originalRun(request);
+    });
+    testHarness.dependencies.writeArtifact = vi.fn(
+      async (directory, name, contents) => {
+        events.push(`write:${name}`);
+        testHarness.artifacts.set(`${directory}/${name}`, contents);
+      },
+    );
+
+    await expect(
+      runMobileD0Evidence(["--platform", "ios"], testHarness.dependencies),
+    ).rejects.toThrow("D0_MOBILE_NOT_VERIFIED");
+
+    for (const label of [
+      "git-head",
+      "git-status",
+      "snapshot-archive",
+      "snapshot-extract",
+    ]) {
+      expect(
+        testHarness.artifacts.get(
+          `/evidence/${SHA}/mobile-d0/ios/${label}.log`,
+        ),
+      ).toContain(`\"label\":\"${label}\"`);
+    }
+    expect(events.indexOf("write:git-head.log")).toBeLessThan(
+      events.indexOf("run:git-status"),
+    );
+  });
+
+  it("ignores a hostile PATH and only launches recorded absolute tool identities", async () => {
+    const testHarness = harness({
+      "git-head": result({ stdout: `${SHA}\n` }),
+      "git-status": result(),
+      "android-probe": result({ exitCode: 127, stderr: "unavailable\n" }),
+      "snapshot-archive": result(),
+      "snapshot-extract": result(),
+      "snapshot-install": result(),
+      "expo-export": result(),
+      "expo-prebuild": result(),
+    });
+    const originalPath = process.env.PATH;
+    process.env.PATH = "/attacker-controlled/bin";
+    try {
+      await expect(
+        runMobileD0Evidence(
+          ["--platform", "android"],
+          testHarness.dependencies,
+        ),
+      ).rejects.toThrow("D0_MOBILE_NOT_VERIFIED");
+    } finally {
+      process.env.PATH = originalPath;
+    }
+
+    expect(testHarness.requests).not.toHaveLength(0);
+    expect(
+      testHarness.requests.every(({ executable }) => isAbsolute(executable)),
+    ).toBe(true);
+    const summary = JSON.parse(
+      testHarness.artifacts.get(
+        `/evidence/${SHA}/mobile-d0/android/summary.json`,
+      ) ?? "null",
+    ) as { tools?: Record<string, unknown> } | null;
+    expect(summary?.tools).toMatchObject({
+      git: { realpath: expect.any(String), sha256: expect.any(String) },
+      pnpm: { realpath: expect.any(String), sha256: expect.any(String) },
+      tar: { realpath: expect.any(String), sha256: expect.any(String) },
+    });
   });
 
   it("runs both fallback captures even when snapshot installation fails", async () => {
