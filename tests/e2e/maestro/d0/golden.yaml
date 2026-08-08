@@ -1,0 +1,21 @@
+appId: com.huoqiu.alpha
+name: D0 fixture golden path
+---
+- launchApp:
+    clearState: true
+- assertVisible: "演示数据"
+- tapOn: "搜索演示标的"
+- tapOn: "输入演示标的关键词"
+- inputText: SYN001
+- tapOn: "提交演示标的搜索"
+- assertVisible: "搜索结果"
+- tapOn: "打开合成示例一号详情"
+- assertVisible: "huoqiu-synthetic"
+- assertVisible: "固定 Fixture · 非实时行情"
+- tapOn: "加自选"
+- assertVisible: "已加自选"
+- tapOn: "返回"
+- tapOn: "返回"
+- tapOn: "自选"
+- assertVisible: "我的自选"
+- assertVisible: "合成示例一号"
