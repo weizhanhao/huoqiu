@@ -19,7 +19,7 @@ describe("synthetic D0 market fixture", () => {
         listing_id: "listing_syn_0001",
         symbol: "SYN001",
         name: "合成示例一号",
-        pinyin: "hechengshiliyhao",
+        pinyin: "hechengshiliyihao",
         aliases: ["合成一号", "synthetic one"],
         market: "CN",
         currency: "CNY",
