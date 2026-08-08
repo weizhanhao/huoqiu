@@ -19,14 +19,29 @@ const expoRoot = dirname(require.resolve("expo/package.json"));
 const expoModules = readJson<Readonly<Record<string, string>>>(
   join(expoRoot, "bundledNativeModules.json"),
 );
+const lockfile = readFileSync(join(mobileRoot, "../../pnpm-lock.yaml"), "utf8");
 
 const expectedNativeDependencies = {
-  "react-native-gesture-handler": "~2.32.0",
   "react-native-reanimated": "4.5.1",
   "react-native-worklets": "0.10.1",
 } as const;
 
 describe("Expo native dependency graph", () => {
+  it("pins react-native-gesture-handler exactly within the Expo SDK 57 range", () => {
+    expect(expoModules["react-native-gesture-handler"]).toBe("~2.32.0");
+    expect(manifest.dependencies?.["react-native-gesture-handler"]).toBe(
+      "2.32.0",
+    );
+
+    const installedManifest = readJson<PackageManifest>(
+      require.resolve("react-native-gesture-handler/package.json"),
+    );
+    expect(installedManifest.version).toBe("2.32.0");
+    expect(lockfile).toMatch(
+      /react-native-gesture-handler:\n\s+specifier: 2\.32\.0\n\s+version: 2\.32\.0(?:\(|\n)/u,
+    );
+  });
+
   it.each(Object.entries(expectedNativeDependencies))(
     "declares Expo SDK 57 mapping for %s",
     (dependency, expectedVersion) => {

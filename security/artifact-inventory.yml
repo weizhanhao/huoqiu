@@ -1,0 +1,41 @@
+# prettier-ignore
+{
+  "schema_version": 1,
+  "actions": [
+    {
+      "owner": "actions",
+      "repository": "checkout",
+      "release": "v7.0.1",
+      "commit_sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "source_url": "https://github.com/actions/checkout",
+      "license": "MIT",
+      "platform_owner": "platform-engineering"
+    },
+    {
+      "owner": "pnpm",
+      "repository": "setup",
+      "release": "v2.0.0",
+      "commit_sha": "c9883cc79df532ad1a7b81bf9ab944ceb090d65c",
+      "source_url": "https://github.com/pnpm/setup",
+      "license": "MIT",
+      "platform_owner": "platform-engineering"
+    },
+    {
+      "owner": "actions",
+      "repository": "upload-artifact",
+      "release": "v7.0.1",
+      "commit_sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "source_url": "https://github.com/actions/upload-artifact",
+      "license": "MIT",
+      "platform_owner": "platform-engineering"
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "unit-test-log-${{ github.run_id }}-${{ github.run_attempt }}",
+      "path": "test-results/unit.log",
+      "classification": "internal-ci-test-log",
+      "retention_days": 7
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  EXPO_NO_TELEMETRY: "1"
+  TURBO_TELEMETRY_DISABLED: "1"
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up pnpm and Node
+        uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
+        with:
+          version: 11.4.0
+          runtime: node@24.15.0
+          install: false
+          cache: false
+      - name: Verify toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node --version)" = "v24.15.0"
+          test "$(pnpm --version)" = "11.4.0"
+      - name: Install dependencies
+        shell: bash
+        run: pnpm install --frozen-lockfile --strict-peer-dependencies
+      - name: Verify generated state is clean
+        shell: bash
+        run: git diff --exit-code
+
+  quality:
+    name: Quality (${{ matrix.lane }})
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [format, lint, typecheck, test, build, boundaries]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up pnpm and Node
+        uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
+        with:
+          version: 11.4.0
+          runtime: node@24.15.0
+          install: false
+          cache: false
+      - name: Install dependencies
+        shell: bash
+        run: pnpm install --frozen-lockfile --strict-peer-dependencies
+      - name: Run fixed quality lane
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.lane }}" in
+            format) pnpm format:check ;;
+            lint) pnpm lint ;;
+            typecheck) pnpm typecheck ;;
+            test)
+              mkdir -p test-results
+              pnpm test 2>&1 | tee test-results/unit.log
+              ;;
+            build) pnpm build ;;
+            boundaries) pnpm qa:boundaries ;;
+            *) exit 64 ;;
+          esac
+      - name: Upload unit-test log
+        if: ${{ always() && matrix.lane == 'test' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/unit.log
+          if-no-files-found: error
+          retention-days: 7
