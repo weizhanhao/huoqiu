@@ -12,7 +12,12 @@ export default function HomeScreen() {
     <ScrollView contentContainerStyle={styles.canvas} style={styles.viewport}>
       <View style={styles.shell}>
         <View style={styles.masthead}>
-          <View style={styles.brandMark} accessibilityElementsHidden>
+          <View
+            accessibilityElementsHidden
+            aria-hidden
+            importantForAccessibility="no-hide-descendants"
+            style={styles.brandMark}
+          >
             <Text style={styles.brandGlyph}>火</Text>
           </View>
           <View>
