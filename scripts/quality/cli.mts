@@ -10,10 +10,11 @@ export const parseStrictFlags = (
   allowed: ReadonlySet<string>,
   repeatable: ReadonlySet<string> = new Set(),
 ): Map<string, string[]> => {
+  const normalizedArgs = args[0] === "--" ? args.slice(1) : args;
   const parsed = new Map<string, string[]>();
-  for (let index = 0; index < args.length; index += 2) {
-    const flag = args[index];
-    const value = args[index + 1];
+  for (let index = 0; index < normalizedArgs.length; index += 2) {
+    const flag = normalizedArgs[index];
+    const value = normalizedArgs[index + 1];
     if (
       flag === undefined ||
       !flag.startsWith("--") ||

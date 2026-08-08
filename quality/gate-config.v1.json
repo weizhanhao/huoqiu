@@ -95,6 +95,7 @@
   "config_inputs": [
     "quality/gate-config.v1.json",
     "quality/evidence/evidence.schema.json",
-    "quality/evidence/review.schema.json"
+    "quality/evidence/review.schema.json",
+    "quality/reviewers/trust-registry.v1.json"
   ]
 }

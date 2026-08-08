@@ -1,5 +1,18 @@
-import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import {
+  createHash,
+  createPrivateKey,
+  createPublicKey,
+  sign as signBytes,
+  verify as verifyBytes,
+} from "node:crypto";
+import {
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  writeFile,
+} from "node:fs/promises";
 import { arch, platform } from "node:os";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
@@ -80,6 +93,7 @@ const CONFIG_INPUT_PATHS = [
   "quality/gate-config.v1.json",
   "quality/evidence/evidence.schema.json",
   "quality/evidence/review.schema.json",
+  "quality/reviewers/trust-registry.v1.json",
 ] as const;
 
 const INVALID_TEST_MARKERS = [
@@ -140,6 +154,17 @@ const requireString = (value: unknown, code: string, label: string): string => {
     fail(code, `${label} must be a non-empty string`);
   }
   return value as string;
+};
+
+const requirePatternString = (
+  value: unknown,
+  code: string,
+  label: string,
+  pattern: RegExp,
+): string => {
+  const text = requireString(value, code, label);
+  if (!pattern.test(text)) fail(code, `${label} has an invalid format`);
+  return text;
 };
 
 const requireInteger = (
@@ -286,6 +311,7 @@ const FORBIDDEN_EXECUTABLES = new Set([
   "cmd.exe",
   "fish",
   "powershell",
+  "powershell.exe",
   "pwsh",
   "sh",
   "zsh",
@@ -302,9 +328,15 @@ export const validateCommand = (
     code,
     "command.executable",
   );
+  const executableBasename = executable
+    .replaceAll("\\", "/")
+    .split("/")
+    .at(-1)
+    ?.toLowerCase();
   if (
     /\s/.test(executable) ||
-    FORBIDDEN_EXECUTABLES.has(executable.toLowerCase())
+    executableBasename === undefined ||
+    FORBIDDEN_EXECUTABLES.has(executableBasename)
   ) {
     fail(code, "command executable must be a non-shell argv token");
   }
@@ -328,6 +360,28 @@ export interface CapabilityManifest {
   required_caps: CapabilityManifestItem[];
   stretch_cap_ids: string[];
 }
+
+const PENDING_IMPLEMENTER_ID = "pending:capability-implementation";
+
+const pendingCapabilityCommand = (capId: string): RunCommand => ({
+  executable: "pnpm",
+  args: [
+    "exec",
+    "tsx",
+    "scripts/quality/not-implemented-gate.mts",
+    "--cap",
+    capId,
+  ],
+});
+
+const isCanonicalIdentity = (value: string): boolean =>
+  /^github:[1-9][0-9]*$/.test(value);
+
+const isPendingCapability = (item: CapabilityManifestItem): boolean =>
+  item.implementer_ids.length === 1 &&
+  item.implementer_ids[0] === PENDING_IMPLEMENTER_ID &&
+  canonicalJson(item.command) ===
+    canonicalJson(pendingCapabilityCommand(item.cap_id));
 
 export const validateManifest = (
   value: unknown,
@@ -373,15 +427,30 @@ export const validateManifest = (
       );
       if (!/^CAP-[A-Z]+-[0-9]{3}$/.test(capId))
         fail(code, `invalid CAP ID ${capId}`);
-      return {
+      const command = validateCommand(item.command, code);
+      const implementerIds = requireUniqueStrings(
+        item.implementer_ids,
+        code,
+        `required_caps[${index}].implementer_ids`,
+      );
+      const candidate = {
         cap_id: capId,
-        command: validateCommand(item.command, code),
-        implementer_ids: requireUniqueStrings(
-          item.implementer_ids,
-          code,
-          `required_caps[${index}].implementer_ids`,
-        ),
+        command,
+        implementer_ids: implementerIds,
       };
+      const hasPendingIdentity = implementerIds.includes(
+        PENDING_IMPLEMENTER_ID,
+      );
+      if (
+        (hasPendingIdentity && !isPendingCapability(candidate)) ||
+        (!hasPendingIdentity && !implementerIds.every(isCanonicalIdentity))
+      ) {
+        fail(
+          code,
+          `required_caps[${index}].implementer_ids must be canonical GitHub IDs or the exact pending sentinel command`,
+        );
+      }
+      return candidate;
     },
   );
   const stretchCapIds = requireUniqueStrings(
@@ -472,8 +541,26 @@ const assertNoSymlinkSegments = async (
 ): Promise<void> => {
   const rootAbsolute = resolve(root);
   const relativePath = relative(rootAbsolute, absolute);
+  const rootStat = await lstat(rootAbsolute).catch(() =>
+    fail(code, "repository root cannot be inspected"),
+  );
+  if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+    fail(code, "repository root must be a real directory");
+  }
+  const rootReal = await realpath(rootAbsolute);
+  const assertContained = (candidate: string): void => {
+    const relativeReal = relative(rootReal, candidate);
+    if (
+      relativeReal === ".." ||
+      relativeReal.startsWith(`..${sep}`) ||
+      isAbsolute(relativeReal)
+    ) {
+      fail(code, `${toPosix(relativePath)} resolves outside the repository`);
+    }
+  };
   let cursor = rootAbsolute;
-  for (const [index, segment] of relativePath.split(sep).entries()) {
+  const segments = relativePath.split(sep);
+  for (const [index, segment] of segments.entries()) {
     cursor = resolve(cursor, segment);
     try {
       const stat = await lstat(cursor);
@@ -484,14 +571,16 @@ const assertNoSymlinkSegments = async (
         allowMissingLeaf &&
         isRecord(error) &&
         error.code === "ENOENT" &&
-        index <= relativePath.split(sep).length - 1
+        index <= segments.length - 1
       ) {
+        assertContained(await realpath(dirname(cursor)));
         return;
       }
       if (error instanceof QualityGateError) throw error;
       throw error;
     }
   }
+  assertContained(await realpath(absolute));
 };
 
 const readEvidenceFile = async (
@@ -546,6 +635,7 @@ const collectDirectoryFiles = async (
   const stat = await lstat(absolute).catch(() =>
     fail("GATE_INPUT_MISSING", `${directoryPath} does not exist`),
   );
+  await assertNoSymlinkSegments(root, absolute, false, "GATE_INPUT_INVALID");
   if (stat.isSymbolicLink() || !stat.isDirectory()) {
     fail("GATE_INPUT_INVALID", `${directoryPath} must be a real directory`);
   }
@@ -584,6 +674,12 @@ const expandInputs = async (
     const absolute = safeRepositoryPath(root, input.path, "GATE_INPUT_INVALID");
     try {
       const stat = await lstat(absolute);
+      await assertNoSymlinkSegments(
+        root,
+        absolute,
+        false,
+        "GATE_INPUT_INVALID",
+      );
       if (stat.isSymbolicLink() || !stat.isFile())
         fail("GATE_INPUT_INVALID", `${input.path} must be a real file`);
     } catch (error) {
@@ -610,9 +706,10 @@ export const hashRepositoryInputs = async (
   hash.update(domain);
   hash.update("\0");
   for (const path of files) {
-    const contents = await readFile(
-      safeRepositoryPath(root, path, "GATE_INPUT_INVALID"),
-    );
+    const absolute = safeRepositoryPath(root, path, "GATE_INPUT_INVALID");
+    await assertNoSymlinkSegments(root, absolute, false, "GATE_INPUT_INVALID");
+    const contents = await readFile(absolute);
+    await assertNoSymlinkSegments(root, absolute, false, "GATE_INPUT_INVALID");
     hash.update("PATH\0");
     hash.update(path);
     hash.update("\0SIZE\0");
@@ -680,6 +777,33 @@ export interface CurrentContext {
   config_sha: string;
 }
 
+const assertContextStillCurrent = async (
+  root: string,
+  milestone: Milestone,
+  expected: CurrentContext,
+): Promise<void> => {
+  let current: CurrentContext;
+  try {
+    current = await computeCurrentContext(root, milestone);
+  } catch (error) {
+    if (error instanceof QualityGateError) {
+      fail("CONTEXT_CHANGED_DURING_EXECUTION", error.message);
+    }
+    throw error;
+  }
+  for (const field of [
+    "commit_sha",
+    "base_sha",
+    "contract_sha",
+    "fixture_sha",
+    "config_sha",
+  ] as const) {
+    if (current[field] !== expected[field]) {
+      fail("CONTEXT_CHANGED_DURING_EXECUTION", field);
+    }
+  }
+};
+
 export interface SpawnResult {
   command: RunCommand;
   started_at: string;
@@ -711,14 +835,13 @@ export const validateRawReport = (value: unknown): SpawnResult => {
   if (Date.parse(finishedAt) < Date.parse(startedAt))
     fail(code, "finished_at precedes started_at");
   const signal = raw.signal;
-  if (signal !== null && typeof signal !== "string")
-    fail(code, "signal must be a string or null");
+  if (signal !== null) fail(code, "accepted raw report signal must be null");
   return {
     command: validateCommand(raw.command, code),
     started_at: startedAt,
     finished_at: finishedAt,
     exit_code: requireSignedInteger(raw.exit_code, code, "exit_code"),
-    signal: signal as string | null,
+    signal: null,
     stdout:
       typeof raw.stdout === "string"
         ? raw.stdout
@@ -743,8 +866,17 @@ const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 const terminateProcessGroup = (child: ReturnType<typeof spawn>): void => {
   if (child.pid === undefined) return;
   try {
-    if (process.platform === "win32") child.kill("SIGKILL");
-    else process.kill(-child.pid, "SIGKILL");
+    if (process.platform === "win32") {
+      const killer = spawn(
+        "taskkill",
+        ["/pid", String(child.pid), "/t", "/f"],
+        { shell: false, stdio: "ignore", windowsHide: true },
+      );
+      killer.on("error", () => child.kill("SIGKILL"));
+      killer.unref();
+    } else {
+      process.kill(-child.pid, "SIGKILL");
+    }
   } catch {
     child.kill("SIGKILL");
   }
@@ -984,7 +1116,7 @@ export const scanForInvalidTestMarkers = (
   contents: string,
 ): InvalidTestMarker[] => {
   const patterns: Record<InvalidTestMarker, RegExp> = {
-    skip: /(?:\.skip\s*\(|\b(?:skip|skipped)["']?\s*[:=]\s*(?:true|[1-9]))/iu,
+    skip: /(?:\.(?:skip|skipIf)\s*\(|\b(?:xit|xdescribe)\s*\(|\b(?:skip|skipped)["']?\s*[:=]\s*(?:true|[1-9])|\b[1-9][0-9]*\s+(?:tests?\s+)?skipped\b|\[\s*skipped\s*\]|<skipped(?:\s|\/>|>))/iu,
     fixme: /(?:\.fixme\s*\(|\bfixme["']?\s*[:=]\s*(?:true|[1-9]))/iu,
     todo: /(?:\.todo\s*\(|\btodo["']?\s*[:=]\s*(?:true|[1-9]))/iu,
     passWithNoTests: /\bpassWithNoTests["']?\s*[:=]\s*true/iu,
@@ -1234,6 +1366,13 @@ export const assembleEvidence = async (
   item: CapabilityManifestItem,
   execution: SpawnResult,
 ): Promise<Evidence> => {
+  if (isPendingCapability(item)) {
+    fail(
+      "NOT_IMPLEMENTED",
+      `${item.cap_id} has no certifiable implementation evidence yet`,
+    );
+  }
+  await assertContextStillCurrent(root, milestone, context);
   if (canonicalJson(execution.command) !== canonicalJson(item.command)) {
     fail(
       "EVIDENCE_SCOPE_MISMATCH",
@@ -1366,6 +1505,12 @@ export const runCapability = async (
       "REQUIRED_SCOPE_MISMATCH",
       `${capId} is not required for ${milestone}`,
     );
+  if (isPendingCapability(item)) {
+    fail(
+      "NOT_IMPLEMENTED",
+      `${item.cap_id} has no certifiable implementation evidence yet`,
+    );
+  }
   const commandOptions: ExecuteCommandOptions = {};
   if (options.clock !== undefined) commandOptions.clock = options.clock;
   if (options.environment !== undefined)
@@ -1394,7 +1539,7 @@ const verifyEvidence = async (
   context: CurrentContext,
   manifest: CapabilityManifest,
   item: CapabilityManifestItem,
-): Promise<Evidence> => {
+): Promise<{ evidence: Evidence; rawContents: Uint8Array }> => {
   const evidence = validateEvidence(unknownEvidence);
   for (const field of [
     "commit_sha",
@@ -1463,68 +1608,351 @@ const verifyEvidence = async (
       "normalized raw result does not match evidence counters",
     );
   }
-  return evidence;
+  return { evidence, rawContents };
 };
+
+export interface ReviewerProvenance {
+  provider: "github-actions";
+  actor: string;
+  actor_id: string;
+  repository: string;
+  repository_id: string;
+  workflow_ref: string;
+  workflow_sha: string;
+  ref: string;
+  ref_protected: true;
+  event_name: string;
+  run_id: string;
+  run_attempt: string;
+  job: string;
+  protected_environment: string;
+}
 
 export interface TrustedReviewerIdentity {
   reviewer_id: string;
-  source: { provider: "github-actions"; actor: string; actor_id: string };
+  source: ReviewerProvenance;
 }
 
-export type TrustedReviewerIdentityProvider = () => TrustedReviewerIdentity;
+const REVIEW_ACTOR_PATTERN = /^[A-Za-z0-9-]+$/;
+const POSITIVE_DECIMAL_PATTERN = /^[1-9][0-9]*$/;
+const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const WORKFLOW_REF_PATTERN =
+  /^[^\0\r\n]+\/.github\/workflows\/[^\0\r\n]+@refs\/[^\0\r\n]+$/;
+const PROTECTED_REF_PATTERN = /^refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+$/;
+const EVENT_PATTERN = /^[A-Za-z0-9_]+$/;
+const SAFE_PROVENANCE_NAME_PATTERN = /^[A-Za-z0-9_.-]+$/;
+
+const requiredEnvironmentValue = (
+  environment: NodeJS.ProcessEnv,
+  name: string,
+  pattern: RegExp,
+): string => {
+  const value = environment[name];
+  if (value === undefined || !pattern.test(value)) {
+    fail("TRUSTED_REVIEWER_IDENTITY_REQUIRED", `${name} is missing or invalid`);
+  }
+  return value as string;
+};
 
 export const resolveTrustedReviewerIdentity = (
   environment: NodeJS.ProcessEnv = process.env,
 ): TrustedReviewerIdentity => {
-  if (environment.GITHUB_ACTIONS !== "true") {
-    fail(
-      "TRUSTED_REVIEWER_IDENTITY_REQUIRED",
-      "review recording is restricted to GitHub Actions",
-    );
-  }
-  const actor = environment.GITHUB_ACTOR;
-  const actorId = environment.GITHUB_ACTOR_ID;
   if (
-    actor === undefined ||
-    !/^[A-Za-z0-9-]+$/.test(actor) ||
-    actorId === undefined ||
-    !/^[0-9]+$/.test(actorId)
+    environment.GITHUB_ACTIONS !== "true" ||
+    environment.GITHUB_REF_PROTECTED !== "true"
   ) {
     fail(
       "TRUSTED_REVIEWER_IDENTITY_REQUIRED",
-      "GitHub actor identity is incomplete",
+      "review recording requires a protected GitHub Actions ref",
     );
   }
-  const trustedActor = actor as string;
-  const trustedActorId = actorId as string;
+  const actor = requiredEnvironmentValue(
+    environment,
+    "GITHUB_ACTOR",
+    REVIEW_ACTOR_PATTERN,
+  );
+  const actorId = requiredEnvironmentValue(
+    environment,
+    "GITHUB_ACTOR_ID",
+    POSITIVE_DECIMAL_PATTERN,
+  );
   return {
-    reviewer_id: `github:${trustedActorId}`,
+    reviewer_id: `github:${actorId}`,
     source: {
       provider: "github-actions",
-      actor: trustedActor,
-      actor_id: trustedActorId,
+      actor,
+      actor_id: actorId,
+      repository: requiredEnvironmentValue(
+        environment,
+        "GITHUB_REPOSITORY",
+        REPOSITORY_PATTERN,
+      ),
+      repository_id: requiredEnvironmentValue(
+        environment,
+        "GITHUB_REPOSITORY_ID",
+        POSITIVE_DECIMAL_PATTERN,
+      ),
+      workflow_ref: requiredEnvironmentValue(
+        environment,
+        "GITHUB_WORKFLOW_REF",
+        WORKFLOW_REF_PATTERN,
+      ),
+      workflow_sha: requiredEnvironmentValue(
+        environment,
+        "GITHUB_WORKFLOW_SHA",
+        /^[a-f0-9]{40}$/,
+      ),
+      ref: requiredEnvironmentValue(
+        environment,
+        "GITHUB_REF",
+        PROTECTED_REF_PATTERN,
+      ),
+      ref_protected: true,
+      event_name: requiredEnvironmentValue(
+        environment,
+        "GITHUB_EVENT_NAME",
+        EVENT_PATTERN,
+      ),
+      run_id: requiredEnvironmentValue(
+        environment,
+        "GITHUB_RUN_ID",
+        POSITIVE_DECIMAL_PATTERN,
+      ),
+      run_attempt: requiredEnvironmentValue(
+        environment,
+        "GITHUB_RUN_ATTEMPT",
+        POSITIVE_DECIMAL_PATTERN,
+      ),
+      job: requiredEnvironmentValue(
+        environment,
+        "GITHUB_JOB",
+        SAFE_PROVENANCE_NAME_PATTERN,
+      ),
+      protected_environment: requiredEnvironmentValue(
+        environment,
+        "HUOQIU_REVIEW_ENVIRONMENT",
+        SAFE_PROVENANCE_NAME_PATTERN,
+      ),
     },
   };
 };
 
-export interface Review {
+interface TrustPolicy {
+  reviewer_id: string;
+  actor: string;
+  actor_id: string;
+  repository: string;
+  repository_id: string;
+  workflow_ref: string;
+  workflow_sha: string;
+  ref: string;
+  event_name: string;
+  protected_environment: string;
+  public_key_spki_pem: string;
+}
+
+interface TrustRegistry {
   schema_version: 1;
+  keys: Record<string, TrustPolicy>;
+}
+
+interface LoadedTrustRegistry {
+  registry: TrustRegistry;
+  sha256: string;
+}
+
+const TRUST_REGISTRY_PATH = "quality/reviewers/trust-registry.v1.json";
+
+const validateTrustRegistry = (value: unknown): TrustRegistry => {
+  const code = "REVIEW_TRUST_REGISTRY_INVALID";
+  const registry = requireRecord(value, code, "trust registry");
+  assertExactKeys(registry, ["schema_version", "keys"], code, "trust registry");
+  if (registry.schema_version !== 1) fail(code, "schema_version must be 1");
+  const unknownKeys = requireRecord(registry.keys, code, "trust registry keys");
+  const keys: Record<string, TrustPolicy> = {};
+  for (const [keyId, unknownPolicy] of Object.entries(unknownKeys)) {
+    if (!/^ed25519:[a-f0-9]{64}$/.test(keyId)) fail(code, "invalid key ID");
+    const policy = requireRecord(unknownPolicy, code, `keys.${keyId}`);
+    const policyKeys = [
+      "reviewer_id",
+      "actor",
+      "actor_id",
+      "repository",
+      "repository_id",
+      "workflow_ref",
+      "workflow_sha",
+      "ref",
+      "event_name",
+      "protected_environment",
+      "public_key_spki_pem",
+    ] as const;
+    assertExactKeys(policy, policyKeys, code, `keys.${keyId}`);
+    const actorId = requirePatternString(
+      policy.actor_id,
+      code,
+      `${keyId}.actor_id`,
+      POSITIVE_DECIMAL_PATTERN,
+    );
+    const reviewerId = requireString(
+      policy.reviewer_id,
+      code,
+      `${keyId}.reviewer_id`,
+    );
+    if (reviewerId !== `github:${actorId}`)
+      fail(code, `${keyId} reviewer identity is not canonical`);
+    const publicKeyPem = requireString(
+      policy.public_key_spki_pem,
+      code,
+      `${keyId}.public_key_spki_pem`,
+    );
+    const publicKey = (() => {
+      try {
+        return createPublicKey(publicKeyPem);
+      } catch {
+        return fail(code, `${keyId} public key is invalid`);
+      }
+    })();
+    if (publicKey.asymmetricKeyType !== "ed25519")
+      fail(code, `${keyId} key must be Ed25519`);
+    const derivedKeyId = `ed25519:${sha256(
+      publicKey.export({ format: "der", type: "spki" }),
+    )}`;
+    if (derivedKeyId !== keyId)
+      fail(code, `${keyId} does not match its public key`);
+    keys[keyId] = {
+      reviewer_id: reviewerId,
+      actor: requirePatternString(
+        policy.actor,
+        code,
+        `${keyId}.actor`,
+        REVIEW_ACTOR_PATTERN,
+      ),
+      actor_id: actorId,
+      repository: requirePatternString(
+        policy.repository,
+        code,
+        `${keyId}.repository`,
+        REPOSITORY_PATTERN,
+      ),
+      repository_id: requirePatternString(
+        policy.repository_id,
+        code,
+        `${keyId}.repository_id`,
+        POSITIVE_DECIMAL_PATTERN,
+      ),
+      workflow_ref: requirePatternString(
+        policy.workflow_ref,
+        code,
+        `${keyId}.workflow_ref`,
+        WORKFLOW_REF_PATTERN,
+      ),
+      workflow_sha: requireSha(
+        policy.workflow_sha,
+        code,
+        `${keyId}.workflow_sha`,
+        /^[a-f0-9]{40}$/,
+      ),
+      ref: requirePatternString(
+        policy.ref,
+        code,
+        `${keyId}.ref`,
+        PROTECTED_REF_PATTERN,
+      ),
+      event_name: requirePatternString(
+        policy.event_name,
+        code,
+        `${keyId}.event_name`,
+        EVENT_PATTERN,
+      ),
+      protected_environment: requirePatternString(
+        policy.protected_environment,
+        code,
+        `${keyId}.protected_environment`,
+        SAFE_PROVENANCE_NAME_PATTERN,
+      ),
+      public_key_spki_pem: publicKeyPem,
+    };
+  }
+  return { schema_version: 1, keys };
+};
+
+const loadTrustRegistry = async (
+  root: string,
+): Promise<LoadedTrustRegistry> => {
+  const absolute = safeRepositoryPath(
+    root,
+    TRUST_REGISTRY_PATH,
+    "REVIEW_TRUST_REGISTRY_INVALID",
+  );
+  try {
+    await assertNoSymlinkSegments(
+      root,
+      absolute,
+      false,
+      "REVIEW_TRUST_REGISTRY_INVALID",
+    );
+    const contents = await readFile(absolute);
+    return {
+      registry: validateTrustRegistry(
+        parseJson(
+          Buffer.from(contents).toString("utf8"),
+          "REVIEW_TRUST_REGISTRY_INVALID",
+          TRUST_REGISTRY_PATH,
+        ),
+      ),
+      sha256: sha256(contents),
+    };
+  } catch (error) {
+    if (error instanceof QualityGateError) throw error;
+    return fail(
+      "REVIEW_TRUST_REGISTRY_INVALID",
+      "trust registry cannot be read",
+    );
+  }
+};
+
+const policyMatchesIdentity = (
+  policy: TrustPolicy,
+  identity: TrustedReviewerIdentity,
+): boolean => {
+  const source = identity.source;
+  return (
+    policy.reviewer_id === identity.reviewer_id &&
+    policy.actor === source.actor &&
+    policy.actor_id === source.actor_id &&
+    policy.repository === source.repository &&
+    policy.repository_id === source.repository_id &&
+    policy.workflow_ref === source.workflow_ref &&
+    policy.workflow_sha === source.workflow_sha &&
+    policy.ref === source.ref &&
+    policy.event_name === source.event_name &&
+    policy.protected_environment === source.protected_environment
+  );
+};
+
+export interface Review {
+  schema_version: 2;
   milestone: Milestone;
   commit_sha: string;
+  base_sha: string;
   contract_sha: string;
   fixture_sha: string;
   config_sha: string;
+  trust_registry_sha256: string;
+  evidence_set_sha256: string;
+  evidence_count: number;
+  latest_evidence_finished_at: string;
   reviewer_id: string;
-  reviewer_source: TrustedReviewerIdentity["source"];
+  reviewer_source: ReviewerProvenance;
   reviewed_at: string;
   p0: number;
   p1: number;
   implementer_ids: string[];
   checklist: { path: string; sha256: string };
   signature: {
-    method: "github-actions-identity-v1";
-    signed_by: string;
-    statement_sha256: string;
+    algorithm: "Ed25519";
+    key_id: string;
+    value_base64: string;
   };
 }
 
@@ -1532,9 +1960,14 @@ const reviewKeys = [
   "schema_version",
   "milestone",
   "commit_sha",
+  "base_sha",
   "contract_sha",
   "fixture_sha",
   "config_sha",
+  "trust_registry_sha256",
+  "evidence_set_sha256",
+  "evidence_count",
+  "latest_evidence_finished_at",
   "reviewer_id",
   "reviewer_source",
   "reviewed_at",
@@ -1545,16 +1978,35 @@ const reviewKeys = [
   "signature",
 ] as const;
 
-export const reviewStatementSha = (review: Omit<Review, "signature">): string =>
-  sha256(`HUOQIU-REVIEW-ATTESTATION\0v1\0${canonicalJson(review)}`);
+const reviewerSourceKeys = [
+  "provider",
+  "actor",
+  "actor_id",
+  "repository",
+  "repository_id",
+  "workflow_ref",
+  "workflow_sha",
+  "ref",
+  "ref_protected",
+  "event_name",
+  "run_id",
+  "run_attempt",
+  "job",
+  "protected_environment",
+] as const;
 
 const unsignedReview = (review: Review): Omit<Review, "signature"> => ({
   schema_version: review.schema_version,
   milestone: review.milestone,
   commit_sha: review.commit_sha,
+  base_sha: review.base_sha,
   contract_sha: review.contract_sha,
   fixture_sha: review.fixture_sha,
   config_sha: review.config_sha,
+  trust_registry_sha256: review.trust_registry_sha256,
+  evidence_set_sha256: review.evidence_set_sha256,
+  evidence_count: review.evidence_count,
+  latest_evidence_finished_at: review.latest_evidence_finished_at,
   reviewer_id: review.reviewer_id,
   reviewer_source: review.reviewer_source,
   reviewed_at: review.reviewed_at,
@@ -1563,6 +2015,9 @@ const unsignedReview = (review: Review): Omit<Review, "signature"> => ({
   implementer_ids: review.implementer_ids,
   checklist: review.checklist,
 });
+
+const reviewSigningBytes = (review: Omit<Review, "signature">): Uint8Array =>
+  Buffer.from(`HUOQIU-QUALITY-REVIEW\0v2\0${canonicalJson(review)}`, "utf8");
 
 export const validateReview = (value: unknown): Review => {
   if (
@@ -1576,48 +2031,63 @@ export const validateReview = (value: unknown): Review => {
   const code = "REVIEW_SCHEMA_INVALID";
   const review = requireRecord(value, code, "review");
   assertExactKeys(review, reviewKeys, code, "review");
-  if (review.schema_version !== 1) fail(code, "schema_version must be 1");
+  if (review.schema_version !== 2) fail(code, "schema_version must be 2");
   const source = requireRecord(review.reviewer_source, code, "reviewer_source");
-  assertExactKeys(
-    source,
-    ["provider", "actor", "actor_id"],
-    code,
-    "reviewer_source",
-  );
-  if (source.provider !== "github-actions")
-    fail(code, "reviewer_source.provider is invalid");
-  const actorId = requireString(
+  assertExactKeys(source, reviewerSourceKeys, code, "reviewer_source");
+  if (source.provider !== "github-actions" || source.ref_protected !== true)
+    fail(code, "reviewer_source provider/protection is invalid");
+  const actorId = requirePatternString(
     source.actor_id,
     code,
     "reviewer_source.actor_id",
+    POSITIVE_DECIMAL_PATTERN,
   );
-  if (!/^[0-9]+$/.test(actorId))
-    fail(code, "reviewer_source.actor_id must be numeric");
   const reviewerId = requireString(review.reviewer_id, code, "reviewer_id");
   if (reviewerId !== `github:${actorId}`)
-    fail(code, "reviewer_id does not match reviewer_source");
+    fail(code, "reviewer identity is not canonical");
   const checklist = requireRecord(review.checklist, code, "checklist");
   assertExactKeys(checklist, ["path", "sha256"], code, "checklist");
   const signature = requireRecord(review.signature, code, "signature");
   assertExactKeys(
     signature,
-    ["method", "signed_by", "statement_sha256"],
+    ["algorithm", "key_id", "value_base64"],
     code,
     "signature",
   );
+  if (signature.algorithm !== "Ed25519")
+    fail(code, "signature algorithm is invalid");
+  const signatureBase64 = requireString(
+    signature.value_base64,
+    code,
+    "signature.value_base64",
+  );
+  const signatureBytes = Buffer.from(signatureBase64, "base64");
   if (
-    signature.method !== "github-actions-identity-v1" ||
-    signature.signed_by !== reviewerId
+    signatureBytes.byteLength !== 64 ||
+    signatureBytes.toString("base64") !== signatureBase64
   ) {
-    fail(code, "signature identity is invalid");
+    fail(code, "signature.value_base64 is not canonical Ed25519 bytes");
   }
+  const implementerIds = requireUniqueStrings(
+    review.implementer_ids,
+    code,
+    "implementer_ids",
+  );
+  if (!implementerIds.every(isCanonicalIdentity))
+    fail(code, "implementer_ids must be canonical GitHub identities");
   const result: Review = {
-    schema_version: 1,
+    schema_version: 2,
     milestone: validateMilestone(review.milestone, code),
     commit_sha: requireSha(
       review.commit_sha,
       code,
       "commit_sha",
+      /^[a-f0-9]{40,64}$/,
+    ),
+    base_sha: requireSha(
+      review.base_sha,
+      code,
+      "base_sha",
       /^[a-f0-9]{40,64}$/,
     ),
     contract_sha: requireSha(
@@ -1638,20 +2108,104 @@ export const validateReview = (value: unknown): Review => {
       "config_sha",
       /^[a-f0-9]{64}$/,
     ),
+    trust_registry_sha256: requireSha(
+      review.trust_registry_sha256,
+      code,
+      "trust_registry_sha256",
+      /^[a-f0-9]{64}$/,
+    ),
+    evidence_set_sha256: requireSha(
+      review.evidence_set_sha256,
+      code,
+      "evidence_set_sha256",
+      /^[a-f0-9]{64}$/,
+    ),
+    evidence_count: requireInteger(
+      review.evidence_count,
+      code,
+      "evidence_count",
+    ),
+    latest_evidence_finished_at: requireIsoDate(
+      review.latest_evidence_finished_at,
+      code,
+      "latest_evidence_finished_at",
+    ),
     reviewer_id: reviewerId,
     reviewer_source: {
       provider: "github-actions",
-      actor: requireString(source.actor, code, "reviewer_source.actor"),
+      actor: requirePatternString(
+        source.actor,
+        code,
+        "reviewer_source.actor",
+        REVIEW_ACTOR_PATTERN,
+      ),
       actor_id: actorId,
+      repository: requirePatternString(
+        source.repository,
+        code,
+        "reviewer_source.repository",
+        REPOSITORY_PATTERN,
+      ),
+      repository_id: requirePatternString(
+        source.repository_id,
+        code,
+        "reviewer_source.repository_id",
+        POSITIVE_DECIMAL_PATTERN,
+      ),
+      workflow_ref: requirePatternString(
+        source.workflow_ref,
+        code,
+        "reviewer_source.workflow_ref",
+        WORKFLOW_REF_PATTERN,
+      ),
+      workflow_sha: requireSha(
+        source.workflow_sha,
+        code,
+        "reviewer_source.workflow_sha",
+        /^[a-f0-9]{40}$/,
+      ),
+      ref: requirePatternString(
+        source.ref,
+        code,
+        "reviewer_source.ref",
+        PROTECTED_REF_PATTERN,
+      ),
+      ref_protected: true,
+      event_name: requirePatternString(
+        source.event_name,
+        code,
+        "reviewer_source.event_name",
+        EVENT_PATTERN,
+      ),
+      run_id: requirePatternString(
+        source.run_id,
+        code,
+        "reviewer_source.run_id",
+        POSITIVE_DECIMAL_PATTERN,
+      ),
+      run_attempt: requirePatternString(
+        source.run_attempt,
+        code,
+        "reviewer_source.run_attempt",
+        POSITIVE_DECIMAL_PATTERN,
+      ),
+      job: requirePatternString(
+        source.job,
+        code,
+        "reviewer_source.job",
+        SAFE_PROVENANCE_NAME_PATTERN,
+      ),
+      protected_environment: requirePatternString(
+        source.protected_environment,
+        code,
+        "reviewer_source.protected_environment",
+        SAFE_PROVENANCE_NAME_PATTERN,
+      ),
     },
     reviewed_at: requireIsoDate(review.reviewed_at, code, "reviewed_at"),
     p0: requireInteger(review.p0, code, "p0"),
     p1: requireInteger(review.p1, code, "p1"),
-    implementer_ids: requireUniqueStrings(
-      review.implementer_ids,
-      code,
-      "implementer_ids",
-    ),
+    implementer_ids: implementerIds,
     checklist: {
       path: requireString(checklist.path, code, "checklist.path"),
       sha256: requireSha(
@@ -1662,29 +2216,31 @@ export const validateReview = (value: unknown): Review => {
       ),
     },
     signature: {
-      method: "github-actions-identity-v1",
-      signed_by: reviewerId,
-      statement_sha256: requireSha(
-        signature.statement_sha256,
+      algorithm: "Ed25519",
+      key_id: requireSha(
+        signature.key_id,
         code,
-        "signature.statement_sha256",
-        /^[a-f0-9]{64}$/,
+        "signature.key_id",
+        /^ed25519:[a-f0-9]{64}$/,
       ),
+      value_base64: signatureBase64,
     },
   };
-  if (result.implementer_ids.includes(result.reviewer_id)) {
+  if (result.evidence_count === 0)
+    fail(code, "evidence_count must be positive");
+  if (result.implementer_ids.includes(result.reviewer_id))
     fail("INDEPENDENT_REVIEW_REQUIRED", "reviewer is listed as an implementer");
-  }
   if (result.p0 > 0 || result.p1 > 0)
     fail("QUALITY_FINDING_PRESENT", `p0=${result.p0} p1=${result.p1}`);
-  if (
-    result.signature.statement_sha256 !==
-    reviewStatementSha(unsignedReview(result))
-  ) {
-    fail("REVIEW_SIGNATURE_INVALID", "review statement digest mismatch");
-  }
   return result;
 };
+
+interface Finding {
+  id: string;
+  severity: "P0" | "P1" | "P2" | "P3";
+  summary: string;
+  evidence_refs: string[];
+}
 
 interface Checklist {
   schema_version: 1;
@@ -1692,14 +2248,23 @@ interface Checklist {
   commit_sha: string;
   p0: number;
   p1: number;
-  findings: unknown[];
+  findings: Finding[];
   reviewed_dimensions: string[];
 }
+
+const requiredReviewDimensions = (milestone: Milestone): string[] =>
+  milestone === "d0"
+    ? ["functional", "quality"]
+    : ["functional", "quality", "security", "release"];
+
+const expectedReviewDimension = (milestone: Milestone): string | undefined =>
+  milestone === "m1" ? "release" : undefined;
 
 const validateChecklist = (
   value: unknown,
   milestone: Milestone,
   commitSha: string,
+  allowedEvidenceRefs: ReadonlySet<string>,
 ): Checklist => {
   const code = "REVIEW_CHECKLIST_INVALID";
   const checklist = requireRecord(value, code, "checklist");
@@ -1726,8 +2291,67 @@ const validateChecklist = (
   }
   if (!Array.isArray(checklist.findings))
     fail(code, "findings must be an array");
+  const findings = (checklist.findings as unknown[]).map(
+    (unknownFinding, index) => {
+      const finding = requireRecord(unknownFinding, code, `findings[${index}]`);
+      assertExactKeys(
+        finding,
+        ["id", "severity", "summary", "evidence_refs"],
+        code,
+        `findings[${index}]`,
+      );
+      const id = requireString(finding.id, code, `findings[${index}].id`);
+      if (!/^F-[A-Z0-9][A-Z0-9-]{0,63}$/.test(id))
+        fail(code, `${id} is invalid`);
+      const severity = requireString(
+        finding.severity,
+        code,
+        `findings[${index}].severity`,
+      );
+      if (!["P0", "P1", "P2", "P3"].includes(severity))
+        fail(code, `${id} severity is invalid`);
+      const summary = requireString(
+        finding.summary,
+        code,
+        `findings[${index}].summary`,
+      );
+      if (summary.trim() !== summary || summary.length > 500)
+        fail(code, `${id} summary is invalid`);
+      const evidenceRefs = requireUniqueStrings(
+        finding.evidence_refs,
+        code,
+        `findings[${index}].evidence_refs`,
+      );
+      if (!evidenceRefs.every((path) => allowedEvidenceRefs.has(path)))
+        fail(code, `${id} references evidence outside this review set`);
+      return {
+        id,
+        severity: severity as Finding["severity"],
+        summary,
+        evidence_refs: evidenceRefs,
+      };
+    },
+  );
+  if (new Set(findings.map((finding) => finding.id)).size !== findings.length)
+    fail(code, "finding IDs must be unique");
   const p0 = requireInteger(checklist.p0, code, "p0");
   const p1 = requireInteger(checklist.p1, code, "p1");
+  if (
+    p0 !== findings.filter((finding) => finding.severity === "P0").length ||
+    p1 !== findings.filter((finding) => finding.severity === "P1").length
+  ) {
+    fail(code, "P0/P1 counters do not match finding severities");
+  }
+  const reviewedDimensions = requireUniqueStrings(
+    checklist.reviewed_dimensions,
+    code,
+    "reviewed_dimensions",
+  );
+  if (!sameStringArray(reviewedDimensions, requiredReviewDimensions(milestone)))
+    fail(
+      "REVIEW_DIMENSION_INVALID",
+      "review dimensions do not match milestone policy",
+    );
   if (p0 > 0 || p1 > 0) fail("QUALITY_FINDING_PRESENT", `p0=${p0} p1=${p1}`);
   return {
     schema_version: 1,
@@ -1735,35 +2359,133 @@ const validateChecklist = (
     commit_sha: commitSha,
     p0,
     p1,
-    findings: checklist.findings as unknown[],
-    reviewed_dimensions: requireUniqueStrings(
-      checklist.reviewed_dimensions,
-      code,
-      "reviewed_dimensions",
-    ),
+    findings,
+    reviewed_dimensions: reviewedDimensions,
   };
 };
 
-const sortedImplementers = (evidence: readonly Evidence[]): string[] =>
-  [...new Set(evidence.flatMap((item) => item.implementer_ids))].sort();
+interface VerifiedEvidenceArtifact {
+  path: string;
+  contents: Uint8Array;
+  rawContents: Uint8Array;
+  evidence: Evidence;
+}
+
+interface EvidenceSet {
+  sha256: string;
+  count: number;
+  latestFinishedAt: string;
+}
+
+const sortedImplementers = (
+  artifacts: readonly VerifiedEvidenceArtifact[],
+): string[] =>
+  [
+    ...new Set(
+      artifacts.flatMap((artifact) => artifact.evidence.implementer_ids),
+    ),
+  ].sort();
 
 const loadAllEvidence = async (
   root: string,
   manifest: CapabilityManifest,
   context: CurrentContext,
-): Promise<Evidence[]> => {
-  const evidence: Evidence[] = [];
+): Promise<VerifiedEvidenceArtifact[]> => {
+  const artifacts: VerifiedEvidenceArtifact[] = [];
   for (const item of manifest.required_caps) {
-    const unknownEvidence = await readEvidenceJson(
+    const path = evidencePath(
+      context.commit_sha,
+      manifest.milestone,
+      item.cap_id,
+    );
+    const contents = await readEvidenceFile(
       root,
-      evidencePath(context.commit_sha, manifest.milestone, item.cap_id),
+      path,
       "REQUIRED_EVIDENCE_MISSING",
     );
-    evidence.push(
-      await verifyEvidence(root, unknownEvidence, context, manifest, item),
+    const verified = await verifyEvidence(
+      root,
+      parseJson(
+        Buffer.from(contents).toString("utf8"),
+        "REQUIRED_EVIDENCE_MISSING",
+        path,
+      ),
+      context,
+      manifest,
+      item,
     );
+    artifacts.push({ path, contents, ...verified });
   }
-  return evidence;
+  return artifacts;
+};
+
+const evidenceSet = (
+  artifacts: readonly VerifiedEvidenceArtifact[],
+): EvidenceSet => {
+  const hash = createHash("sha256");
+  hash.update("HUOQIU-EVIDENCE-SET\0v1\0");
+  let latestFinishedAt = "";
+  for (const artifact of artifacts) {
+    const rawPath = artifact.evidence.raw_report.path;
+    for (const [kind, path, contents] of [
+      ["EVIDENCE", artifact.path, artifact.contents],
+      ["RAW", rawPath, artifact.rawContents],
+    ] as const) {
+      hash.update(kind);
+      hash.update("\0PATH\0");
+      hash.update(path);
+      hash.update("\0SIZE\0");
+      hash.update(String(contents.byteLength));
+      hash.update("\0CONTENT\0");
+      hash.update(contents);
+      hash.update("\0END\0");
+    }
+    if (
+      latestFinishedAt === "" ||
+      Date.parse(artifact.evidence.finished_at) > Date.parse(latestFinishedAt)
+    ) {
+      latestFinishedAt = artifact.evidence.finished_at;
+    }
+  }
+  if (artifacts.length === 0 || latestFinishedAt === "")
+    fail("REQUIRED_EVIDENCE_MISSING", "evidence set is empty");
+  return {
+    sha256: hash.digest("hex"),
+    count: artifacts.length,
+    latestFinishedAt,
+  };
+};
+
+const policyForKey = (
+  registry: TrustRegistry,
+  keyId: string | undefined,
+): { keyId: string; policy: TrustPolicy } => {
+  const trustedKeyId =
+    keyId ??
+    fail("REVIEW_TRUST_REQUIRED", "a registered Ed25519 key ID is required");
+  if (!/^ed25519:[a-f0-9]{64}$/.test(trustedKeyId))
+    fail("REVIEW_TRUST_REQUIRED", "a registered Ed25519 key ID is required");
+  const policy =
+    registry.keys[trustedKeyId] ??
+    fail("REVIEW_TRUST_REQUIRED", "review key is not registered");
+  return { keyId: trustedKeyId, policy };
+};
+
+const verifyReviewSignature = (review: Review, policy: TrustPolicy): void => {
+  const verified = (() => {
+    try {
+      return verifyBytes(
+        null,
+        reviewSigningBytes(unsignedReview(review)),
+        createPublicKey(policy.public_key_spki_pem),
+        Buffer.from(review.signature.value_base64, "base64"),
+      );
+    } catch {
+      return false;
+    }
+  })();
+  if (!verified)
+    fail("REVIEW_SIGNATURE_INVALID", "Ed25519 verification failed");
 };
 
 const verifyReview = async (
@@ -1771,10 +2493,11 @@ const verifyReview = async (
   review: Review,
   milestone: Milestone,
   context: CurrentContext,
-  implementerIds: string[],
+  artifacts: readonly VerifiedEvidenceArtifact[],
 ): Promise<void> => {
   for (const field of [
     "commit_sha",
+    "base_sha",
     "contract_sha",
     "fixture_sha",
     "config_sha",
@@ -1784,20 +2507,52 @@ const verifyReview = async (
   }
   if (review.milestone !== milestone)
     fail("REVIEW_SCOPE_MISMATCH", "review milestone mismatch");
-  if (!sameStringArray(review.implementer_ids, implementerIds)) {
-    fail("REVIEW_SCOPE_MISMATCH", "review implementer set mismatch");
+  const currentEvidenceSet = evidenceSet(artifacts);
+  if (
+    review.evidence_set_sha256 !== currentEvidenceSet.sha256 ||
+    review.evidence_count !== currentEvidenceSet.count ||
+    review.latest_evidence_finished_at !== currentEvidenceSet.latestFinishedAt
+  ) {
+    fail(
+      "EVIDENCE_SET_MISMATCH",
+      "review does not bind the current evidence bytes",
+    );
   }
-  const expectedChecklistPath = checklistPath(context.commit_sha, milestone);
-  if (review.checklist.path !== expectedChecklistPath) {
+  const implementerIds = sortedImplementers(artifacts);
+  if (!sameStringArray(review.implementer_ids, implementerIds))
+    fail("REVIEW_SCOPE_MISMATCH", "review implementer set mismatch");
+  const loadedRegistry = await loadTrustRegistry(root);
+  if (review.trust_registry_sha256 !== loadedRegistry.sha256)
+    fail("STALE_EVIDENCE", "review trust_registry_sha256");
+  const { policy } = policyForKey(
+    loadedRegistry.registry,
+    review.signature.key_id,
+  );
+  verifyReviewSignature(review, policy);
+  const identity: TrustedReviewerIdentity = {
+    reviewer_id: review.reviewer_id,
+    source: review.reviewer_source,
+  };
+  if (!policyMatchesIdentity(policy, identity))
+    fail("REVIEW_TRUST_POLICY_MISMATCH", "signed provenance is not authorized");
+  if (
+    Date.parse(review.reviewed_at) <
+    Date.parse(currentEvidenceSet.latestFinishedAt)
+  )
+    fail("REVIEW_TIME_INVALID", "review predates capability evidence");
+  const expectedChecklistPath = checklistPath(
+    context.commit_sha,
+    milestone,
+    expectedReviewDimension(milestone),
+  );
+  if (review.checklist.path !== expectedChecklistPath)
     fail(
       "EVIDENCE_PATH_INVALID",
       `review checklist must equal ${expectedChecklistPath}`,
     );
-  }
   const checklistContents = await readEvidenceFile(root, review.checklist.path);
-  if (sha256(checklistContents) !== review.checklist.sha256) {
+  if (sha256(checklistContents) !== review.checklist.sha256)
     fail("RAW_REPORT_HASH_MISMATCH", review.checklist.path);
-  }
   validateChecklist(
     parseJson(
       Buffer.from(checklistContents).toString("utf8"),
@@ -1806,6 +2561,7 @@ const verifyReview = async (
     ),
     milestone,
     context.commit_sha,
+    new Set(artifacts.map((artifact) => artifact.path)),
   );
 };
 
@@ -1815,25 +2571,77 @@ export const recordReview = async (
   commitSha: string,
   options: {
     dimension?: string;
-    identityProvider?: TrustedReviewerIdentityProvider;
+    environment?: NodeJS.ProcessEnv;
     clock?: () => Date;
   } = {},
 ): Promise<Review> => {
+  const expectedDimension = expectedReviewDimension(milestone);
+  if (options.dimension !== expectedDimension)
+    fail(
+      "REVIEW_DIMENSION_INVALID",
+      `${milestone} requires ${expectedDimension ?? "default"}`,
+    );
   const { manifest, context } = await loadMilestoneInputs(root, milestone);
   if (commitSha !== context.commit_sha)
     fail("STALE_EVIDENCE", "record-review only accepts current HEAD");
-  const evidence = await loadAllEvidence(root, manifest, context);
-  const implementerIds = sortedImplementers(evidence);
-  const identity = (
-    options.identityProvider ?? resolveTrustedReviewerIdentity
-  )();
-  if (implementerIds.includes(identity.reviewer_id)) {
+  const artifacts = await loadAllEvidence(root, manifest, context);
+  const currentEvidenceSet = evidenceSet(artifacts);
+  const implementerIds = sortedImplementers(artifacts);
+  const environment = options.environment ?? process.env;
+  const identity = resolveTrustedReviewerIdentity(environment);
+  if (implementerIds.includes(identity.reviewer_id))
     fail("INDEPENDENT_REVIEW_REQUIRED", "reviewer is listed as an implementer");
-  }
+  const loadedRegistry = await loadTrustRegistry(root);
+  const { keyId, policy } = policyForKey(
+    loadedRegistry.registry,
+    environment.HUOQIU_REVIEW_KEY_ID,
+  );
+  if (!policyMatchesIdentity(policy, identity))
+    fail(
+      "REVIEW_TRUST_POLICY_MISMATCH",
+      "workflow provenance is not authorized",
+    );
+  const privateKeyBase64 =
+    environment.HUOQIU_REVIEW_PRIVATE_KEY_B64 ??
+    fail(
+      "REVIEW_PRIVATE_KEY_REQUIRED",
+      "the protected signing secret is missing",
+    );
+  const privateKeyBytes = Buffer.from(privateKeyBase64, "base64");
+  if (privateKeyBytes.toString("base64") !== privateKeyBase64)
+    fail(
+      "REVIEW_PRIVATE_KEY_REQUIRED",
+      "the protected signing secret is malformed",
+    );
+  const privateKey = (() => {
+    try {
+      return createPrivateKey(privateKeyBytes);
+    } catch {
+      return fail(
+        "REVIEW_PRIVATE_KEY_REQUIRED",
+        "the protected signing secret is invalid",
+      );
+    }
+  })();
+  if (privateKey.asymmetricKeyType !== "ed25519")
+    fail("REVIEW_PRIVATE_KEY_REQUIRED", "the signing key must be Ed25519");
+  const derivedPublic = createPublicKey(privateKey).export({
+    format: "der",
+    type: "spki",
+  });
+  const registeredPublic = createPublicKey(policy.public_key_spki_pem).export({
+    format: "der",
+    type: "spki",
+  });
+  if (!Buffer.from(derivedPublic).equals(Buffer.from(registeredPublic)))
+    fail(
+      "REVIEW_PRIVATE_KEY_MISMATCH",
+      "private key does not match the registry",
+    );
   const checklistRelativePath = checklistPath(
     context.commit_sha,
     milestone,
-    options.dimension,
+    expectedDimension,
   );
   const checklistContents = await readEvidenceFile(root, checklistRelativePath);
   const checklist = validateChecklist(
@@ -1844,17 +2652,22 @@ export const recordReview = async (
     ),
     milestone,
     context.commit_sha,
+    new Set(artifacts.map((artifact) => artifact.path)),
   );
+  const reviewedAt = (options.clock ?? (() => new Date()))().toISOString();
+  if (Date.parse(reviewedAt) < Date.parse(currentEvidenceSet.latestFinishedAt))
+    fail("REVIEW_TIME_INVALID", "review predates capability evidence");
   const unsigned: Omit<Review, "signature"> = {
-    schema_version: 1,
+    schema_version: 2,
     milestone,
-    commit_sha: context.commit_sha,
-    contract_sha: context.contract_sha,
-    fixture_sha: context.fixture_sha,
-    config_sha: context.config_sha,
+    ...context,
+    trust_registry_sha256: loadedRegistry.sha256,
+    evidence_set_sha256: currentEvidenceSet.sha256,
+    evidence_count: currentEvidenceSet.count,
+    latest_evidence_finished_at: currentEvidenceSet.latestFinishedAt,
     reviewer_id: identity.reviewer_id,
     reviewer_source: identity.source,
-    reviewed_at: (options.clock ?? (() => new Date()))().toISOString(),
+    reviewed_at: reviewedAt,
     p0: checklist.p0,
     p1: checklist.p1,
     implementer_ids: implementerIds,
@@ -1866,15 +2679,20 @@ export const recordReview = async (
   const review: Review = {
     ...unsigned,
     signature: {
-      method: "github-actions-identity-v1",
-      signed_by: identity.reviewer_id,
-      statement_sha256: reviewStatementSha(unsigned),
+      algorithm: "Ed25519",
+      key_id: keyId,
+      value_base64: signBytes(
+        null,
+        reviewSigningBytes(unsigned),
+        privateKey,
+      ).toString("base64"),
     },
   };
   validateReview(review);
+  verifyReviewSignature(review, policy);
   await writeEvidenceFile(
     root,
-    reviewPath(context.commit_sha, milestone, options.dimension),
+    reviewPath(context.commit_sha, milestone, expectedDimension),
     review,
   );
   return review;
@@ -1883,43 +2701,22 @@ export const recordReview = async (
 export const runGate = async (
   root: string,
   milestone: Milestone,
-  options: {
-    executeCapabilities?: boolean;
-    clock?: () => Date;
-    environment?: NodeJS.ProcessEnv;
-  } = {},
 ): Promise<string> => {
   const { manifest, context } = await loadMilestoneInputs(root, milestone);
-  if (options.executeCapabilities !== false) {
-    for (const item of manifest.required_caps) {
-      const commandOptions: ExecuteCommandOptions = {};
-      if (options.clock !== undefined) commandOptions.clock = options.clock;
-      if (options.environment !== undefined)
-        commandOptions.environment = options.environment;
-      const execution = await executeCommand(
-        root,
-        item.command,
-        commandOptions,
-      );
-      await assembleEvidence(
-        root,
-        milestone,
-        context,
-        manifest,
-        item,
-        execution,
-      );
-    }
-  }
-  const evidence = await loadAllEvidence(root, manifest, context);
+  const artifacts = await loadAllEvidence(root, manifest, context);
   const unknownReview = await readEvidenceJson(
     root,
-    reviewPath(context.commit_sha, milestone),
+    reviewPath(
+      context.commit_sha,
+      milestone,
+      expectedReviewDimension(milestone),
+    ),
     "INDEPENDENT_REVIEW_REQUIRED",
   );
   if (isRecord(unknownReview)) {
     for (const field of [
       "commit_sha",
+      "base_sha",
       "contract_sha",
       "fixture_sha",
       "config_sha",
@@ -1929,25 +2726,18 @@ export const runGate = async (
     }
   }
   const review = validateReview(unknownReview);
-  await verifyReview(
-    root,
-    review,
-    milestone,
-    context,
-    sortedImplementers(evidence),
-  );
-  const totals = evidence.reduce(
-    (current, item) => ({
-      failed: current.failed + item.failed,
-      skipped: current.skipped + item.skipped,
-      p0: current.p0 + item.p0,
-      p1: current.p1 + item.p1,
+  await verifyReview(root, review, milestone, context, artifacts);
+  const totals = artifacts.reduce(
+    (current, artifact) => ({
+      failed: current.failed + artifact.evidence.failed,
+      skipped: current.skipped + artifact.evidence.skipped,
+      p0: current.p0 + artifact.evidence.p0,
+      p1: current.p1 + artifact.evidence.p1,
     }),
     { failed: 0, skipped: 0, p0: review.p0, p1: review.p1 },
   );
-  if (Object.values(totals).some((value) => value !== 0)) {
+  if (Object.values(totals).some((value) => value !== 0))
     fail("GATE_FAILED", canonicalJson(totals));
-  }
   return milestone === "d0"
     ? "D0_GATE PASS required_caps=5 failed=0 skipped=0 p0=0 p1=0"
     : "M1_GATE PASS required_caps=10 api_operations=31 event_types=18 failed=0 skipped=0 p0=0 p1=0";
@@ -1958,16 +2748,21 @@ export const writeChecklistForTesting = async (
   milestone: Milestone,
   commitSha: string,
   dimensions: string[],
+  dimension?: string,
 ): Promise<void> => {
-  await writeEvidenceFile(root, checklistPath(commitSha, milestone), {
-    schema_version: 1,
-    milestone,
-    commit_sha: commitSha,
-    p0: 0,
-    p1: 0,
-    findings: [],
-    reviewed_dimensions: dimensions,
-  });
+  await writeEvidenceFile(
+    root,
+    checklistPath(commitSha, milestone, dimension),
+    {
+      schema_version: 1,
+      milestone,
+      commit_sha: commitSha,
+      p0: 0,
+      p1: 0,
+      findings: [],
+      reviewed_dimensions: dimensions,
+    },
+  );
 };
 
 export const loadInputsForTesting = loadMilestoneInputs;

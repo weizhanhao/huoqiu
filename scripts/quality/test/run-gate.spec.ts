@@ -1,10 +1,12 @@
 import { execFile as execFileCallback } from "node:child_process";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import {
   copyFile,
   mkdir,
   mkdtemp,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -19,6 +21,7 @@ import {
   D0_REQUIRED_CAP_IDS,
   M1_REQUIRED_CAP_IDS,
   assertRequiredScope,
+  checklistPath,
   computeCurrentContext,
   evidencePath,
   executeCommand,
@@ -33,17 +36,72 @@ import {
   runGate,
   safeRepositoryPath,
   scanForInvalidTestMarkers,
+  validateCommand,
   validateEvidence,
+  validateManifest,
   validateRawReport,
   validateReview,
   writeChecklistForTesting,
+  writeEvidenceFileForTesting,
 } from "../gate-core.mts";
+import { parseStrictFlags } from "../cli.mts";
 import { main as notImplementedMain } from "../not-implemented-gate.mts";
 import { main as recordReviewMain } from "../record-review.mts";
 
 const execFile = promisify(execFileCallback);
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const temporaryRoots: string[] = [];
+const reviewEnvironments = new Map<string, NodeJS.ProcessEnv>();
+
+const installEphemeralReviewTrust = async (root: string): Promise<void> => {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const publicDer = publicKey.export({ format: "der", type: "spki" });
+  const keyId = `ed25519:${createHash("sha256").update(publicDer).digest("hex")}`;
+  const workflowSha = "a".repeat(40);
+  await writeJson(resolve(root, "quality/reviewers/trust-registry.v1.json"), {
+    schema_version: 1,
+    keys: {
+      [keyId]: {
+        reviewer_id: "github:200",
+        actor: "quality-reviewer",
+        actor_id: "200",
+        repository: "huoqiu/huoqiu",
+        repository_id: "9001",
+        workflow_ref:
+          "huoqiu/huoqiu/.github/workflows/quality-review.yml@refs/heads/main",
+        workflow_sha: workflowSha,
+        ref: "refs/heads/main",
+        event_name: "workflow_dispatch",
+        protected_environment: "quality-review",
+        public_key_spki_pem: publicKey
+          .export({ format: "pem", type: "spki" })
+          .toString(),
+      },
+    },
+  });
+  reviewEnvironments.set(root, {
+    GITHUB_ACTIONS: "true",
+    GITHUB_ACTOR: "quality-reviewer",
+    GITHUB_ACTOR_ID: "200",
+    GITHUB_REPOSITORY: "huoqiu/huoqiu",
+    GITHUB_REPOSITORY_ID: "9001",
+    GITHUB_WORKFLOW_REF:
+      "huoqiu/huoqiu/.github/workflows/quality-review.yml@refs/heads/main",
+    GITHUB_WORKFLOW_SHA: workflowSha,
+    GITHUB_REF: "refs/heads/main",
+    GITHUB_REF_PROTECTED: "true",
+    GITHUB_EVENT_NAME: "workflow_dispatch",
+    GITHUB_RUN_ID: "7001",
+    GITHUB_RUN_ATTEMPT: "1",
+    GITHUB_JOB: "independent-review",
+    HUOQIU_REVIEW_ENVIRONMENT: "quality-review",
+    HUOQIU_REVIEW_KEY_ID: keyId,
+    HUOQIU_REVIEW_PRIVATE_KEY_B64: Buffer.from(
+      privateKey.export({ format: "pem", type: "pkcs8" }).toString(),
+      "utf8",
+    ).toString("base64"),
+  });
+};
 
 const json = async (path: string): Promise<Record<string, unknown>> =>
   JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
@@ -139,6 +197,7 @@ const setupRepository = async (
       stretch_cap_ids: [],
     },
   );
+  await installEphemeralReviewTrust(root);
   await execFile("git", ["init", "-q"], { cwd: root });
   await execFile("git", ["config", "user.name", "Quality Test"], { cwd: root });
   await execFile("git", ["config", "user.email", "quality@example.invalid"], {
@@ -151,31 +210,71 @@ const setupRepository = async (
   return root;
 };
 
-const identityProvider = () => ({
-  reviewer_id: "github:200",
-  source: {
-    provider: "github-actions" as const,
-    actor: "reviewer",
-    actor_id: "200",
-  },
-});
+const signingOptions = (
+  root: string,
+  environmentOverrides: NodeJS.ProcessEnv = {},
+  clock?: () => Date,
+  dimension?: string,
+) =>
+  ({
+    // Kept only so the pre-hardening implementation reaches the RED assertions.
+    // The production API intentionally removes this injectable identity boundary.
+    identityProvider: () => ({
+      reviewer_id: "github:200",
+      source: {
+        provider: "github-actions" as const,
+        actor: "quality-reviewer",
+        actor_id: "200",
+      },
+    }),
+    environment: {
+      ...reviewEnvironments.get(root),
+      ...environmentOverrides,
+    },
+    ...(clock === undefined ? {} : { clock }),
+    ...(dimension === undefined ? {} : { dimension }),
+  }) as never;
+
+const prepareReviewInputs = async (
+  root: string,
+  milestone: "d0" | "m1",
+): Promise<Awaited<ReturnType<typeof computeCurrentContext>>> => {
+  const capIds = milestone === "d0" ? D0_REQUIRED_CAP_IDS : M1_REQUIRED_CAP_IDS;
+  for (const capId of capIds) await runCapability(root, milestone, capId);
+  const context = await computeCurrentContext(root, milestone);
+  await writeChecklistForTesting(
+    root,
+    milestone,
+    context.commit_sha,
+    milestone === "d0"
+      ? ["functional", "quality"]
+      : ["functional", "quality", "security", "release"],
+    milestone === "m1" ? "release" : undefined,
+  );
+  return context;
+};
 
 const prepareReviewedGate = async (
   milestone: "d0" | "m1" = "d0",
 ): Promise<string> => {
   const root = await setupRepository(milestone);
-  const capIds = milestone === "d0" ? D0_REQUIRED_CAP_IDS : M1_REQUIRED_CAP_IDS;
-  for (const capId of capIds) await runCapability(root, milestone, capId);
-  const context = await computeCurrentContext(root, milestone);
-  await writeChecklistForTesting(root, milestone, context.commit_sha, [
-    "functional",
-    "quality",
-  ]);
-  await recordReview(root, milestone, context.commit_sha, { identityProvider });
+  const context = await prepareReviewInputs(root, milestone);
+  await recordReview(
+    root,
+    milestone,
+    context.commit_sha,
+    signingOptions(
+      root,
+      {},
+      undefined,
+      milestone === "m1" ? "release" : undefined,
+    ),
+  );
   return root;
 };
 
 afterEach(async () => {
+  reviewEnvironments.clear();
   await Promise.all(
     temporaryRoots
       .splice(0)
@@ -224,9 +323,45 @@ describe("independent required scope", () => {
     const oracle = await json(oraclePath);
     oracle.required_cap_ids = [...D0_REQUIRED_CAP_IDS, "CAP-UNKNOWN-999"];
     await writeJson(oraclePath, oracle);
-    await expect(
-      runGate(root, "d0", { executeCapabilities: false }),
-    ).rejects.toThrow("ORACLE_INTEGRITY_FAILURE");
+    await expect(runGate(root, "d0")).rejects.toThrow(
+      "ORACLE_INTEGRITY_FAILURE",
+    );
+  });
+
+  it("rejects non-canonical implementer aliases for implemented capabilities", () => {
+    expect(() =>
+      validateManifest(
+        {
+          schema_version: 1,
+          milestone: "d0",
+          fixture_version: "d0.v1",
+          required_caps: D0_REQUIRED_CAP_IDS.map((capId) => ({
+            cap_id: capId,
+            command: successCommand("d0.v1"),
+            implementer_ids: ["alice"],
+          })),
+          stretch_cap_ids: [],
+        },
+        "d0",
+      ),
+    ).toThrow("MANIFEST_SCHEMA_INVALID");
+  });
+
+  it("allows the pending sentinel only with the exact fail-closed command", () => {
+    const manifest = {
+      schema_version: 1,
+      milestone: "d0",
+      fixture_version: "d0.v1",
+      required_caps: D0_REQUIRED_CAP_IDS.map((capId) => ({
+        cap_id: capId,
+        command: successCommand("d0.v1"),
+        implementer_ids: ["pending:capability-implementation"],
+      })),
+      stretch_cap_ids: [],
+    };
+    expect(() => validateManifest(manifest, "d0")).toThrow(
+      "MANIFEST_SCHEMA_INVALID",
+    );
   });
 });
 
@@ -252,6 +387,16 @@ describe("required test validity", () => {
     })}`;
     expect(scanForInvalidTestMarkers(stdout)).toEqual([]);
     expect(parseCapabilitySummary(stdout).skipped).toBe(0);
+  });
+
+  it.each([
+    ["xit", "xit('disabled', () => {})"],
+    ["xdescribe", "xdescribe('disabled suite', () => {})"],
+    ["skipIf", "test.skipIf(process.env.CI)('conditional', () => {})"],
+    ["runner output", "Tests  2 skipped (2)"],
+    ["JUnit skipped", '<testcase name="later"><skipped/></testcase>'],
+  ])("detects %s as forbidden skipped coverage", (_name, report) => {
+    expect(scanForInvalidTestMarkers(report)).toContain("skip");
   });
 
   it("rejects a non-zero structured skipped count", () => {
@@ -392,9 +537,40 @@ describe("deterministic context hashing", () => {
       "DIRTY_WORKTREE",
     );
   });
+
+  it("rejects an input whose parent directory is a symlink outside the repository", async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "huoqiu-parent-link-root-"));
+    const outside = await mkdtemp(
+      resolve(tmpdir(), "huoqiu-parent-link-outside-"),
+    );
+    temporaryRoots.push(root, outside);
+    await mkdir(resolve(root, "packages/contracts"), { recursive: true });
+    await mkdir(resolve(outside, "d0"), { recursive: true });
+    await writeFile(resolve(outside, "d0/contract.ts"), "export {};\n");
+    await symlink(outside, resolve(root, "packages/contracts/src"), "dir");
+    await expect(
+      hashRepositoryInputs(root, "contract:d0", [
+        { kind: "directory", path: "packages/contracts/src/d0" },
+      ]),
+    ).rejects.toThrow("GATE_INPUT_INVALID");
+  });
 });
 
 describe("argv-only capability execution", () => {
+  it.each([
+    "/bin/sh",
+    "/usr/bin/bash",
+    "C:\\Windows\\System32\\cmd.exe",
+    "powershell.exe",
+  ])(
+    "rejects shell executable path %s by normalized basename",
+    (executable) => {
+      expect(() => validateCommand({ executable, args: [] })).toThrow(
+        "COMMAND_INVALID",
+      );
+    },
+  );
+
   it("passes metacharacters as a literal argv value and never invokes a shell", async () => {
     const root = await mkdtemp(resolve(tmpdir(), "huoqiu-argv-"));
     temporaryRoots.push(root);
@@ -472,6 +648,35 @@ describe("strict evidence and review documents", () => {
     ).toThrow("INDEPENDENT_REVIEW_REQUIRED");
   });
 
+  it("keeps every signed provenance field as strict as the review schema", async () => {
+    const root = await prepareReviewedGate();
+    const context = await computeCurrentContext(root, "d0");
+    const review = await json(
+      resolve(root, reviewPath(context.commit_sha, "d0")),
+    );
+    for (const [field, invalidValue] of [
+      ["actor", "bad actor"],
+      ["actor_id", "0"],
+      ["repository", "missing-owner"],
+      ["repository_id", "zero"],
+      ["workflow_ref", "workflow.yml"],
+      ["workflow_sha", "not-a-sha"],
+      ["ref", "main"],
+      ["event_name", "bad event"],
+      ["run_id", "0"],
+      ["run_attempt", "0"],
+      ["job", "bad job"],
+      ["protected_environment", "bad environment"],
+    ] as const) {
+      const candidate = structuredClone(review);
+      (candidate.reviewer_source as Record<string, unknown>)[field] =
+        invalidValue;
+      expect(() => validateReview(candidate), field).toThrow(
+        "REVIEW_SCHEMA_INVALID",
+      );
+    }
+  });
+
   it.each(["command", "started_at", "finished_at", "signal"])(
     "rejects malformed raw report %s",
     (field) => {
@@ -506,6 +711,21 @@ describe("strict evidence and review documents", () => {
     ).toThrow("RAW_REPORT_INVALID");
   });
 
+  it("rejects a zero exit raw report terminated by a signal", () => {
+    expect(() =>
+      validateRawReport({
+        schema_version: 1,
+        command: { executable: "node", args: [] },
+        started_at: "2026-08-08T00:00:00.000Z",
+        finished_at: "2026-08-08T00:00:01.000Z",
+        exit_code: 0,
+        signal: "SIGKILL",
+        stdout: "ok",
+        stderr: "",
+      }),
+    ).toThrow("RAW_REPORT_INVALID");
+  });
+
   it("rejects path traversal and absolute evidence paths", () => {
     expect(() => safeRepositoryPath(sourceRoot, "../escape")).toThrow(
       "EVIDENCE_PATH_INVALID",
@@ -516,7 +736,82 @@ describe("strict evidence and review documents", () => {
   });
 });
 
+describe("strict CLI normalization", () => {
+  it("strips exactly one leading pnpm separator", () => {
+    expect(
+      parseStrictFlags(["--", "--milestone", "d0"], new Set(["--milestone"])),
+    ).toEqual(new Map([["--milestone", ["d0"]]]));
+    expect(() =>
+      parseStrictFlags(
+        ["--", "--", "--milestone", "d0"],
+        new Set(["--milestone"]),
+      ),
+    ).toThrow("CLI_ARGUMENT_INVALID");
+  });
+});
+
 describe("current evidence and independent review binding", () => {
+  it("rechecks repository context after a capability command before writing evidence", async () => {
+    const root = await setupRepository();
+    const manifestPath = resolve(root, "quality/manifests/d0-required.json");
+    const manifest = await json(manifestPath);
+    const requiredCaps = manifest.required_caps as Record<string, unknown>[];
+    const firstCap = requiredCaps[0];
+    if (firstCap === undefined) throw new Error("missing test capability");
+    const summary = `HUOQIU_CAPABILITY_RESULT ${JSON.stringify({
+      fixture_version: "d0.v1",
+      passed: 1,
+      failed: 0,
+      skipped: 0,
+      invalid_test_markers: [],
+      p0: 0,
+      p1: 0,
+    })}`;
+    firstCap.command = {
+      executable: process.execPath,
+      args: [
+        "-e",
+        `require('node:fs').appendFileSync('packages/contracts/src/d0/contract.ts',' '); console.log(${JSON.stringify(summary)})`,
+      ],
+    };
+    await writeJson(manifestPath, manifest);
+    await execFile("git", ["add", "quality/manifests/d0-required.json"], {
+      cwd: root,
+    });
+    await execFile("git", ["commit", "-q", "-m", "mutating capability"], {
+      cwd: root,
+    });
+    await expect(runCapability(root, "d0", "CAP-ID-001")).rejects.toThrow(
+      "CONTEXT_CHANGED_DURING_EXECUTION",
+    );
+  });
+
+  it("keeps final gate verification read-only and never overwrites evidence", async () => {
+    const root = await prepareReviewedGate();
+    const context = await computeCurrentContext(root, "d0");
+    const path = resolve(
+      root,
+      evidencePath(context.commit_sha, "d0", "CAP-ID-001"),
+    );
+    const before = await readFile(path, "utf8");
+    await expect(runGate(root, "d0")).resolves.toContain("D0_GATE PASS");
+    expect(await readFile(path, "utf8")).toBe(before);
+  });
+
+  it("rejects evidence bytes changed after the signed review", async () => {
+    const root = await prepareReviewedGate();
+    const context = await computeCurrentContext(root, "d0");
+    const path = resolve(
+      root,
+      evidencePath(context.commit_sha, "d0", "CAP-ID-001"),
+    );
+    const evidence = await json(path);
+    const environment = evidence.environment as Record<string, unknown>;
+    environment.platform = "tampered-platform";
+    await writeJson(path, evidence);
+    await expect(runGate(root, "d0")).rejects.toThrow("EVIDENCE_SET_MISMATCH");
+  });
+
   it.each(["commit_sha", "contract_sha", "fixture_sha", "config_sha"])(
     "rejects stale evidence %s",
     async (field) => {
@@ -530,9 +825,7 @@ describe("current evidence and independent review binding", () => {
       evidence[field] =
         field === "commit_sha" ? "a".repeat(40) : "a".repeat(64);
       await writeJson(path, evidence);
-      await expect(
-        runGate(root, "d0", { executeCapabilities: false }),
-      ).rejects.toThrow("STALE_EVIDENCE");
+      await expect(runGate(root, "d0")).rejects.toThrow("STALE_EVIDENCE");
     },
   );
 
@@ -545,9 +838,7 @@ describe("current evidence and independent review binding", () => {
       const review = await json(path);
       review[field] = field === "commit_sha" ? "b".repeat(40) : "b".repeat(64);
       await writeJson(path, review);
-      await expect(
-        runGate(root, "d0", { executeCapabilities: false }),
-      ).rejects.toThrow("STALE_EVIDENCE");
+      await expect(runGate(root, "d0")).rejects.toThrow("STALE_EVIDENCE");
     },
   );
 
@@ -566,9 +857,7 @@ describe("current evidence and independent review binding", () => {
     const sourceEvidence = await json(source);
     targetEvidence.raw_report = sourceEvidence.raw_report;
     await writeJson(target, targetEvidence);
-    await expect(
-      runGate(root, "d0", { executeCapabilities: false }),
-    ).rejects.toThrow("EVIDENCE_PATH_INVALID");
+    await expect(runGate(root, "d0")).rejects.toThrow("EVIDENCE_PATH_INVALID");
   });
 
   it("rejects raw report bytes that do not match the recorded SHA-256", async () => {
@@ -579,48 +868,117 @@ describe("current evidence and independent review binding", () => {
       rawReportPath(context.commit_sha, "d0", "CAP-ID-001"),
     );
     await writeFile(path, "tampered\n");
-    await expect(
-      runGate(root, "d0", { executeCapabilities: false }),
-    ).rejects.toThrow("RAW_REPORT_HASH_MISMATCH");
+    await expect(runGate(root, "d0")).rejects.toThrow(
+      "RAW_REPORT_HASH_MISMATCH",
+    );
   });
 
   it("rejects self review while recording", async () => {
+    const root = await setupRepository();
+    const manifestPath = resolve(root, "quality/manifests/d0-required.json");
+    const manifest = await json(manifestPath);
+    for (const item of manifest.required_caps as Record<string, unknown>[]) {
+      item.implementer_ids = ["github:200"];
+    }
+    await writeJson(manifestPath, manifest);
+    await execFile("git", ["add", "quality/manifests/d0-required.json"], {
+      cwd: root,
+    });
+    await execFile("git", ["commit", "-q", "-m", "reviewer implemented caps"], {
+      cwd: root,
+    });
+    for (const capId of D0_REQUIRED_CAP_IDS)
+      await runCapability(root, "d0", capId);
+    const context = await computeCurrentContext(root, "d0");
+    await writeChecklistForTesting(root, "d0", context.commit_sha, [
+      "functional",
+      "quality",
+    ]);
+    await expect(
+      recordReview(root, "d0", context.commit_sha, signingOptions(root)),
+    ).rejects.toThrow("INDEPENDENT_REVIEW_REQUIRED");
+  });
+
+  it("rejects checklist counters that do not match strict finding severities", async () => {
+    const root = await setupRepository();
+    for (const capId of D0_REQUIRED_CAP_IDS)
+      await runCapability(root, "d0", capId);
+    const context = await computeCurrentContext(root, "d0");
+    await writeEvidenceFileForTesting(
+      root,
+      checklistPath(context.commit_sha, "d0"),
+      {
+        schema_version: 1,
+        milestone: "d0",
+        commit_sha: context.commit_sha,
+        p0: 0,
+        p1: 0,
+        findings: [
+          {
+            id: "F-001",
+            severity: "P0",
+            summary: "blocking finding",
+            evidence_refs: [
+              evidencePath(context.commit_sha, "d0", "CAP-ID-001"),
+            ],
+          },
+        ],
+        reviewed_dimensions: ["functional", "quality"],
+      },
+    );
+    await expect(
+      recordReview(root, "d0", context.commit_sha, signingOptions(root)),
+    ).rejects.toThrow("REVIEW_CHECKLIST_INVALID");
+  });
+
+  it("rejects arbitrary review dimensions", async () => {
+    const root = await setupRepository();
+    for (const capId of D0_REQUIRED_CAP_IDS)
+      await runCapability(root, "d0", capId);
+    const context = await computeCurrentContext(root, "d0");
+    await writeChecklistForTesting(root, "d0", context.commit_sha, [
+      "invented",
+    ]);
+    await expect(
+      recordReview(root, "d0", context.commit_sha, signingOptions(root)),
+    ).rejects.toThrow("REVIEW_DIMENSION_INVALID");
+  });
+
+  it("requires review time to be at or after the latest evidence", async () => {
     const root = await setupRepository();
     for (const capId of D0_REQUIRED_CAP_IDS)
       await runCapability(root, "d0", capId);
     const context = await computeCurrentContext(root, "d0");
     await writeChecklistForTesting(root, "d0", context.commit_sha, [
       "functional",
+      "quality",
     ]);
     await expect(
-      recordReview(root, "d0", context.commit_sha, {
-        identityProvider: () => ({
-          reviewer_id: "github:100",
-          source: {
-            provider: "github-actions",
-            actor: "implementer",
-            actor_id: "100",
-          },
-        }),
-      }),
-    ).rejects.toThrow("INDEPENDENT_REVIEW_REQUIRED");
+      recordReview(
+        root,
+        "d0",
+        context.commit_sha,
+        signingOptions(root, {}, () => new Date("2000-01-01T00:00:00.000Z")),
+      ),
+    ).rejects.toThrow("REVIEW_TIME_INVALID");
   });
 });
 
 describe("trusted reviewer identity boundary", () => {
-  it("accepts only the GitHub Actions actor ID as canonical identity", () => {
+  it("accepts only complete protected GitHub Actions provenance", async () => {
+    const root = await setupRepository();
     expect(
-      resolveTrustedReviewerIdentity({
-        GITHUB_ACTIONS: "true",
-        GITHUB_ACTOR: "quality-owner",
-        GITHUB_ACTOR_ID: "12345",
-      }),
-    ).toEqual({
-      reviewer_id: "github:12345",
+      resolveTrustedReviewerIdentity(reviewEnvironments.get(root)),
+    ).toMatchObject({
+      reviewer_id: "github:200",
       source: {
         provider: "github-actions",
-        actor: "quality-owner",
-        actor_id: "12345",
+        actor: "quality-reviewer",
+        actor_id: "200",
+        repository: "huoqiu/huoqiu",
+        ref: "refs/heads/main",
+        ref_protected: true,
+        protected_environment: "quality-review",
       },
     });
   });
@@ -652,6 +1010,143 @@ describe("trusted reviewer identity boundary", () => {
       ]),
     ).rejects.toThrow("CLI_ARGUMENT_INVALID");
   });
+
+  it("records a versioned Ed25519 signature over evidence and provenance", async () => {
+    const root = await setupRepository();
+    const context = await prepareReviewInputs(root, "d0");
+    const review = (await recordReview(
+      root,
+      "d0",
+      context.commit_sha,
+      signingOptions(root),
+    )) as unknown as Record<string, unknown>;
+    const signature = review.signature as Record<string, unknown>;
+    const environment = reviewEnvironments.get(root);
+    expect(review.schema_version).toBe(2);
+    expect(review.evidence_set_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(review.trust_registry_sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(signature.algorithm).toBe("Ed25519");
+    expect(signature.key_id).toBe(environment?.HUOQIU_REVIEW_KEY_ID);
+    const bytes = Buffer.from(String(signature.value_base64), "base64");
+    expect(bytes.byteLength).toBe(64);
+    expect(bytes.toString("base64")).toBe(signature.value_base64);
+  });
+
+  it("fails closed when the trust registry has no authorized key", async () => {
+    const root = await setupRepository();
+    await writeJson(resolve(root, "quality/reviewers/trust-registry.v1.json"), {
+      schema_version: 1,
+      keys: {},
+    });
+    await execFile("git", ["add", "quality/reviewers/trust-registry.v1.json"], {
+      cwd: root,
+    });
+    await execFile("git", ["commit", "-q", "-m", "empty reviewer trust"], {
+      cwd: root,
+    });
+    const context = await prepareReviewInputs(root, "d0");
+    await expect(
+      recordReview(root, "d0", context.commit_sha, signingOptions(root)),
+    ).rejects.toThrow("REVIEW_TRUST_REQUIRED");
+  });
+
+  it("rejects malformed trust-policy provenance before key authorization", async () => {
+    const root = await setupRepository();
+    const registryPath = resolve(
+      root,
+      "quality/reviewers/trust-registry.v1.json",
+    );
+    const registry = await json(registryPath);
+    const keys = registry.keys as Record<string, Record<string, unknown>>;
+    const policy = Object.values(keys)[0];
+    if (policy === undefined) throw new Error("missing test trust policy");
+    policy.repository_id = "not-numeric";
+    await writeJson(registryPath, registry);
+    await execFile("git", ["add", "quality/reviewers/trust-registry.v1.json"], {
+      cwd: root,
+    });
+    await execFile("git", ["commit", "-q", "-m", "malformed trust policy"], {
+      cwd: root,
+    });
+    const context = await prepareReviewInputs(root, "d0");
+    await expect(
+      recordReview(root, "d0", context.commit_sha, signingOptions(root)),
+    ).rejects.toThrow("REVIEW_TRUST_REGISTRY_INVALID");
+  });
+
+  it("rejects an unknown key ID and a private key that does not match the registry", async () => {
+    const root = await setupRepository();
+    const context = await prepareReviewInputs(root, "d0");
+    await expect(
+      recordReview(
+        root,
+        "d0",
+        context.commit_sha,
+        signingOptions(root, {
+          HUOQIU_REVIEW_KEY_ID: `ed25519:${"0".repeat(64)}`,
+        }),
+      ),
+    ).rejects.toThrow("REVIEW_TRUST_REQUIRED");
+
+    const { privateKey } = generateKeyPairSync("ed25519");
+    await expect(
+      recordReview(
+        root,
+        "d0",
+        context.commit_sha,
+        signingOptions(root, {
+          HUOQIU_REVIEW_PRIVATE_KEY_B64: Buffer.from(
+            privateKey.export({ format: "pem", type: "pkcs8" }).toString(),
+          ).toString("base64"),
+        }),
+      ),
+    ).rejects.toThrow("REVIEW_PRIVATE_KEY_MISMATCH");
+  });
+
+  it("rejects forged local provenance, unprotected refs, and trust-policy mismatch", async () => {
+    const root = await setupRepository();
+    const context = await prepareReviewInputs(root, "d0");
+    await expect(
+      recordReview(
+        root,
+        "d0",
+        context.commit_sha,
+        signingOptions(root, {
+          HUOQIU_REVIEW_KEY_ID: undefined,
+          HUOQIU_REVIEW_PRIVATE_KEY_B64: undefined,
+        }),
+      ),
+    ).rejects.toThrow("REVIEW_TRUST_REQUIRED");
+    await expect(
+      recordReview(
+        root,
+        "d0",
+        context.commit_sha,
+        signingOptions(root, { GITHUB_REF_PROTECTED: "false" }),
+      ),
+    ).rejects.toThrow("TRUSTED_REVIEWER_IDENTITY_REQUIRED");
+    await expect(
+      recordReview(
+        root,
+        "d0",
+        context.commit_sha,
+        signingOptions(root, { GITHUB_REF: "refs/heads/attacker" }),
+      ),
+    ).rejects.toThrow("REVIEW_TRUST_POLICY_MISMATCH");
+  });
+
+  it("rejects signed provenance tampering during verification", async () => {
+    const root = await prepareReviewedGate();
+    const context = await computeCurrentContext(root, "d0");
+    const path = resolve(root, reviewPath(context.commit_sha, "d0"));
+    const review = await json(path);
+    (review.reviewer_source as Record<string, unknown>).ref =
+      "refs/heads/attacker";
+    await writeJson(path, review);
+    await expect(runGate(root, "d0")).rejects.toThrow(
+      "REVIEW_SIGNATURE_INVALID",
+    );
+  });
 });
 
 describe("milestone results and explicit not-ready behavior", () => {
@@ -664,10 +1159,21 @@ describe("milestone results and explicit not-ready behavior", () => {
 
   it("prints the exact M1 successful line only after all ten capabilities", async () => {
     const root = await prepareReviewedGate("m1");
-    await expect(
-      runGate(root, "m1", { executeCapabilities: false }),
-    ).resolves.toBe(
+    await expect(runGate(root, "m1")).resolves.toBe(
       "M1_GATE PASS required_caps=10 api_operations=31 event_types=18 failed=0 skipped=0 p0=0 p1=0",
+    );
+  });
+
+  it("requires the M1 final gate to use the release-dimension review path", async () => {
+    const root = await prepareReviewedGate("m1");
+    const context = await computeCurrentContext(root, "m1");
+    await copyFile(
+      resolve(root, reviewPath(context.commit_sha, "m1", "release")),
+      resolve(root, reviewPath(context.commit_sha, "m1")),
+    );
+    await rm(resolve(root, reviewPath(context.commit_sha, "m1", "release")));
+    await expect(runGate(root, "m1")).rejects.toThrow(
+      "INDEPENDENT_REVIEW_REQUIRED",
     );
   });
 
@@ -675,6 +1181,16 @@ describe("milestone results and explicit not-ready behavior", () => {
     await expect(notImplementedMain(["--gate", "security"])).rejects.toThrow(
       "NOT_IMPLEMENTED",
     );
+  });
+
+  it("registered future qa modules fail explicitly instead of module resolution errors", async () => {
+    const result = await executeCommand(sourceRoot, {
+      executable: "pnpm",
+      args: ["qa:auth-spike"],
+    });
+    expect(result.exit_code).not.toBe(0);
+    expect(result.stderr).toContain("NOT_IMPLEMENTED");
+    expect(result.stderr).not.toContain("ERR_MODULE_NOT_FOUND");
   });
 
   it("registers quality tests and script checks in the root regression commands", async () => {
@@ -701,11 +1217,21 @@ describe("milestone results and explicit not-ready behavior", () => {
     );
     expect(evidenceSchema.additionalProperties).toBe(false);
     expect(reviewSchema.additionalProperties).toBe(false);
-    expect(reviewSchema["x-huoqiu-not-in"]).toEqual({
-      valuePointer: "/reviewer_id",
-      arrayPointer: "/implementer_ids",
-      error: "INDEPENDENT_REVIEW_REQUIRED",
-    });
+    expect(reviewSchema["x-huoqiu-not-in"]).toBeUndefined();
+    expect(reviewSchema.$comment).toContain("runtime validateReview");
+    expect(evidenceSchema.$comment).toContain("runtime validateCommand");
+    const definitions = evidenceSchema.$defs as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const command = definitions.command;
+    const properties = command?.properties as
+      Record<string, Record<string, unknown>> | undefined;
+    const executablePattern = properties?.executable?.pattern;
+    expect(typeof executablePattern).toBe("string");
+    const executableRegex = new RegExp(String(executablePattern));
+    expect(executableRegex.test("/bin/sh")).toBe(false);
+    expect(executableRegex.test("node")).toBe(true);
   });
 
   it("loads the real manifests without letting them redefine the oracle", async () => {

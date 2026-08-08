@@ -1,21 +1,22 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://huoqiu.invalid/schemas/review.v1.json",
-  "title": "Huoqiu independent review v1",
+  "$id": "https://huoqiu.invalid/schemas/review.v2.json",
+  "title": "Huoqiu independent review v2",
   "type": "object",
   "additionalProperties": false,
-  "x-huoqiu-not-in": {
-    "valuePointer": "/reviewer_id",
-    "arrayPointer": "/implementer_ids",
-    "error": "INDEPENDENT_REVIEW_REQUIRED"
-  },
+  "$comment": "Standard JSON Schema cannot express reviewer independence, evidence byte-set binding, trust-policy authorization, or Ed25519 verification. Repository certification therefore requires the authoritative runtime validateReview and cryptographic checks; schema-only validation is never certification.",
   "required": [
     "schema_version",
     "milestone",
     "commit_sha",
+    "base_sha",
     "contract_sha",
     "fixture_sha",
     "config_sha",
+    "trust_registry_sha256",
+    "evidence_set_sha256",
+    "evidence_count",
+    "latest_evidence_finished_at",
     "reviewer_id",
     "reviewer_source",
     "reviewed_at",
@@ -26,21 +27,64 @@
     "signature"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "milestone": { "enum": ["d0", "m1"] },
     "commit_sha": { "$ref": "#/$defs/gitSha" },
+    "base_sha": { "$ref": "#/$defs/gitSha" },
     "contract_sha": { "$ref": "#/$defs/sha256" },
     "fixture_sha": { "$ref": "#/$defs/sha256" },
     "config_sha": { "$ref": "#/$defs/sha256" },
-    "reviewer_id": { "type": "string", "pattern": "^github:[0-9]+$" },
+    "trust_registry_sha256": { "$ref": "#/$defs/sha256" },
+    "evidence_set_sha256": { "$ref": "#/$defs/sha256" },
+    "evidence_count": { "type": "integer", "minimum": 1 },
+    "latest_evidence_finished_at": { "type": "string", "format": "date-time" },
+    "reviewer_id": { "$ref": "#/$defs/githubIdentity" },
     "reviewer_source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["provider", "actor", "actor_id"],
+      "required": [
+        "provider",
+        "actor",
+        "actor_id",
+        "repository",
+        "repository_id",
+        "workflow_ref",
+        "workflow_sha",
+        "ref",
+        "ref_protected",
+        "event_name",
+        "run_id",
+        "run_attempt",
+        "job",
+        "protected_environment"
+      ],
       "properties": {
         "provider": { "const": "github-actions" },
-        "actor": { "type": "string", "minLength": 1 },
-        "actor_id": { "type": "string", "pattern": "^[0-9]+$" }
+        "actor": { "type": "string", "pattern": "^[A-Za-z0-9-]+$" },
+        "actor_id": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "repository_id": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+        "workflow_ref": {
+          "type": "string",
+          "pattern": "^[^\\u0000\\r\\n]+/\\.github/workflows/[^\\u0000\\r\\n]+@refs/[^\\u0000\\r\\n]+$"
+        },
+        "workflow_sha": { "$ref": "#/$defs/gitSha40" },
+        "ref": {
+          "type": "string",
+          "pattern": "^refs/(heads|tags)/[A-Za-z0-9._/-]+$"
+        },
+        "ref_protected": { "const": true },
+        "event_name": { "type": "string", "pattern": "^[A-Za-z0-9_]+$" },
+        "run_id": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+        "run_attempt": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+        "job": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "protected_environment": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        }
       }
     },
     "reviewed_at": { "type": "string", "format": "date-time" },
@@ -50,30 +94,35 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1 }
+      "items": { "$ref": "#/$defs/githubIdentity" }
     },
     "checklist": {
       "type": "object",
       "additionalProperties": false,
       "required": ["path", "sha256"],
       "properties": {
-        "path": { "type": "string", "pattern": "^artifacts/evidence/" },
+        "path": {
+          "type": "string",
+          "pattern": "^artifacts/evidence/[a-f0-9]{40,64}/reviews/(d0|m1-release)-checklist\\.json$"
+        },
         "sha256": { "$ref": "#/$defs/sha256" }
       }
     },
     "signature": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["method", "signed_by", "statement_sha256"],
+      "required": ["algorithm", "key_id", "value_base64"],
       "properties": {
-        "method": { "const": "github-actions-identity-v1" },
-        "signed_by": { "type": "string", "pattern": "^github:[0-9]+$" },
-        "statement_sha256": { "$ref": "#/$defs/sha256" }
+        "algorithm": { "const": "Ed25519" },
+        "key_id": { "type": "string", "pattern": "^ed25519:[a-f0-9]{64}$" },
+        "value_base64": { "type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$" }
       }
     }
   },
   "$defs": {
     "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
-    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+    "gitSha40": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "githubIdentity": { "type": "string", "pattern": "^github:[1-9][0-9]*$" }
   }
 }

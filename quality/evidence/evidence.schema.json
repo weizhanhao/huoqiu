@@ -4,6 +4,7 @@
   "title": "Huoqiu capability evidence v1",
   "type": "object",
   "additionalProperties": false,
+  "$comment": "The authoritative runtime validateCommand additionally normalizes path separators and case before rejecting path-qualified shell executables. Schema-only validation is never capability certification.",
   "required": [
     "schema_version",
     "milestone",
@@ -66,7 +67,10 @@
       "additionalProperties": false,
       "required": ["path", "sha256"],
       "properties": {
-        "path": { "type": "string", "pattern": "^artifacts/evidence/" },
+        "path": {
+          "type": "string",
+          "pattern": "^artifacts/evidence/[a-f0-9]{40,64}/raw/(d0|m1)/CAP-[A-Z]+-[0-9]{3}\\.raw\\.json$"
+        },
         "sha256": { "$ref": "#/$defs/sha256" }
       }
     },
@@ -76,7 +80,7 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1 }
+      "items": { "type": "string", "pattern": "^github:[1-9][0-9]*$" }
     }
   },
   "$defs": {
@@ -87,8 +91,14 @@
       "additionalProperties": false,
       "required": ["executable", "args"],
       "properties": {
-        "executable": { "type": "string", "minLength": 1 },
-        "args": { "type": "array", "items": { "type": "string" } }
+        "executable": {
+          "type": "string",
+          "pattern": "^(?!.*\\s)(?!(?:.*[\\\\/])?(?:bash|cmd(?:\\.exe)?|fish|powershell(?:\\.exe)?|pwsh|sh|zsh)$).+$"
+        },
+        "args": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     }
   }
