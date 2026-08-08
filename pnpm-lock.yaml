@@ -178,6 +178,9 @@ importers:
 
   apps/web:
     dependencies:
+      "@huoqiu/contracts":
+        specifier: workspace:*
+        version: link:../../packages/contracts
       "@huoqiu/web-ui":
         specifier: workspace:*
         version: link:../../packages/web-ui
