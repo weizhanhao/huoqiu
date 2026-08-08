@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 const routes = [
@@ -57,6 +58,14 @@ test("all D0 routes expose normal/loading/empty/error and recover", async ({
   for (const route of routes) {
     await page.goto(route.path);
     await expect(page.locator("body")).toContainText(route.normal);
+    const accessibility = await new AxeBuilder({ page })
+      .include(".d0-app-shell")
+      .analyze();
+    expect(
+      accessibility.violations.filter(
+        ({ impact }) => impact === "serious" || impact === "critical",
+      ),
+    ).toEqual([]);
 
     await page.goto(withState(route.path, "loading"));
     await expect(
