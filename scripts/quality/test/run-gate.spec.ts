@@ -667,8 +667,11 @@ const refreshAuthorship = async (
     await execFile("git", ["rev-parse", "HEAD"], { cwd: root })
   ).stdout.trim();
   const environment = authorshipEnvironments.get(root);
-  if (environment === undefined)
-    throw new Error("missing ephemeral authorship environment");
+  const reviewEnvironment = reviewEnvironments.get(root);
+  if (environment === undefined || reviewEnvironment === undefined)
+    throw new Error("missing ephemeral signing environment");
+  environment.GITHUB_WORKFLOW_SHA = head;
+  reviewEnvironment.GITHUB_WORKFLOW_SHA = head;
   installAuthorshipArchive(
     root,
     head,
