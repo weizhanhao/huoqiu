@@ -4,7 +4,7 @@
   "title": "Huoqiu capability evidence v1",
   "type": "object",
   "additionalProperties": false,
-  "$comment": "The authoritative runtime validateCommand additionally normalizes path separators and case before rejecting path-qualified shell executables. Schema-only validation is never capability certification.",
+  "$comment": "The authoritative runtime validateCommand enforces the protected Node/pnpm-exec runner allowlist, exact protected-runtime identity for path-qualified Node, and a fixed pnpm target allowlist. Schema-only validation is never capability certification.",
   "required": [
     "schema_version",
     "milestone",
@@ -95,7 +95,7 @@
       "properties": {
         "executable": {
           "type": "string",
-          "pattern": "^(?!.*\\s)(?!(?:.*[\\\\/])?(?:bash|cmd(?:\\.exe)?|fish|powershell(?:\\.exe)?|pwsh|sh|zsh)$).+$"
+          "pattern": "^(?!.*\\s)(?:(?:.*[\\\\/])?node(?:\\.exe)?|pnpm(?:\\.(?:cmd|exe))?)$"
         },
         "args": {
           "type": "array",

@@ -11,16 +11,18 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  realpath,
   rename,
   rm,
   symlink,
   writeFile,
 } from "node:fs/promises";
 import { createServer } from "node:http";
+import { Session } from "node:inspector";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -106,6 +108,53 @@ const verifierBundleSha256ForTesting = (
   return hash.digest("hex");
 };
 
+const inMemoryScriptBytesForTesting = async (path: string): Promise<Buffer> => {
+  const expectedUrl = pathToFileURL(await realpath(path)).href;
+  const session = new Session();
+  session.connect();
+  const scripts = new Map<string, string>();
+  session.on("Debugger.scriptParsed", ({ params }) => {
+    if (params.url.length > 0) scripts.set(params.url, params.scriptId);
+  });
+  try {
+    await new Promise<void>((resolvePromise, rejectPromise) => {
+      session.post("Debugger.enable", (error) =>
+        error === null || error === undefined
+          ? resolvePromise()
+          : rejectPromise(error),
+      );
+    });
+    const scriptId = scripts.get(expectedUrl);
+    if (scriptId === undefined)
+      throw new Error(`missing in-memory verifier script ${expectedUrl}`);
+    const source = await new Promise<string>(
+      (resolvePromise, rejectPromise) => {
+        session.post(
+          "Debugger.getScriptSource",
+          { scriptId },
+          (error, result) => {
+            if (error !== null && error !== undefined) {
+              rejectPromise(error);
+              return;
+            }
+            const scriptSource = (
+              result as { scriptSource?: unknown } | undefined
+            )?.scriptSource;
+            if (typeof scriptSource !== "string") {
+              rejectPromise(new Error("inspector omitted script source"));
+              return;
+            }
+            resolvePromise(scriptSource);
+          },
+        );
+      },
+    );
+    return Buffer.from(source, "utf8");
+  } finally {
+    session.disconnect();
+  }
+};
+
 const installEphemeralReviewTrust = async (root: string): Promise<void> => {
   const rootPair = generateKeyPairSync("ed25519");
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
@@ -130,8 +179,8 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
     throw new Error("missing test verifier entrypoint");
   const verifierEntrypoint = resolve(verifierArgument);
   const verifierSha = verifierBundleSha256ForTesting(
-    await readFile(verifierEntrypoint),
-    await readFile(gateCorePath),
+    await inMemoryScriptBytesForTesting(verifierEntrypoint),
+    await inMemoryScriptBytesForTesting(gateCorePath),
   );
   const launcherRoot = await mkdtemp(
     resolve(tmpdir(), "huoqiu-protected-launcher-"),
@@ -1010,7 +1059,7 @@ describe("deterministic context hashing", () => {
     },
   );
 
-  it("removes hostile inherited GIT_* variables from verifier git calls", async () => {
+  it("uses raw Git objects and never executes candidate Git filters", async () => {
     const root = await setupRepository();
     const originalGitDir = process.env.GIT_DIR;
     const originalGitWorkTree = process.env.GIT_WORK_TREE;
@@ -1026,6 +1075,131 @@ describe("deterministic context hashing", () => {
       if (originalGitWorkTree === undefined) delete process.env.GIT_WORK_TREE;
       else process.env.GIT_WORK_TREE = originalGitWorkTree;
     }
+
+    const rawContext = await computeCurrentContext(root, "d0");
+    const replacement = (
+      await execFile(
+        "git",
+        [
+          "commit-tree",
+          "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+          "-m",
+          "attacker replacement commit",
+        ],
+        { cwd: root },
+      )
+    ).stdout.trim();
+    await execFile("git", ["replace", rawContext.commit_sha, replacement], {
+      cwd: root,
+    });
+    await expect(computeCurrentContext(root, "d0")).resolves.toEqual(
+      rawContext,
+    );
+
+    const installAttributes = async (
+      repository: string,
+      attributes: string,
+    ): Promise<void> => {
+      await writeFile(resolve(repository, ".gitattributes"), attributes);
+      await execFile("git", ["add", ".gitattributes"], { cwd: repository });
+      await execFile("git", ["commit", "-q", "-m", "candidate attributes"], {
+        cwd: repository,
+      });
+    };
+
+    const cleanRoot = await setupRepository();
+    await installAttributes(
+      cleanRoot,
+      "packages/contracts/src/d0/contract.ts filter=attack\n",
+    );
+    const cleanMarker = resolve(cleanRoot, ".git/clean-filter-executed");
+    const cleanFilter = resolve(cleanRoot, ".git/clean-filter.cjs");
+    await writeFile(
+      cleanFilter,
+      [
+        "const { writeFileSync } = require('node:fs');",
+        `writeFileSync(${JSON.stringify(cleanMarker)}, 'executed');`,
+        "process.stdin.pipe(process.stdout);",
+        "",
+      ].join("\n"),
+    );
+    await execFile(
+      "git",
+      ["config", "filter.attack.clean", `${process.execPath} ${cleanFilter}`],
+      { cwd: cleanRoot },
+    );
+    await expect(computeCurrentContext(cleanRoot, "d0")).resolves.toMatchObject(
+      {
+        commit_sha: expect.stringMatching(/^[a-f0-9]{40}$/u),
+      },
+    );
+    await expect(readFile(cleanMarker)).rejects.toThrow();
+
+    const processRoot = await setupRepository();
+    await installAttributes(
+      processRoot,
+      "packages/contracts/src/d0/contract.ts filter=attack\n",
+    );
+    const processMarker = resolve(processRoot, ".git/process-filter-executed");
+    const processFilter = resolve(processRoot, ".git/process-filter.cjs");
+    await writeFile(
+      processFilter,
+      [
+        "const { writeFileSync } = require('node:fs');",
+        `writeFileSync(${JSON.stringify(processMarker)}, 'executed');`,
+        "process.exit(1);",
+        "",
+      ].join("\n"),
+    );
+    await execFile(
+      "git",
+      [
+        "config",
+        "filter.attack.process",
+        `${process.execPath} ${processFilter}`,
+      ],
+      { cwd: processRoot },
+    );
+    await expect(
+      computeCurrentContext(processRoot, "d0"),
+    ).resolves.toMatchObject({
+      commit_sha: expect.stringMatching(/^[a-f0-9]{40}$/u),
+    });
+    await expect(readFile(processMarker)).rejects.toThrow();
+
+    const textconvRoot = await setupRepository();
+    await installAttributes(
+      textconvRoot,
+      "packages/contracts/src/d0/contract.ts diff=attack\n",
+    );
+    await writeFile(
+      resolve(textconvRoot, "packages/contracts/src/d0/contract.ts"),
+      '{"contract":"d0","revision":2}\n',
+    );
+    await execFile("git", ["add", "packages/contracts/src/d0/contract.ts"], {
+      cwd: textconvRoot,
+    });
+    await execFile("git", ["commit", "-q", "-m", "candidate revision"], {
+      cwd: textconvRoot,
+    });
+    const textconvMarker = resolve(textconvRoot, ".git/textconv-executed");
+    const textconv = resolve(textconvRoot, ".git/textconv.cjs");
+    await writeFile(
+      textconv,
+      [
+        "const { readFileSync, writeFileSync } = require('node:fs');",
+        `writeFileSync(${JSON.stringify(textconvMarker)}, 'executed');`,
+        "process.stdout.write(readFileSync(process.argv[2]));",
+        "",
+      ].join("\n"),
+    );
+    await execFile(
+      "git",
+      ["config", "diff.attack.textconv", `${process.execPath} ${textconv}`],
+      { cwd: textconvRoot },
+    );
+    await refreshAuthorship(textconvRoot, "d0", ["github:100"]);
+    await expect(readFile(textconvMarker)).rejects.toThrow();
   });
 
   it("rejects an input whose parent directory is a symlink outside the repository", async () => {
@@ -1048,16 +1222,18 @@ describe("deterministic context hashing", () => {
 
 describe("argv-only capability execution", () => {
   it.each([
-    "/bin/sh",
-    "/usr/bin/bash",
-    "C:\\Windows\\System32\\cmd.exe",
-    "powershell.exe",
+    ["/bin/sh", ["dash", "ksh"]],
+    ["/usr/bin/bash", ["csh", "tcsh"]],
+    ["C:\\Windows\\System32\\cmd.exe", ["npm", "npx"]],
+    ["powershell.exe", ["yarn", "bun"]],
   ])(
     "rejects shell executable path %s by normalized basename",
-    (executable) => {
-      expect(() => validateCommand({ executable, args: [] })).toThrow(
-        "COMMAND_INVALID",
-      );
+    (executable, additionalExecutables) => {
+      for (const candidate of [executable, ...additionalExecutables]) {
+        expect(() =>
+          validateCommand({ executable: candidate, args: [] }),
+        ).toThrow("COMMAND_INVALID");
+      }
     },
   );
 
@@ -1066,6 +1242,12 @@ describe("argv-only capability execution", () => {
       validateCommand({
         executable: "/usr/bin/env",
         args: ["sh", "-c", "printf attacker"],
+      }),
+    ).toThrow("COMMAND_INVALID");
+    expect(() =>
+      validateCommand({
+        executable: "pnpm",
+        args: ["exec", "playwright", "codegen"],
       }),
     ).toThrow("COMMAND_INVALID");
   });
@@ -1078,19 +1260,37 @@ describe("argv-only capability execution", () => {
     },
     { executable: process.execPath, args: ["-e", "console.log('attack')"] },
     {
-      executable: process.execPath,
-      args: ["--eval=console.log('attack')"],
+      executable: "pnpm",
+      args: ["exec", "tsx", "--eval", "console.log('attack')"],
     },
     { executable: process.execPath, args: ["--print", "process.pid"] },
     {
       executable: "pnpm",
-      args: ["exec", "node", "--eval", "console.log('attack')"],
+      args: ["exec", "vitest", "--watch"],
     },
   ])("rejects eval and shell-wrapper command $executable $args", (command) => {
     expect(() => validateCommand(command)).toThrow("COMMAND_INVALID");
   });
 
   it("passes metacharacters as a literal argv value and never invokes a shell", async () => {
+    expect(
+      validateCommand({
+        executable: "pnpm",
+        args: ["exec", "vitest", "run", "quality.spec.ts"],
+      }),
+    ).toEqual({
+      executable: "pnpm",
+      args: ["exec", "vitest", "run", "quality.spec.ts"],
+    });
+    expect(
+      validateCommand({
+        executable: "pnpm",
+        args: ["exec", "playwright", "test", "quality.spec.ts"],
+      }),
+    ).toEqual({
+      executable: "pnpm",
+      args: ["exec", "playwright", "test", "quality.spec.ts"],
+    });
     const root = await mkdtemp(resolve(tmpdir(), "huoqiu-argv-"));
     temporaryRoots.push(root);
     const marker = resolve(root, "injected");
@@ -1571,7 +1771,7 @@ describe("current evidence and independent review binding", () => {
     ).rejects.toThrow("PROTECTED_EXECUTION_LAUNCHER_REQUIRED");
   });
 
-  it("rejects a verifier pin that covers only the bootstrap entry and not the loaded core", async () => {
+  it("binds verifier pins to both exact scripts already executing in memory", async () => {
     const root = await setupRepository();
     const environment = reviewEnvironments.get(root);
     const entrypoint = environment?.HUOQIU_VERIFIER_ENTRYPOINT_PATH;
@@ -1591,6 +1791,41 @@ describe("current evidence and independent review binding", () => {
     await expect(
       runTrustedCapability(root, "d0", "CAP-ID-001"),
     ).rejects.toThrow("VERIFIER_TRUST_ROOT_REQUIRED");
+
+    const substitutionRoot = await setupRepository();
+    const substitutionEnvironment = reviewEnvironments.get(substitutionRoot);
+    const substitutionAuthorship = authorshipEnvironments.get(substitutionRoot);
+    const substitutionEntrypoint =
+      substitutionEnvironment?.HUOQIU_VERIFIER_ENTRYPOINT_PATH;
+    if (
+      substitutionEnvironment === undefined ||
+      substitutionAuthorship === undefined ||
+      substitutionEntrypoint === undefined
+    ) {
+      throw new Error("missing substitution verifier environment");
+    }
+    const originalCoreBytes = await readFile(gateCorePath);
+    const substitutedCoreBytes = Buffer.concat([
+      originalCoreBytes,
+      Buffer.from("\n// disk bytes replaced after this module was loaded\n"),
+    ]);
+    try {
+      await writeFile(gateCorePath, substitutedCoreBytes);
+      const substitutedDiskSha = verifierBundleSha256ForTesting(
+        await readFile(substitutionEntrypoint),
+        substitutedCoreBytes,
+      );
+      await resignTrustRegistry(substitutionRoot, (unsigned) => {
+        unsigned.verifier_sha256 = substitutedDiskSha;
+      });
+      substitutionEnvironment.HUOQIU_VERIFIER_SHA256 = substitutedDiskSha;
+      substitutionAuthorship.HUOQIU_VERIFIER_SHA256 = substitutedDiskSha;
+      await expect(
+        runTrustedCapability(substitutionRoot, "d0", "CAP-ID-001"),
+      ).rejects.toThrow("VERIFIER_TRUST_ROOT_REQUIRED");
+    } finally {
+      await writeFile(gateCorePath, originalCoreBytes);
+    }
   });
 
   it.skipIf(process.platform === "win32")(
@@ -2666,7 +2901,7 @@ describe("milestone results and explicit not-ready behavior", () => {
   it("registered future qa modules fail explicitly instead of module resolution errors", async () => {
     const result = await executeCommand(sourceRoot, {
       executable: "pnpm",
-      args: ["qa:auth-spike"],
+      args: ["exec", "tsx", "scripts/quality/auth-spike-gate.mts"],
     });
     expect(result.exit_code).not.toBe(0);
     expect(result.stderr).toContain("NOT_IMPLEMENTED");

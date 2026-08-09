@@ -21,10 +21,11 @@ import {
 } from "node:fs/promises";
 import { watch as watchFiles, type FSWatcher, type Stats } from "node:fs";
 import { constants as fsConstants } from "node:fs";
+import { Session } from "node:inspector";
 import { arch, platform, tmpdir } from "node:os";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export type Milestone = "d0" | "m1";
 
@@ -318,30 +319,18 @@ export interface RunCommand {
   args: string[];
 }
 
-const FORBIDDEN_EXECUTABLES = new Set([
-  "bash",
-  "cmd",
-  "cmd.exe",
-  "fish",
-  "env",
-  "nohup",
-  "setsid",
-  "powershell",
-  "powershell.exe",
-  "pwsh",
-  "script",
-  "sh",
-  "start",
-  "timeout",
-  "xargs",
-  "zsh",
-]);
-
 const executableBasename = (executable: string): string | undefined =>
   executable.replaceAll("\\", "/").split("/").at(-1)?.toLowerCase();
 
 const NODE_EXECUTABLES = new Set(["node", "node.exe"]);
 const PNPM_EXECUTABLES = new Set(["pnpm", "pnpm.cmd", "pnpm.exe"]);
+const ALLOWED_PNPM_EXEC_TARGETS = new Set(["playwright", "tsx", "vitest"]);
+
+const isBareExecutable = (executable: string): boolean =>
+  !executable.includes("/") && !executable.includes("\\");
+
+const normalizedExecutablePath = (executable: string): string =>
+  executable.replaceAll("\\", "/").toLowerCase();
 
 const isNodeEvalArgument = (argument: string): boolean =>
   argument === "-e" ||
@@ -352,38 +341,69 @@ const isNodeEvalArgument = (argument: string): boolean =>
   argument.startsWith("--print=") ||
   /^-[^-]*[ep][^-]*$/u.test(argument);
 
-const assertNoSemanticShellWrapper = (
+const assertAllowedRunner = (
   executable: string,
   args: readonly string[],
   code: string,
 ): void => {
   const basename = executableBasename(executable);
   if (basename !== undefined && NODE_EXECUTABLES.has(basename)) {
+    if (
+      !isBareExecutable(executable) &&
+      normalizedExecutablePath(executable) !==
+        normalizedExecutablePath(process.execPath)
+    ) {
+      fail(code, "path-qualified Node must equal the protected runtime");
+    }
     if (args.some(isNodeEvalArgument))
       fail(code, "Node eval/print commands are forbidden");
+    const script = args[0];
+    if (
+      script === undefined ||
+      script.startsWith("-") ||
+      !/\.(?:cjs|js|mjs)$/iu.test(script)
+    ) {
+      fail(code, "Node commands must execute an explicit JavaScript file");
+    }
     return;
   }
-  if (basename === undefined || !PNPM_EXECUTABLES.has(basename)) return;
+  if (
+    basename === undefined ||
+    !PNPM_EXECUTABLES.has(basename) ||
+    !isBareExecutable(executable)
+  ) {
+    fail(code, "command executable is not in the protected runner allowlist");
+  }
   if (args.includes("--shell-mode")) fail(code, "pnpm shell mode is forbidden");
-  const execIndex = args.indexOf("exec");
-  if (execIndex < 0) return;
-  let targetIndex = execIndex + 1;
+  if (args[0] !== "exec") fail(code, "pnpm commands must use pnpm exec");
+  let targetIndex = 1;
   while (args[targetIndex] === "--") targetIndex += 1;
   const target =
     args[targetIndex] ??
-    fail(code, "pnpm exec requires a non-shell executable");
+    fail(code, "pnpm exec requires an allowlisted executable");
   const targetBasename =
     executableBasename(target) ??
-    fail(code, "pnpm exec requires a non-shell executable");
-  if (FORBIDDEN_EXECUTABLES.has(targetBasename)) {
-    fail(code, "pnpm exec shell wrappers are forbidden");
-  }
+    fail(code, "pnpm exec requires an allowlisted executable");
   if (
-    NODE_EXECUTABLES.has(targetBasename) &&
-    args.slice(targetIndex + 1).some(isNodeEvalArgument)
-  ) {
-    fail(code, "Node eval/print commands are forbidden through pnpm exec");
+    !isBareExecutable(target) ||
+    !ALLOWED_PNPM_EXEC_TARGETS.has(targetBasename)
+  )
+    fail(code, "pnpm exec target is not in the protected runner allowlist");
+  const targetArgs = args.slice(targetIndex + 1);
+  if (targetBasename === "tsx") {
+    const script = targetArgs[0];
+    if (
+      script === undefined ||
+      script.startsWith("-") ||
+      !/\.(?:[cm]?[jt]s|[jt]sx)$/iu.test(script)
+    ) {
+      fail(code, "tsx commands must execute an explicit source file");
+    }
   }
+  if (targetBasename === "vitest" && targetArgs[0] !== "run")
+    fail(code, "vitest commands must use non-interactive run mode");
+  if (targetBasename === "playwright" && targetArgs[0] !== "test")
+    fail(code, "playwright commands must use test mode");
 };
 
 export const validateCommand = (
@@ -398,18 +418,13 @@ export const validateCommand = (
     "command.executable",
   );
   const basename = executableBasename(executable);
-  if (
-    /\s/.test(executable) ||
-    basename === undefined ||
-    FORBIDDEN_EXECUTABLES.has(basename)
-  ) {
-    fail(code, "command executable must be a non-shell argv token");
-  }
+  if (/\s/.test(executable) || basename === undefined)
+    fail(code, "command executable must be a single argv token");
   if (!Array.isArray(command.args)) fail(code, "command.args must be an array");
   const args = (command.args as unknown[]).map((arg, index) =>
     requireString(arg, code, `command.args[${index}]`),
   );
-  assertNoSemanticShellWrapper(executable, args, code);
+  assertAllowedRunner(executable, args, code);
   return { executable, args };
 };
 
@@ -994,6 +1009,7 @@ const minimalChildEnvironment = (
     environment.GIT_CONFIG_NOSYSTEM = "1";
     environment.GIT_CONFIG_GLOBAL =
       process.platform === "win32" ? "NUL" : "/dev/null";
+    environment.GIT_NO_REPLACE_OBJECTS = "1";
     environment.GIT_TERMINAL_PROMPT = "0";
     environment.GIT_OPTIONAL_LOCKS = "0";
   }
@@ -1032,6 +1048,57 @@ const verifierBundleSha256 = (
     hash.update("\0END\0");
   }
   return hash.digest("hex");
+};
+
+const loadedScriptBytes = async (
+  path: string,
+  code: string,
+  label: string,
+): Promise<Buffer> => {
+  const expectedUrl = pathToFileURL(await realpath(path)).href;
+  const session = new Session();
+  session.connect();
+  const scripts = new Map<string, string>();
+  session.on("Debugger.scriptParsed", ({ params }) => {
+    if (params.url.length > 0) scripts.set(params.url, params.scriptId);
+  });
+  try {
+    await new Promise<void>((resolvePromise, rejectPromise) => {
+      session.post("Debugger.enable", (error) =>
+        error === null || error === undefined
+          ? resolvePromise()
+          : rejectPromise(error),
+      );
+    });
+    const scriptId = scripts.get(expectedUrl);
+    if (scriptId === undefined)
+      fail(code, `${label} is not an executing in-memory script`);
+    const source = await new Promise<string>(
+      (resolvePromise, rejectPromise) => {
+        session.post(
+          "Debugger.getScriptSource",
+          { scriptId },
+          (error, result) => {
+            if (error !== null && error !== undefined) {
+              rejectPromise(error);
+              return;
+            }
+            const scriptSource = (
+              result as { scriptSource?: unknown } | undefined
+            )?.scriptSource;
+            if (typeof scriptSource !== "string") {
+              rejectPromise(new Error("inspector omitted script source"));
+              return;
+            }
+            resolvePromise(scriptSource);
+          },
+        );
+      },
+    ).catch(() => fail(code, `${label} in-memory bytes cannot be measured`));
+    return Buffer.from(source, "utf8");
+  } finally {
+    session.disconnect();
+  }
 };
 
 const assertSelfContainedBuiltInModule = (
@@ -1571,20 +1638,19 @@ const executeGit = async (
 ): Promise<SpawnResult> => {
   const executable = await trustedGitExecutable();
   const nullDevice = process.platform === "win32" ? "NUL" : "/dev/null";
-  return await executeCommand(
-    root,
-    {
-      executable,
-      args: [
-        "-c",
-        `core.hooksPath=${nullDevice}`,
-        "-c",
-        "core.fsmonitor=false",
-        ...args,
-      ],
-    },
-    { environmentProfile: "git" },
-  );
+  const command = {
+    executable,
+    args: [
+      "-c",
+      `core.hooksPath=${nullDevice}`,
+      "-c",
+      "core.fsmonitor=false",
+      ...args,
+    ],
+  };
+  return await executeSpawn(root, command, executable, command.args, {
+    environmentProfile: "git",
+  });
 };
 
 const runGitRaw = async (root: string, args: string[]): Promise<string> => {
@@ -1605,6 +1671,7 @@ interface TrackedSourceSnapshot {
 
 interface TrackedSourceEntry {
   mode: "100644" | "100755";
+  oid: string;
   path: string;
 }
 
@@ -1654,19 +1721,20 @@ export const computeTrackedSourceSnapshot = async (
     fail("GIT_CONTEXT_UNAVAILABLE", "repository has no tracked files");
   const entries: TrackedSourceEntry[] = records.map((record) => {
     const match =
-      /^([0-7]{6}) [a-f0-9]{40,64} ([0-3])\t([\s\S]+)$/u.exec(record) ??
+      /^([0-7]{6}) ([a-f0-9]{40,64}) ([0-3])\t([\s\S]+)$/u.exec(record) ??
       fail("GIT_CONTEXT_UNAVAILABLE", "tracked index entry is malformed");
     const mode = match[1] as string;
-    const stage = match[2] as string;
+    const oid = match[2] as string;
+    const stage = match[3] as string;
     const path = toPosix(
-      match[3] ??
+      match[4] ??
         fail("GIT_CONTEXT_UNAVAILABLE", "tracked index path is missing"),
     );
     if (stage !== "0") fail("DIRTY_WORKTREE", "unmerged index entry");
     if (mode !== "100644" && mode !== "100755")
       fail("GATE_INPUT_INVALID", `${path} is not a regular tracked file`);
     safeRepositoryPath(root, path, "GATE_INPUT_INVALID");
-    return { mode: mode as TrackedSourceEntry["mode"], path };
+    return { mode: mode as TrackedSourceEntry["mode"], oid, path };
   });
   entries.sort((left, right) => left.path.localeCompare(right.path));
   return {
@@ -1674,6 +1742,69 @@ export const computeTrackedSourceSnapshot = async (
     paths: entries.map(({ path }) => path),
     entries,
   };
+};
+
+const assertRawRepositoryClean = async (
+  root: string,
+  commitSha: string,
+  entries: readonly TrackedSourceEntry[],
+): Promise<void> => {
+  const headRecords = (
+    await runGitRaw(root, ["ls-tree", "-r", "-z", "--full-tree", commitSha])
+  )
+    .split("\0")
+    .filter(Boolean)
+    .map((record) => {
+      const match =
+        /^([0-7]{6}) blob ([a-f0-9]{40,64})\t([\s\S]+)$/u.exec(record) ??
+        fail("DIRTY_WORKTREE", "HEAD contains a non-regular tracked entry");
+      return {
+        mode: match[1] as string,
+        oid: match[2] as string,
+        path: toPosix(match[3] as string),
+      };
+    })
+    .sort((left, right) => left.path.localeCompare(right.path));
+  if (
+    headRecords.length !== entries.length ||
+    headRecords.some((head, index) => {
+      const entry = entries[index];
+      return (
+        entry === undefined ||
+        head.mode !== entry.mode ||
+        head.oid !== entry.oid ||
+        head.path !== entry.path
+      );
+    })
+  ) {
+    fail("DIRTY_WORKTREE", "the raw index does not equal the raw HEAD tree");
+  }
+  const untracked = (
+    await runGitRaw(root, [
+      "ls-files",
+      "--others",
+      "--exclude-per-directory=.gitignore",
+      "-z",
+    ])
+  )
+    .split("\0")
+    .filter(Boolean);
+  if (untracked.length > 0)
+    fail("DIRTY_WORKTREE", "the worktree contains untracked files");
+  for (const entry of entries) {
+    const absolute = safeRepositoryPath(root, entry.path, "GATE_INPUT_INVALID");
+    await assertNoSymlinkSegments(root, absolute, false, "GATE_INPUT_INVALID");
+    const contents = await readFile(absolute).catch(() =>
+      fail("DIRTY_WORKTREE", `${entry.path} is missing from the worktree`),
+    );
+    const algorithm = entry.oid.length === 40 ? "sha1" : "sha256";
+    const worktreeOid = createHash(algorithm)
+      .update(`blob ${contents.byteLength}\0`)
+      .update(contents)
+      .digest("hex");
+    if (worktreeOid !== entry.oid)
+      fail("DIRTY_WORKTREE", `${entry.path} differs from the raw index blob`);
+  }
 };
 
 export const computeCurrentContext = async (
@@ -1685,18 +1816,8 @@ export const computeCurrentContext = async (
   const commitSha = await runGit(root, ["rev-parse", "HEAD"]);
   if (!/^[a-f0-9]{40,64}$/.test(commitSha))
     fail("GIT_CONTEXT_UNAVAILABLE", "HEAD is not a full git SHA");
-  const worktreeStatus = await runGit(root, [
-    "status",
-    "--porcelain",
-    "--untracked-files=all",
-  ]);
-  if (worktreeStatus.length > 0) {
-    fail(
-      "DIRTY_WORKTREE",
-      "gate inputs and source must be committed before evidence runs",
-    );
-  }
   const sourceSnapshot = await computeTrackedSourceSnapshot(root);
+  await assertRawRepositoryClean(root, commitSha, sourceSnapshot.entries);
   let baseSha: string;
   try {
     baseSha = await runGit(root, ["rev-parse", "HEAD^"]);
@@ -3201,12 +3322,16 @@ const measuredVerifierSha256 = async (
   );
   if (snapshot.path !== actualRealPath)
     fail(code, "configured verifier is not the executing entrypoint");
+  const [executingEntrypointBytes, executingCoreBytes] = await Promise.all([
+    loadedScriptBytes(actualRealPath, code, "protected verifier entrypoint"),
+    loadedScriptBytes(loadedCore.path, code, "loaded verifier core"),
+  ]);
   assertSelfContainedBuiltInModule(
-    loadedCore.bytes,
+    executingCoreBytes,
     code,
     "loaded verifier core",
   );
-  return verifierBundleSha256(snapshot.bytes, loadedCore.bytes);
+  return verifierBundleSha256(executingEntrypointBytes, executingCoreBytes);
 };
 
 const loadTrustRegistry = async (
@@ -3745,6 +3870,7 @@ const canonicalDiffSha256 = async (
     "--binary",
     "--full-index",
     "--no-ext-diff",
+    "--no-textconv",
     `${trustedBaseSha}..${headSha}`,
     "--",
   ]);

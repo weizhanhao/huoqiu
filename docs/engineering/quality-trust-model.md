@@ -9,11 +9,13 @@ boundary described below.
 ## Production trust chain
 
 1. A protected launcher runs a pinned verifier distribution outside the
-   candidate checkout. The verifier binds one domain-separated digest to both
-   its actual bootstrap entrypoint and the loaded, built-in-only verifier core;
-   both are opened without following the leaf path, checked for trusted
-   ownership and permissions, measured through stable file handles, and
-   required to live outside the candidate repository. The protected system
+   candidate checkout. The verifier binds one domain-separated digest to the
+   exact bootstrap entrypoint and built-in-only verifier-core source already
+   executing in V8. It obtains those source bytes from the local inspector
+   session, not by reopening mutable paths. Both deployment files are still
+   opened without following the leaf path, checked for trusted ownership and
+   permissions through stable file handles, and required to live outside the
+   candidate repository. The protected system
    injects the repository ID, exact current-registry digest, accepted registry
    epoch, exact raw registry history for epochs after 1, the N-1 digest, root
    Ed25519 SPKI, and root key ID. Candidate-provided `HUOQIU_*` variables are
@@ -96,9 +98,14 @@ verifier additionally:
 - watches tracked paths for writes (including modify-then-restore attacks),
   recomputes the source digest afterward, and discards the snapshot;
 - invokes a fixed absolute, trusted system Git with a fixed system `PATH`, no
-  global/system configuration, disabled hooks, and disabled fsmonitor for the
-  small set of read-only context operations;
-- rejects direct and `pnpm exec` shell wrappers plus Node eval/print forms,
+  global/system configuration, replacement objects disabled, disabled hooks,
+  and disabled fsmonitor for the small set of read-only context operations;
+- compares raw HEAD, index, and worktree blob identities without `git status`,
+  so candidate clean/process filters cannot run, and canonical diffs disable
+  both external diff drivers and text conversion;
+- accepts only the protected Node runtime with an explicit JavaScript file or
+  bare `pnpm exec` with a fixed verifier-owned target allowlist (currently
+  `tsx`, `vitest`, and `playwright`),
   strips caller secrets and hostile `GIT_*` state, kills the launched process
   group on every exit path, and performs ownership-token and new-workspace-PID
   cleanup as defense in depth; and
@@ -126,6 +133,13 @@ items are canonical base64 for the exact raw registry bytes from epochs 1
 through N-1. For authorship, `HUOQIU_AUTHORSHIP_ARCHIVE_B64` is the exact
 canonical-base64 archive and `HUOQIU_AUTHORSHIP_INPUT_SHA256` is the SHA-256 of
 those decoded bytes. It then runs:
+
+`verifier_sha256` has one strict meaning: SHA-256 of the v1 verifier-bundle
+framing over the UTF-8 script sources that V8 reports for the already executing
+bootstrap entrypoint and core. On-disk bytes, path names, or a caller-provided
+digest string cannot substitute for those in-memory sources. Production ships
+plain pinned JavaScript under Node 24.15; development transforms therefore
+produce a different verifier digest by design.
 
 ```text
 quality:record-authorship --milestone <d0|m1> --commit-sha <HEAD>
