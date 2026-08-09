@@ -3,6 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 const expoSecureStoreMock = vi.hoisted(() => {
   const values = new Map<string, string>();
   const observedOptions: unknown[] = [];
+  let tokenReadPause:
+    | Readonly<{
+        releasePromise: Promise<void>;
+        releaseRead: () => void;
+        reportPaused: () => void;
+      }>
+    | undefined;
   let tokenWritePause:
     | Readonly<{
         releasePromise: Promise<void>;
@@ -18,9 +25,31 @@ const expoSecureStoreMock = vi.hoisted(() => {
     },
     getItemAsync: async (key: string, options?: unknown) => {
       observedOptions.push(options);
-      return values.get(key) ?? null;
+      const value = values.get(key) ?? null;
+      if (
+        tokenReadPause !== undefined &&
+        value?.includes('"accessToken"') === true
+      ) {
+        const pause = tokenReadPause;
+        tokenReadPause = undefined;
+        pause.reportPaused();
+        await pause.releasePromise;
+      }
+      return value;
     },
     observedOptions,
+    pauseNextTokenRead: () => {
+      let releaseRead: () => void = () => undefined;
+      let reportPaused: () => void = () => undefined;
+      const releasePromise = new Promise<void>((resolve) => {
+        releaseRead = resolve;
+      });
+      const waitUntilPaused = new Promise<void>((resolve) => {
+        reportPaused = resolve;
+      });
+      tokenReadPause = { releasePromise, releaseRead, reportPaused };
+      return { release: releaseRead, waitUntilPaused };
+    },
     pauseNextTokenWrite: () => {
       let releaseWrite: () => void = () => undefined;
       let reportPaused: () => void = () => undefined;
@@ -35,6 +64,7 @@ const expoSecureStoreMock = vi.hoisted(() => {
     },
     reset: () => {
       observedOptions.length = 0;
+      tokenReadPause = undefined;
       tokenWritePause = undefined;
       values.clear();
     },
@@ -77,6 +107,10 @@ type MemorySecureStore = Readonly<{
   failDeleteOnCall: (call: number) => void;
   failDeleteOnCalls: (calls: readonly number[]) => void;
   failSetOnCall: (call: number) => void;
+  pauseNextTokenRead: () => Readonly<{
+    release: () => void;
+    waitUntilPaused: Promise<void>;
+  }>;
   pauseNextTokenWrite: () => Readonly<{
     release: () => void;
     waitUntilPaused: Promise<void>;
@@ -92,6 +126,13 @@ const createMemorySecureStore = (): MemorySecureStore => {
   let deleteCalls = 0;
   const failOnDeleteCalls = new Set<number>();
   let failOnSetCall: number | null = null;
+  let tokenReadPause:
+    | Readonly<{
+        releasePromise: Promise<void>;
+        releaseRead: () => void;
+        reportPaused: () => void;
+      }>
+    | undefined;
   let tokenWritePause:
     | Readonly<{
         releasePromise: Promise<void>;
@@ -109,7 +150,19 @@ const createMemorySecureStore = (): MemorySecureStore => {
         }
         values.delete(key);
       },
-      getItemAsync: async (key) => values.get(key) ?? null,
+      getItemAsync: async (key) => {
+        const value = values.get(key) ?? null;
+        if (
+          tokenReadPause !== undefined &&
+          value?.includes('"accessToken"') === true
+        ) {
+          const pause = tokenReadPause;
+          tokenReadPause = undefined;
+          pause.reportPaused();
+          await pause.releasePromise;
+        }
+        return value;
+      },
       setItemAsync: async (key, value) => {
         setCalls += 1;
         if (setCalls === failOnSetCall) {
@@ -143,6 +196,18 @@ const createMemorySecureStore = (): MemorySecureStore => {
     },
     failSetOnCall: (call) => {
       failOnSetCall = call;
+    },
+    pauseNextTokenRead: () => {
+      let releaseRead: () => void = () => undefined;
+      let reportPaused: () => void = () => undefined;
+      const releasePromise = new Promise<void>((resolve) => {
+        releaseRead = resolve;
+      });
+      const waitUntilPaused = new Promise<void>((resolve) => {
+        reportPaused = resolve;
+      });
+      tokenReadPause = { releasePromise, releaseRead, reportPaused };
+      return { release: releaseRead, waitUntilPaused };
     },
     pauseNextTokenWrite: () => {
       let releaseWrite: () => void = () => undefined;
@@ -460,6 +525,30 @@ describe("Expo SecureStore session spike", () => {
     expect(memory.storedValues().join("|")).not.toContain(session.refreshToken);
   });
 
+  it("does not return a restored credential after another store completes logout", async () => {
+    const memory = createMemorySecureStore();
+    const restoringStore = createSecureSessionStore(memory.adapter, {
+      now: () => 1_900_000_000_000,
+    });
+    const clearingStore = createSecureSessionStore(memory.adapter, {
+      now: () => 1_900_000_000_000,
+    });
+    await restoringStore.persist(session);
+    const pause = memory.pauseNextTokenRead();
+
+    const restorePromise = restoringStore.restore();
+    await pause.waitUntilPaused;
+    await expect(clearingStore.clear()).resolves.toBeUndefined();
+    expect(memory.storedValues().join("|")).not.toContain(session.accessToken);
+    pause.release();
+    const restored = await restorePromise.catch((error: unknown) => error);
+
+    expect(
+      restored === null || restored instanceof SecureSessionStorageError,
+    ).toBe(true);
+    expect(restored).not.toEqual(session);
+  });
+
   it("shares fail-closed state and retries cleanup after a partial logout", async () => {
     const memory = createMemorySecureStore();
     const clearingStore = createSecureSessionStore(memory.adapter, {
@@ -582,5 +671,37 @@ describe("Expo SecureStore session spike", () => {
     expect(expoSecureStoreMock.storedValues().join("|")).not.toContain(
       session.accessToken,
     );
+  });
+
+  it("does not restore a production credential after concurrent logout completes", async () => {
+    expoSecureStoreMock.reset();
+    const secureSessionModule =
+      (await import("../../src/auth/secure-session-spike")) as Readonly<{
+        createExpoSecureSessionStore: (options: {
+          now: () => number;
+        }) => SecureSessionStore;
+      }>;
+    const restoringStore = secureSessionModule.createExpoSecureSessionStore({
+      now: () => 1_900_000_000_000,
+    });
+    const clearingStore = secureSessionModule.createExpoSecureSessionStore({
+      now: () => 1_900_000_000_000,
+    });
+    await restoringStore.persist(session);
+    const pause = expoSecureStoreMock.pauseNextTokenRead();
+
+    const restorePromise = restoringStore.restore();
+    await pause.waitUntilPaused;
+    await expect(clearingStore.clear()).resolves.toBeUndefined();
+    expect(expoSecureStoreMock.storedValues().join("|")).not.toContain(
+      session.accessToken,
+    );
+    pause.release();
+    const restored = await restorePromise.catch((error: unknown) => error);
+
+    expect(
+      restored === null || restored instanceof SecureSessionStorageError,
+    ).toBe(true);
+    expect(restored).not.toEqual(session);
   });
 });

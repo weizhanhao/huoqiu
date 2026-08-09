@@ -305,7 +305,9 @@ export const createSecureSessionStore = (
     }
   };
 
-  const restoreStoredSession = async (): Promise<SecureSession | null> => {
+  const restoreStoredSession = async (
+    expectedInvalidationGeneration: number,
+  ): Promise<SecureSession | null> => {
     if (coordination.failClosedInMemory) {
       if (coordination.cleanupRequired) {
         try {
@@ -357,6 +359,12 @@ export const createSecureSessionStore = (
         await clearStoredSession(markInvalidated());
         return null;
       }
+      if (
+        coordination.failClosedInMemory ||
+        coordination.invalidationGeneration !== expectedInvalidationGeneration
+      ) {
+        return null;
+      }
       return restoredSession;
     } catch {
       const invalidationGeneration = markInvalidated();
@@ -397,7 +405,13 @@ export const createSecureSessionStore = (
         persistStoredSession(session, expectedInvalidationGeneration),
       );
     },
-    restore: () => serialize(restoreStoredSession),
+    restore: () => {
+      const expectedInvalidationGeneration =
+        coordination.invalidationGeneration;
+      return serialize(() =>
+        restoreStoredSession(expectedInvalidationGeneration),
+      );
+    },
   };
 };
 
