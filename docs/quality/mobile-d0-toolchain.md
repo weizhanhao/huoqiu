@@ -14,18 +14,42 @@ The pnpm offline store is inside the pnpm closure: every store file is therefore
 path-bound and hashed just like the pnpm launcher files.
 
 The exported protected resolver and identity verifier do not inspect a
-checkout, `.git`, or the caller's current directory. An outer gate may reuse
-them while operating on a detached snapshot without expanding their trust
-surface.
+checkout, `.git`, or the caller's current directory. The prepared executor
+`runPreparedMobileD0Evidence(platform, workspace, dependencies)` runs directly
+in the absolute, normalized workspace supplied by the external protected
+launcher. It never invokes Git, archives, checkout, status, clone, dependency
+installation, or another source-snapshot operation.
 
-Prepared-snapshot execution is still an integration TODO. The existing
-`runMobileD0Evidence` entrypoint discovers the commit through `.git` and creates
-its own `git archive` snapshot, so an outer capability launcher must not call it
-inside an already-detached snapshot. For that integration, this module exports
-the resolver/verifier plus pure platform, target-output, Maestro-total, required
-tool, version-contract, and fixed-environment helpers. The follow-up executor
-must accept the launcher-supplied snapshot root, exact commit, and artifact sink
-directly; it must not rediscover Git state or take a second snapshot.
+The mandatory outer v3 launcher must validate and bind the exact tracked source
+before invoking the prepared executor. The original candidate source remains
+read-only. When Expo needs native build output, the launcher provides a private
+detached execution view or overlay inside its protected boundary; that view is
+the `workspace` argument. The executor does not create, copy, certify, or
+resnapshot it. It also does not own the no-network boundary or complete process
+tree cleanup.
+
+The prepared Android sequence is exact: protected Node, adb, and Maestro
+version probes; `adb devices`; Expo native prebuild; Expo Android
+build/install/launch; and the unique Maestro D0 flow. The prepared iOS sequence
+uses protected Node, xcrun, CocoaPods, and Maestro version probes; the available
+simulator query; boot plus blocking boot status when required; Expo native
+prebuild; Expo iOS build/install/launch; and the same unique flow. Every command
+uses fixed argument arrays without a shell, a fixed safe environment, pre/post
+identity verification for the relevant recursive component closures, and a
+final sweep of every platform-required identity.
+
+Only a zero-exit command sequence whose Maestro totals are exactly `passed=1`,
+`failed=0`, and `skipped=0` returns
+`mobile-d0-prepared-raw-v1`. That result intentionally has no `verified` field:
+it is raw input that becomes acceptable only when the outer v3 launcher binds
+it to the exact commit, tracked-source digest, protected registry and execution
+image, and isolation result. Candidate-supplied dependency adapters and direct
+calls to this API cannot certify that boundary.
+
+The existing `runMobileD0Evidence` entrypoint remains a direct diagnostic. It
+discovers the commit through `.git` and creates its own `git archive` snapshot,
+so an outer launcher must call `runPreparedMobileD0Evidence`, never the legacy
+entrypoint, inside an already-detached workspace.
 
 The registry is data, not an executable launch recipe. It cannot supply
 `executable`, `prefix_args`, environment variables, or working directories.
@@ -304,13 +328,15 @@ rotation therefore fails closed rather than mixing two toolchain generations.
 
 ## Runner validation
 
-Run Android and iOS only through the root-signed external verifier and protected
-OS launcher described in `docs/engineering/quality-trust-model.md`. That
-launcher must enforce the exact
+Run Android and iOS only through the root-signed external verifier and mandatory
+v3 protected OS launcher described in
+`docs/engineering/quality-trust-model.md`. That launcher must enforce the exact
 `container-v1:no-network,read-only-source,owned-process-tree` profile, expose a
-writable private snapshot and artifact mount, provide image-pinned offline
+writable private execution view and artifact mount, provide image-pinned offline
 Gradle/CocoaPods/native caches, and clean every descendant. The original source
 mount remains read-only. An environment variable cannot prove this boundary.
+The launcher invokes `runPreparedMobileD0Evidence` in that view and exclusively
+owns the certification decision; the raw result can never self-certify.
 
 The commands below are diagnostics only. Running them directly can test runner
 provisioning, but their raw output is never certification evidence:
@@ -320,13 +346,13 @@ pnpm e2e:mobile:d0:android
 pnpm e2e:mobile:d0:ios
 ```
 
-The final gate accepts a mobile raw report only when the outer protected
+The final gate accepts a mobile raw report only when the outer v3 protected
 launcher binds it to the exact commit, tracked-source digest, toolchain
-registry, and isolation profile. If the protected image cannot supply a pinned
-Android Gradle distribution/cache or the pinned Xcode/CocoaPods inputs needed
-by Expo's native child processes, native build/launch must fail and the platform
-must remain `NOT_VERIFIED`; do not add a host `PATH`, home, or checkout-local
-fallback.
+registry, execution image, and isolation profile. If the protected image cannot
+supply a pinned Android Gradle distribution/cache or the pinned
+Xcode/CocoaPods inputs needed by Expo's native child processes, native
+build/launch must fail and the platform must remain `NOT_VERIFIED`; do not add a
+host `PATH`, home, or checkout-local fallback.
 
 A host lacking the protected registry or any platform-required entry must exit
 non-zero, print `D0_MOBILE NOT_VERIFIED`, and write `summary.json` with

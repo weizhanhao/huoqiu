@@ -104,6 +104,44 @@ export interface MobileD0EvidenceDependencies {
   ) => Promise<void>;
 }
 
+export interface PreparedMobileD0EvidenceDependencies {
+  resolveTools: (platform: MobileD0Platform) => Promise<ToolSet>;
+  runCommand: (request: CommandRequest) => Promise<CommandResult>;
+  verifyToolIdentity: (identity: ToolIdentity) => Promise<boolean>;
+}
+
+export interface PreparedMobileD0CommandRecord {
+  readonly args: readonly string[];
+  readonly cwd: string;
+  readonly executable: string;
+  readonly exit_code: number;
+  readonly label: string;
+  readonly signal: NodeJS.Signals | null;
+}
+
+export interface PreparedMobileD0ToolReport {
+  readonly components: readonly ToolComponentIdentity[];
+  readonly executable: string;
+  readonly expected_version: string;
+  readonly registry: ToolComponentIdentity;
+  readonly version: string;
+}
+
+export interface PreparedMobileD0EvidenceResult {
+  readonly commands: readonly PreparedMobileD0CommandRecord[];
+  readonly failed: 0;
+  readonly flow_count: 1;
+  readonly passed: 1;
+  readonly platform: MobileD0Platform;
+  readonly report_type: "mobile-d0-prepared-raw-v1";
+  readonly schema_version: 1;
+  readonly skipped: 0;
+  readonly target_id: string;
+  readonly tools: Readonly<
+    Partial<Record<MobileD0ToolName, PreparedMobileD0ToolReport>>
+  >;
+}
+
 export interface MobileTarget {
   id: string;
   state?: string;
@@ -1063,6 +1101,262 @@ const maestroTotals = (
 };
 
 export const parseMaestroFlowTotals = maestroTotals;
+
+export const preparedMobileD0RequiredToolNames = (
+  platform: MobileD0Platform,
+): readonly ToolName[] => {
+  if (!isMobileD0Platform(platform))
+    throw new QualityGateError(
+      "CLI_ARGUMENT_INVALID",
+      "platform must be ios or android",
+    );
+  return platform === "ios"
+    ? ["node", "xcrun", "pod", "maestro"]
+    : ["node", "adb", "maestro"];
+};
+
+const defaultPreparedMobileD0EvidenceDependencies: PreparedMobileD0EvidenceDependencies =
+  {
+    resolveTools: resolveProtectedMobileTools,
+    runCommand: defaultRunCommand,
+    verifyToolIdentity,
+  };
+
+const preparedFailure = (reason: string): never => {
+  throw new QualityGateError("D0_MOBILE_NOT_VERIFIED", reason);
+};
+
+const preparedCommandSucceeded = (result: CommandResult): boolean =>
+  result.errorMessage === undefined &&
+  result.exitCode === 0 &&
+  result.signal === null;
+
+export const runPreparedMobileD0Evidence = async (
+  platform: MobileD0Platform,
+  workspace: string,
+  dependencies: PreparedMobileD0EvidenceDependencies = defaultPreparedMobileD0EvidenceDependencies,
+): Promise<PreparedMobileD0EvidenceResult> => {
+  if (!isMobileD0Platform(platform))
+    throw new QualityGateError(
+      "CLI_ARGUMENT_INVALID",
+      "platform must be ios or android",
+    );
+  if (
+    !isAbsolute(workspace) ||
+    resolve(workspace) !== workspace ||
+    parse(workspace).root === workspace ||
+    isWithinPath(MOBILE_D0_TOOLCHAIN_ROOT, workspace)
+  )
+    throw new QualityGateError(
+      "D0_MOBILE_CONTEXT_INVALID",
+      "prepared workspace must be an absolute normalized launcher workspace",
+    );
+
+  const requiredNames = preparedMobileD0RequiredToolNames(platform);
+  let tools: ToolSet;
+  try {
+    tools = await dependencies.resolveTools(platform);
+  } catch {
+    return preparedFailure("tool_resolution_failed");
+  }
+  for (const name of requiredNames) {
+    if (tools[name] === undefined || tools[name]?.name !== name)
+      return preparedFailure(`tool_identity_missing:${name}`);
+  }
+
+  const commands: PreparedMobileD0CommandRecord[] = [];
+  const observedVersions = new Map<ToolName, string>();
+  const verifyIdentity = async (name: ToolName): Promise<boolean> => {
+    const tool = tools[name];
+    if (tool === undefined || tool.name !== name) return false;
+    try {
+      return await dependencies.verifyToolIdentity(tool);
+    } catch {
+      return false;
+    }
+  };
+  const runTool = async (
+    name: ToolName,
+    args: readonly string[],
+    cwd: string,
+    label: string,
+    timeoutMs?: number,
+    supportNames: readonly ToolName[] = [],
+  ): Promise<CommandResult> => {
+    if (!isWithinPath(workspace, cwd))
+      return preparedFailure(`command_cwd_outside_workspace:${label}`);
+    const tool = tools[name];
+    if (tool === undefined || tool.name !== name)
+      return preparedFailure(`tool_identity_missing:${name}`);
+    if (!isAbsolute(tool.executable))
+      return preparedFailure(`tool_identity_untrusted:${name}`);
+    const identityNames = [...new Set([name, ...supportNames])];
+    for (const identityName of identityNames) {
+      if (!(await verifyIdentity(identityName)))
+        return preparedFailure(`tool_identity_changed:${identityName}`);
+    }
+    let result: CommandResult;
+    try {
+      result = await dependencies.runCommand({
+        args: [...tool.prefixArgs, ...args],
+        cwd,
+        executable: tool.executable,
+        label,
+        platform,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      });
+    } catch {
+      return preparedFailure(`command_failed:${label}`);
+    }
+    commands.push({
+      args: Object.freeze([...tool.prefixArgs, ...args]),
+      cwd,
+      executable: tool.executable,
+      exit_code: result.exitCode,
+      label,
+      signal: result.signal,
+    });
+    for (const identityName of identityNames) {
+      if (!(await verifyIdentity(identityName)))
+        return preparedFailure(`tool_identity_changed:${identityName}`);
+    }
+    return result;
+  };
+
+  for (const name of requiredNames) {
+    const contract = mobileD0VersionContract(name);
+    const probe = await runTool(
+      name,
+      contract.args,
+      workspace,
+      `tool-${name}-version`,
+    );
+    const versionOutput = `${probe.stdout}\n${probe.stderr}`.trim();
+    if (
+      !preparedCommandSucceeded(probe) ||
+      !contract.pattern.test(versionOutput) ||
+      versionOutput !== tools[name]?.expectedVersion
+    )
+      return preparedFailure(`tool_version_invalid:${name}`);
+    observedVersions.set(name, versionOutput);
+  }
+
+  let target: MobileTarget | undefined;
+  if (platform === "android") {
+    const probe = await runTool("adb", ["devices"], workspace, "android-probe");
+    if (!preparedCommandSucceeded(probe))
+      return preparedFailure("android_probe_failed");
+    target = parseAndroidMobileTarget(probe.stdout);
+    if (target === undefined)
+      return preparedFailure("android_target_unavailable");
+  } else {
+    const probe = await runTool(
+      "xcrun",
+      ["simctl", "list", "devices", "available", "--json"],
+      workspace,
+      "ios-probe",
+    );
+    if (!preparedCommandSucceeded(probe))
+      return preparedFailure("ios_probe_failed");
+    target = parseIosMobileTarget(probe.stdout);
+    if (target === undefined) return preparedFailure("ios_target_unavailable");
+    if (target.state !== "Booted") {
+      const boot = await runTool(
+        "xcrun",
+        ["simctl", "boot", target.id],
+        workspace,
+        "ios-boot",
+      );
+      if (!preparedCommandSucceeded(boot))
+        return preparedFailure("ios_simulator_boot_failed");
+      const bootStatus = await runTool(
+        "xcrun",
+        ["simctl", "bootstatus", target.id, "-b"],
+        workspace,
+        "ios-boot-status",
+        BUILD_TIMEOUT_MS,
+      );
+      if (!preparedCommandSucceeded(bootStatus))
+        return preparedFailure("ios_simulator_boot_status_failed");
+    }
+  }
+
+  const mobileRoot = join(workspace, "apps", "mobile");
+  const expoCli = join(workspace, PROTECTED_EXPO_CLI);
+  const platformSupport: readonly ToolName[] =
+    platform === "ios" ? ["xcrun", "pod"] : ["adb", "maestro"];
+  const prebuild = await runTool(
+    "node",
+    [expoCli, "prebuild", "--no-install", "--platform", platform],
+    mobileRoot,
+    "expo-prebuild",
+    BUILD_TIMEOUT_MS,
+    platformSupport,
+  );
+  if (!preparedCommandSucceeded(prebuild))
+    return preparedFailure("expo_prebuild_failed");
+
+  const launch = await runTool(
+    "node",
+    [expoCli, `run:${platform}`, "--no-install", "--device", target.id],
+    mobileRoot,
+    "app-launch",
+    BUILD_TIMEOUT_MS,
+    platformSupport,
+  );
+  if (!preparedCommandSucceeded(launch))
+    return preparedFailure(`${platform}_build_or_launch_failed`);
+
+  const flow = await runTool(
+    "maestro",
+    ["--device", target.id, "test", "tests/e2e/maestro/d0/golden.yaml"],
+    workspace,
+    "maestro-flow",
+    BUILD_TIMEOUT_MS,
+  );
+  if (!preparedCommandSucceeded(flow))
+    return preparedFailure("maestro_flow_failed");
+  const totals = parseMaestroFlowTotals(`${flow.stdout}\n${flow.stderr}`);
+  if (totals === undefined)
+    return preparedFailure("maestro_flow_result_invalid");
+
+  for (const name of requiredNames) {
+    if (!(await verifyIdentity(name)))
+      return preparedFailure(`tool_identity_changed:${name}`);
+  }
+
+  const toolReports = Object.fromEntries(
+    requiredNames.map((name) => {
+      const tool = tools[name];
+      if (tool === undefined)
+        return preparedFailure(`tool_identity_missing:${name}`);
+      return [
+        name,
+        Object.freeze({
+          components: Object.freeze(
+            tool.components.map((component) => Object.freeze({ ...component })),
+          ),
+          executable: tool.executable,
+          expected_version: tool.expectedVersion,
+          registry: Object.freeze({ ...tool.registry }),
+          version: observedVersions.get(name) ?? "",
+        }),
+      ];
+    }),
+  ) as Readonly<Partial<Record<MobileD0ToolName, PreparedMobileD0ToolReport>>>;
+  return Object.freeze({
+    commands: Object.freeze(commands.map((command) => Object.freeze(command))),
+    failed: 0,
+    flow_count: 1,
+    passed: 1,
+    platform,
+    report_type: "mobile-d0-prepared-raw-v1",
+    schema_version: 1,
+    skipped: 0,
+    target_id: target.id,
+    tools: Object.freeze(toolReports),
+  });
+};
 
 export const runMobileD0Evidence = async (
   args: string[],

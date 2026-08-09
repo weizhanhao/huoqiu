@@ -93,3 +93,92 @@
   notes: >
     The no-network snapshot install, clean-commit requirement, read-only source
     boundary, and existing exact version contracts remain mandatory.
+
+- id: INV-MOBILE_TOOLCHAIN-004
+  name: prepared_execution_never_rediscovers_or_resnapshots_source
+  category: authorization
+  status: confirmed
+  scope:
+    include:
+      - "scripts/quality/mobile-d0-evidence.mts#runPreparedMobileD0Evidence"
+    exclude:
+      - "scripts/quality/mobile-d0-evidence.mts#runMobileD0Evidence"
+  rule: >
+    Prepared mobile D0 execution accepts the detached workspace supplied by the
+    protected launcher and never invokes Git, archive, checkout, clone, status,
+    or another source-snapshot operation.
+  formal: >
+    prepared_commands(workspace) intersect
+    {git, archive, checkout, clone, status, snapshot} == empty_set
+  evidence:
+    - "docs/quality/mobile-d0-toolchain.md:16-29"
+    - "docs/engineering/quality-trust-model.md:81-93"
+    - "scripts/quality/mobile-d0-evidence.mts:1134-1359"
+  severity: critical
+  confirmed_by: "D0 remediation task owner"
+  confirmed_at: "2026-08-09"
+  test: "scripts/quality/test/mobile-d0-prepared-evidence.spec.ts"
+  supersedes: null
+  notes: >
+    The legacy repository entrypoint remains outside this scope and may retain
+    Git discovery for direct diagnostics.
+
+- id: INV-MOBILE_TOOLCHAIN-005
+  name: prepared_success_requires_one_exact_flow
+  category: boundary
+  status: confirmed
+  scope:
+    include:
+      - "scripts/quality/mobile-d0-evidence.mts#runPreparedMobileD0Evidence"
+    exclude: []
+  rule: >
+    Prepared execution returns a raw success report only after every required
+    tool version, platform target, native build/install/launch command, and
+    Maestro command succeeds; Maestro totals must be exactly passed=1,
+    failed=0, and skipped=0, followed by a final identity sweep.
+  formal: >
+    raw_success => all_commands_exit_zero && target_ready &&
+    totals == {passed: 1, failed: 0, skipped: 0} &&
+    all_required_tool_identities_unchanged
+  evidence:
+    - "docs/quality/mobile-d0-toolchain.md:31-47"
+    - "scripts/quality/mobile-d0-evidence.mts:1125-1359"
+  severity: critical
+  confirmed_by: "D0 remediation task owner"
+  confirmed_at: "2026-08-09"
+  test: "scripts/quality/test/mobile-d0-prepared-evidence.spec.ts"
+  supersedes: null
+  notes: >
+    Malformed, ambiguous, skipped, mixed pass/fail, and false-success Maestro
+    output are all terminal failures.
+
+- id: INV-MOBILE_TOOLCHAIN-006
+  name: prepared_report_never_self_certifies
+  category: authorization
+  status: confirmed
+  scope:
+    include:
+      - "scripts/quality/mobile-d0-evidence.mts#runPreparedMobileD0Evidence"
+    exclude: []
+  rule: >
+    A prepared executor result is only a raw report. It cannot assert VERIFIED
+    or certification and is acceptable only when the outer root-signed v3
+    launcher binds it to the detached source, protected execution image,
+    no-network/read-only-source/owned-process-tree profile, and final gate.
+  formal: >
+    prepared_result.report_type == "mobile-d0-prepared-raw-v1" &&
+    prepared_result.verified is undefined && certification_by_inner == false
+  evidence:
+    - "docs/engineering/quality-trust-model.md:73-93"
+    - "docs/engineering/quality-trust-model.md:115-125"
+    - "docs/quality/mobile-d0-toolchain.md:41-52"
+    - "docs/quality/mobile-d0-toolchain.md:331-355"
+    - "scripts/quality/mobile-d0-evidence.mts:1347-1359"
+  severity: critical
+  confirmed_by: "D0 remediation task owner"
+  confirmed_at: "2026-08-09"
+  test: "scripts/quality/test/mobile-d0-prepared-evidence.spec.ts"
+  supersedes: null
+  notes: >
+    No environment variable or repository-local wrapper can prove the launcher
+    boundary.
