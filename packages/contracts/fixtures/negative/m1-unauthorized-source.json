@@ -1,0 +1,118 @@
+{
+  "version": "m1.v1",
+  "mode": "fixture",
+  "source": "unapproved-live-vendor",
+  "as_of": "2026-08-08T08:00:00.000Z",
+  "surfaces": [
+    "identity",
+    "instrument",
+    "market_data",
+    "feed",
+    "watchlist",
+    "content",
+    "social",
+    "notification",
+    "moderation",
+    "portfolio_private"
+  ],
+  "identities": {
+    "employees": [
+      {
+        "subject_id": "subject_syn_0001",
+        "display_alias": "合成员工甲",
+        "roles": ["Reviewer"],
+        "alpha_access": true,
+        "source": "huoqiu-synthetic"
+      },
+      {
+        "subject_id": "subject_syn_0002",
+        "display_alias": "合成员工乙",
+        "roles": ["Operator"],
+        "alpha_access": true,
+        "source": "huoqiu-synthetic"
+      }
+    ]
+  },
+  "market": {
+    "exchange": {
+      "exchange_id": "exchange_syn_0001",
+      "code": "SYNX",
+      "display_label": "火球合成交易所",
+      "timezone": "Asia/Shanghai",
+      "source": "huoqiu-synthetic"
+    },
+    "instrument": {
+      "instrument_id": "instrument_syn_0001",
+      "instrument_type": "equity",
+      "display_label": "合成示例一号",
+      "source": "huoqiu-synthetic"
+    },
+    "listing": {
+      "listing_id": "listing_syn_0001",
+      "instrument_id": "instrument_syn_0001",
+      "exchange_id": "exchange_syn_0001",
+      "symbol": "SYN001",
+      "currency": "CNY",
+      "status": "open",
+      "source": "huoqiu-synthetic"
+    }
+  },
+  "registries": {
+    "default_channel_id": "home",
+    "channels": [
+      { "channel_id": "home", "surface": "feed", "source": "huoqiu-synthetic" },
+      {
+        "channel_id": "following",
+        "surface": "feed",
+        "source": "huoqiu-synthetic"
+      },
+      {
+        "channel_id": "market",
+        "surface": "market_data",
+        "source": "huoqiu-synthetic"
+      },
+      {
+        "channel_id": "news",
+        "surface": "content",
+        "source": "huoqiu-synthetic"
+      }
+    ],
+    "cards": [
+      {
+        "card_type": "post",
+        "schema_version": 1,
+        "allowed_channel_ids": ["home", "following"],
+        "deep_link": "/",
+        "source": "huoqiu-synthetic"
+      },
+      {
+        "card_type": "news",
+        "schema_version": 1,
+        "allowed_channel_ids": ["home", "news"],
+        "deep_link": "/",
+        "source": "huoqiu-synthetic"
+      },
+      {
+        "card_type": "market_strip",
+        "schema_version": 1,
+        "allowed_channel_ids": ["home", "market"],
+        "deep_link": "/instruments/listing_syn_0001",
+        "source": "huoqiu-synthetic"
+      },
+      {
+        "card_type": "topic",
+        "schema_version": 1,
+        "allowed_channel_ids": ["home"],
+        "deep_link": "/",
+        "source": "huoqiu-synthetic"
+      },
+      {
+        "card_type": "ops_banner",
+        "schema_version": 1,
+        "allowed_channel_ids": ["home"],
+        "deep_link": "/notifications",
+        "source": "huoqiu-synthetic"
+      }
+    ]
+  }
+}

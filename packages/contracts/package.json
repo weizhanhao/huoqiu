@@ -10,6 +10,7 @@
     "./d0/fixture": "./fixtures/d0.v1.json",
     "./feed/card-v1": "./src/feed/card-v1.ts",
     "./m1": "./src/m1/index.ts",
+    "./m1/fixture": "./src/m1/fixture-schema.ts",
     "./shared/error": "./src/shared/error.ts",
     "./shared/page": "./src/shared/page.ts"
   },

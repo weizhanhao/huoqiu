@@ -1,5 +1,6 @@
 import { m1Router } from "./router.js";
 
+export { m1FixtureSchema, type M1Fixture } from "./fixture-schema.js";
 export {
   actorRoles,
   m1OperationRegistry,

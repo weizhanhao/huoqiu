@@ -16,10 +16,12 @@ export {
 export { d0FixtureSchema, type D0Fixture } from "./d0/schema.js";
 export { feedCardV1Schema, type FeedCardV1 } from "./feed/card-v1.js";
 export {
+  m1FixtureSchema,
   m1OperationRegistry,
   m1Router,
   notificationSseDataSchema,
   notificationSseFrameBatchSchema,
   notificationSseWireSchema,
+  type M1Fixture,
   type M1AppRouter,
 } from "./m1/index.js";
