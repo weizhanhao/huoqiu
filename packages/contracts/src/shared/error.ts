@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod4";
 
 export const errorCodes = [
   "AUTH_REQUIRED",

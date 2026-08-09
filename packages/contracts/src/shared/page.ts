@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod4";
 
 const MAX_CURSOR_LENGTH = 512;
 

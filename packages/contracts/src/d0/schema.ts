@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod4";
 
 import { feedCardV1Schema } from "@huoqiu/contracts/feed/card-v1";
 
