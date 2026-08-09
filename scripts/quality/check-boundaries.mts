@@ -1096,6 +1096,18 @@ const validateSourceImports = async (
       validateOwner(project, target, file);
 
       const exportTargets = packageExportTargets(target, specifier, file);
+      const approvedFixtureTarget =
+        versionedContractFixtureExports.get(specifier);
+      if (
+        approvedFixtureTarget !== undefined &&
+        (exportTargets.length !== 1 ||
+          exportTargets[0]?.exactMapping !== true ||
+          exportTargets[0].path !== approvedFixtureTarget)
+      )
+        fail(
+          "WORKSPACE_IMPORT_TARGET_EXCLUDED",
+          `${file}: ${specifier} must map directly and exclusively to ${approvedFixtureTarget}`,
+        );
 
       const resolution = ts.resolveModuleName(
         specifier,

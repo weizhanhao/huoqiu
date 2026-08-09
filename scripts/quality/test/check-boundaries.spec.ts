@@ -996,12 +996,17 @@ describe("workspace and supply-chain boundaries", () => {
   });
 
   it.each([
-    ["./m1/fixture-data", "./fixtures/other.v1.json", "other.v1.json"],
-    ["./m1/unrelated", "./fixtures/m1.v1.json", "m1.v1.json"],
-    ["./m1/*", "./fixtures/*.json", "m1.v1.json"],
+    [
+      "./m1/fixture-data",
+      "./fixtures/other.v1.json",
+      "other.v1.json",
+      "@huoqiu/contracts/m1/fixture-data",
+    ],
+    ["./m1/unrelated", "./fixtures/m1.v1.json", "m1.v1.json", "m1.v1.json"],
+    ["./m1/*", "./fixtures/*.json", "m1.v1.json", "m1.v1.json"],
   ])(
     "does not widen the M1 fixture-data exception for export %s to %s",
-    async (exportKey, exportTarget, fixtureName) => {
+    async (exportKey, exportTarget, fixtureName, expectedDetail) => {
       const root = await createRepository();
       await writeJson(root, "packages/db/package.json", {
         ...workspacePackage("@huoqiu/db"),
@@ -1028,7 +1033,58 @@ describe("workspace and supply-chain boundaries", () => {
 
       expect(result.code).toBe(1);
       expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
-      expect(result.stderr).toContain(fixtureName);
+      expect(result.stderr).toContain(expectedDetail);
+    },
+  );
+
+  it.each([
+    [
+      "a direct source redirect",
+      { "./m1/fixture-data": "./src/alternate.ts" },
+      "packages/contracts/src/alternate.ts",
+    ],
+    [
+      "a conditional alternate source",
+      {
+        "./m1/fixture-data": {
+          import: "./fixtures/m1.v1.json",
+          default: "./src/alternate.ts",
+        },
+      },
+      "packages/contracts/src/alternate.ts",
+    ],
+    [
+      "a wildcard source redirect",
+      { "./m1/*": "./src/*.ts" },
+      "packages/contracts/src/fixture-data.ts",
+    ],
+  ])(
+    "rejects %s for the reserved M1 fixture-data specifier",
+    async (_label, exports, sourcePath) => {
+      const root = await createRepository();
+      await writeJson(root, "packages/db/package.json", {
+        ...workspacePackage("@huoqiu/db"),
+        dependencies: { "@huoqiu/contracts": "workspace:*" },
+      });
+      await writeJson(root, "packages/contracts/package.json", {
+        ...workspacePackage("@huoqiu/contracts"),
+        exports,
+      });
+      await writeJson(root, "packages/contracts/fixtures/m1.v1.json", {
+        version: "m1.v1",
+      });
+      await writeText(root, sourcePath, "export default {};\n");
+      await writeText(
+        root,
+        "packages/db/src/m1-fixture.ts",
+        'import fixture from "@huoqiu/contracts/m1/fixture-data";\nvoid fixture;\n',
+      );
+
+      const result = await runChecker(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+      expect(result.stderr).toContain("@huoqiu/contracts/m1/fixture-data");
     },
   );
 
@@ -1059,12 +1115,22 @@ describe("workspace and supply-chain boundaries", () => {
   });
 
   it.each([
-    ["./unrelated-secret", "./fixtures/d0.v1.json", "d0.v1.json"],
-    ["./d0/fixture", "./fixtures/secret.v9.json", "secret.v9.json"],
-    ["./d0/fixture", "./fixtures/other.v1.json", "other.v1.json"],
+    ["./unrelated-secret", "./fixtures/d0.v1.json", "d0.v1.json", "d0.v1.json"],
+    [
+      "./d0/fixture",
+      "./fixtures/secret.v9.json",
+      "secret.v9.json",
+      "@huoqiu/contracts/d0/fixture",
+    ],
+    [
+      "./d0/fixture",
+      "./fixtures/other.v1.json",
+      "other.v1.json",
+      "@huoqiu/contracts/d0/fixture",
+    ],
   ])(
     "does not widen the D0 fixture exception for export %s to %s",
-    async (exportKey, exportTarget, fixtureName) => {
+    async (exportKey, exportTarget, fixtureName, expectedDetail) => {
       const root = await createRepository();
       const webManifestPath = "apps/web/package.json";
       const webManifest = await readManifest(root, webManifestPath);
@@ -1090,7 +1156,7 @@ describe("workspace and supply-chain boundaries", () => {
 
       expect(result.code).toBe(1);
       expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
-      expect(result.stderr).toContain(fixtureName);
+      expect(result.stderr).toContain(expectedDetail);
     },
   );
 
