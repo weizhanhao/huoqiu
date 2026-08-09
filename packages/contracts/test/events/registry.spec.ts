@@ -60,8 +60,25 @@ const requiredPayloadKeys: Readonly<Record<string, readonly string[]>> = {
   "market.quote_revised": ["listing_id", "sequence", "revision", "as_of"],
 };
 
-const forbiddenPayloadKey =
-  /(?:email|token|body|text|content|evidence|rationale|trade|private[_-]?fund|payment|push|ai[_-]?advice)/iu;
+const forbiddenPayloadKeys = [
+  "email",
+  "token",
+  "body",
+  "text",
+  "content",
+  "evidence",
+  "rationale",
+  "trade",
+  "private_fund",
+  "payment",
+  "push",
+  "ai_advice",
+] as const;
+
+const forbiddenPayloadKey = new RegExp(
+  `(?:${forbiddenPayloadKeys.join("|")})`,
+  "iu",
+);
 
 const collectKeys = (
   value: unknown,
@@ -119,6 +136,12 @@ describe("M1 event registry", () => {
     expect(
       eventEnvelopeSchema.safeParse({
         ...sample,
+        sequence: "9223372036854775806",
+      }).success,
+    ).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({
+        ...sample,
         sequence: "9223372036854775807",
       }).success,
     ).toBe(true);
@@ -127,6 +150,7 @@ describe("M1 event registry", () => {
       -1,
       "-1",
       "01",
+      "1\n",
       "9223372036854775808",
       "9".repeat(128),
     ]) {
@@ -176,10 +200,15 @@ describe("M1 event registry", () => {
         event.type,
       ).toEqual([]);
 
-      const withEmail = clone(event.sample);
-      (withEmail.payload as Record<string, unknown>).email =
-        "person@example.invalid";
-      expect(event.schema.safeParse(withEmail).success, event.type).toBe(false);
+      for (const forbiddenKey of forbiddenPayloadKeys) {
+        const withForbiddenKey = clone(event.sample);
+        (withForbiddenKey.payload as Record<string, unknown>)[forbiddenKey] =
+          "must-not-cross-the-event-boundary";
+        expect(
+          event.schema.safeParse(withForbiddenKey).success,
+          `${event.type}:${forbiddenKey}`,
+        ).toBe(false);
+      }
     }
   });
 
@@ -209,6 +238,7 @@ describe("M1 event registry", () => {
       "huoqiu://trade/order_1",
       "/admin/moderation",
       "/posts/%252Fadmin",
+      "/login\n",
     ]) {
       const sample = clone(notification.sample);
       (sample.payload as Record<string, unknown>).deep_link = deepLink;

@@ -19,6 +19,131 @@ interface JsonObject {
   readonly [key: string]: JsonValue;
 }
 
+const payloadFieldsByEventType: Readonly<Record<string, readonly string[]>> = {
+  "identity.user_registered": ["user_id", "reason", "effective_at"],
+  "content.post_submitted": ["post_id", "author_id", "status", "version"],
+  "moderation.decision_recorded": [
+    "case_id",
+    "target_type",
+    "target_id",
+    "action",
+    "decision_version",
+  ],
+  "content.post_published": ["post_id", "author_id", "status", "version"],
+  "content.post_hidden": ["post_id", "author_id", "status", "version"],
+  "content.post_restored": ["post_id", "author_id", "status", "version"],
+  "identity.user_suspended": ["user_id", "reason", "effective_at"],
+  "social.comment_submitted": ["comment_id", "author_id", "status", "version"],
+  "social.comment_published": ["comment_id", "author_id", "status", "version"],
+  "social.comment_hidden": ["comment_id", "author_id", "status", "version"],
+  "social.comment_restored": ["comment_id", "author_id", "status", "version"],
+  "social.reaction_changed": ["actor_id", "target_type", "target_id", "active"],
+  "watchlist.item_changed": ["user_id", "listing_id", "present"],
+  "notification.created": [
+    "notification_id",
+    "recipient_id",
+    "canonical_key",
+    "deep_link",
+  ],
+  "notification.read_watermark_advanced": ["recipient_id", "read_watermark"],
+  "moderation.report_submitted": [
+    "report_id",
+    "case_id",
+    "reporter_id",
+    "target_type",
+    "target_id",
+    "reason_code",
+  ],
+  "portfolio.ledger_entry_posted": [
+    "portfolio_id",
+    "ledger_entry_id",
+    "committed_version",
+  ],
+  "market.quote_revised": ["listing_id", "sequence", "revision", "as_of"],
+};
+
+const int64PayloadFieldsByEventType: Readonly<
+  Partial<Record<string, readonly string[]>>
+> = {
+  "content.post_submitted": ["version"],
+  "moderation.decision_recorded": ["decision_version"],
+  "content.post_published": ["version"],
+  "content.post_hidden": ["version"],
+  "content.post_restored": ["version"],
+  "social.comment_submitted": ["version"],
+  "social.comment_published": ["version"],
+  "social.comment_hidden": ["version"],
+  "social.comment_restored": ["version"],
+  "notification.read_watermark_advanced": ["read_watermark"],
+  "portfolio.ledger_entry_posted": ["committed_version"],
+  "market.quote_revised": ["sequence", "revision"],
+};
+
+const forbiddenPayloadKeys = [
+  "email",
+  "token",
+  "body",
+  "text",
+  "content",
+  "evidence",
+  "rationale",
+  "trade",
+  "private_fund",
+  "payment",
+  "push",
+  "ai_advice",
+] as const;
+
+const approvedArtifactDeepLinks = [
+  "/",
+  "/login",
+  "/search",
+  "/watchlist",
+  "/compose",
+  "/notifications",
+  "/portfolios",
+  "/instruments/listing_US_AAPL",
+  "/instruments/listing%5FUS%5FAAPL",
+  "/posts/post_01J00000000000000000000000",
+  "/posts/post%3A01J00000000000000000000000",
+  "/portfolios/portfolio_01J00000000000000000000000",
+  `/posts/${"a".repeat(128)}`,
+  `/posts/${"%41".repeat(128)}`,
+  `/search?q=${"a".repeat(120)}`,
+  "huoqiu://home",
+  "huoqiu://login",
+  "huoqiu://search",
+  "huoqiu://watchlist",
+  "huoqiu://compose",
+  "huoqiu://notifications",
+  "huoqiu://portfolios",
+  "huoqiu://instrument/listing_US_AAPL",
+  "huoqiu://instrument/listing%5FUS%5FAAPL",
+  "huoqiu://post/post_01J00000000000000000000000",
+  "huoqiu://post/post%3A01J00000000000000000000000",
+  "huoqiu://portfolio/portfolio_01J00000000000000000000000",
+  `huoqiu://search?q=${"a".repeat(120)}`,
+  null,
+] as const;
+
+const rejectedArtifactDeepLinks = [
+  "https://evil.example/phish",
+  "//evil.example/phish",
+  "/login\n",
+  "/search?q=",
+  "/%2fevil.example/phish",
+  "/%252fevil.example/phish",
+  "/posts/%2e%2e",
+  "/posts/%252e%252e",
+  `/posts/${"a".repeat(129)}`,
+  `/posts/${"%41".repeat(129)}`,
+  `/search?q=${"a".repeat(121)}`,
+  "huoqiu://search?q=",
+  `huoqiu://search?q=${"a".repeat(121)}`,
+  "huoqiu://trade/order_1",
+  "huoqiu://admin/moderation",
+] as const;
+
 const contractsDirectory = resolve(import.meta.dirname, "../..");
 const repositoryRoot = resolve(contractsDirectory, "../..");
 const oracleDirectory = resolve(repositoryRoot, "quality/oracles/m1");
@@ -47,6 +172,15 @@ const requireObject = (value: unknown, label: string): JsonObject => {
   }
   return value as JsonObject;
 };
+
+const requireStringArray = (value: unknown, label: string): string[] => {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new TypeError(`${label} must be a string array`);
+  }
+  return value;
+};
+
+const clone = <T>(value: T): T => structuredClone(value);
 
 const compareKeys = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
@@ -90,6 +224,9 @@ describe("approved M1 event schema artifacts", () => {
         version,
       })),
     ).toEqual(approvedEvents);
+    expect(Object.keys(payloadFieldsByEventType).sort()).toEqual(
+      eventRegistry.map((event) => event.type).sort(),
+    );
   });
 
   it("contains exactly one deterministic Draft 2020-12 schema per approved event", () => {
@@ -130,8 +267,97 @@ describe("approved M1 event schema artifacts", () => {
       const properties = requireObject(document.properties, "properties");
       const sequence = requireObject(properties.sequence, "sequence");
       expect(sequence.type, event.type).toBe("string");
-      expect(sequence.pattern, event.type).toBe("^(?:0|[1-9][0-9]{0,18})$");
       expect(sequence["x-int64-string"], event.type).toBe(true);
+
+      const maximumEnvelope = clone(event.sample);
+      maximumEnvelope.sequence = "9223372036854775807";
+      expect(
+        roundTripSchema.safeParse(maximumEnvelope).success,
+        `${event.type}:envelope.sequence maximum`,
+      ).toBe(true);
+
+      const overflowEnvelope = clone(event.sample);
+      overflowEnvelope.sequence = "9223372036854775808";
+      expect(
+        roundTripSchema.safeParse(overflowEnvelope).success,
+        `${event.type}:envelope.sequence overflow`,
+      ).toBe(false);
+
+      const newlineEnvelope = clone(event.sample);
+      newlineEnvelope.sequence = "1\n";
+      expect(
+        roundTripSchema.safeParse(newlineEnvelope).success,
+        `${event.type}:envelope.sequence trailing newline`,
+      ).toBe(false);
+
+      const payloadSchema = requireObject(properties.payload, "payload");
+      const payloadProperties = requireObject(
+        payloadSchema.properties,
+        "payload.properties",
+      );
+      expect(Object.keys(payloadProperties).sort(), event.type).toEqual(
+        [...(payloadFieldsByEventType[event.type] ?? [])].sort(),
+      );
+      expect(
+        requireStringArray(payloadSchema.required, "payload.required").sort(),
+        event.type,
+      ).toEqual([...(payloadFieldsByEventType[event.type] ?? [])].sort());
+      expect(payloadSchema.additionalProperties, event.type).toBe(false);
+
+      for (const forbiddenKey of forbiddenPayloadKeys) {
+        const withForbiddenKey = clone(event.sample);
+        (withForbiddenKey.payload as Record<string, unknown>)[forbiddenKey] =
+          "must-not-cross-the-event-boundary";
+        expect(
+          roundTripSchema.safeParse(withForbiddenKey).success,
+          `${event.type}:payload.${forbiddenKey}`,
+        ).toBe(false);
+      }
+
+      for (const field of int64PayloadFieldsByEventType[event.type] ?? []) {
+        const overflowPayload = clone(event.sample);
+        (overflowPayload.payload as Record<string, unknown>)[field] =
+          "9223372036854775808";
+        expect(
+          roundTripSchema.safeParse(overflowPayload).success,
+          `${event.type}:payload.${field} overflow`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("preserves the approved deep-link boundary in the generated schema", () => {
+    const notification = eventRegistry.find(
+      (event) => event.type === "notification.created",
+    );
+    expect(notification).toBeDefined();
+    if (notification === undefined) return;
+
+    const path = resolve(
+      eventSchemaDirectory,
+      fileNameFor("notification.created"),
+    );
+    const document = requireObject(
+      JSON.parse(readFileSync(path, "utf8")),
+      path,
+    );
+    const roundTripSchema = z.fromJSONSchema(document);
+
+    for (const deepLink of approvedArtifactDeepLinks) {
+      const approved = clone(notification.sample);
+      (approved.payload as Record<string, unknown>).deep_link = deepLink;
+      expect(
+        roundTripSchema.safeParse(approved).success,
+        `approved deep link: ${String(deepLink)}`,
+      ).toBe(true);
+    }
+    for (const deepLink of rejectedArtifactDeepLinks) {
+      const rejected = clone(notification.sample);
+      (rejected.payload as Record<string, unknown>).deep_link = deepLink;
+      expect(
+        roundTripSchema.safeParse(rejected).success,
+        `rejected deep link: ${deepLink}`,
+      ).toBe(false);
     }
   });
 

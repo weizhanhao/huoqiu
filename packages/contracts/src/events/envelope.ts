@@ -1,21 +1,49 @@
 import { z } from "zod4";
 
 const MAX_NON_NEGATIVE_INT64 = "9223372036854775807";
-const NON_NEGATIVE_INT64_PATTERN = /^(?:0|[1-9][0-9]{0,18})$/u;
 
-const isNonNegativeInt64String = (value: string): boolean =>
-  NON_NEGATIVE_INT64_PATTERN.test(value) &&
-  (value.length < MAX_NON_NEGATIVE_INT64.length ||
-    value <= MAX_NON_NEGATIVE_INT64);
+const createBoundedUnsignedIntegerPattern = (maximum: string): RegExp => {
+  if (!/^[1-9][0-9]*$/u.test(maximum)) {
+    throw new TypeError("Expected a positive decimal maximum");
+  }
+
+  const alternatives = ["0"];
+  if (maximum.length > 1) {
+    alternatives.push(`[1-9][0-9]{0,${maximum.length - 2}}`);
+  }
+
+  let equalPrefix = "";
+  for (const [index, character] of [...maximum].entries()) {
+    const maximumDigit = Number(character);
+    const minimumDigit = index === 0 ? 1 : 0;
+    if (maximumDigit > minimumDigit) {
+      const upperDigit = maximumDigit - 1;
+      const digitRange =
+        upperDigit === minimumDigit
+          ? String(minimumDigit)
+          : `[${minimumDigit}-${upperDigit}]`;
+      const remainingDigits = maximum.length - index - 1;
+      alternatives.push(
+        `${equalPrefix}${digitRange}${
+          remainingDigits === 0 ? "" : `[0-9]{${remainingDigits}}`
+        }`,
+      );
+    }
+    equalPrefix += character;
+  }
+  alternatives.push(maximum);
+  return new RegExp(String.raw`^(?:${alternatives.join("|")})(?![\s\S])`, "u");
+};
+
+const NON_NEGATIVE_INT64_PATTERN = createBoundedUnsignedIntegerPattern(
+  MAX_NON_NEGATIVE_INT64,
+);
 
 export const eventInt64StringSchema = z
   .string()
   .min(1)
   .max(19)
   .regex(NON_NEGATIVE_INT64_PATTERN, "Expected a non-negative int64 string")
-  .refine(isNonNegativeInt64String, {
-    message: "Expected a non-negative int64 string",
-  })
   .meta({
     "x-int64-maximum": MAX_NON_NEGATIVE_INT64,
     "x-int64-minimum": "0",

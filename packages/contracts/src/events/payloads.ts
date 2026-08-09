@@ -13,10 +13,25 @@ const safeCodeSchema = z
   .max(64)
   .regex(/^[a-z][a-z0-9_.:-]*$/u, "Expected a bounded public code");
 
+const encodedResourceFirstCharacter = String.raw`(?:[A-Za-z0-9]|%(?:3[0-9]|4[1-9A-Fa-f]|5[0-9Aa]|6[1-9A-Fa-f]|7[0-9Aa]))`;
+const encodedResourceRemainingCharacter = String.raw`(?:[A-Za-z0-9._:-]|%(?:2[DdEe]|3[0-9Aa]|4[1-9A-Fa-f]|5[0-9AaFf]|6[1-9A-Fa-f]|7[0-9Aa]))`;
+const encodedResourceId = `${encodedResourceFirstCharacter}${encodedResourceRemainingCharacter}{0,127}`;
+
+// This serializable subset is deliberately no broader than the canonical
+// runtime policy. The refine below remains the source-of-truth check.
+const eventDeepLinkAllowlistPattern = new RegExp(
+  String.raw`^(?:/|/(?:login|watchlist|compose|notifications|portfolios)|/search(?:\?q=[A-Za-z0-9._:-]{1,120})?|/(?:instruments|posts|portfolios)/${encodedResourceId}|huoqiu://(?:home|login|watchlist|compose|notifications|portfolios)|huoqiu://search(?:\?q=[A-Za-z0-9._:-]{1,120})?|huoqiu://(?:instrument|post|portfolio)/${encodedResourceId})(?![\s\S])`,
+  "u",
+);
+
 const approvedDeepLinkSchema = z
   .string()
   .min(1)
   .max(512)
+  .regex(
+    eventDeepLinkAllowlistPattern,
+    "Expected a serializable approved deep-link route",
+  )
   .refine((value) => safeDeepLinkSchema.safeParse(value).success, {
     message: "Expected an approved Web or huoqiu App registry deep link",
   })
