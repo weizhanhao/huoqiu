@@ -1,0 +1,92 @@
+[
+  {
+    "event_type": "identity.user_registered",
+    "producer": "identity",
+    "version": 1
+  },
+  {
+    "event_type": "content.post_submitted",
+    "producer": "content",
+    "version": 1
+  },
+  {
+    "event_type": "moderation.decision_recorded",
+    "producer": "moderation",
+    "version": 1
+  },
+  {
+    "event_type": "content.post_published",
+    "producer": "content",
+    "version": 1
+  },
+  {
+    "event_type": "content.post_hidden",
+    "producer": "content",
+    "version": 1
+  },
+  {
+    "event_type": "content.post_restored",
+    "producer": "content",
+    "version": 1
+  },
+  {
+    "event_type": "identity.user_suspended",
+    "producer": "identity",
+    "version": 1
+  },
+  {
+    "event_type": "social.comment_submitted",
+    "producer": "social",
+    "version": 1
+  },
+  {
+    "event_type": "social.comment_published",
+    "producer": "social",
+    "version": 1
+  },
+  {
+    "event_type": "social.comment_hidden",
+    "producer": "social",
+    "version": 1
+  },
+  {
+    "event_type": "social.comment_restored",
+    "producer": "social",
+    "version": 1
+  },
+  {
+    "event_type": "social.reaction_changed",
+    "producer": "social",
+    "version": 1
+  },
+  {
+    "event_type": "watchlist.item_changed",
+    "producer": "watchlist",
+    "version": 1
+  },
+  {
+    "event_type": "notification.created",
+    "producer": "notification",
+    "version": 1
+  },
+  {
+    "event_type": "notification.read_watermark_advanced",
+    "producer": "notification",
+    "version": 1
+  },
+  {
+    "event_type": "moderation.report_submitted",
+    "producer": "moderation",
+    "version": 1
+  },
+  {
+    "event_type": "portfolio.ledger_entry_posted",
+    "producer": "portfolio",
+    "version": 1
+  },
+  {
+    "event_type": "market.quote_revised",
+    "producer": "market",
+    "version": 1
+  }
+]

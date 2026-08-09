@@ -1,0 +1,30 @@
+{
+  "allowed_sources": ["huoqiu-synthetic"],
+  "forbidden_pii_keys": [
+    "access_token",
+    "auth_token",
+    "email",
+    "full_name",
+    "legal_name",
+    "mobile",
+    "phone",
+    "phone_number",
+    "real_name",
+    "refresh_token",
+    "session",
+    "session_id",
+    "token"
+  ],
+  "allowed_surfaces": [
+    "identity",
+    "instrument",
+    "market_data",
+    "feed",
+    "watchlist",
+    "content",
+    "social",
+    "notification",
+    "moderation",
+    "portfolio_private"
+  ]
+}
