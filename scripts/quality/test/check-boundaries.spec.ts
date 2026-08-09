@@ -801,4 +801,137 @@ describe("workspace and supply-chain boundaries", () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("LOCKFILE_GESTURE_HANDLER_INVALID");
   });
+
+  it("scans CommonJS TypeScript .cts workspace imports", async () => {
+    const root = await createRepository();
+    await writeText(
+      root,
+      "apps/admin/src/runtime.cts",
+      'require("@huoqiu/ui/button");\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("UNDECLARED_WORKSPACE_IMPORT");
+    expect(result.stderr).toContain("apps/admin/src/runtime.cts");
+  });
+
+  it("rejects a workspace package export whose target is a directory", async () => {
+    const root = await createRepository();
+    const manifestPath = "packages/ui/package.json";
+    const manifest = await readManifest(root, manifestPath);
+    manifest.exports = { "./button": "./src" };
+    await writeJson(root, manifestPath, manifest);
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_NOT_FILE");
+    expect(result.stderr).toContain("packages/ui/src");
+  });
+
+  it("accepts an exact package export to a versioned contract fixture", async () => {
+    const root = await createRepository();
+    const webManifestPath = "apps/web/package.json";
+    const webManifest = await readManifest(root, webManifestPath);
+    (webManifest.dependencies as Record<string, string>)["@huoqiu/contracts"] =
+      "workspace:*";
+    await writeJson(root, webManifestPath, webManifest);
+    await writeJson(root, "packages/contracts/package.json", {
+      ...workspacePackage("@huoqiu/contracts"),
+      exports: { "./d0/fixture": "./fixtures/d0.v1.json" },
+    });
+    await writeJson(root, "packages/contracts/fixtures/d0.v1.json", {
+      version: 1,
+    });
+    await writeText(
+      root,
+      "apps/web/src/d0-fixture.ts",
+      'import fixture from "@huoqiu/contracts/d0/fixture";\nvoid fixture;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result).toEqual({ code: 0, stderr: "" });
+  });
+
+  it("rejects a relative import to a versioned contract fixture", async () => {
+    const root = await createRepository();
+    await writeJson(
+      root,
+      "packages/contracts/package.json",
+      workspacePackage("@huoqiu/contracts"),
+    );
+    await writeJson(root, "packages/contracts/fixtures/d0.v1.json", {
+      version: 1,
+    });
+    await writeText(
+      root,
+      "apps/web/src/d0-fixture.ts",
+      'import fixture from "../../../packages/contracts/fixtures/d0.v1.json";\nvoid fixture;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+  });
+
+  it("rejects a wildcard package export to a versioned contract fixture", async () => {
+    const root = await createRepository();
+    const webManifestPath = "apps/web/package.json";
+    const webManifest = await readManifest(root, webManifestPath);
+    (webManifest.dependencies as Record<string, string>)["@huoqiu/contracts"] =
+      "workspace:*";
+    await writeJson(root, webManifestPath, webManifest);
+    await writeJson(root, "packages/contracts/package.json", {
+      ...workspacePackage("@huoqiu/contracts"),
+      exports: { "./d0/*": "./fixtures/*.json" },
+    });
+    await writeJson(root, "packages/contracts/fixtures/d0.v1.json", {
+      version: 1,
+    });
+    await writeText(
+      root,
+      "apps/web/src/d0-fixture.ts",
+      'import fixture from "@huoqiu/contracts/d0/d0.v1";\nvoid fixture;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+  });
+
+  it.each([
+    ["a nested test fixture", "./fixtures/test/d0.v1.json"],
+    ["a negative fixture", "./fixtures/d0-negative.v1.json"],
+    ["an unversioned fixture", "./fixtures/d0.json"],
+    ["a traversing fixture target", "./fixtures/../fixtures/d0.v1.json"],
+  ])("rejects an exact package export to %s", async (_label, targetPath) => {
+    const root = await createRepository();
+    const webManifestPath = "apps/web/package.json";
+    const webManifest = await readManifest(root, webManifestPath);
+    (webManifest.dependencies as Record<string, string>)["@huoqiu/contracts"] =
+      "workspace:*";
+    await writeJson(root, webManifestPath, webManifest);
+    await writeJson(root, "packages/contracts/package.json", {
+      ...workspacePackage("@huoqiu/contracts"),
+      exports: { "./d0/fixture": targetPath },
+    });
+    await writeJson(root, `packages/contracts/${targetPath.slice(2)}`, {
+      version: 1,
+    });
+    await writeText(
+      root,
+      "apps/web/src/d0-fixture.ts",
+      'import fixture from "@huoqiu/contracts/d0/fixture";\nvoid fixture;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+  });
 });

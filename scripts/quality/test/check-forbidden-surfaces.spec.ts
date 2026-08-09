@@ -248,6 +248,17 @@ describe("forbidden runtime surfaces", () => {
     expect(result.stderr).toContain(relativePath);
   });
 
+  it("accepts a CommonJS registry factory with a static parameter default", async () => {
+    const root = await createRepository();
+    await writeCandidate(
+      root,
+      'module.exports = function registry(options = {}) { return { routes: ["/watchlist"] }; };',
+      "apps/web/src/navigation/route-registry.cjs",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
   it.each([
     [
       "Controller",
@@ -836,5 +847,250 @@ describe("forbidden runtime surfaces", () => {
     await expect(
       scanForbiddenSurfaces(`${canonicalRoot}/apps/..`),
     ).rejects.toThrow("RUNTIME_CANDIDATE_TRAVERSAL");
+  });
+
+  it.each([
+    ["apps/web/src/runtime.ts", 'export const command = "trade";'],
+    ["apps/mobile/src/runtime.ts", 'export const command = "trade";'],
+    ["packages/example/src/runtime.ts", 'export const command = "trade";'],
+    ["src/runtime.ts", 'export const command = "trade";'],
+    ["runtime.ts", 'export const command = "trade";'],
+    ["scripts/runtime.ts", 'export const command = "trade";'],
+    ["config/runtime.ts", 'export const command = "trade";'],
+  ])("scans every supported runtime source root %s", async (path, source) => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(root, source, path);
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("FORBIDDEN_RUNTIME_SURFACE");
+    expect(result.stderr).toContain(path);
+  });
+
+  it("scans an otherwise excluded build artifact when a package export makes it runtime reachable", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      JSON.stringify({
+        name: "@example/runtime",
+        exports: {
+          ".": { types: "./src/index.ts", import: "./dist/index.js" },
+        },
+      }),
+      "packages/example/package.json",
+    );
+    await writeCandidate(
+      root,
+      'export const command = "trade";',
+      "packages/example/dist/index.js",
+    );
+    await writeCandidate(
+      root,
+      'export const command = "watchlist";',
+      "packages/example/src/index.ts",
+    );
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("packages/example/dist/index.js");
+    expect(result.stderr).toContain("trade");
+  });
+
+  it.each([
+    "routes.push(resolveRuntimeRoute())",
+    "routes.splice(0, 0, resolveRuntimeRoute())",
+    'Reflect.set(routes, "0", resolveRuntimeRoute())',
+    "Object.assign(routes, { 0: resolveRuntimeRoute() })",
+    "const alias = routes; alias.push(resolveRuntimeRoute())",
+  ])(
+    "rejects a mutation of an imported runtime registry %s",
+    async (mutation) => {
+      const root = await createRepository();
+      await writeCandidate(
+        root,
+        'export const routes = ["/watchlist"];',
+        "packages/example/src/runtime.ts",
+      );
+      const relativePath = "apps/web/src/bootstrap.ts";
+      await writeCandidate(
+        root,
+        `import { routes } from "../../../packages/example/src/runtime";\n${mutation};`,
+        relativePath,
+      );
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it.each([
+    "export function registry(options = resolveRuntimeRegistry()) { return { routes: ['/watchlist'] }; }",
+    "export function registry({ routes = resolveRuntimeRoutes() } = {}) { return { routes: ['/watchlist'] }; }",
+    "module.exports = function registry(options = resolveRuntimeRegistry()) { return { routes: ['/watchlist'] }; };",
+  ])(
+    "rejects a dynamic registry function parameter initializer %s",
+    async (source) => {
+      const root = await createRepository();
+      const relativePath = source.startsWith("module")
+        ? "apps/web/src/navigation/route-registry.cjs"
+        : "apps/web/src/navigation/route-registry.ts";
+      await writeCandidate(root, source, relativePath);
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it.each([
+    "registry.routes.splice(0, 0, resolveRuntimeRoute());",
+    'Reflect.set(registry.routes, "0", resolveRuntimeRoute());',
+  ])("rejects registry mutation inside a factory %s", async (mutation) => {
+    const root = await createRepository();
+    const relativePath = "apps/web/src/navigation/route-registry.ts";
+    await writeCandidate(
+      root,
+      `export function registry() { const registry = { routes: ["/watchlist"] }; ${mutation} return registry; }`,
+      relativePath,
+    );
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+    expect(result.stderr).toContain(relativePath);
+  });
+
+  it.each([
+    'const key = "Controller"; const { [key]: RouteController } = Nest; @RouteController(resolveRoute()) class Orders {}',
+    'const { ["Get"]: ReadRoute } = Nest; class Orders { @ReadRoute(resolveRoute()) list() {} }',
+    "const { [resolveDecoratorName()]: ReadRoute } = Nest; class Orders { @ReadRoute(resolveRoute()) list() {} }",
+  ])(
+    "tracks a computed Nest namespace destructuring alias %s",
+    async (declaration) => {
+      const root = await createRepository();
+      await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+      const relativePath = "apps/api/src/execution/orders.ts";
+      await writeCandidate(
+        root,
+        `import * as Nest from "@nestjs/common";\n${declaration}`,
+        relativePath,
+      );
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it.each([
+    'const Nest = require("@nestjs/common"); const RouteController = Nest.Controller; @RouteController(resolveRoute()) class Orders {}',
+    'const { Get: ReadRoute } = require("@nestjs/common"); class Orders { @ReadRoute(resolveRoute()) list() {} }',
+    'const { ["Post"]: CreateRoute } = require("@nestjs/common"); class Orders { @CreateRoute(resolveRoute()) create() {} }',
+  ])("tracks a CommonJS Nest alias %s", async (declaration) => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    const relativePath = "apps/api/src/execution/orders.cts";
+    await writeCandidate(root, declaration, relativePath);
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+    expect(result.stderr).toContain(relativePath);
+  });
+
+  it("accepts static routes through CommonJS and computed Nest aliases", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      'const Nest = require("@nestjs/common"); const { ["Get"]: ReadRoute } = Nest; class Orders { @ReadRoute("watchlist") list() {} }',
+      "apps/api/src/execution/orders.cts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it.each([
+    ["payment", "payment"],
+    ["payment_checkout", "payment"],
+    ["payment_intent", "payment"],
+    ["account_eligibility", "account-eligibility"],
+    ["investor_suitability", "account-eligibility"],
+    ["brokerage_data_import", "unauthorized-data-import"],
+    ["data_import", "unauthorized-data-import"],
+    ["portfolio_sync", "unauthorized-data-import"],
+    ["paid_advice", "paid-advice"],
+    ["premium_stock_recommendation", "paid-advice"],
+    ["place_order", "execution"],
+    ["brokerage_connection", "execution"],
+    ["trading", "execution"],
+    ["支付", "payment"],
+    ["开户资格", "account-eligibility"],
+    ["数据导入", "unauthorized-data-import"],
+    ["付费荐股", "paid-advice"],
+    ["交易下单", "execution"],
+  ])(
+    "rejects licensed or unauthorized surface synonym %s",
+    async (surface, category) => {
+      const root = await createRepository();
+      await writeCandidate(root, JSON.stringify({ command: surface }));
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain(category);
+    },
+  );
+
+  it.each([
+    "paymentHistoryLabel",
+    "tradingHoursLabel",
+    "eligibleDisplayRows",
+    "importantData",
+    "importMap",
+    "adviceColumn",
+    "orderingPreference",
+    "brokerageFirmNews",
+  ])("does not reject a mere licensed-surface substring %s", async (value) => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ label: value }));
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it("accepts ordinary array push usage in runtime source", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      'const values: string[] = []; values.push("watchlist"); const paths: string[] = []; paths.push("asset"); export { values, paths };',
+      "apps/api/src/health/values.ts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it("parses a clean CommonJS TypeScript .cts runtime source", async () => {
+    const root = await createRepository();
+    await writeCandidate(
+      root,
+      'exports.registry = { routes: ["/watchlist"] };',
+      "apps/web/src/navigation/route-registry.cts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
   });
 });

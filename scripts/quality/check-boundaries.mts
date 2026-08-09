@@ -1,5 +1,5 @@
-import type { Dirent } from "node:fs";
-import { lstat, readFile, readdir, realpath } from "node:fs/promises";
+import { constants, type Dirent } from "node:fs";
+import { access, lstat, readFile, readdir, realpath } from "node:fs/promises";
 import { dirname, extname, relative, resolve, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
@@ -25,6 +25,11 @@ interface WorkspaceProject {
   name: string;
 }
 
+interface PackageExportTarget {
+  exactMapping: boolean;
+  path: string;
+}
+
 const DEPENDENCY_SECTIONS: readonly DependencySection[] = [
   "dependencies",
   "devDependencies",
@@ -33,6 +38,7 @@ const DEPENDENCY_SECTIONS: readonly DependencySection[] = [
 ];
 const SOURCE_EXTENSIONS = new Set([
   ".cjs",
+  ".cts",
   ".js",
   ".jsx",
   ".mjs",
@@ -654,7 +660,7 @@ const validateSourceImports = async (
     target: WorkspaceProject,
     specifier: string,
     file: string,
-  ): string[] => {
+  ): PackageExportTarget[] => {
     const importSuffix = specifier.slice(target.name.length);
     const exportKey = importSuffix.length === 0 ? "." : `.${importSuffix}`;
     const exportsValue = target.exports;
@@ -715,8 +721,43 @@ const validateSourceImports = async (
         "WORKSPACE_IMPORT_UNRESOLVED",
         `${file}: ${specifier} is not exported by ${target.name}`,
       );
-    return resolveExportStrings(selected, replacement, file, specifier);
+    return resolveExportStrings(selected, replacement, file, specifier).map(
+      (path) => ({ exactMapping: replacement === undefined, path }),
+    );
   };
+
+  const isVersionedContractFixture = (
+    namedTarget: WorkspaceProject,
+    owner: WorkspaceProject,
+    path: string,
+  ): boolean => {
+    if (
+      namedTarget.name !== "@huoqiu/contracts" ||
+      owner.name !== namedTarget.name
+    )
+      return false;
+    const ownerRelativePath = relative(owner.directory, path).replaceAll(
+      sep,
+      "/",
+    );
+    const match = /^fixtures\/([a-z0-9][a-z0-9_-]*)\.v([1-9]\d*)\.json$/.exec(
+      ownerRelativePath,
+    );
+    if (match === null) return false;
+    return !/(?:^|[_-])(?:fixture|fixtures|invalid|malformed|negative|test|tests)(?:[_-]|$)/.test(
+      match[1] ?? "",
+    );
+  };
+
+  const isExactVersionedContractFixtureExport = (
+    namedTarget: WorkspaceProject,
+    exportTarget: PackageExportTarget,
+  ): boolean =>
+    namedTarget.name === "@huoqiu/contracts" &&
+    exportTarget.exactMapping &&
+    /^\.\/fixtures\/[a-z0-9][a-z0-9_-]*\.v[1-9]\d*\.json$/.test(
+      exportTarget.path,
+    );
 
   const validateOwner = (
     source: WorkspaceProject,
@@ -747,6 +788,7 @@ const validateSourceImports = async (
     targetPath: string,
     file: string,
     specifier: string,
+    allowVersionedContractFixture = false,
   ): Promise<void> => {
     let canonical: string;
     try {
@@ -759,13 +801,31 @@ const validateSourceImports = async (
         );
       throw error;
     }
+    const targetStatus = await lstat(canonical);
+    if (!targetStatus.isFile())
+      fail(
+        "WORKSPACE_IMPORT_TARGET_NOT_FILE",
+        `${file}: ${specifier} -> ${repositoryPath(root, canonical)}`,
+      );
+    try {
+      await access(canonical, constants.R_OK);
+    } catch {
+      fail(
+        "WORKSPACE_IMPORT_TARGET_UNREADABLE",
+        `${file}: ${specifier} -> ${repositoryPath(root, canonical)}`,
+      );
+    }
     const owner = ownerOf(canonical);
     if (owner === undefined)
       return fail(
         "WORKSPACE_IMPORT_TARGET_UNMAPPED",
         `${file}: ${specifier} -> ${repositoryPath(root, canonical)}`,
       );
-    rejectExcludedTarget(owner, canonical, file);
+    if (
+      !allowVersionedContractFixture ||
+      !isVersionedContractFixture(namedTarget, owner, canonical)
+    )
+      rejectExcludedTarget(owner, canonical, file);
     validateOwner(source, owner, file);
     if (owner.name !== namedTarget.name)
       fail(
@@ -800,6 +860,8 @@ const validateSourceImports = async (
         );
       validateOwner(project, target, file);
 
+      const exportTargets = packageExportTargets(target, specifier, file);
+
       const resolution = ts.resolveModuleName(
         specifier,
         absoluteFile,
@@ -807,21 +869,29 @@ const validateSourceImports = async (
         ts.sys,
       ).resolvedModule;
       if (resolution !== undefined) {
+        const allowVersionedContractFixture = exportTargets.some(
+          (exportTarget) =>
+            isExactVersionedContractFixtureExport(target, exportTarget) &&
+            resolve(target.directory, exportTarget.path) ===
+              resolve(resolution.resolvedFileName),
+        );
         await validateWorkspaceImportTarget(
           project,
           target,
           resolution.resolvedFileName,
           file,
           specifier,
+          allowVersionedContractFixture,
         );
       }
-      for (const exportTarget of packageExportTargets(target, specifier, file))
+      for (const exportTarget of exportTargets)
         await validateWorkspaceImportTarget(
           project,
           target,
-          resolve(target.directory, exportTarget),
+          resolve(target.directory, exportTarget.path),
           file,
           specifier,
+          isExactVersionedContractFixtureExport(target, exportTarget),
         );
       return;
     }
