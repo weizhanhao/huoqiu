@@ -17,6 +17,7 @@
     "quality:record-authorship": "tsx scripts/quality/record-authorship.mts",
     "quality:record-review": "tsx scripts/quality/record-review.mts",
     "qa:auth-spike": "tsx scripts/quality/auth-spike-gate.mts",
+    "qa:dependency-patch": "tsx scripts/quality/image-size-patch-gate.mts",
     "qa:boundaries": "tsx scripts/quality/check-boundaries.mts && tsx scripts/quality/check-forbidden-surfaces.mts",
     "qa:contracts": "tsx scripts/quality/contract-gate.mts",
     "qa:ddl": "tsx scripts/quality/ddl-gate.mts",

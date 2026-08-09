@@ -7,6 +7,9 @@ settings:
 overrides:
   "@nestjs/platform-fastify>find-my-way": 9.7.0
 
+patchedDependencies:
+  image-size@1.2.1: c62fd896eb8a88cdbedb24765a600630bcf5158bc3e1fd24fca4d6841287ecc7
+
 importers:
   .:
     devDependencies:
@@ -275,6 +278,9 @@ importers:
 
   packages/contracts:
     dependencies:
+      "@ts-rest/core":
+        specifier: 3.52.1
+        version: 3.52.1(@types/node@24.13.3)(zod@3.25.76)
       eslint:
         specifier: 10.8.0
         version: 10.8.0
@@ -285,8 +291,11 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.1)(terser@5.49.2)(tsx@4.23.9)(yaml@2.9.0))
       zod:
-        specifier: 4.4.3
-        version: 4.4.3
+        specifier: 3.25.76
+        version: 3.25.76
+      zod4:
+        specifier: npm:zod@4.4.3
+        version: zod@4.4.3
     devDependencies:
       "@huoqiu/config":
         specifier: workspace:*
@@ -2984,6 +2993,20 @@ packages:
       {
         integrity: sha512-OvjF+z51L3ov0OyAU0duzsYuvO01PH7x4t6DJx+guahgTnBHkhJdG7soQeTSFLWN3efnHyibZ4Z8l2EuWwJN3A==,
       }
+
+  "@ts-rest/core@3.52.1":
+    resolution:
+      {
+        integrity: sha512-tAjz7Kxq/grJodcTA1Anop4AVRDlD40fkksEV5Mmal88VoZeRKAG8oMHsDwdwPZz+B/zgnz0q2sF+cm5M7Bc7g==,
+      }
+    peerDependencies:
+      "@types/node": ^18.18.7 || >=20.8.4
+      zod: ^3.22.3
+    peerDependenciesMeta:
+      "@types/node":
+        optional: true
+      zod:
+        optional: true
 
   "@turbo/darwin-64@2.10.8":
     resolution:
@@ -9309,6 +9332,11 @@ snapshots:
 
   "@tokenizer/token@0.3.0": {}
 
+  "@ts-rest/core@3.52.1(@types/node@24.13.3)(zod@3.25.76)":
+    optionalDependencies:
+      "@types/node": 24.13.3
+      zod: 3.25.76
+
   "@turbo/darwin-64@2.10.8":
     optional: true
 
@@ -10571,7 +10599,7 @@ snapshots:
 
   ignore@7.0.6: {}
 
-  image-size@1.2.1:
+  image-size@1.2.1(patch_hash=c62fd896eb8a88cdbedb24765a600630bcf5158bc3e1fd24fca4d6841287ecc7):
     dependencies:
       queue: 6.0.2
 
@@ -10948,7 +10976,7 @@ snapshots:
       flow-enums-runtime: 0.0.6
       graceful-fs: 4.2.11
       hermes-parser: 0.35.0
-      image-size: 1.2.1
+      image-size: 1.2.1(patch_hash=c62fd896eb8a88cdbedb24765a600630bcf5158bc3e1fd24fca4d6841287ecc7)
       invariant: 2.2.4
       jest-worker: 29.7.0
       jsc-safe-url: 0.2.4
