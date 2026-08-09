@@ -101,10 +101,10 @@ it.each(["events.main.ts", "market.main.ts"])(
     });
 
     try {
-      await waitForWorkerReady(child, entrypoint.replace(".main.ts", ""));
+      await waitForWorkerReady(child, consumer);
       expect(child.exitCode).toBeNull();
 
-      child.kill("SIGTERM");
+      expect(child.kill("SIGTERM")).toBe(true);
       await expect(exit).resolves.toEqual({ code: 0, signal: null });
     } finally {
       if (child.exitCode === null) {

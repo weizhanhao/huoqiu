@@ -2665,15 +2665,12 @@ describe("milestone results and explicit not-ready behavior", () => {
     expect(result.stderr).not.toContain("ERR_MODULE_NOT_FOUND");
   });
 
-  it("enforces each pending wrapper's actual argument contract", async () => {
+  it("enforces pending wrappers and the implemented mobile CLI argument contracts", async () => {
     await expect(e2eGateMain(["--milestone", "m1"])).rejects.toThrow(
       "NOT_IMPLEMENTED",
     );
     await expect(e2eGateMain(["--platform", "ios"])).rejects.toThrow(
       "CLI_ARGUMENT_INVALID",
-    );
-    await expect(mobileD0Main(["--platform", "ios"])).rejects.toThrow(
-      "NOT_IMPLEMENTED",
     );
     await expect(mobileD0Main(["--milestone", "d0"])).rejects.toThrow(
       "CLI_ARGUMENT_INVALID",

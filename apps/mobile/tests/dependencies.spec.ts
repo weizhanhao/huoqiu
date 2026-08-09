@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 type PackageManifest = Readonly<{
   dependencies?: Readonly<Record<string, string>>;
+  devDependencies?: Readonly<Record<string, string>>;
   version?: string;
 }>;
 
@@ -48,11 +49,25 @@ describe("Expo native dependency graph", () => {
       ?.split("\n  apps/web:\n", 1)[0];
 
     expect(mobileImporter).toBeDefined();
-    expect(mobileImporter).toContain('      "@huoqiu/contracts":');
-    expect(mobileImporter).toContain("        specifier: workspace:*");
-    expect(mobileImporter).toContain(
-      "        version: link:../../packages/contracts",
-    );
+    const workspaceDependencies = Object.entries({
+      ...manifest.dependencies,
+      ...manifest.devDependencies,
+    }).filter(([, version]) => version === "workspace:*");
+
+    expect(workspaceDependencies.length).toBeGreaterThan(0);
+    for (const [dependency] of workspaceDependencies) {
+      const packageDirectory = dependency.replace(/^@huoqiu\//u, "");
+      const escapedDependency = dependency.replace(
+        /[.*+?^${}()|[\]\\]/gu,
+        "\\$&",
+      );
+      expect(mobileImporter).toMatch(
+        new RegExp(
+          `["']?${escapedDependency}["']?:\\n\\s+specifier: workspace:\\*\\n\\s+version: link:\\.\\./\\.\\./packages/${packageDirectory}(?:\\n|$)`,
+          "u",
+        ),
+      );
+    }
   });
 
   it.each(Object.entries(expectedNativeDependencies))(
