@@ -99,6 +99,11 @@ export const m1FixtureSchema = z
             instrument_id: z.literal("instrument_syn_0001"),
             instrument_type: z.literal("equity"),
             display_label: z.literal("合成示例一号"),
+            name_pinyin: z.literal("hechengshiliyihao"),
+            aliases: z.tuple([
+              z.literal("合成一号"),
+              z.literal("Synthetic Example No. 1"),
+            ]),
             source: syntheticSourceSchema,
           })
           .strict(),
@@ -108,6 +113,7 @@ export const m1FixtureSchema = z
             instrument_id: z.literal("instrument_syn_0001"),
             exchange_id: z.literal("exchange_syn_0001"),
             symbol: z.literal("SYN001"),
+            symbol_aliases: z.tuple([z.literal("SYN-001")]),
             currency: z.literal("CNY"),
             status: z.literal("open"),
             source: syntheticSourceSchema,

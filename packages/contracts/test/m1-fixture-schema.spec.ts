@@ -104,7 +104,14 @@ describe("independently approved M1 fixture schema", () => {
     ]);
     expect(parsed.market).toMatchObject({
       exchange: { exchange_id: "exchange_syn_0001" },
-      listing: { listing_id: "listing_syn_0001" },
+      instrument: {
+        aliases: ["合成一号", "Synthetic Example No. 1"],
+        name_pinyin: "hechengshiliyihao",
+      },
+      listing: {
+        listing_id: "listing_syn_0001",
+        symbol_aliases: ["SYN-001"],
+      },
     });
     expect(parsed.registries.default_channel_id).toBe("home");
     expect(

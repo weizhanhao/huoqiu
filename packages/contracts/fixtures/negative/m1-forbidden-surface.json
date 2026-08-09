@@ -50,6 +50,8 @@
       "instrument_id": "instrument_syn_0001",
       "instrument_type": "equity",
       "display_label": "合成示例一号",
+      "name_pinyin": "hechengshiliyihao",
+      "aliases": ["合成一号", "Synthetic Example No. 1"],
       "source": "huoqiu-synthetic"
     },
     "listing": {
@@ -57,6 +59,7 @@
       "instrument_id": "instrument_syn_0001",
       "exchange_id": "exchange_syn_0001",
       "symbol": "SYN001",
+      "symbol_aliases": ["SYN-001"],
       "currency": "CNY",
       "status": "open",
       "source": "huoqiu-synthetic"
