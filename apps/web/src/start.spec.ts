@@ -1,8 +1,18 @@
 import { spawn } from "node:child_process";
-import { connect, createServer } from "node:net";
+import { readFile } from "node:fs/promises";
+import {
+  createServer as createHttpServer,
+  request as httpRequest,
+} from "node:http";
+import { connect, createServer as createNetServer } from "node:net";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
+
+import {
+  handleWebIngressClientError,
+  WEB_INGRESS_SERVER_OPTIONS,
+} from "./upload-ingress";
 
 const appRoot = fileURLToPath(new URL("../", import.meta.url));
 const startScript = fileURLToPath(
@@ -12,7 +22,7 @@ const host = "127.0.0.1";
 
 const availablePort = async (): Promise<number> =>
   new Promise((resolve, reject) => {
-    const server = createServer();
+    const server = createNetServer();
     server.once("error", reject);
     server.listen(0, host, () => {
       const address = server.address();
@@ -129,4 +139,153 @@ describe("Web production start preflight", () => {
       expect(result.connected).toBe(false);
     },
   );
+
+  it("owns the guarded Node HTTP ingress instead of delegating to next start", async () => {
+    const source = await readFile(startScript, "utf8");
+
+    expect(source).toContain("createServer(WEB_INGRESS_SERVER_OPTIONS");
+    expect(source).toContain(
+      'server.on("clientError", handleWebIngressClientError)',
+    );
+    expect(source).not.toContain("spawn(");
+  });
+});
+
+type SlowUploadResult = Readonly<{
+  elapsedMilliseconds: number;
+  status: number | undefined;
+}>;
+
+const probeSlowUpload = (
+  port: number,
+  mode: "chunked" | "content-length",
+): Promise<SlowUploadResult> =>
+  new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    let settled = false;
+    const request = httpRequest(
+      {
+        headers: {
+          "content-type": "application/json",
+          ...(mode === "content-length" ? { "content-length": "2" } : {}),
+        },
+        host,
+        method: "POST",
+        path: "/watchlist",
+        port,
+      },
+      (response) => {
+        response.resume();
+        response.once("end", () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(finishUpload);
+          request.destroy();
+          resolve({
+            elapsedMilliseconds: Date.now() - startedAt,
+            status: response.statusCode,
+          });
+        });
+      },
+    );
+    request.once("error", (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(finishUpload);
+      reject(error);
+    });
+    request.flushHeaders();
+    request.write("{");
+    const finishUpload = setTimeout(() => request.end("}"), 2_000);
+  });
+
+describe("Web Node ingress upload deadline", () => {
+  it("rejects slow Content-Length and chunked uploads at about one second", async () => {
+    const server = createHttpServer(
+      WEB_INGRESS_SERVER_OPTIONS,
+      (request, response) => {
+        void (async () => {
+          try {
+            for await (const chunk of request) {
+              // Model Next buffering the complete upload before middleware.
+              void chunk;
+            }
+            if (!response.writableEnded) {
+              response.statusCode = 200;
+              response.end("unexpected pass-through");
+            }
+          } catch {
+            // The ingress timeout intentionally aborts this request stream.
+          }
+        })();
+      },
+    );
+    server.on("clientError", handleWebIngressClientError);
+    const port = await new Promise<number>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, host, () => {
+        const address = server.address();
+        if (address === null || typeof address === "string") {
+          reject(new Error("TEST_PORT_UNAVAILABLE"));
+          return;
+        }
+        resolve(address.port);
+      });
+    });
+
+    const results = await Promise.all([
+      probeSlowUpload(port, "content-length"),
+      probeSlowUpload(port, "chunked"),
+    ]);
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+
+    for (const result of results) {
+      expect(result.status).toBe(401);
+      expect(result.elapsedMilliseconds).toBeGreaterThanOrEqual(700);
+      expect(result.elapsedMilliseconds).toBeLessThan(1_800);
+    }
+  });
+
+  it("delivers a complete safe body unchanged to the request handler", async () => {
+    const server = createHttpServer(
+      WEB_INGRESS_SERVER_OPTIONS,
+      (request, response) => {
+        void (async () => {
+          const chunks: Buffer[] = [];
+          for await (const chunk of request) {
+            chunks.push(Buffer.from(chunk));
+          }
+          response.statusCode = 200;
+          response.end(Buffer.concat(chunks));
+        })();
+      },
+    );
+    server.on("clientError", handleWebIngressClientError);
+    const port = await new Promise<number>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, host, () => {
+        const address = server.address();
+        if (address === null || typeof address === "string") {
+          reject(new Error("TEST_PORT_UNAVAILABLE"));
+          return;
+        }
+        resolve(address.port);
+      });
+    });
+
+    const response = await fetch(`http://${host}:${port}/watchlist`, {
+      body: "{}",
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const body = await response.text();
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+
+    expect(response.status).toBe(200);
+    expect(body).toBe("{}");
+  });
 });

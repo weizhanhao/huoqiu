@@ -1,3 +1,4 @@
+import { m1Router } from "@huoqiu/contracts/m1";
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
@@ -39,9 +40,17 @@ const MAX_PERCENT_DECODE_PASSES = 4;
 const NEXT_STATIC_PREFIX = "/_next/static/";
 const SAFE_PUBLIC_METHODS = new Set(["GET", "HEAD"]);
 const SESSION_OPTIONAL_PATHS = new Set(["/login", "/register"]);
-const CREDENTIAL_FIELD_FRAGMENTS = [
+const QUERY_CREDENTIAL_FIELD_FRAGMENTS = [
   "authorization",
   "bearer",
+  "credential",
+  "invite",
+  "token",
+] as const;
+const BODY_CREDENTIAL_FIELD_FRAGMENTS = [
+  "authorization",
+  "bearer",
+  "credential",
   "invite",
   "token",
 ] as const;
@@ -171,15 +180,63 @@ const recursivelyDecodePercentEncoding = (
   return decoded.includes("%") ? undefined : decoded;
 };
 
-const isCredentialFieldName = (fieldName: string): boolean => {
+const normalizeFieldName = (fieldName: string): string | undefined => {
   const decodedName = recursivelyDecodePercentEncoding(fieldName);
-  if (decodedName === undefined) return true;
+  if (decodedName === undefined) return undefined;
 
-  const normalizedName = decodedName
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]/gu, "");
-  return CREDENTIAL_FIELD_FRAGMENTS.some((fragment) =>
-    normalizedName.includes(fragment),
+  return decodedName.toLowerCase().replaceAll(/[^a-z0-9]/gu, "");
+};
+
+const hasFieldNameFragment = (
+  fieldName: string,
+  fragments: readonly string[],
+): boolean => {
+  const normalizedName = normalizeFieldName(fieldName);
+  return (
+    normalizedName === undefined ||
+    fragments.some((fragment) => normalizedName.includes(fragment))
+  );
+};
+
+const isQueryCredentialFieldName = (fieldName: string): boolean =>
+  hasFieldNameFragment(fieldName, QUERY_CREDENTIAL_FIELD_FRAGMENTS);
+
+const isBodyCredentialFieldName = (fieldName: string): boolean =>
+  hasFieldNameFragment(fieldName, BODY_CREDENTIAL_FIELD_FRAGMENTS);
+
+type StrictRawPair = readonly [field: string, value: string];
+
+const parseStrictRawPairs = (
+  serializedPairs: string,
+): StrictRawPair[] | undefined => {
+  if (serializedPairs.length === 0 || serializedPairs.includes(";")) {
+    return undefined;
+  }
+
+  const parsedPairs: StrictRawPair[] = [];
+  for (const pair of serializedPairs.split("&")) {
+    const separatorIndex = pair.indexOf("=");
+    if (separatorIndex <= 0 || separatorIndex !== pair.lastIndexOf("=")) {
+      return undefined;
+    }
+    parsedPairs.push([
+      pair.slice(0, separatorIndex),
+      pair.slice(separatorIndex + 1),
+    ]);
+  }
+  return parsedPairs;
+};
+
+const hasSafeCredentialFreeQuery = (search: string): boolean => {
+  if (search.length === 0) return true;
+  if (!search.startsWith("?")) return false;
+
+  const decoded = recursivelyDecodePercentEncoding(search.slice(1));
+  if (decoded === undefined) return false;
+  const pairs = parseStrictRawPairs(decoded);
+  return (
+    pairs !== undefined &&
+    pairs.every(([fieldName]) => !isQueryCredentialFieldName(fieldName))
   );
 };
 
@@ -224,11 +281,7 @@ const hasForbiddenNonCookieCredential = (request: NextRequest): boolean => {
     return true;
   }
 
-  for (const parameterName of request.nextUrl.searchParams.keys()) {
-    if (isCredentialFieldName(parameterName)) return true;
-  }
-
-  return false;
+  return !hasSafeCredentialFreeQuery(request.nextUrl.search);
 };
 
 type BodyKind = "form" | "json";
@@ -252,18 +305,30 @@ type BodyReadResult =
   | Readonly<{ bytes: Uint8Array<ArrayBuffer>; ok: true }>
   | Readonly<{ ok: false }>;
 
+const abortOriginalBody = (request: NextRequest): void => {
+  if (request.body === null || request.bodyUsed) return;
+  void request.body.cancel().catch(() => undefined);
+};
+
+const failedBodyRead = (request: NextRequest): BodyReadResult => {
+  abortOriginalBody(request);
+  return { ok: false };
+};
+
 const readBoundedBody = async (
   request: NextRequest,
 ): Promise<BodyReadResult> => {
   const rawContentLength = request.headers.get("content-length");
   if (rawContentLength !== null) {
-    if (!UNIX_SECONDS_PATTERN.test(rawContentLength)) return { ok: false };
+    if (!UNIX_SECONDS_PATTERN.test(rawContentLength)) {
+      return failedBodyRead(request);
+    }
     const contentLength = Number(rawContentLength);
     if (
       !Number.isSafeInteger(contentLength) ||
       contentLength > MAX_INSPECTED_BODY_BYTES
     ) {
-      return { ok: false };
+      return failedBodyRead(request);
     }
   }
 
@@ -271,7 +336,7 @@ const readBoundedBody = async (
   try {
     clone = request.clone();
   } catch {
-    return { ok: false };
+    return failedBodyRead(request);
   }
   if (clone.body === null) return { bytes: new Uint8Array(), ok: true };
 
@@ -290,19 +355,19 @@ const readBoundedBody = async (
       const result = await Promise.race([reader.read(), deadline]);
       if (result === BODY_READ_TIMEOUT) {
         void reader.cancel().catch(() => undefined);
-        return { ok: false };
+        return failedBodyRead(request);
       }
       if (result.done) break;
       totalBytes += result.value.byteLength;
       if (totalBytes > MAX_INSPECTED_BODY_BYTES) {
         void reader.cancel().catch(() => undefined);
-        return { ok: false };
+        return failedBodyRead(request);
       }
       chunks.push(result.value);
     }
   } catch {
     void reader.cancel().catch(() => undefined);
-    return { ok: false };
+    return failedBodyRead(request);
   } finally {
     if (timeoutId !== undefined) clearTimeout(timeoutId);
   }
@@ -333,7 +398,7 @@ const containsSensitiveValue = (value: unknown): boolean => {
     }
     if (candidate !== null && typeof candidate === "object") {
       for (const [field, nestedValue] of Object.entries(candidate)) {
-        if (isCredentialFieldName(field)) return true;
+        if (isBodyCredentialFieldName(field)) return true;
         pending.push(nestedValue);
       }
     }
@@ -341,19 +406,57 @@ const containsSensitiveValue = (value: unknown): boolean => {
   return false;
 };
 
+const isWebAuthContractPost = (request: NextRequest): boolean =>
+  request.method === "POST" &&
+  (request.nextUrl.pathname === "/login" ||
+    request.nextUrl.pathname === "/register");
+
+const hasValidWebAuthBody = (
+  pathname: string,
+  parsedBody: unknown,
+): boolean => {
+  if (pathname === "/register") {
+    return m1Router.authRegister.body.safeParse(parsedBody).success;
+  }
+
+  const result = m1Router.authLogin.body.safeParse(parsedBody);
+  return result.success && result.data.transport === "cookie";
+};
+
+type BodyInspection = "credential" | "invalid" | "safe";
+
+const inspectCredentialFreeForm = (body: string): BodyInspection => {
+  const decoded = recursivelyDecodePercentEncoding(body);
+  if (decoded === undefined) return "invalid";
+  const pairs = parseStrictRawPairs(decoded);
+  if (pairs === undefined) return "invalid";
+  return pairs.some(
+    ([field, formValue]) =>
+      isBodyCredentialFieldName(field) ||
+      BEARER_VALUE_PATTERN.test(formValue.replaceAll("+", " ")),
+  )
+    ? "credential"
+    : "safe";
+};
+
 const hasSafeCredentialFreeBody = async (
   request: NextRequest,
 ): Promise<boolean> => {
-  if (request.body === null) return true;
+  const authContractPost = isWebAuthContractPost(request);
+  if (request.body === null) return !authContractPost;
   if (
     request.headers.has("content-encoding") &&
     request.headers.get("content-encoding") !== "identity"
   ) {
+    abortOriginalBody(request);
     return false;
   }
 
   const kind = bodyKind(request);
-  if (kind === undefined) return false;
+  if (kind === undefined || (authContractPost && kind !== "json")) {
+    abortOriginalBody(request);
+    return false;
+  }
   const result = await readBoundedBody(request);
   if (!result.ok) return false;
 
@@ -361,19 +464,24 @@ const hasSafeCredentialFreeBody = async (
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(result.bytes);
   } catch {
+    abortOriginalBody(request);
     return false;
   }
 
   if (kind === "form") {
-    return ![...new URLSearchParams(text)].some(
-      ([field, formValue]) =>
-        isCredentialFieldName(field) || BEARER_VALUE_PATTERN.test(formValue),
-    );
+    const inspection = inspectCredentialFreeForm(text);
+    if (inspection === "invalid") abortOriginalBody(request);
+    return inspection === "safe";
   }
 
   try {
-    return !containsSensitiveValue(JSON.parse(text) as unknown);
+    const parsedBody = JSON.parse(text) as unknown;
+    if (!authContractPost) return !containsSensitiveValue(parsedBody);
+    const valid = hasValidWebAuthBody(request.nextUrl.pathname, parsedBody);
+    if (!valid) abortOriginalBody(request);
+    return valid;
   } catch {
+    abortOriginalBody(request);
     return false;
   }
 };

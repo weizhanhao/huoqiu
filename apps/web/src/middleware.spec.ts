@@ -1,9 +1,12 @@
 import { createHmac } from "node:crypto";
 
+import { m1Router as publicM1Router } from "@huoqiu/contracts/m1";
 import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { m1Router as authoritativeM1Router } from "../../../packages/contracts/src/m1/router";
+import nextConfig, { M1_ROUTER_WEBPACK_SOURCE } from "../next.config";
 import {
   config as middlewareConfig,
   enforceWebBoundary,
@@ -191,6 +194,64 @@ describe("Zero Trust startup configuration", () => {
 
     await expect(import("../next.config")).rejects.toThrowError(
       "ZERO_TRUST_CONFIGURATION_INVALID",
+    );
+  });
+
+  it("maps only the exact public M1 subpath to the authoritative router", () => {
+    const configuration = { resolve: { alias: {} } };
+    const adapted = nextConfig.webpack?.(configuration as never, {} as never);
+    const aliases = configuration.resolve.alias as Record<string, unknown>;
+
+    expect(adapted).toBe(configuration);
+    expect(M1_ROUTER_WEBPACK_SOURCE).toMatch(
+      /packages\/contracts\/src\/m1\/router\.ts$/u,
+    );
+    expect(aliases["@huoqiu/contracts/m1$"]).toBe(M1_ROUTER_WEBPACK_SOURCE);
+    expect(
+      Object.keys(aliases).filter((specifier) =>
+        specifier.startsWith("@huoqiu/contracts/m1"),
+      ),
+    ).toEqual(["@huoqiu/contracts/m1$"]);
+    expect(authoritativeM1Router).toBe(publicM1Router);
+    expect(authoritativeM1Router.authRegister).toBe(
+      publicM1Router.authRegister,
+    );
+    expect(authoritativeM1Router.authLogin).toBe(publicM1Router.authLogin);
+    expect(authoritativeM1Router.authGetSession).toBe(
+      publicM1Router.authGetSession,
+    );
+    expect(authoritativeM1Router.authLogout).toBe(publicM1Router.authLogout);
+    expect(authoritativeM1Router.authRegister.body).toBe(
+      publicM1Router.authRegister.body,
+    );
+    expect(authoritativeM1Router.authRegister.headers).toBe(
+      publicM1Router.authRegister.headers,
+    );
+    expect(authoritativeM1Router.authLogin.body).toBe(
+      publicM1Router.authLogin.body,
+    );
+    expect(authoritativeM1Router.authLogin.headers).toBe(
+      publicM1Router.authLogin.headers,
+    );
+    expect(authoritativeM1Router.authLogout.body).toBe(
+      publicM1Router.authLogout.body,
+    );
+    expect(authoritativeM1Router.authLogout.headers).toBe(
+      publicM1Router.authLogout.headers,
+    );
+    expect(authoritativeM1Router.authGetSession).not.toHaveProperty("body");
+    expect(
+      (
+        authoritativeM1Router.authGetSession as typeof authoritativeM1Router.authGetSession & {
+          headers: unknown;
+        }
+      ).headers,
+    ).toBe(
+      (
+        publicM1Router.authGetSession as typeof publicM1Router.authGetSession & {
+          headers: unknown;
+        }
+      ).headers,
     );
   });
 });
@@ -525,6 +586,46 @@ describe("Web Alpha boundary", () => {
   });
 
   it.each([
+    ["credential key", "/watchlist?credential=query-secret"],
+    ["credentials key", "/watchlist?credentials=query-secret"],
+    ["reviewer raw semicolon carrier", "/watchlist?page=1;access_token=x"],
+    [
+      "reviewer encoded semicolon carrier",
+      "/watchlist?page=1%3Baccess_token=x",
+    ],
+    ["encoded nested pair", "/watchlist?page=1%26credential%3Dquery-secret"],
+    [
+      "double-encoded nested pair",
+      "/watchlist?page=1%2526credentials%253Dquery-secret",
+    ],
+    [
+      "encoded semicolon carrier",
+      "/watchlist?page=1%3Bcredential%3Dquery-secret",
+    ],
+    ["encoded nested equals", "/watchlist?page=1%3Dcredential%3Dquery-secret"],
+    ["malformed encoded value", "/watchlist?page=%ZZ"],
+    ["reviewer residual percent value", "/watchlist?page=%25"],
+    [
+      "still-encoded value after the decode bound",
+      "/watchlist?page=%25252525252531",
+    ],
+  ])(
+    "rejects a valid Cookie request carrying a %s in the full query sequence",
+    async (_label, target) => {
+      const request = protectedRequest(target, {
+        headers: edgeHeadersFor(target),
+      });
+      expect(`${request.nextUrl.pathname}${request.nextUrl.search}`).toBe(
+        target,
+      );
+
+      const response = await enforce(request);
+
+      expect(response.status).toBe(401);
+    },
+  );
+
+  it.each([
     [
       "JSON credential field",
       "application/json",
@@ -534,6 +635,11 @@ describe("Web Alpha boundary", () => {
       "nested Bearer value",
       "application/json; charset=utf-8",
       JSON.stringify({ payload: { value: "Bearer body-secret" } }),
+    ],
+    [
+      "form-encoded Bearer value",
+      "application/x-www-form-urlencoded",
+      "note=Bearer+body-secret",
     ],
     [
       "form credential field",
@@ -560,6 +666,21 @@ describe("Web Alpha boundary", () => {
       "application/x-www-form-urlencoded",
       "%2561ccess_token=body-secret",
     ],
+    [
+      "JSON credential field alias",
+      "application/json",
+      JSON.stringify({ credential: "body-secret" }),
+    ],
+    [
+      "JSON credentials field alias",
+      "application/json",
+      JSON.stringify({ credentials: "body-secret" }),
+    ],
+    [
+      "encoded nested form credential",
+      "application/x-www-form-urlencoded",
+      "note=ok%26credential%3Dbody-secret",
+    ],
   ])(
     "rejects a Cookie request carrying a %s",
     async (_label, contentType, body) => {
@@ -581,8 +702,134 @@ describe("Web Alpha boundary", () => {
     },
   );
 
+  it("allows only the exact M1 register JSON contract with invite_code", async () => {
+    const target = "/register";
+    const body = JSON.stringify({
+      display_name: "Alpha User",
+      email: "alpha@example.test",
+      invite_code: "invite-code-1234",
+      password: "correct-horse-battery-staple",
+    });
+    const headers: Record<string, string> = {
+      ...edgeHeadersFor(target, { requestMethod: "POST" }),
+      "content-type": "application/json",
+    };
+    delete headers.cookie;
+    const request = protectedRequest(target, { body, headers, method: "POST" });
+
+    const response = await enforce(request);
+
+    expect(response.status).toBe(200);
+    expect(request.bodyUsed).toBe(false);
+    await expect(request.text()).resolves.toBe(body);
+  });
+
+  it.each([
+    [
+      "an extra field",
+      "/register",
+      {
+        display_name: "Alpha User",
+        email: "alpha@example.test",
+        extra: "not-in-contract",
+        invite_code: "invite-code-1234",
+        password: "correct-horse-battery-staple",
+      },
+    ],
+    [
+      "a credential alias",
+      "/register",
+      {
+        credential: "not-allowed",
+        display_name: "Alpha User",
+        email: "alpha@example.test",
+        invite_code: "invite-code-1234",
+        password: "correct-horse-battery-staple",
+      },
+    ],
+    [
+      "an extra login field",
+      "/login",
+      {
+        email: "alpha@example.test",
+        extra: "not-in-contract",
+        password: "correct-horse-battery-staple",
+        transport: "cookie",
+      },
+    ],
+    [
+      "Bearer transport",
+      "/login",
+      {
+        email: "alpha@example.test",
+        password: "correct-horse-battery-staple",
+        transport: "bearer",
+      },
+    ],
+  ] as const)(
+    "rejects %s on the Web auth body boundary",
+    async (_label, target, payload) => {
+      const body = JSON.stringify(payload);
+      const headers: Record<string, string> = {
+        ...edgeHeadersFor(target, { requestMethod: "POST" }),
+        "content-type": "application/json",
+      };
+      delete headers.cookie;
+
+      const response = await enforce(
+        protectedRequest(target, { body, headers, method: "POST" }),
+      );
+
+      expect(response.status).toBe(401);
+    },
+  );
+
+  it("allows the exact M1 cookie-login JSON contract", async () => {
+    const target = "/login";
+    const body = JSON.stringify({
+      email: "alpha@example.test",
+      password: "correct-horse-battery-staple",
+      transport: "cookie",
+    });
+    const headers: Record<string, string> = {
+      ...edgeHeadersFor(target, { requestMethod: "POST" }),
+      "content-type": "application/json",
+    };
+    delete headers.cookie;
+
+    const response = await enforce(
+      protectedRequest(target, { body, headers, method: "POST" }),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it.each(["/login", "/register"])(
+    "rejects a bodyless POST to %s",
+    async (target) => {
+      const headers = edgeHeadersFor(target, { requestMethod: "POST" });
+      delete headers.cookie;
+
+      const response = await enforce(
+        protectedRequest(target, { headers, method: "POST" }),
+      );
+
+      expect(response.status).toBe(401);
+    },
+  );
+
   it.each([
     ["malformed JSON", "{", "application/json"],
+    [
+      "malformed form encoding",
+      "note=%ZZ",
+      "application/x-www-form-urlencoded",
+    ],
+    [
+      "encoded semicolon form carrier",
+      "note=ok%3Bcredential%3Dbody-secret",
+      "application/x-www-form-urlencoded",
+    ],
     ["unsupported content type", "safe text", "text/plain"],
     [
       "oversized JSON",
@@ -590,7 +837,7 @@ describe("Web Alpha boundary", () => {
       "application/json",
     ],
   ])(
-    "fails closed for %s without consuming the handler body",
+    "fails closed for %s and aborts the original handler body",
     async (_label, body, contentType) => {
       const target = "/watchlist";
       const request = protectedRequest(target, {
@@ -605,12 +852,12 @@ describe("Web Alpha boundary", () => {
       const response = await enforce(request);
 
       expect(response.status).toBe(401);
-      expect(request.bodyUsed).toBe(false);
-      await expect(request.text()).resolves.toBe(body);
+      expect(request.bodyUsed).toBe(true);
+      await expect(request.text()).rejects.toThrow();
     },
   );
 
-  it("fails closed for invalid UTF-8 without consuming the handler body", async () => {
+  it("fails closed for invalid UTF-8 and aborts the original handler body", async () => {
     const target = "/watchlist";
     const body = new Uint8Array([0xc3, 0x28]);
     const request = protectedRequest(target, {
@@ -625,8 +872,8 @@ describe("Web Alpha boundary", () => {
     const response = await enforce(request);
 
     expect(response.status).toBe(401);
-    expect(request.bodyUsed).toBe(false);
-    await expect(request.arrayBuffer()).resolves.toEqual(body.buffer);
+    expect(request.bodyUsed).toBe(true);
+    await expect(request.arrayBuffer()).rejects.toThrow();
   });
 
   it("fails closed on an unfinished body without waiting forever", async () => {
@@ -657,14 +904,17 @@ describe("Web Alpha boundary", () => {
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(1_001);
     const settledBeforeSourceClosed = settled;
-    controller.close();
     const response = await responsePromise;
+    const originalBodyWasAborted = request.bodyUsed;
+    if (!originalBodyWasAborted) {
+      controller.close();
+      await request.body?.cancel();
+    }
     vi.useRealTimers();
 
     expect(settledBeforeSourceClosed).toBe(true);
     expect(response.status).toBe(401);
-    expect(request.bodyUsed).toBe(false);
-    await request.body?.cancel();
+    expect(originalBodyWasAborted).toBe(true);
   });
 
   it("preserves a safe bounded JSON body for the protected handler", async () => {
