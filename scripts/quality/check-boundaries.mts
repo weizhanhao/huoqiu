@@ -955,34 +955,44 @@ const validateSourceImports = async (
     );
   };
 
+  const versionedContractFixtureExports = new Map([
+    ["@huoqiu/contracts/d0/fixture", "./fixtures/d0.v1.json"],
+    ["@huoqiu/contracts/m1/fixture-data", "./fixtures/m1.v1.json"],
+  ]);
+
   const isVersionedContractFixture = (
     namedTarget: WorkspaceProject,
     owner: WorkspaceProject,
     path: string,
     specifier: string,
   ): boolean => {
+    const approvedTarget = versionedContractFixtureExports.get(specifier);
     if (
       namedTarget.name !== "@huoqiu/contracts" ||
       owner.name !== namedTarget.name ||
-      specifier !== "@huoqiu/contracts/d0/fixture"
+      approvedTarget === undefined
     )
       return false;
     const ownerRelativePath = relative(owner.directory, path).replaceAll(
       sep,
       "/",
     );
-    return ownerRelativePath === "fixtures/d0.v1.json";
+    return ownerRelativePath === approvedTarget.slice(2);
   };
 
   const isExactVersionedContractFixtureExport = (
     namedTarget: WorkspaceProject,
     exportTarget: PackageExportTarget,
     specifier: string,
-  ): boolean =>
-    namedTarget.name === "@huoqiu/contracts" &&
-    specifier === "@huoqiu/contracts/d0/fixture" &&
-    exportTarget.exactMapping &&
-    exportTarget.path === "./fixtures/d0.v1.json";
+  ): boolean => {
+    const approvedTarget = versionedContractFixtureExports.get(specifier);
+    return (
+      namedTarget.name === "@huoqiu/contracts" &&
+      approvedTarget !== undefined &&
+      exportTarget.exactMapping &&
+      exportTarget.path === approvedTarget
+    );
+  };
 
   const validateOwner = (
     source: WorkspaceProject,

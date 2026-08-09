@@ -970,6 +970,94 @@ describe("workspace and supply-chain boundaries", () => {
     expect(result).toEqual({ code: 0, stderr: "" });
   });
 
+  it("accepts only the exact M1 fixture-data package export", async () => {
+    const root = await createRepository();
+    const dbManifestPath = "packages/db/package.json";
+    await writeJson(root, dbManifestPath, {
+      ...workspacePackage("@huoqiu/db"),
+      dependencies: { "@huoqiu/contracts": "workspace:*" },
+    });
+    await writeJson(root, "packages/contracts/package.json", {
+      ...workspacePackage("@huoqiu/contracts"),
+      exports: { "./m1/fixture-data": "./fixtures/m1.v1.json" },
+    });
+    await writeJson(root, "packages/contracts/fixtures/m1.v1.json", {
+      version: "m1.v1",
+    });
+    await writeText(
+      root,
+      "packages/db/src/m1-fixture.ts",
+      'import fixture from "@huoqiu/contracts/m1/fixture-data";\nvoid fixture;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result).toEqual({ code: 0, stderr: "" });
+  });
+
+  it.each([
+    ["./m1/fixture-data", "./fixtures/other.v1.json", "other.v1.json"],
+    ["./m1/unrelated", "./fixtures/m1.v1.json", "m1.v1.json"],
+    ["./m1/*", "./fixtures/*.json", "m1.v1.json"],
+  ])(
+    "does not widen the M1 fixture-data exception for export %s to %s",
+    async (exportKey, exportTarget, fixtureName) => {
+      const root = await createRepository();
+      await writeJson(root, "packages/db/package.json", {
+        ...workspacePackage("@huoqiu/db"),
+        dependencies: { "@huoqiu/contracts": "workspace:*" },
+      });
+      await writeJson(root, "packages/contracts/package.json", {
+        ...workspacePackage("@huoqiu/contracts"),
+        exports: { [exportKey]: exportTarget },
+      });
+      await writeJson(root, `packages/contracts/fixtures/${fixtureName}`, {
+        version: "m1.v1",
+      });
+      const specifier =
+        exportKey === "./m1/*"
+          ? "@huoqiu/contracts/m1/m1.v1"
+          : `@huoqiu/contracts${exportKey.slice(1)}`;
+      await writeText(
+        root,
+        "packages/db/src/m1-fixture.ts",
+        `import fixture from "${specifier}";\nvoid fixture;\n`,
+      );
+
+      const result = await runChecker(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+      expect(result.stderr).toContain(fixtureName);
+    },
+  );
+
+  it("rejects a relative import to the M1 fixture data", async () => {
+    const root = await createRepository();
+    await writeJson(root, "packages/db/package.json", {
+      ...workspacePackage("@huoqiu/db"),
+      dependencies: { "@huoqiu/contracts": "workspace:*" },
+    });
+    await writeJson(
+      root,
+      "packages/contracts/package.json",
+      workspacePackage("@huoqiu/contracts"),
+    );
+    await writeJson(root, "packages/contracts/fixtures/m1.v1.json", {
+      version: "m1.v1",
+    });
+    await writeText(
+      root,
+      "packages/db/src/m1-seed.ts",
+      'import fixture from "../../contracts/fixtures/m1.v1.json";\nvoid fixture;\n',
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+  });
+
   it.each([
     ["./unrelated-secret", "./fixtures/d0.v1.json", "d0.v1.json"],
     ["./d0/fixture", "./fixtures/secret.v9.json", "secret.v9.json"],
