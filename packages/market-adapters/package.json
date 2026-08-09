@@ -1,0 +1,28 @@
+{
+  "name": "@huoqiu/market-adapters",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/provider.ts",
+    "./synthetic": "./src/synthetic/synthetic-provider.ts"
+  },
+  "scripts": {
+    "lint": "eslint --config ../config/eslint/base.mjs src test",
+    "test": "vitest run --config ../config/vitest/base.ts test",
+    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals src/provider.ts src/synthetic/generator.ts src/synthetic/synthetic-provider.ts test/*.spec.ts"
+  },
+  "dependencies": {
+    "@huoqiu/contracts": "workspace:*",
+    "@huoqiu/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@huoqiu/config": "workspace:*"
+  },
+  "peerDependencies": {
+    "eslint": "10.8.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
