@@ -508,7 +508,10 @@ git commit -m "test(fixtures): approve versioned M1 seed input"
 
 **Files:**
 
-- Create: `packages/db/drizzle/0000_m1_foundation.sql`
+- Create: `packages/db/drizzle/0000_m1_prerequisites.sql`
+- Create: `packages/db/drizzle/0001_m1_foundation.sql`
+- Create: `packages/db/drizzle/0002_m1_invariants.sql`
+- Create: `packages/db/drizzle/meta/_journal.json`
 - Create: `packages/db/scripts/migrate.mts`
 - Create: `packages/db/scripts/seed.mts`
 - Create: `packages/db/src/seed/m1.v1.ts`
@@ -518,20 +521,25 @@ git commit -m "test(fixtures): approve versioned M1 seed input"
 
 - [ ] **Step 1: 写空库迁移、重复 Seed 和非法 Fixture 失败测试**
 
-Testcontainers 启动临时 PostgreSQL，迁移一次、再次迁移、Seed 两次；断言 schema drift 为零、稳定 ID 行数不增长。三个 negative fixtures 必须在任何 SQL 写入前被拒绝，并留下零行副作用。
+Testcontainers 启动临时 PostgreSQL，迁移一次、再次迁移、Seed 两次；断言 schema drift 为零、稳定 ID 行数不增长。三个 negative fixtures 必须在建立数据库连接或开启 transaction 前被拒绝，并留下零行副作用。另用已能在既有 `drizzle` schema 建表、但没有 database `CREATE` 权限的受限角色回放 `0000`；`pg_trgm` 安装必须 fail closed，`public` 业务表和 migration history 行数都必须为零（允许 Drizzle 自己的空 bookkeeping 表存在）。
 
 - [ ] **Step 2: 生成并审查 SQL**
 
+迁移顺序是强制协议，不得合并或调换：
+
+1. `drizzle-kit generate --custom --name=m1_prerequisites` 生成 `0000`，只写 `CREATE EXTENSION IF NOT EXISTS pg_trgm` 和能力断言；它必须是第一条可能失败的数据库能力操作，之前不得创建任何业务表。
+2. `drizzle-kit generate --name=m1_foundation` 生成 `0001`，从已批准 Drizzle Schema 生成 40 张 public、4 张 provider-private 表及 5 个 `gin_trgm_ops` 索引；不得手改生成 SQL。
+3. `drizzle-kit generate --custom --name=m1_invariants` 生成 `0002`，只加入 append-only、单向状态转换、CHECK 和 trigger 等 Drizzle 无法表达的约束。
+
 ```bash
-pnpm --filter @huoqiu/db drizzle-kit generate
 rg -n 'double precision|real' packages/db/drizzle
 ```
 
-预期第二条命令无输出。
+预期命令无输出。提交必须包含 Drizzle `meta/_journal.json`，且真库测试逐条核对 migration 文件 SHA 与数据库 history；只提交单个 `0000_m1_foundation.sql` 或先建表再安装扩展均为失败。
 
 - [ ] **Step 3: 消费 Root 冻结的 Fixture，而非复制**
 
-`packages/contracts/fixtures/m1.v1.json` 是唯一 Seed 数据源；`packages/db/src/seed/m1.v1.ts` import `m1FixtureSchema` 后幂等写库，不得复制 JSON、Schema 或批准规则。基础迁移启用 `pg_trgm`，为 instrument/listing 名称、代码、拼音和别名建立 M1 搜索索引；扩展不可用时迁移直接失败，不静默退化为全表扫描。
+`packages/contracts/fixtures/m1.v1.json` 是唯一 Seed 数据源；`packages/db/src/seed/m1.v1.ts` 只能通过精确导出 `@huoqiu/contracts/m1/fixture-data` 读取原始 JSON，并 import `m1FixtureSchema` 后幂等写库，不得复制 JSON、Schema、批准规则或用跨包相对路径绕过边界。`0000` 启用 `pg_trgm`，`0001` 为 instrument/listing 名称、代码、拼音和别名建立 M1 搜索索引；扩展不可用时迁移直接失败，不静默退化为全表扫描。Fixture 的卡片白名单只做 Schema/registry 校验，结果显式报告 `persistedCards=0`，不虚构数据库表。
 
 - [ ] **Step 4: API 目标验证并提交**
 
