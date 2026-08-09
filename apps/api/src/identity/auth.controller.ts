@@ -1,8 +1,6 @@
 import {
-  Body,
   Controller,
   Get,
-  Headers,
   HttpCode,
   Inject,
   Post,
@@ -11,20 +9,19 @@ import {
 } from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
+import { getVerifiedEdgeSubject } from "./alpha-access.guard.js";
 import {
-  AuthService,
-  type IdentitySession,
-  type IssuedIdentitySession,
-} from "./auth.service.js";
+  parseLoginRequest,
+  parseLoginResponse,
+  parseLogoutRequest,
+  parseLogoutResponse,
+  parseRegisterRequest,
+  parseRegisterResponse,
+  parseSessionResponse,
+} from "./auth-contract.js";
+import { CredentialBoundary } from "./auth-provider.adapter.js";
+import { AuthService, type IdentitySession } from "./auth.service.js";
 import { getAuthenticatedSession, SessionOptional } from "./session.guard.js";
-
-const bodyWithIdempotencyKey = (
-  body: unknown,
-  idempotencyKey: unknown,
-): unknown =>
-  typeof body === "object" && body !== null && !Array.isArray(body)
-    ? { ...body, idempotencyKey }
-    : { idempotencyKey };
 
 const requestMetadata = (
   request: FastifyRequest,
@@ -44,84 +41,71 @@ const publicSession = (session: IdentitySession) => ({
   transport: session.transport,
 });
 
-const applyCredential = (
-  reply: FastifyReply,
-  session: IssuedIdentitySession,
-): void => {
-  if (session.issuedCredential.transport === "cookie") {
-    void reply.header(
-      "set-cookie",
-      session.issuedCredential.responseHeaderValue,
-    );
-    return;
-  }
-  void reply
-    .header("set-auth-token", session.issuedCredential.responseHeaderValue)
-    .header("access-control-expose-headers", "set-auth-token");
-};
-
 @Controller("v1/auth")
 export class AuthController {
-  constructor(@Inject(AuthService) private readonly authService: AuthService) {}
+  constructor(
+    @Inject(AuthService) private readonly authService: AuthService,
+    @Inject(CredentialBoundary)
+    private readonly credentialBoundary: CredentialBoundary,
+  ) {}
 
   @Post("register")
   @HttpCode(201)
   @SessionOptional()
   async register(
-    @Body() body: unknown,
-    @Headers("idempotency-key") idempotencyKey: unknown,
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<unknown> {
-    const session = await this.authService.register(
-      bodyWithIdempotencyKey(body, idempotencyKey),
-    );
-    applyCredential(reply, session);
-    return {
+    const session = await this.authService.register({
+      ...parseRegisterRequest(request),
+      callerId: getVerifiedEdgeSubject(request),
+    });
+    this.credentialBoundary.deliver(reply, session.credential);
+    return parseRegisterResponse({
       ...requestMetadata(request),
       session: publicSession(session),
-    };
+    });
   }
 
   @Post("login")
   @HttpCode(200)
   @SessionOptional()
   async login(
-    @Body() body: unknown,
-    @Headers("idempotency-key") idempotencyKey: unknown,
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<unknown> {
-    const session = await this.authService.login(
-      bodyWithIdempotencyKey(body, idempotencyKey),
-    );
-    applyCredential(reply, session);
-    return {
+    const session = await this.authService.login({
+      ...parseLoginRequest(request),
+      callerId: getVerifiedEdgeSubject(request),
+    });
+    this.credentialBoundary.deliver(reply, session.credential);
+    return parseLoginResponse({
       ...requestMetadata(request),
       session: publicSession(session),
-    };
+    });
   }
 
   @Get("session")
   getSession(@Req() request: FastifyRequest): unknown {
-    const session = getAuthenticatedSession(request);
-    return {
+    return parseSessionResponse({
       ...requestMetadata(request),
-      session: publicSession(session),
-    };
+      session: publicSession(getAuthenticatedSession(request)),
+    });
   }
 
   @Post("logout")
   @HttpCode(200)
-  async logout(
-    @Body() body: unknown,
-    @Headers("idempotency-key") idempotencyKey: unknown,
-    @Req() request: FastifyRequest,
-  ): Promise<unknown> {
-    this.authService.validateLogout(
-      bodyWithIdempotencyKey(body, idempotencyKey),
+  async logout(@Req() request: FastifyRequest): Promise<unknown> {
+    await this.authService.logout(
+      {
+        ...parseLogoutRequest(request),
+        callerId: getVerifiedEdgeSubject(request),
+      },
+      getAuthenticatedSession(request),
     );
-    await this.authService.logout(getAuthenticatedSession(request));
-    return { ...requestMetadata(request), revoked: true as const };
+    return parseLogoutResponse({
+      ...requestMetadata(request),
+      revoked: true,
+    });
   }
 }

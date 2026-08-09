@@ -9,17 +9,17 @@ import {
 import { Reflector } from "@nestjs/core";
 import type { FastifyRequest } from "fastify";
 
+import { getVerifiedEdgeSubject } from "./alpha-access.guard.js";
+import { parseLogoutRequest } from "./auth-contract.js";
+import { CredentialBoundary } from "./auth-provider.adapter.js";
+import { AuthService, type IdentitySession } from "./auth.service.js";
 import {
-  AuthService,
-  type IdentitySession,
   identityHttpException,
   SuspendedActorError,
-} from "./auth.service.js";
-import type { ProviderRequestCredential } from "./auth-provider.port.js";
+} from "./identity-error.js";
 
 const SESSION_OPTIONAL = "huoqiu:identity:session-optional";
 const SESSION_CONTEXT = Symbol("huoqiu:identity:session-context");
-const SESSION_COOKIE_NAME = "__Secure-huoqiu.session_token";
 
 export const SessionOptional = () => SetMetadata(SESSION_OPTIONAL, true);
 
@@ -31,36 +31,8 @@ export const getAuthenticatedSession = (
   request: FastifyRequest,
 ): IdentitySession => {
   const session = (request as RequestWithSession)[SESSION_CONTEXT];
-  if (session === undefined) {
-    throw identityHttpException(
-      HttpStatus.UNAUTHORIZED,
-      "AUTH_REQUIRED",
-      "Authentication is required",
-    );
-  }
+  if (session === undefined) throw authenticationRequired();
   return session;
-};
-
-const extractCredential = (
-  request: FastifyRequest,
-): ProviderRequestCredential | null => {
-  const authorization = request.headers.authorization;
-  const cookie = request.headers.cookie;
-  const hasBearer =
-    typeof authorization === "string" && authorization.startsWith("Bearer ");
-  const hasCookie =
-    typeof cookie === "string" &&
-    cookie.split(";").some((part) => {
-      const normalized = part.trim();
-      const separator = normalized.indexOf("=");
-      return (
-        separator >= 0 && normalized.slice(0, separator) === SESSION_COOKIE_NAME
-      );
-    });
-  if (hasBearer === hasCookie) return null;
-  return hasBearer
-    ? { authorizationHeader: authorization, transport: "bearer" }
-    : { cookieHeader: cookie as string, transport: "cookie" };
 };
 
 const authenticationRequired = () =>
@@ -75,6 +47,8 @@ export class SessionGuard implements CanActivate {
   constructor(
     @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(AuthService) private readonly authService: AuthService,
+    @Inject(CredentialBoundary)
+    private readonly credentialBoundary: CredentialBoundary,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -85,19 +59,40 @@ export class SessionGuard implements CanActivate {
     ) {
       return true;
     }
+
+    const inspection = this.credentialBoundary.inspect(request);
+    if (inspection.kind === "invalid") throw authenticationRequired();
     const optional = this.reflector.getAllAndOverride<boolean>(
       SESSION_OPTIONAL,
       [context.getHandler(), context.getClass()],
     );
     if (optional === true) return true;
+    if (inspection.kind === "none") throw authenticationRequired();
 
-    const credential = extractCredential(request);
-    if (credential === null) throw authenticationRequired();
     try {
-      const session = await this.authService.resolveSession(credential);
-      if (session === null) throw authenticationRequired();
-      request[SESSION_CONTEXT] = session;
-      return true;
+      const session = await this.authService.resolveSession(
+        inspection.credential,
+      );
+      if (session !== null) {
+        request[SESSION_CONTEXT] = session;
+        return true;
+      }
+
+      if (request.method === "POST" && request.url === "/v1/auth/logout") {
+        const parsed = parseLogoutRequest(request);
+        const replay = await this.authService.findLogoutReplay(
+          {
+            ...parsed,
+            callerId: getVerifiedEdgeSubject(request),
+          },
+          inspection.credential,
+        );
+        if (replay !== null) {
+          request[SESSION_CONTEXT] = replay;
+          return true;
+        }
+      }
+      throw authenticationRequired();
     } catch (error) {
       if (error instanceof SuspendedActorError) {
         throw identityHttpException(

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { once } from "node:events";
 import { createServer } from "node:net";
 import process from "node:process";
@@ -11,6 +12,10 @@ const applicationDirectory = fileURLToPath(new URL("..", import.meta.url));
 const readyTimeoutMilliseconds = 15_000;
 const shutdownTimeoutMilliseconds = 5_000;
 const maximumPortAllocationAttempts = 3;
+const edgeIssuer = "huoqiu-build-verifier";
+const edgeSecret = "huoqiu-build-edge-secret-with-at-least-32-characters";
+const identitySecret =
+  "huoqiu-build-identity-secret-with-at-least-32-characters";
 
 const withTimeout = async (promise, milliseconds, message) => {
   let timeout;
@@ -234,6 +239,62 @@ const pollHealth = async (baseUrl) => {
   throw new Error(`Compiled API health verification failed: ${lastFailure}`);
 };
 
+const edgeHeaders = (method, path) => {
+  const issuedAt = String(Math.floor(Date.now() / 1_000));
+  const subject = "build-verifier";
+  const canonical = [
+    "v1",
+    method,
+    path,
+    subject,
+    edgeIssuer,
+    "true",
+    issuedAt,
+  ].join("\n");
+  return {
+    "x-huoqiu-alpha-access": "true",
+    "x-huoqiu-edge-issued-at": issuedAt,
+    "x-huoqiu-edge-issuer": edgeIssuer,
+    "x-huoqiu-edge-signature": `v1=${createHmac("sha256", edgeSecret)
+      .update(canonical)
+      .digest("hex")}`,
+    "x-huoqiu-edge-subject": subject,
+  };
+};
+
+const verifyIdentityRoutes = async (baseUrl) => {
+  const path = "/v1/auth/register";
+  const response = await globalThis.fetch(new URL(path, baseUrl), {
+    body: JSON.stringify({
+      display_name: "Build verifier",
+      email: "build-verifier@huoqiu.test",
+      invite_code: "BUILD-VERIFY-INVITE",
+      password: "correct-horse-battery-staple",
+    }),
+    headers: {
+      ...edgeHeaders("POST", path),
+      "content-type": "application/json",
+      "idempotency-key": "build-verifier-register",
+    },
+    method: "POST",
+  });
+  const body = await response.json();
+  const { m1Router } =
+    await import("../dist/node_modules/@huoqiu/contracts/m1.js");
+  assert.equal(response.status, 201);
+  m1Router.authRegister.responses[201].parse(body);
+  assert.match(
+    response.headers.get("set-cookie") ?? "",
+    /^__Secure-huoqiu\.session_token=/u,
+  );
+
+  const nativePath = "/api/auth/get-session";
+  const nativeResponse = await globalThis.fetch(new URL(nativePath, baseUrl), {
+    headers: edgeHeaders("GET", nativePath),
+  });
+  assert.equal(nativeResponse.status, 404);
+};
+
 const allocateEphemeralPort = async () => {
   const reservation = createServer();
 
@@ -264,9 +325,14 @@ const verifyHttpEntrypoint = async () => {
   ) {
     const port = await allocateEphemeralPort();
     const entrypoint = spawnEntrypoint("dist/main.js", {
+      ALPHA_INVITE_CODES: "BUILD-VERIFY-INVITE",
+      APP_ENV: "development",
+      BETTER_AUTH_SECRET: identitySecret,
       HTTP_HOST: "127.0.0.1",
       NODE_ENV: "production",
       PORT: String(port),
+      ZERO_TRUST_HMAC_SECRET: edgeSecret,
+      ZERO_TRUST_ISSUER: edgeIssuer,
     });
 
     try {
@@ -280,9 +346,10 @@ const verifyHttpEntrypoint = async () => {
       assert.equal(Number(url.port), port);
 
       await pollHealth(url);
+      await verifyIdentityRoutes(url);
       await stopGracefully(entrypoint);
       process.stdout.write(
-        "dist/main.js: health boundary and graceful shutdown verified\n",
+        "dist/main.js: health, identity surface, and graceful shutdown verified\n",
       );
       return;
     } catch (error) {

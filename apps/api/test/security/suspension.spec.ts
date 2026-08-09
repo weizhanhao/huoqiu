@@ -4,12 +4,16 @@ import { Controller, Get, HttpException, Module } from "@nestjs/common";
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AuthProviderPort } from "../../src/identity/auth-provider.port.js";
+import type {
+  AuthCredentialCapability,
+  AuthProviderPort,
+} from "../../src/identity/auth-provider.port.js";
 import {
   AuthService,
   InMemoryIdentityStore,
 } from "../../src/identity/auth.service.js";
 import { IdentityModule } from "../../src/identity/identity.module.js";
+import { BoundedIdempotencyRegistry } from "../../src/identity/idempotency-registry.js";
 import { createHttpApp } from "../../src/main.js";
 
 const edgeSecret = "alpha-edge-test-secret-with-at-least-32-characters";
@@ -113,6 +117,7 @@ describe("strong suspension checks", () => {
       },
     });
     const actorId = registration.json().session.actor.actor_id as string;
+    const cookie = String(registration.headers["set-cookie"]);
     const login = await server.inject({
       method: "POST",
       url: "/v1/auth/login",
@@ -138,7 +143,16 @@ describe("strong suspension checks", () => {
       },
     });
     expect(beforeSuspension.statusCode).toBe(200);
-    expect(controllerAction).toHaveBeenCalledOnce();
+    const cookieBeforeSuspension = await server.inject({
+      method: "GET",
+      url: "/protected-action",
+      headers: {
+        ...edgeHeaders("GET", "/protected-action"),
+        cookie,
+      },
+    });
+    expect(cookieBeforeSuspension.statusCode).toBe(200);
+    expect(controllerAction).toHaveBeenCalledTimes(2);
     await expect(authService.isSseTokenValid(sseToken)).resolves.toBe(true);
 
     await authService.suspendActor(actorId);
@@ -153,6 +167,15 @@ describe("strong suspension checks", () => {
       },
     });
     expect(afterSuspension.statusCode).toBe(401);
+    const cookieAfterSuspension = await server.inject({
+      method: "GET",
+      url: "/protected-action",
+      headers: {
+        ...edgeHeaders("GET", "/protected-action"),
+        cookie,
+      },
+    });
+    expect(cookieAfterSuspension.statusCode).toBe(401);
     expect(controllerAction).not.toHaveBeenCalled();
     await expect(authService.isSseTokenValid(sseToken)).resolves.toBe(false);
 
@@ -192,27 +215,22 @@ describe("strong suspension checks", () => {
 
   it("revokes the just-issued provider session when a suspended actor attempts login", async () => {
     const credential = {
-      authorizationHeader: "Bearer provider-private-credential",
+      fingerprint: "a".repeat(64),
       transport: "bearer" as const,
-    };
-    const revokeActorSessions = vi.fn(async () => undefined);
+    } as AuthCredentialCapability;
+    const revokeSubjectSessions = vi.fn(async () => undefined);
     const provider: AuthProviderPort = {
       login: vi.fn(async () => ({
         credential,
         expiresAt: new Date("2026-08-10T12:00:00.000Z"),
-        issuedCredential: {
-          responseHeaderValue: "provider-private-credential",
-          transport: "bearer" as const,
-        },
-        providerSessionId: "provider-session-new",
-        providerUserId: "provider-user-suspended",
+        subjectId: "identity-subject-suspended",
       })),
       logout: vi.fn(async () => undefined),
       register: vi.fn(async () => {
         throw new Error("not used");
       }),
       resolveSession: vi.fn(async () => null),
-      revokeActorSessions,
+      revokeSubjectSessions,
     };
     const store = new InMemoryIdentityStore([inviteCode]);
     const created = await store.consumeInvitationAndCreateActor(
@@ -222,28 +240,34 @@ describe("strong suspension checks", () => {
         inviteCode,
       },
       async () => ({
-        providerSessionId: "provider-session-old",
-        providerUserId: "provider-user-suspended",
+        subjectId: "identity-subject-suspended",
       }),
     );
     await store.suspendActor(created.actor.actorId);
-    const service = new AuthService(provider, store);
+    const service = new AuthService(
+      provider,
+      store,
+      new BoundedIdempotencyRegistry({ secret: authSecret }),
+    );
 
     let status: number | undefined;
     try {
       await service.login({
-        email: "suspended-unit@huoqiu.test",
+        body: {
+          email: "suspended-unit@huoqiu.test",
+          password: "correct-horse-battery-staple",
+          transport: "bearer",
+        },
+        callerId: "suspension-unit-test",
         idempotencyKey: "suspended-login-unit",
-        password: "correct-horse-battery-staple",
-        transport: "bearer",
       });
     } catch (error) {
       status = error instanceof HttpException ? error.getStatus() : undefined;
     }
 
     expect(status).toBe(403);
-    expect(revokeActorSessions).toHaveBeenCalledExactlyOnceWith(
-      "provider-user-suspended",
+    expect(revokeSubjectSessions).toHaveBeenCalledExactlyOnceWith(
+      "identity-subject-suspended",
     );
   });
 });

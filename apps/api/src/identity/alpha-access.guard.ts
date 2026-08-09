@@ -9,7 +9,7 @@ import {
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 
-import { identityHttpException } from "./auth.service.js";
+import { identityHttpException } from "./identity-error.js";
 
 const DEFAULT_MAX_CLOCK_SKEW_SECONDS = 300;
 const MAX_CLOCK_SKEW_SECONDS = 3_600;
@@ -19,6 +19,23 @@ const CANONICAL_UNIX_SECONDS = /^(?:0|[1-9]\d*)$/u;
 const ALPHA_ACCESS_VALUE = /^(?:false|true)$/u;
 const CONTROL_CHARACTER = /\p{C}/u;
 const SCALAR_SEPARATOR_OR_WHITESPACE = /[,\s]/u;
+const EDGE_SUBJECT_CONTEXT = Symbol("huoqiu:identity:verified-edge-subject");
+
+type RequestWithEdgeSubject = FastifyRequest & {
+  [EDGE_SUBJECT_CONTEXT]?: string;
+};
+
+export const getVerifiedEdgeSubject = (request: FastifyRequest): string => {
+  const subject = (request as RequestWithEdgeSubject)[EDGE_SUBJECT_CONTEXT];
+  if (subject === undefined) {
+    throw identityHttpException(
+      HttpStatus.UNAUTHORIZED,
+      "AUTH_REQUIRED",
+      "Valid edge proof is required",
+    );
+  }
+  return subject;
+};
 
 export type ZeroTrustConfiguration = Readonly<{
   issuer: string;
@@ -210,6 +227,7 @@ export class AlphaAccessGuard implements CanActivate {
       throw edgeAuthenticationFailure();
     }
     if (alphaAccess !== "true") throw alphaAccessFailure();
+    (request as RequestWithEdgeSubject)[EDGE_SUBJECT_CONTEXT] = subject;
     return true;
   }
 }

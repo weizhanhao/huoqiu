@@ -1,15 +1,31 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
-import { z } from "zod";
+import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 
+import type {
+  IdempotentRequest,
+  LoginBody,
+  LogoutBody,
+  RegisterBody,
+} from "./auth-contract.js";
 import {
   AUTH_PROVIDER_PORT,
+  type AuthCredentialCapability,
   type AuthProviderPort,
+  type AuthSubjectSession,
   type AuthTransport,
-  type IssuedProviderCredential,
-  type ProviderRequestCredential,
 } from "./auth-provider.port.js";
+import { IDEMPOTENCY_REGISTRY } from "./idempotency-registry.js";
+import type { BoundedIdempotencyRegistry } from "./idempotency-registry.js";
+import {
+  identityHttpException,
+  SuspendedActorError,
+} from "./identity-error.js";
+
+export {
+  identityHttpException,
+  SuspendedActorError,
+} from "./identity-error.js";
 
 export const IDENTITY_STORE_PORT = Symbol("IDENTITY_STORE_PORT");
 
@@ -20,26 +36,19 @@ export type IdentityActor = Readonly<{
   consentVersion: string;
   displayName: string;
   email: string;
-  providerUserId: string;
+  identitySubjectId: string;
   roles: readonly ActorRole[];
   status: "active" | "suspended";
 }>;
 
 export type IdentitySession = Readonly<{
   actor: IdentityActor;
-  credential: ProviderRequestCredential;
+  credential: AuthCredentialCapability;
   expiresAt: Date;
-  providerSessionId: string;
   transport: AuthTransport;
 }>;
 
-export type IssuedIdentitySession = IdentitySession &
-  Readonly<{ issuedCredential: IssuedProviderCredential }>;
-
-type ProvisionedIdentity = Readonly<{
-  providerSessionId: string;
-  providerUserId: string;
-}>;
+type ProvisionedIdentity = Readonly<{ subjectId: string }>;
 
 export interface IdentityStorePort {
   consumeInvitationAndCreateActor<TProvisioned extends ProvisionedIdentity>(
@@ -51,9 +60,17 @@ export interface IdentityStorePort {
     provision: () => Promise<TProvisioned>,
   ): Promise<Readonly<{ actor: IdentityActor; provisioned: TProvisioned }>>;
   findActorById(actorId: string): Promise<IdentityActor | null>;
-  findActorByProviderUserId(
-    providerUserId: string,
+  findActorByIdentitySubjectId(
+    identitySubjectId: string,
   ): Promise<IdentityActor | null>;
+  isDeviceBindingRevoked(
+    actorId: string,
+    deviceBindingId: string,
+  ): Promise<boolean>;
+  recordDeviceBindingRevocation(
+    actorId: string,
+    deviceBindingId: string,
+  ): Promise<void>;
   suspendActor(actorId: string): Promise<IdentityActor>;
 }
 
@@ -61,7 +78,8 @@ type InvitationState = "available" | "consumed";
 
 export class InMemoryIdentityStore implements IdentityStorePort {
   private readonly actorsById = new Map<string, IdentityActor>();
-  private readonly actorsByProviderUserId = new Map<string, IdentityActor>();
+  private readonly actorsByIdentitySubjectId = new Map<string, IdentityActor>();
+  private readonly deviceBindingTombstones = new Set<string>();
   private readonly invitations = new Map<string, InvitationState>();
   private transactionTail: Promise<void> = Promise.resolve();
 
@@ -96,13 +114,13 @@ export class InMemoryIdentityStore implements IdentityStorePort {
         consentVersion: "1",
         displayName: input.displayName,
         email: input.email,
-        providerUserId: provisioned.providerUserId,
+        identitySubjectId: provisioned.subjectId,
         roles: ["user"],
         status: "active",
       };
       this.invitations.set(input.inviteCode, "consumed");
       this.actorsById.set(actor.actorId, actor);
-      this.actorsByProviderUserId.set(actor.providerUserId, actor);
+      this.actorsByIdentitySubjectId.set(actor.identitySubjectId, actor);
       return { actor, provisioned };
     });
   }
@@ -111,10 +129,30 @@ export class InMemoryIdentityStore implements IdentityStorePort {
     return this.actorsById.get(actorId) ?? null;
   }
 
-  async findActorByProviderUserId(
-    providerUserId: string,
+  async findActorByIdentitySubjectId(
+    identitySubjectId: string,
   ): Promise<IdentityActor | null> {
-    return this.actorsByProviderUserId.get(providerUserId) ?? null;
+    return this.actorsByIdentitySubjectId.get(identitySubjectId) ?? null;
+  }
+
+  async isDeviceBindingRevoked(
+    actorId: string,
+    deviceBindingId: string,
+  ): Promise<boolean> {
+    return this.deviceBindingTombstones.has(
+      this.deviceBindingKey(actorId, deviceBindingId),
+    );
+  }
+
+  async recordDeviceBindingRevocation(
+    actorId: string,
+    deviceBindingId: string,
+  ): Promise<void> {
+    await this.inTransaction(async () => {
+      this.deviceBindingTombstones.add(
+        this.deviceBindingKey(actorId, deviceBindingId),
+      );
+    });
   }
 
   async suspendActor(actorId: string): Promise<IdentityActor> {
@@ -129,7 +167,7 @@ export class InMemoryIdentityStore implements IdentityStorePort {
       }
       const suspended = { ...actor, status: "suspended" as const };
       this.actorsById.set(actorId, suspended);
-      this.actorsByProviderUserId.set(actor.providerUserId, suspended);
+      this.actorsByIdentitySubjectId.set(actor.identitySubjectId, suspended);
       return suspended;
     });
   }
@@ -140,6 +178,10 @@ export class InMemoryIdentityStore implements IdentityStorePort {
 
   actorCount(): number {
     return this.actorsById.size;
+  }
+
+  private deviceBindingKey(actorId: string, deviceBindingId: string): string {
+    return `${actorId}\0${deviceBindingId}`;
   }
 
   private async inTransaction<T>(work: () => Promise<T>): Promise<T> {
@@ -157,57 +199,14 @@ export class InMemoryIdentityStore implements IdentityStorePort {
   }
 }
 
-const registerSchema = z
-  .object({
-    display_name: z.string().min(1).max(80),
-    email: z.string().email(),
-    idempotencyKey: z.string().min(8).max(128),
-    invite_code: z.string().min(8).max(256),
-    password: z.string().min(12).max(256),
-  })
-  .strict();
+type CallerContext = Readonly<{ callerId: string }>;
+type RegisterInput = IdempotentRequest<RegisterBody> & CallerContext;
+type LoginInput = IdempotentRequest<LoginBody> & CallerContext;
+type LogoutInput = IdempotentRequest<LogoutBody> & CallerContext;
+type LogoutOutcome = Readonly<{ session: IdentitySession }>;
 
-const loginSchema = z
-  .object({
-    email: z.string().email(),
-    idempotencyKey: z.string().min(8).max(128),
-    password: z.string().min(1).max(256),
-    transport: z.enum(["cookie", "bearer"]),
-  })
-  .strict();
-
-const logoutSchema = z
-  .object({
-    device_binding_id: z
-      .string()
-      .min(1)
-      .max(128)
-      .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u)
-      .optional(),
-    idempotencyKey: z.string().min(8).max(128),
-  })
-  .strict();
-
-export const identityHttpException = (
-  status: number,
-  code:
-    | "AUTH_REQUIRED"
-    | "CONFLICT"
-    | "FORBIDDEN"
-    | "NOT_FOUND"
-    | "VALIDATION_FAILED",
-  message: string,
-): HttpException => new HttpException({ code, details: {}, message }, status);
-
-const validationFailure = (): HttpException =>
-  identityHttpException(
-    HttpStatus.BAD_REQUEST,
-    "VALIDATION_FAILED",
-    "Request validation failed",
-  );
-
-export class SuspendedActorError extends Error {
-  override readonly name = "SuspendedActorError";
+class IdentityProvisioningConflict extends Error {
+  override readonly name = "IdentityProvisioningConflict";
 }
 
 @Injectable()
@@ -219,99 +218,174 @@ export class AuthService {
 
   constructor(
     @Inject(AUTH_PROVIDER_PORT)
-    private readonly provider: AuthProviderPort,
+    private readonly identityBackend: AuthProviderPort,
     @Inject(IDENTITY_STORE_PORT)
     private readonly identityStore: IdentityStorePort,
+    @Inject(IDEMPOTENCY_REGISTRY)
+    private readonly idempotency: BoundedIdempotencyRegistry,
   ) {}
 
-  async register(input: unknown): Promise<IssuedIdentitySession> {
-    const parsed = registerSchema.safeParse(input);
-    if (!parsed.success) throw validationFailure();
-
-    const result = await this.identityStore.consumeInvitationAndCreateActor(
+  async register(input: RegisterInput): Promise<IdentitySession> {
+    const email = input.body.email.toLowerCase();
+    return await this.idempotency.execute(
       {
-        displayName: parsed.data.display_name,
-        email: parsed.data.email.toLowerCase(),
-        inviteCode: parsed.data.invite_code,
+        callerId: input.callerId,
+        key: input.idempotencyKey,
+        operation: "auth.register",
+        request: { ...input.body, email },
       },
-      async () =>
-        await this.provider.register({
-          displayName: parsed.data.display_name,
-          email: parsed.data.email.toLowerCase(),
-          password: parsed.data.password,
-        }),
+      async () => {
+        try {
+          const result =
+            await this.identityStore.consumeInvitationAndCreateActor(
+              {
+                displayName: input.body.display_name,
+                email,
+                inviteCode: input.body.invite_code,
+              },
+              async () => {
+                try {
+                  return await this.identityBackend.register({
+                    displayName: input.body.display_name,
+                    email,
+                    password: input.body.password,
+                  });
+                } catch {
+                  throw new IdentityProvisioningConflict();
+                }
+              },
+            );
+          return this.toIdentitySession(result.actor, result.provisioned);
+        } catch (error) {
+          if (error instanceof IdentityProvisioningConflict) {
+            throw identityHttpException(
+              HttpStatus.CONFLICT,
+              "CONFLICT",
+              "Identity already exists",
+            );
+          }
+          throw error;
+        }
+      },
     );
-    return this.toIssuedIdentitySession(result.actor, result.provisioned);
   }
 
-  async login(input: unknown): Promise<IssuedIdentitySession> {
-    const parsed = loginSchema.safeParse(input);
-    if (!parsed.success) throw validationFailure();
-    let providerSession;
-    try {
-      providerSession = await this.provider.login({
-        email: parsed.data.email.toLowerCase(),
-        password: parsed.data.password,
-        transport: parsed.data.transport,
-      });
-    } catch {
-      throw identityHttpException(
-        HttpStatus.UNAUTHORIZED,
-        "AUTH_REQUIRED",
-        "Authentication failed",
-      );
-    }
+  async login(input: LoginInput): Promise<IdentitySession> {
+    const email = input.body.email.toLowerCase();
+    return await this.idempotency.execute(
+      {
+        callerId: input.callerId,
+        key: input.idempotencyKey,
+        operation: "auth.login",
+        request: { ...input.body, email },
+      },
+      async () => {
+        let subjectSession: AuthSubjectSession;
+        try {
+          subjectSession = await this.identityBackend.login({
+            email,
+            password: input.body.password,
+            transport: input.body.transport,
+          });
+        } catch {
+          throw identityHttpException(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH_REQUIRED",
+            "Authentication failed",
+          );
+        }
 
-    const actor = await this.identityStore.findActorByProviderUserId(
-      providerSession.providerUserId,
+        const actor = await this.identityStore.findActorByIdentitySubjectId(
+          subjectSession.subjectId,
+        );
+        if (actor === null) {
+          await this.identityBackend.logout(subjectSession.credential);
+          throw identityHttpException(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH_REQUIRED",
+            "Authentication failed",
+          );
+        }
+        if (actor.status === "suspended") {
+          await this.identityBackend.revokeSubjectSessions(
+            actor.identitySubjectId,
+          );
+          throw identityHttpException(
+            HttpStatus.FORBIDDEN,
+            "FORBIDDEN",
+            "Actor is suspended",
+          );
+        }
+        return this.toIdentitySession(actor, subjectSession);
+      },
     );
-    if (actor === null) {
-      await this.provider.logout(providerSession.credential);
-      throw identityHttpException(
-        HttpStatus.UNAUTHORIZED,
-        "AUTH_REQUIRED",
-        "Authentication failed",
-      );
-    }
-    if (actor.status === "suspended") {
-      await this.provider.revokeActorSessions(actor.providerUserId);
-      throw identityHttpException(
-        HttpStatus.FORBIDDEN,
-        "FORBIDDEN",
-        "Actor is suspended",
-      );
-    }
-    return this.toIssuedIdentitySession(actor, providerSession);
   }
 
   async resolveSession(
-    credential: ProviderRequestCredential,
+    credential: AuthCredentialCapability,
   ): Promise<IdentitySession | null> {
-    const providerSession = await this.provider.resolveSession(credential);
-    if (providerSession === null) return null;
-    const actor = await this.identityStore.findActorByProviderUserId(
-      providerSession.providerUserId,
+    const subjectSession =
+      await this.identityBackend.resolveSession(credential);
+    if (subjectSession === null) return null;
+    const actor = await this.identityStore.findActorByIdentitySubjectId(
+      subjectSession.subjectId,
     );
     if (actor === null) return null;
     if (actor.status === "suspended") {
-      await this.provider.revokeActorSessions(actor.providerUserId);
+      await this.identityBackend.revokeSubjectSessions(actor.identitySubjectId);
       throw new SuspendedActorError();
     }
-    return {
-      actor,
-      credential,
-      expiresAt: providerSession.expiresAt,
-      providerSessionId: providerSession.providerSessionId,
-      transport: credential.transport,
-    };
+    return this.toIdentitySession(actor, subjectSession);
   }
 
-  async logout(session: IdentitySession): Promise<void> {
-    await this.provider.logout(session.credential);
+  async logout(input: LogoutInput, session: IdentitySession): Promise<void> {
+    await this.idempotency.execute<LogoutOutcome>(
+      {
+        callerId: input.callerId,
+        key: input.idempotencyKey,
+        operation: "auth.logout",
+        request: {
+          body: input.body,
+          credentialFingerprint: session.credential.fingerprint,
+        },
+      },
+      async () => {
+        await this.identityBackend.logout(session.credential);
+        if (input.body.device_binding_id !== undefined) {
+          await this.identityStore.recordDeviceBindingRevocation(
+            session.actor.actorId,
+            input.body.device_binding_id,
+          );
+        }
+        return { session };
+      },
+    );
   }
 
-  validateLogout(input: unknown): void {
-    if (!logoutSchema.safeParse(input).success) throw validationFailure();
+  async findLogoutReplay(
+    input: LogoutInput,
+    credential: AuthCredentialCapability,
+  ): Promise<IdentitySession | null> {
+    const outcome = await this.idempotency.replay<LogoutOutcome>({
+      callerId: input.callerId,
+      key: input.idempotencyKey,
+      operation: "auth.logout",
+      request: {
+        body: input.body,
+        credentialFingerprint: credential.fingerprint,
+      },
+    });
+    return outcome?.session ?? null;
+  }
+
+  async isDeviceBindingRevoked(
+    actorId: string,
+    deviceBindingId: string,
+  ): Promise<boolean> {
+    return await this.identityStore.isDeviceBindingRevoked(
+      actorId,
+      deviceBindingId,
+    );
   }
 
   async suspendActor(actorId: string): Promise<void> {
@@ -319,7 +393,7 @@ export class AuthService {
     for (const [token, state] of this.sseSessionState) {
       if (state.actorId === actorId) this.sseSessionState.delete(token);
     }
-    await this.provider.revokeActorSessions(actor.providerUserId);
+    await this.identityBackend.revokeSubjectSessions(actor.identitySubjectId);
   }
 
   async issueSseToken(actorId: string): Promise<string> {
@@ -348,22 +422,15 @@ export class AuthService {
     if (actor.status === "suspended") throw new SuspendedActorError();
   }
 
-  private toIssuedIdentitySession(
+  private toIdentitySession(
     actor: IdentityActor,
-    providerSession: Readonly<{
-      credential: ProviderRequestCredential;
-      expiresAt: Date;
-      issuedCredential: IssuedProviderCredential;
-      providerSessionId: string;
-    }>,
-  ): IssuedIdentitySession {
+    subjectSession: AuthSubjectSession,
+  ): IdentitySession {
     return {
       actor,
-      credential: providerSession.credential,
-      expiresAt: providerSession.expiresAt,
-      issuedCredential: providerSession.issuedCredential,
-      providerSessionId: providerSession.providerSessionId,
-      transport: providerSession.credential.transport,
+      credential: subjectSession.credential,
+      expiresAt: subjectSession.expiresAt,
+      transport: subjectSession.credential.transport,
     };
   }
 }

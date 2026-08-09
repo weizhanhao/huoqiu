@@ -9,6 +9,9 @@ import {
 } from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
+import { parseAuthErrorResponse } from "../identity/auth-contract.js";
+import { isIdentityHttpException } from "../identity/identity-error.js";
+
 type ErrorDefinition = Readonly<{
   code: string;
   message: string;
@@ -66,21 +69,12 @@ const resolveDefinition = (statusCode: number): ErrorDefinition =>
 const contractErrorStatuses = {
   AUTH_REQUIRED: HttpStatus.UNAUTHORIZED,
   CONFLICT: HttpStatus.CONFLICT,
+  DATA_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   FORBIDDEN: HttpStatus.FORBIDDEN,
   NOT_FOUND: HttpStatus.NOT_FOUND,
+  RATE_LIMITED: HttpStatus.TOO_MANY_REQUESTS,
   VALIDATION_FAILED: HttpStatus.BAD_REQUEST,
 } as const;
-
-const contractErrorMessages = new Set([
-  "Actor is suspended",
-  "Actor was not found",
-  "Alpha access is required",
-  "Authentication failed",
-  "Authentication is required",
-  "Invitation is unavailable",
-  "Request validation failed",
-  "Valid edge proof is required",
-]);
 
 type ContractErrorPayload = Readonly<{
   code: keyof typeof contractErrorStatuses;
@@ -92,7 +86,7 @@ const contractErrorPayload = (
   exception: unknown,
   statusCode: number,
 ): ContractErrorPayload | undefined => {
-  if (!(exception instanceof HttpException)) return undefined;
+  if (!isIdentityHttpException(exception)) return undefined;
   const response = exception.getResponse();
   if (typeof response !== "object" || response === null) return undefined;
   const candidate = response as Readonly<Record<string, unknown>>;
@@ -105,7 +99,6 @@ const contractErrorPayload = (
     contractErrorStatuses[code as keyof typeof contractErrorStatuses] !==
       statusCode ||
     typeof message !== "string" ||
-    !contractErrorMessages.has(message) ||
     typeof details !== "object" ||
     details === null ||
     Array.isArray(details) ||
@@ -123,6 +116,51 @@ const contractErrorPayload = (
   };
 };
 
+const authFallback = (
+  statusCode: number,
+): Readonly<{
+  code: keyof typeof contractErrorStatuses;
+  message: string;
+  statusCode: number;
+}> => {
+  switch (statusCode) {
+    case HttpStatus.BAD_REQUEST:
+      return {
+        code: "VALIDATION_FAILED",
+        message: "Request validation failed",
+        statusCode,
+      };
+    case HttpStatus.UNAUTHORIZED:
+      return {
+        code: "AUTH_REQUIRED",
+        message: "Authentication is required",
+        statusCode,
+      };
+    case HttpStatus.FORBIDDEN:
+      return { code: "FORBIDDEN", message: "Access is forbidden", statusCode };
+    case HttpStatus.NOT_FOUND:
+      return {
+        code: "NOT_FOUND",
+        message: "Resource was not found",
+        statusCode,
+      };
+    case HttpStatus.CONFLICT:
+      return { code: "CONFLICT", message: "Request conflicts", statusCode };
+    case HttpStatus.TOO_MANY_REQUESTS:
+      return {
+        code: "RATE_LIMITED",
+        message: "Request rate is limited",
+        statusCode,
+      };
+    default:
+      return {
+        code: "DATA_UNAVAILABLE",
+        message: "Identity service is unavailable",
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+      };
+  }
+};
+
 const safeTraceId = (requestId: string): string =>
   /^[A-Za-z0-9._:-]{1,128}$/u.test(requestId) ? requestId : randomUUID();
 
@@ -133,15 +171,24 @@ export class HttpErrorFilter implements ExceptionFilter {
     const request = context.getRequest<FastifyRequest>();
     const reply = context.getResponse<FastifyReply>();
     const statusCode = resolveStatusCode(exception);
+    const isAuthRoute = /^\/v1\/auth(?:\/|$)/u.test(request.url);
     const contractPayload = contractErrorPayload(exception, statusCode);
-    if (contractPayload !== undefined) {
+    if (isAuthRoute) {
+      const fallback = authFallback(statusCode);
+      const payload = parseAuthErrorResponse({
+        ...(contractPayload ?? {
+          code: fallback.code,
+          details: {},
+          message: fallback.message,
+        }),
+        trace_id: safeTraceId(String(request.id)),
+      });
       void reply
         .header("x-request-id", String(request.id))
-        .status(statusCode)
-        .send({
-          ...contractPayload,
-          trace_id: safeTraceId(String(request.id)),
-        });
+        .status(
+          contractPayload === undefined ? fallback.statusCode : statusCode,
+        )
+        .send(payload);
       return;
     }
     const definition = resolveDefinition(statusCode);

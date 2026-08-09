@@ -322,4 +322,38 @@ describe("Zero Trust startup configuration", () => {
       else process.env.ZERO_TRUST_HMAC_SECRET = previous.secret;
     }
   });
+
+  it("rejects process-local identity persistence before NestFactory.create is called", async () => {
+    const previous = {
+      appEnvironment: process.env.APP_ENV,
+      authSecret: process.env.BETTER_AUTH_SECRET,
+      issuer: process.env.ZERO_TRUST_ISSUER,
+      secret: process.env.ZERO_TRUST_HMAC_SECRET,
+    };
+    process.env.APP_ENV = "production";
+    process.env.BETTER_AUTH_SECRET =
+      "production-auth-secret-with-at-least-thirty-two-characters";
+    process.env.ZERO_TRUST_HMAC_SECRET = secret;
+    process.env.ZERO_TRUST_ISSUER = issuer;
+    const create = vi.spyOn(NestFactory, "create");
+
+    try {
+      await expect(createHttpApp()).rejects.toThrow(
+        "AUTH_PROVIDER_PERSISTENCE_NOT_CONFIGURED",
+      );
+      expect(create).not.toHaveBeenCalled();
+    } finally {
+      create.mockRestore();
+      if (previous.appEnvironment === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = previous.appEnvironment;
+      if (previous.authSecret === undefined)
+        delete process.env.BETTER_AUTH_SECRET;
+      else process.env.BETTER_AUTH_SECRET = previous.authSecret;
+      if (previous.issuer === undefined) delete process.env.ZERO_TRUST_ISSUER;
+      else process.env.ZERO_TRUST_ISSUER = previous.issuer;
+      if (previous.secret === undefined)
+        delete process.env.ZERO_TRUST_HMAC_SECRET;
+      else process.env.ZERO_TRUST_HMAC_SECRET = previous.secret;
+    }
+  });
 });
