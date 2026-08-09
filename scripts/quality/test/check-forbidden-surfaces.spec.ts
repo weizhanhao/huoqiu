@@ -1307,6 +1307,20 @@ describe("forbidden runtime surfaces", () => {
     },
   );
 
+  it.each(["TSX", "MTS"])(
+    "accepts an unshadowed Zod binding in an uppercase .%s source file",
+    async (extension) => {
+      const root = await createRepository();
+      await writeCandidate(
+        root,
+        'import { z } from "zod"; const safeDeepLinkSchema = z.string(); function build() { return z.object({ deep_link: safeDeepLinkSchema }).strict(); } void build;',
+        `packages/contracts/src/nested.${extension}`,
+      );
+
+      expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+    },
+  );
+
   it("still rejects a dynamic deep_link on an ordinary runtime object", async () => {
     const root = await createRepository();
     const relativePath = "apps/web/src/notification.ts";
@@ -1327,11 +1341,57 @@ describe("forbidden runtime surfaces", () => {
     'import { z } from "zod"; function build(z: any) { return z.object({ deep_link: resolveRuntimeDeepLink() }); } void build;',
     'import { z } from "zod"; function build() { const z = runtimeSchemaFactory; return z.object({ deep_link: resolveRuntimeDeepLink() }); } void build;',
     'import { z } from "zod"; const z = runtimeSchemaFactory; z.object({ deep_link: resolveRuntimeDeepLink() });',
+    'import z from "zod"; const z = runtimeSchemaFactory; z.object({ deep_link: resolveRuntimeDeepLink() });',
+    'import * as z from "zod"; const z = runtimeSchemaFactory; z.object({ deep_link: resolveRuntimeDeepLink() });',
   ])(
     "rejects a dynamic deep_link when a Zod import name is lexically shadowed %s",
     async (source) => {
       const root = await createRepository();
       const relativePath = "apps/web/src/shadowed-schema.ts";
+      await writeCandidate(root, source, relativePath);
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it.each([
+    [
+      "named import before foreign import",
+      'import { z } from "zod"; import { createSchema as z } from "./schema-factory.js"; z.object({ deep_link: resolveRuntimeDeepLink() });',
+    ],
+    [
+      "foreign import before named import",
+      'import { createSchema as z } from "./schema-factory.js"; import { z } from "zod"; z.object({ deep_link: resolveRuntimeDeepLink() });',
+    ],
+    [
+      "default import before foreign import",
+      'import z from "zod"; import { createSchema as z } from "./schema-factory.js"; z.object({ deep_link: resolveRuntimeDeepLink() });',
+    ],
+    [
+      "foreign import before default import",
+      'import { createSchema as z } from "./schema-factory.js"; import z from "zod"; z.object({ deep_link: resolveRuntimeDeepLink() });',
+    ],
+    [
+      "namespace import before foreign import",
+      'import * as z from "zod"; import { createSchema as z } from "./schema-factory.js"; z.object({ deep_link: resolveRuntimeDeepLink() });',
+    ],
+    [
+      "foreign import before namespace import",
+      'import { createSchema as z } from "./schema-factory.js"; import * as z from "zod"; z.object({ deep_link: resolveRuntimeDeepLink() });',
+    ],
+    [
+      "duplicate Zod imports",
+      'import { z } from "zod"; import { z as z } from "zod"; z.object({ deep_link: resolveRuntimeDeepLink() });',
+    ],
+  ])(
+    "rejects an ambiguous top-level Zod factory binding from %s",
+    async (_label, source) => {
+      const root = await createRepository();
+      const relativePath = "apps/web/src/ambiguous-schema.ts";
       await writeCandidate(root, source, relativePath);
 
       const result = await runScanner(root);

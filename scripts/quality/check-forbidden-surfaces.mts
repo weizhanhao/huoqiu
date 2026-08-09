@@ -560,11 +560,12 @@ const collectJsonStrings = (
 };
 
 const parseSourceFile = (file: string, content: string): ts.SourceFile => {
-  const scriptKind = [".tsx", ".jsx"].includes(extname(file).toLowerCase())
+  const extension = extname(file).toLowerCase();
+  const scriptKind = [".tsx", ".jsx"].includes(extension)
     ? ts.ScriptKind.TSX
     : ts.ScriptKind.TS;
   const sourceFile = ts.createSourceFile(
-    file,
+    `__huoqiu_quality_candidate__${extension}`,
     content,
     ts.ScriptTarget.ES2023,
     true,
@@ -594,6 +595,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   const nestRouteDecoratorAliases = new Set<string>();
   const nestNamespaces = new Set<string>();
   const zodObjectFactoryImports = new Map<string, ts.Identifier>();
+  const topLevelValueBindingCounts = new Map<string, number>();
   const surfaces = new Set<string>();
   const evaluating = new Set<string>();
 
@@ -674,6 +676,54 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     ts.forEachChild(node, indexConstants);
   };
   indexConstants(sourceFile);
+
+  const recordTopLevelValueBinding = (name: ts.BindingName): void => {
+    if (ts.isIdentifier(name)) {
+      topLevelValueBindingCounts.set(
+        name.text,
+        (topLevelValueBindingCounts.get(name.text) ?? 0) + 1,
+      );
+      return;
+    }
+    for (const element of name.elements)
+      if (!ts.isOmittedExpression(element))
+        recordTopLevelValueBinding(element.name);
+  };
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const clause = statement.importClause;
+      if (clause === undefined || clause.isTypeOnly) continue;
+      if (clause.name !== undefined) recordTopLevelValueBinding(clause.name);
+      const bindings = clause.namedBindings;
+      if (bindings === undefined) continue;
+      if (ts.isNamespaceImport(bindings)) {
+        recordTopLevelValueBinding(bindings.name);
+        continue;
+      }
+      for (const element of bindings.elements)
+        if (!element.isTypeOnly) recordTopLevelValueBinding(element.name);
+      continue;
+    }
+    if (ts.isImportEqualsDeclaration(statement) && !statement.isTypeOnly) {
+      recordTopLevelValueBinding(statement.name);
+      continue;
+    }
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations)
+        recordTopLevelValueBinding(declaration.name);
+      continue;
+    }
+    if (
+      (ts.isFunctionDeclaration(statement) ||
+        ts.isClassDeclaration(statement) ||
+        ts.isEnumDeclaration(statement) ||
+        ts.isModuleDeclaration(statement)) &&
+      statement.name !== undefined &&
+      ts.isIdentifier(statement.name)
+    )
+      recordTopLevelValueBinding(statement.name);
+  }
 
   for (const statement of sourceFile.statements) {
     if (ts.isFunctionDeclaration(statement) && statement.name !== undefined) {
@@ -936,7 +986,11 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     const factory = unwrapExpression(call.expression.expression);
     if (!ts.isIdentifier(factory)) return false;
     const importedFactory = zodObjectFactoryImports.get(factory.text);
-    if (importedFactory === undefined) return false;
+    if (
+      importedFactory === undefined ||
+      topLevelValueBindingCounts.get(factory.text) !== 1
+    )
+      return false;
     const checker = getLexicalBindingChecker();
     const importedSymbol = checker.getSymbolAtLocation(importedFactory);
     return (
