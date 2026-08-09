@@ -195,7 +195,7 @@ describe("forbidden runtime surfaces", () => {
     ],
     [
       "apps/api/src/trading/execution.controller.ts",
-      '@Controller("trade")\nexport class ExecutionController {}',
+      'import { Controller } from "@nestjs/common";\n@Controller("trade")\nexport class ExecutionController {}',
     ],
     [
       "packages/domain/src/capabilities/registry.ts",
@@ -237,7 +237,7 @@ describe("forbidden runtime surfaces", () => {
     await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
     await writeCandidate(
       root,
-      '@Controller("trade")\nexport class Orders {}',
+      'import { Controller } from "@nestjs/common";\n@Controller("trade")\nexport class Orders {}',
       relativePath,
     );
 
@@ -1113,6 +1113,176 @@ describe("forbidden runtime surfaces", () => {
       root,
       'exports.registry = { routes: ["/watchlist"] };',
       "apps/web/src/navigation/route-registry.cts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it.each([
+    'export const registry = { routes: ["/tr" + "ade"] };',
+    'const key = ["ro", "utes"].join(""); const value = ["/tr", "ade"].join(""); export default { [key]: [value] };',
+  ])(
+    "rejects a forbidden surface assembled inside a static registry %s",
+    async (source) => {
+      const root = await createRepository();
+      const relativePath = "apps/web/src/navigation/route-registry.ts";
+      await writeCandidate(root, source, relativePath);
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("FORBIDDEN_RUNTIME_SURFACE");
+      expect(result.stderr).toContain(relativePath);
+      expect(result.stderr).toContain("trade");
+    },
+  );
+
+  it.each([
+    ["基金申购", "subscription", "product-command"],
+    ["开户", "open_account", "account-command"],
+    ["资金托管", "fund_custody", "custody"],
+    ["跟单", "copy_portfolio", "portfolio-copying"],
+    ["自动交易", "real_trade", "execution"],
+    ["打赏", "payment", "payment"],
+    ["基 金 申 购", "subscription", "product-command"],
+  ])(
+    "rejects Chinese compliance denylist surface %s",
+    async (surface, normalizedSurface, category) => {
+      const root = await createRepository();
+      await writeCandidate(root, JSON.stringify({ routes: [surface] }));
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("FORBIDDEN_RUNTIME_SURFACE");
+      expect(result.stderr).toContain(normalizedSurface);
+      expect(result.stderr).toContain(category);
+    },
+  );
+
+  it.each([
+    { scheme: "trade" },
+    {
+      android: {
+        intentFilters: [
+          {
+            action: "VIEW",
+            data: [{ scheme: "trade" }],
+            category: ["BROWSABLE"],
+          },
+        ],
+      },
+    },
+  ])("scans Expo app.json runtime configuration %#", async (expo) => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    const relativePath = "apps/mobile/app.json";
+    await writeCandidate(root, JSON.stringify({ expo }), relativePath);
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("FORBIDDEN_RUNTIME_SURFACE");
+    expect(result.stderr).toContain(relativePath);
+    expect(result.stderr).toContain("trade");
+  });
+
+  it("scans a package runtime entry without a dot-slash prefix", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      JSON.stringify({ name: "@example/runtime", main: "dist/index.js" }),
+      "packages/example/package.json",
+    );
+    const relativePath = "packages/example/dist/index.js";
+    await writeCandidate(root, 'export const command = "trade";', relativePath);
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("FORBIDDEN_RUNTIME_SURFACE");
+    expect(result.stderr).toContain(relativePath);
+  });
+
+  it.each([
+    "let alias; alias = routes; alias.push(resolveRuntimeRoute());",
+    "function mutate(value: string[]) { value.push(resolveRuntimeRoute()); } mutate(routes);",
+    'Object.defineProperty(routes, "0", { value: resolveRuntimeRoute() });',
+    "new Set([routes]);",
+    'new Map([["routes", routes]]);',
+  ])(
+    "rejects an imported registry escaping through an indirect mutation %s",
+    async (mutation) => {
+      const root = await createRepository();
+      await writeCandidate(
+        root,
+        'export const routes = ["/watchlist"];',
+        "packages/example/src/runtime.ts",
+      );
+      const relativePath = "apps/web/src/bootstrap.ts";
+      await writeCandidate(
+        root,
+        `import { routes } from "../../../packages/example/src/runtime";\n${mutation}`,
+        relativePath,
+      );
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
+  it("accepts an unrelated local decorator named Get", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      "const Get = (value: unknown) => (_target: unknown, _name: string) => value; class Example { @Get(resolveValue()) method() {} }",
+      "apps/api/src/example/service.ts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it("accepts an ordinary exported history helper", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      "export function pushToHistory(value: string) { return value; }",
+      "apps/web/src/history.ts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it("accepts a dynamic Zod issue path in an ordinary contract schema", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      'import { z } from "zod"; export const feedCardV1Schema = z.object({ type: z.literal("post") });',
+      "packages/contracts/src/feed/card-v1.ts",
+    );
+    await writeCandidate(
+      root,
+      'import { z } from "zod"; import { feedCardV1Schema } from "@huoqiu/contracts/feed/card-v1"; export const fixtureSchema = z.array(feedCardV1Schema).superRefine((rows, context) => { for (const [index] of rows.entries()) context.addIssue({ code: "custom", path: ["rows", index], message: "invalid row" }); });',
+      "packages/contracts/src/d0/schema.ts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it("accepts an ordinary exported feed card schema", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      'import { z } from "zod"; export const feedCardV1Schema = z.object({ type: z.enum(["post", "news", "market_strip", "topic", "ops_banner"]), schema_version: z.literal(1), card_id: z.string(), published_at: z.string(), source: z.string(), payload: z.record(z.string(), z.unknown()) }).strict();',
+      "packages/contracts/src/feed/card-v1.ts",
     );
 
     expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });

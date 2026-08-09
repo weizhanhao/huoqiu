@@ -483,6 +483,153 @@ const sourceImports = (file: string, content: string): string[] => {
     if (node !== undefined && ts.isStringLiteralLike(node))
       imports.push(node.text);
   };
+
+  const unwrapExpression = (expression: ts.Expression): ts.Expression => {
+    if (
+      ts.isParenthesizedExpression(expression) ||
+      ts.isAsExpression(expression) ||
+      ts.isTypeAssertionExpression(expression) ||
+      ts.isSatisfiesExpression(expression)
+    )
+      return unwrapExpression(expression.expression);
+    return expression;
+  };
+
+  const staticMemberName = (expression: ts.Expression): string | undefined => {
+    const value = unwrapExpression(expression);
+    if (ts.isPropertyAccessExpression(value)) return value.name.text;
+    if (
+      ts.isElementAccessExpression(value) &&
+      value.argumentExpression !== undefined
+    )
+      return evaluate(value.argumentExpression);
+    return undefined;
+  };
+
+  const isModuleRequire = (expression: ts.Expression): boolean => {
+    const value = unwrapExpression(expression);
+    if (
+      !ts.isPropertyAccessExpression(value) &&
+      !ts.isElementAccessExpression(value)
+    )
+      return false;
+    return (
+      ts.isIdentifier(value.expression) &&
+      value.expression.text === "module" &&
+      staticMemberName(value) === "require"
+    );
+  };
+
+  const loaderAliases = new Set(["require"]);
+  const createRequireAliases = new Set<string>();
+  const moduleNamespaces = new Set<string>();
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteralLike(statement.moduleSpecifier) ||
+      statement.moduleSpecifier.text !== "node:module" ||
+      statement.importClause?.isTypeOnly === true
+    )
+      continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings === undefined) continue;
+    if (ts.isNamespaceImport(bindings)) {
+      moduleNamespaces.add(bindings.name.text);
+      continue;
+    }
+    for (const element of bindings.elements) {
+      if (element.isTypeOnly) continue;
+      if ((element.propertyName ?? element.name).text === "createRequire")
+        createRequireAliases.add(element.name.text);
+    }
+  }
+
+  const isCreateRequireReference = (expression: ts.Expression): boolean => {
+    const value = unwrapExpression(expression);
+    if (ts.isIdentifier(value)) return createRequireAliases.has(value.text);
+    if (
+      !ts.isPropertyAccessExpression(value) &&
+      !ts.isElementAccessExpression(value)
+    )
+      return false;
+    return (
+      ts.isIdentifier(value.expression) &&
+      moduleNamespaces.has(value.expression.text) &&
+      staticMemberName(value) === "createRequire"
+    );
+  };
+
+  const isLoaderReference = (expression: ts.Expression): boolean => {
+    const value = unwrapExpression(expression);
+    if (ts.isIdentifier(value)) return loaderAliases.has(value.text);
+    if (isModuleRequire(value)) return true;
+    return false;
+  };
+
+  const isLoaderBindCall = (expression: ts.Expression): boolean => {
+    const value = unwrapExpression(expression);
+    if (!ts.isCallExpression(value)) return false;
+    const callee = unwrapExpression(value.expression);
+    return (
+      (ts.isPropertyAccessExpression(callee) ||
+        ts.isElementAccessExpression(callee)) &&
+      staticMemberName(callee) === "bind" &&
+      isLoaderReference(callee.expression)
+    );
+  };
+
+  let discoveredLoaderAlias: boolean;
+  do {
+    discoveredLoaderAlias = false;
+    const indexLoaderAliases = (node: ts.Node): void => {
+      let target: ts.Identifier | undefined;
+      let initializer: ts.Expression | undefined;
+      if (
+        ts.isVariableDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        node.initializer !== undefined
+      ) {
+        target = node.name;
+        initializer = node.initializer;
+      } else if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        ts.isIdentifier(node.left)
+      ) {
+        target = node.left;
+        initializer = node.right;
+      }
+      if (target !== undefined && initializer !== undefined) {
+        const value = unwrapExpression(initializer);
+        const createsLoader =
+          isLoaderReference(value) ||
+          isLoaderBindCall(value) ||
+          (ts.isCallExpression(value) &&
+            isCreateRequireReference(value.expression));
+        if (createsLoader && !loaderAliases.has(target.text)) {
+          loaderAliases.add(target.text);
+          discoveredLoaderAlias = true;
+        }
+      }
+      ts.forEachChild(node, indexLoaderAliases);
+    };
+    indexLoaderAliases(sourceFile);
+  } while (discoveredLoaderAlias);
+
+  const loaderCall = (expression: ts.Expression): boolean => {
+    const value = unwrapExpression(expression);
+    if (isLoaderReference(value)) return true;
+    if (
+      !ts.isPropertyAccessExpression(value) &&
+      !ts.isElementAccessExpression(value)
+    )
+      return false;
+    return (
+      staticMemberName(value) === "resolve" &&
+      isLoaderReference(value.expression)
+    );
+  };
+
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       recordStaticSpecifier(node.moduleSpecifier);
@@ -494,8 +641,7 @@ const sourceImports = (file: string, content: string): string[] => {
     } else if (
       ts.isCallExpression(node) &&
       (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-        (ts.isIdentifier(node.expression) &&
-          node.expression.text === "require"))
+        loaderCall(node.expression))
     ) {
       const argument = node.arguments[0];
       const specifier = argument === undefined ? undefined : evaluate(argument);
@@ -730,34 +876,30 @@ const validateSourceImports = async (
     namedTarget: WorkspaceProject,
     owner: WorkspaceProject,
     path: string,
+    specifier: string,
   ): boolean => {
     if (
       namedTarget.name !== "@huoqiu/contracts" ||
-      owner.name !== namedTarget.name
+      owner.name !== namedTarget.name ||
+      specifier !== "@huoqiu/contracts/d0/fixture"
     )
       return false;
     const ownerRelativePath = relative(owner.directory, path).replaceAll(
       sep,
       "/",
     );
-    const match = /^fixtures\/([a-z0-9][a-z0-9_-]*)\.v([1-9]\d*)\.json$/.exec(
-      ownerRelativePath,
-    );
-    if (match === null) return false;
-    return !/(?:^|[_-])(?:fixture|fixtures|invalid|malformed|negative|test|tests)(?:[_-]|$)/.test(
-      match[1] ?? "",
-    );
+    return ownerRelativePath === "fixtures/d0.v1.json";
   };
 
   const isExactVersionedContractFixtureExport = (
     namedTarget: WorkspaceProject,
     exportTarget: PackageExportTarget,
+    specifier: string,
   ): boolean =>
     namedTarget.name === "@huoqiu/contracts" &&
+    specifier === "@huoqiu/contracts/d0/fixture" &&
     exportTarget.exactMapping &&
-    /^\.\/fixtures\/[a-z0-9][a-z0-9_-]*\.v[1-9]\d*\.json$/.test(
-      exportTarget.path,
-    );
+    exportTarget.path === "./fixtures/d0.v1.json";
 
   const validateOwner = (
     source: WorkspaceProject,
@@ -823,7 +965,7 @@ const validateSourceImports = async (
       );
     if (
       !allowVersionedContractFixture ||
-      !isVersionedContractFixture(namedTarget, owner, canonical)
+      !isVersionedContractFixture(namedTarget, owner, canonical, specifier)
     )
       rejectExcludedTarget(owner, canonical, file);
     validateOwner(source, owner, file);
@@ -871,7 +1013,11 @@ const validateSourceImports = async (
       if (resolution !== undefined) {
         const allowVersionedContractFixture = exportTargets.some(
           (exportTarget) =>
-            isExactVersionedContractFixtureExport(target, exportTarget) &&
+            isExactVersionedContractFixtureExport(
+              target,
+              exportTarget,
+              specifier,
+            ) &&
             resolve(target.directory, exportTarget.path) ===
               resolve(resolution.resolvedFileName),
         );
@@ -891,7 +1037,11 @@ const validateSourceImports = async (
           resolve(target.directory, exportTarget.path),
           file,
           specifier,
-          isExactVersionedContractFixtureExport(target, exportTarget),
+          isExactVersionedContractFixtureExport(
+            target,
+            exportTarget,
+            specifier,
+          ),
         );
       return;
     }

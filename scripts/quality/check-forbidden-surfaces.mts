@@ -48,6 +48,11 @@ const FORBIDDEN_SURFACES: readonly ForbiddenSurfaceRule[] = [
     tokens: ["private", "fund"],
   },
   {
+    category: "custody",
+    surface: "fund_custody",
+    tokens: ["fund", "custody"],
+  },
+  {
     category: "portfolio-privacy",
     surface: "public_portfolio",
     tokens: ["public", "portfolio"],
@@ -424,6 +429,17 @@ const isDomainRegistry = (path: string): boolean => {
   );
 };
 
+const isExpoRuntimeConfig = (path: string): boolean => {
+  const parts = splitPath(path);
+  return (
+    parts[0] === "apps" &&
+    parts.length === 3 &&
+    (parts[2] === "app.json" ||
+      parts[2] === "app.config.json" ||
+      parts[2] === "expo.json")
+  );
+};
+
 const isStaticSurfaceRegistry = (path: string): boolean => {
   const parts = splitPath(path);
   const hasRegistry = parts.some((part) =>
@@ -463,6 +479,7 @@ const isRuntimeCandidate = (path: string): boolean => {
     parts[0] === "scripts" ||
     parts[0] === "config";
   if (isSupportedRuntimeRoot && SOURCE_EXTENSIONS.has(extension)) return true;
+  if (isExpoRuntimeConfig(path)) return true;
   if (
     (parts[0] === "config" || hasRuntimeRegistryName(path)) &&
     STRUCTURED_EXTENSIONS.has(extension)
@@ -479,6 +496,14 @@ const isRuntimeCandidate = (path: string): boolean => {
 const tokenize = (value: string): string[] =>
   value
     .normalize("NFKC")
+    .replace(/基\s*金\s*申\s*购/gu, " fund subscribe ")
+    .replace(/账\s*户\s*资\s*格/gu, " account eligibility ")
+    .replace(/开\s*户\s*资\s*格/gu, " account eligibility ")
+    .replace(/开\s*户/gu, " open account ")
+    .replace(/资\s*金\s*托\s*管/gu, " fund custody ")
+    .replace(/跟\s*单/gu, " copy portfolio ")
+    .replace(/自\s*动\s*交\s*易/gu, " real trade ")
+    .replace(/打\s*赏/gu, " payment ")
     .replaceAll("交易下单", " place order ")
     .replaceAll("真实交易", " real trade ")
     .replaceAll("付费荐股", " paid stock recommendation ")
@@ -856,7 +881,13 @@ const sourceSurfaces = (file: string, content: string): string[] => {
 
   const runtimeImportedBindings = new Set<string>();
   const moduleHasRuntimeRegistrySemantics = (specifier: string): boolean =>
-    specifier.split(/[\\/]/).some((part) => runtimeRegistryName.test(part));
+    specifier
+      .split(/[\\/]/)
+      .some((part) =>
+        /(?:^|[._+-])(?:deep[-_]?link|deeplink|linking|navigation|navigator|openapi|registr(?:y|ies)|route|router|routes)(?:[._+-]|$)/i.test(
+          part,
+        ),
+      );
   const recordImportedBinding = (
     localName: string,
     importedName: string | undefined,
@@ -997,6 +1028,29 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     }
     return false;
   };
+  const containsRuntimeRegistryReference = (
+    expression: ts.Expression,
+  ): boolean => {
+    const value = unwrapExpression(expression);
+    if (isRuntimeRegistryReference(value)) return true;
+    if (ts.isArrayLiteralExpression(value))
+      return value.elements.some((element) =>
+        ts.isSpreadElement(element)
+          ? containsRuntimeRegistryReference(element.expression)
+          : containsRuntimeRegistryReference(element),
+      );
+    if (ts.isObjectLiteralExpression(value))
+      return value.properties.some((property) => {
+        if (ts.isPropertyAssignment(property))
+          return containsRuntimeRegistryReference(property.initializer);
+        if (ts.isShorthandPropertyAssignment(property))
+          return isRuntimeRegistryReference(property.name);
+        if (ts.isSpreadAssignment(property))
+          return containsRuntimeRegistryReference(property.expression);
+        return false;
+      });
+    return false;
+  };
   let discoveredRuntimeRegistryAlias: boolean;
   do {
     discoveredRuntimeRegistryAlias = false;
@@ -1032,6 +1086,15 @@ const sourceSurfaces = (file: string, content: string): string[] => {
             }
           }
         }
+      } else if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        ts.isIdentifier(node.left) &&
+        isRuntimeRegistryReference(node.right) &&
+        !runtimeRegistryAliases.has(node.left.text)
+      ) {
+        runtimeRegistryAliases.add(node.left.text);
+        discoveredRuntimeRegistryAlias = true;
       }
       ts.forEachChild(node, visitRuntimeAliases);
     };
@@ -1092,13 +1155,31 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       else if (
         ts.isPropertyAccessExpression(callee) &&
         ts.isIdentifier(callee.expression) &&
-        ((callee.expression.text === "Reflect" && callee.name.text === "set") ||
+        ((callee.expression.text === "Reflect" &&
+          (callee.name.text === "set" ||
+            callee.name.text === "defineProperty")) ||
           (callee.expression.text === "Object" &&
-            callee.name.text === "assign"))
+            (callee.name.text === "assign" ||
+              callee.name.text === "defineProperty" ||
+              callee.name.text === "defineProperties")))
       ) {
         const target = node.arguments[0];
         if (target !== undefined && isRuntimeRegistryReference(target))
           mutated = target;
+      } else {
+        const escaped = node.arguments.find(containsRuntimeRegistryReference);
+        if (escaped !== undefined) mutated = escaped;
+      }
+    } else if (
+      ts.isNewExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      (node.expression.text === "Map" || node.expression.text === "Set")
+    ) {
+      for (const argument of node.arguments ?? []) {
+        if (containsRuntimeRegistryReference(argument)) {
+          mutated = argument;
+          break;
+        }
       }
     } else if (
       ts.isBinaryExpression(node) &&
@@ -1132,6 +1213,48 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       ts.forEachChild(node, collect);
     };
     collect(expression);
+  };
+
+  const collectStaticRegistrySurfaces = (
+    expression: ts.Expression,
+    bindings: ReadonlyMap<string, ts.Expression>,
+    active = new Set<string>(),
+  ): void => {
+    const value = unwrapExpression(expression);
+    const evaluated = evaluate(value, bindings, new Set(active));
+    if (evaluated !== undefined) surfaces.add(evaluated);
+    if (ts.isIdentifier(value)) {
+      if (active.has(value.text)) return;
+      const initializer = bindings.get(value.text);
+      if (initializer === undefined) return;
+      active.add(value.text);
+      collectStaticRegistrySurfaces(initializer, bindings, active);
+      active.delete(value.text);
+      return;
+    }
+    if (ts.isArrayLiteralExpression(value)) {
+      for (const element of value.elements)
+        if (!ts.isSpreadElement(element))
+          collectStaticRegistrySurfaces(element, bindings, active);
+      return;
+    }
+    if (!ts.isObjectLiteralExpression(value)) return;
+    for (const property of value.properties) {
+      if (ts.isPropertyAssignment(property)) {
+        const name = ts.isComputedPropertyName(property.name)
+          ? evaluate(property.name.expression, bindings, new Set(active))
+          : staticPropertyName(property.name);
+        if (name !== undefined) surfaces.add(name);
+        collectStaticRegistrySurfaces(property.initializer, bindings, active);
+        continue;
+      }
+      if (ts.isShorthandPropertyAssignment(property)) {
+        surfaces.add(property.name.text);
+        const initializer = bindings.get(property.name.text);
+        if (initializer !== undefined)
+          collectStaticRegistrySurfaces(initializer, bindings, active);
+      }
+    }
   };
 
   const staticRegistryIdentifiers = new Set<string>();
@@ -1196,10 +1319,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   const routeDecorator = (expression: ts.LeftHandSideExpression): boolean => {
     const value = unwrapExpression(expression);
     if (ts.isIdentifier(value))
-      return (
-        NEST_ROUTE_DECORATOR.test(value.text) ||
-        nestRouteDecoratorAliases.has(value.text)
-      );
+      return nestRouteDecoratorAliases.has(value.text);
     if (ts.isPropertyAccessExpression(value))
       return (
         NEST_ROUTE_DECORATOR.test(value.name.text) &&
@@ -1234,6 +1354,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
         "RUNTIME_CANDIDATE_UNRESOLVED",
         `${file}: ${label} is not statically decidable`,
       );
+    collectStaticRegistrySurfaces(expression, bindings);
   };
 
   const hasModifier = (node: ts.Node, kind: ts.SyntaxKind): boolean =>
@@ -1582,6 +1703,18 @@ const sourceSurfaces = (file: string, content: string): string[] => {
 
   validateTopLevelRegistryExports();
 
+  const recordExportedSurface = (name: string): void => {
+    const tokens = tokenize(name);
+    if (
+      FORBIDDEN_SURFACES.some(
+        (rule) =>
+          tokens.length === rule.tokens.length &&
+          rule.tokens.every((token, index) => tokens[index] === token),
+      )
+    )
+      surfaces.add(name);
+  };
+
   const visit = (node: ts.Node): void => {
     rejectRuntimeRegistryMutation(node);
     if (
@@ -1591,7 +1724,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       ts.isVariableStatement(node.parent.parent) &&
       hasModifier(node.parent.parent, ts.SyntaxKind.ExportKeyword)
     )
-      surfaces.add(node.name.text);
+      recordExportedSurface(node.name.text);
     if (
       (ts.isFunctionDeclaration(node) ||
         ts.isClassDeclaration(node) ||
@@ -1599,10 +1732,11 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       node.name !== undefined &&
       hasModifier(node, ts.SyntaxKind.ExportKeyword)
     )
-      surfaces.add(node.name.text);
+      recordExportedSurface(node.name.text);
     if (ts.isExportSpecifier(node) && !node.isTypeOnly) {
-      surfaces.add(node.name.text);
-      if (node.propertyName !== undefined) surfaces.add(node.propertyName.text);
+      recordExportedSurface(node.name.text);
+      if (node.propertyName !== undefined)
+        recordExportedSurface(node.propertyName.text);
     }
     if (
       ts.isBinaryExpression(node) &&
@@ -1611,7 +1745,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       isCommonJsExportReference(node.left)
     ) {
       const exportedName = memberName(node.left);
-      if (exportedName !== undefined) surfaces.add(exportedName);
+      if (exportedName !== undefined) recordExportedSurface(exportedName);
     }
     if (
       ts.isVariableDeclaration(node) &&
@@ -1629,21 +1763,15 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       requireStaticRegistry(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
     }
-    const strictRuntimeFieldContext =
-      isStaticSurfaceRegistry(file) || isRouteSource(file);
     if (
-      strictRuntimeFieldContext &&
       ts.isPropertyAssignment(node) &&
-      runtimeField(node.name)
+      runtimeField(node.name) &&
+      staticPropertyName(node.name) !== "path"
     ) {
       requireStatic(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
     }
-    if (
-      strictRuntimeFieldContext &&
-      ts.isPropertyAssignment(node) &&
-      runtimeContainerField(node.name)
-    ) {
+    if (ts.isPropertyAssignment(node) && runtimeContainerField(node.name)) {
       requireStaticRegistry(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
     }
@@ -1678,7 +1806,9 @@ const contentSurfaces = (file: string, content: string): string[] => {
     collectJsonStrings(
       parsed,
       strings,
-      isStaticSurfaceRegistry(file) || hasRuntimeRegistryName(file),
+      isStaticSurfaceRegistry(file) ||
+        hasRuntimeRegistryName(file) ||
+        isExpoRuntimeConfig(file),
     );
     return strings;
   }
@@ -1786,7 +1916,13 @@ const discoverRuntimeCandidates = async (root: string): Promise<string[]> => {
 
   const collectManifestTargets = (value: unknown, output: string[]): void => {
     if (typeof value === "string") {
-      if (value.startsWith("./")) output.push(value);
+      if (
+        value.length > 0 &&
+        !value.startsWith("#") &&
+        !value.startsWith("/") &&
+        !/^[a-z][a-z\d+.-]*:/i.test(value)
+      )
+        output.push(value);
       return;
     }
     if (Array.isArray(value)) {

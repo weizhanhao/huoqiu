@@ -817,6 +817,28 @@ describe("workspace and supply-chain boundaries", () => {
     expect(result.stderr).toContain("apps/admin/src/runtime.cts");
   });
 
+  it.each([
+    'const load = require; load("@huoqiu/ui/button");\n',
+    'module.require("@huoqiu/ui/button");\n',
+    'const load = module.require; load("@huoqiu/ui/button");\n',
+    'let load; load = require; load("@huoqiu/ui/button");\n',
+    'const load = module.require.bind(module); load("@huoqiu/ui/button");\n',
+    'const load = require.bind(null); load("@huoqiu/ui/button");\n',
+    'module["require"]("@huoqiu/ui/button");\n',
+    'import { createRequire } from "node:module"; const load = createRequire(import.meta.url); load("@huoqiu/ui/button");\n',
+    'import * as Module from "node:module"; const load = Module.createRequire(import.meta.url); load("@huoqiu/ui/button");\n',
+  ])("scans an indirect CommonJS workspace import %s", async (source) => {
+    const root = await createRepository();
+    const relativePath = "apps/admin/src/indirect-loader.cts";
+    await writeText(root, relativePath, source);
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("UNDECLARED_WORKSPACE_IMPORT");
+    expect(result.stderr).toContain(relativePath);
+  });
+
   it("rejects a workspace package export whose target is a directory", async () => {
     const root = await createRepository();
     const manifestPath = "packages/ui/package.json";
@@ -855,6 +877,42 @@ describe("workspace and supply-chain boundaries", () => {
 
     expect(result).toEqual({ code: 0, stderr: "" });
   });
+
+  it.each([
+    ["./unrelated-secret", "./fixtures/d0.v1.json", "d0.v1.json"],
+    ["./d0/fixture", "./fixtures/secret.v9.json", "secret.v9.json"],
+    ["./d0/fixture", "./fixtures/other.v1.json", "other.v1.json"],
+  ])(
+    "does not widen the D0 fixture exception for export %s to %s",
+    async (exportKey, exportTarget, fixtureName) => {
+      const root = await createRepository();
+      const webManifestPath = "apps/web/package.json";
+      const webManifest = await readManifest(root, webManifestPath);
+      (webManifest.dependencies as Record<string, string>)[
+        "@huoqiu/contracts"
+      ] = "workspace:*";
+      await writeJson(root, webManifestPath, webManifest);
+      await writeJson(root, "packages/contracts/package.json", {
+        ...workspacePackage("@huoqiu/contracts"),
+        exports: { [exportKey]: exportTarget },
+      });
+      await writeJson(root, `packages/contracts/fixtures/${fixtureName}`, {
+        version: 1,
+      });
+      const specifier = `@huoqiu/contracts${exportKey.slice(1)}`;
+      await writeText(
+        root,
+        "apps/web/src/secret.ts",
+        `import fixture from "${specifier}";\nvoid fixture;\n`,
+      );
+
+      const result = await runChecker(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+      expect(result.stderr).toContain(fixtureName);
+    },
+  );
 
   it("rejects a relative import to a versioned contract fixture", async () => {
     const root = await createRepository();
