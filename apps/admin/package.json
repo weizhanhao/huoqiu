@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build && node tests/verify-built-routes.mjs",
+    "build": "node scripts/zero-trust-preflight.mjs && next build && node tests/verify-built-routes.mjs",
     "dev": "next dev",
-    "lint": "eslint --config ../../packages/config/eslint/react.mjs src tests next.config.ts vitest.config.ts",
-    "start": "next start",
+    "lint": "eslint --config ../../packages/config/eslint/react.mjs scripts src tests next.config.ts vitest.config.ts",
+    "start": "node scripts/zero-trust-preflight.mjs && next start",
     "test": "vitest run --config vitest.config.ts tests src/middleware.spec.ts",
     "typecheck": "tsc --noEmit"
   },

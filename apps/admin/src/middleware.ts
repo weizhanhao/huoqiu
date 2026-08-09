@@ -5,6 +5,7 @@ const CONFIGURATION_ERROR = "ADMIN_ZERO_TRUST_CONFIGURATION_REQUIRED";
 const DEFAULT_MAX_SKEW_SECONDS = 300;
 const MAX_CONFIGURED_SKEW_SECONDS = 3600;
 const MINIMUM_SECRET_BYTES = 32;
+const STATIC_DECODE_LIMIT = 3;
 
 const EDGE_HEADERS = Object.freeze({
   alphaAccess: "x-huoqiu-alpha-access",
@@ -78,19 +79,28 @@ type AdminAccessDecision =
 
 const configurationError = (): Error => new Error(CONFIGURATION_ERROR);
 
-const hasForbiddenCharactersOrWhitespace = (value: string): boolean => {
-  if (value.trim() !== value) {
-    return true;
-  }
-
+const containsControlCharacter = (value: string): boolean => {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
-    if (codePoint !== undefined && (codePoint <= 31 || codePoint === 127)) {
+    if (
+      codePoint !== undefined &&
+      (codePoint <= 31 || (codePoint >= 127 && codePoint <= 159))
+    ) {
       return true;
     }
   }
 
   return false;
+};
+
+const hasForbiddenSingleValueCharacter = (value: string): boolean => {
+  for (const character of value) {
+    if (character === "," || /\s/u.test(character)) {
+      return true;
+    }
+  }
+
+  return containsControlCharacter(value);
 };
 
 const parseMaxSkewSeconds = (rawValue: string | undefined): number => {
@@ -127,7 +137,7 @@ export const loadAdminAccessConfig = (
     issuer === undefined ||
     issuer.length === 0 ||
     issuer.length > 256 ||
-    hasForbiddenCharactersOrWhitespace(issuer) ||
+    hasForbiddenSingleValueCharacter(issuer) ||
     secret === undefined ||
     new TextEncoder().encode(secret).byteLength < MINIMUM_SECRET_BYTES
   ) {
@@ -167,19 +177,38 @@ const hasSafeStaticSegments = (path: string): boolean => {
       return false;
     }
 
-    try {
-      const decoded = decodeURIComponent(segment);
-      return (
-        decoded !== "." &&
-        decoded !== ".." &&
-        !hasForbiddenCharactersOrWhitespace(decoded) &&
-        !decoded.includes("/") &&
-        !decoded.includes("\\") &&
-        !decoded.includes("\0")
-      );
-    } catch {
-      return false;
+    let decoded = segment;
+    for (let pass = 0; pass < STATIC_DECODE_LIMIT; pass += 1) {
+      if (
+        decoded === "." ||
+        decoded === ".." ||
+        decoded.includes("/") ||
+        decoded.includes("\\") ||
+        containsControlCharacter(decoded)
+      ) {
+        return false;
+      }
+
+      let nextValue: string;
+      try {
+        nextValue = decodeURIComponent(decoded);
+      } catch {
+        return false;
+      }
+      if (nextValue === decoded) {
+        return true;
+      }
+      decoded = nextValue;
     }
+
+    return (
+      decoded !== "." &&
+      decoded !== ".." &&
+      !decoded.includes("/") &&
+      !decoded.includes("\\") &&
+      !decoded.includes("%") &&
+      !containsControlCharacter(decoded)
+    );
   });
 };
 
@@ -256,15 +285,19 @@ const verifyEdgeProof = async (
     subject === null ||
     subject.length === 0 ||
     subject.length > 256 ||
-    hasForbiddenCharactersOrWhitespace(subject) ||
+    hasForbiddenSingleValueCharacter(subject) ||
     issuer === null ||
     issuer.length === 0 ||
     issuer.length > 256 ||
-    hasForbiddenCharactersOrWhitespace(issuer) ||
+    hasForbiddenSingleValueCharacter(issuer) ||
     issuer !== accessConfig.issuer ||
     rawIssuedAt === null ||
     rawSignature === null
   ) {
+    return false;
+  }
+
+  if (hasForbiddenSingleValueCharacter(alphaAccess)) {
     return false;
   }
 

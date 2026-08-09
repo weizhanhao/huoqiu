@@ -32,6 +32,7 @@ const encodeHex = (bytes: ArrayBuffer): string =>
 const signEdgeProof = async (properties: {
   alphaAccess: string;
   issuedAt: string;
+  issuer: string;
   method: string;
   pathAndSearch: string;
   subject: string;
@@ -41,7 +42,7 @@ const signEdgeProof = async (properties: {
     properties.method.toUpperCase(),
     properties.pathAndSearch,
     properties.subject,
-    ZERO_TRUST_ISSUER,
+    properties.issuer,
     properties.alphaAccess,
     properties.issuedAt,
   ].join("\n");
@@ -125,6 +126,7 @@ const createSignedRequest = async (
         (await signEdgeProof({
           alphaAccess: alphaAccess ?? "",
           issuedAt: issuedAt ?? String(NOW_SECONDS),
+          issuer: ZERO_TRUST_ISSUER,
           method,
           pathAndSearch: `${url.pathname}${url.search}`,
           subject: subject ?? "employee-42",
@@ -137,6 +139,30 @@ const createSignedRequest = async (
     method,
     nextConfig: { basePath: "/admin" },
     ...(overrides.body === undefined ? {} : { body: overrides.body }),
+  });
+};
+
+const withResignedHeaders = async (
+  original: NextRequest,
+  headers: Headers,
+): Promise<NextRequest> => {
+  const url = new URL(original.url);
+  headers.set(
+    "x-huoqiu-edge-signature",
+    await signEdgeProof({
+      alphaAccess: headers.get("x-huoqiu-alpha-access") ?? "",
+      issuedAt: headers.get("x-huoqiu-edge-issued-at") ?? "",
+      issuer: headers.get("x-huoqiu-edge-issuer") ?? "",
+      method: original.method,
+      pathAndSearch: `${url.pathname}${url.search}`,
+      subject: headers.get("x-huoqiu-edge-subject") ?? "",
+    }),
+  );
+
+  return new NextRequest(original.url, {
+    headers,
+    method: original.method,
+    nextConfig: { basePath: "/admin" },
   });
 };
 
@@ -256,6 +282,30 @@ describe("admin matcher and exact public allowlist", () => {
     expect(response.headers.get("x-middleware-next")).toBeNull();
   });
 
+  it.each([
+    "/admin/_next/static/%252e%252e/secret",
+    "/admin/_next/static/%252fsecret",
+    "/admin/_next/static/%255csecret",
+    "/admin/_next/static/%2525252e%2525252e/secret",
+    "/admin/_next/static/%25c2%2585evil.js",
+  ])(
+    "rejects recursively encoded static traversal in decision and HTTP response: %s",
+    async (path) => {
+      const request = new NextRequest(`https://admin.huoqiu.test${path}`, {
+        nextConfig: { basePath: "/admin" },
+      });
+
+      await expect(
+        evaluateAdminAccess(request, runtimeConfig, {
+          now: () => NOW_MILLISECONDS,
+        }),
+      ).resolves.toMatchObject({ checkpoint: "edge_proof", kind: "deny" });
+      const response = await gate(request);
+      expect(response.status).toBe(403);
+      expect(response.headers.get("x-middleware-next")).toBeNull();
+    },
+  );
+
   it("does not treat the existing admin root page as a sessionless entry", async () => {
     const bareResponse = await gate(
       new NextRequest("https://admin.huoqiu.test/admin", {
@@ -349,6 +399,91 @@ describe("ordered admin access chain", () => {
         }),
       ).resolves.toMatchObject({ checkpoint: "edge_proof", kind: "deny" });
     }
+  });
+
+  it("rejects two Fetch-merged subjects even when the merged value is correctly signed", async () => {
+    const original = await createSignedRequest();
+    const headers = new Headers(original.headers);
+    headers.delete("x-huoqiu-edge-signature");
+    headers.append("x-huoqiu-edge-subject", "employee-42");
+    const request = await withResignedHeaders(original, headers);
+
+    expect(request.headers.get("x-huoqiu-edge-subject")).toBe(
+      "employee-42, employee-42",
+    );
+    await expect(
+      evaluateAdminAccess(request, runtimeConfig, {
+        now: () => NOW_MILLISECONDS,
+      }),
+    ).resolves.toMatchObject({ checkpoint: "edge_proof", kind: "deny" });
+    expect((await gate(request)).status).toBe(403);
+  });
+
+  it("rejects a correctly signed subject containing internal whitespace", async () => {
+    const request = await createSignedRequest({ subject: "employee 42" });
+
+    await expect(
+      evaluateAdminAccess(request, runtimeConfig, {
+        now: () => NOW_MILLISECONDS,
+      }),
+    ).resolves.toMatchObject({ checkpoint: "edge_proof", kind: "deny" });
+  });
+
+  it("rejects a correctly signed issuer containing internal whitespace", async () => {
+    const original = await createSignedRequest();
+    const headers = new Headers(original.headers);
+    headers.set("x-huoqiu-edge-issuer", "huoqiu zero-trust");
+    headers.delete("x-huoqiu-edge-signature");
+    const request = await withResignedHeaders(original, headers);
+
+    await expect(
+      evaluateAdminAccess(
+        request,
+        { ...runtimeConfig, issuer: "huoqiu zero-trust" },
+        { now: () => NOW_MILLISECONDS },
+      ),
+    ).resolves.toMatchObject({ checkpoint: "edge_proof", kind: "deny" });
+  });
+
+  it.each([
+    "x-huoqiu-edge-issuer",
+    "x-huoqiu-alpha-access",
+    "x-huoqiu-edge-issued-at",
+  ] as const)(
+    "rejects a correctly signed Fetch-merged %s field",
+    async (headerName) => {
+      const original = await createSignedRequest();
+      const headers = new Headers(original.headers);
+      const originalValue = headers.get(headerName);
+      expect(originalValue).not.toBeNull();
+      headers.delete("x-huoqiu-edge-signature");
+      headers.append(headerName, originalValue ?? "");
+      const request = await withResignedHeaders(original, headers);
+
+      await expect(
+        evaluateAdminAccess(request, runtimeConfig, {
+          now: () => NOW_MILLISECONDS,
+        }),
+      ).resolves.toMatchObject({ checkpoint: "edge_proof", kind: "deny" });
+    },
+  );
+
+  it("rejects Fetch-merged signatures", async () => {
+    const original = await createSignedRequest();
+    const headers = new Headers(original.headers);
+    const signature = headers.get("x-huoqiu-edge-signature");
+    expect(signature).not.toBeNull();
+    headers.append("x-huoqiu-edge-signature", signature ?? "");
+    const request = new NextRequest(original.url, {
+      headers,
+      nextConfig: { basePath: "/admin" },
+    });
+
+    await expect(
+      evaluateAdminAccess(request, runtimeConfig, {
+        now: () => NOW_MILLISECONDS,
+      }),
+    ).resolves.toMatchObject({ checkpoint: "edge_proof", kind: "deny" });
   });
 
   it("rejects an otherwise valid proof outside the configured clock skew", async () => {
