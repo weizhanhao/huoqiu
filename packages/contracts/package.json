@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./d0": "./src/d0/schema.ts",
     "./d0/fixture": "./fixtures/d0.v1.json",
+    "./events": "./src/events/index.ts",
     "./feed/card-v1": "./src/feed/card-v1.ts",
     "./m1": "./src/m1/index.ts",
     "./m1/fixture": "./src/m1/fixture-schema.ts",
@@ -15,10 +16,11 @@
     "./shared/page": "./src/shared/page.ts"
   },
   "scripts": {
+    "generate:events": "tsx scripts/generate-events.mts",
     "generate:openapi": "tsx scripts/generate-openapi.mts",
     "lint": "eslint --config ../config/eslint/base.mjs scripts src test",
     "test": "vitest run --config ../config/vitest/base.ts test",
-    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals scripts/generate-openapi.mts src/index.ts src/d0/index.ts src/d0/schema.ts src/feed/card-v1.ts src/shared/error.ts src/shared/page.ts src/m1/*.ts test/d0-fixture.contract.spec.ts test/feed-card-v1.spec.ts test/openapi.spec.ts test/shared.spec.ts test/synthetic-market-fixture.spec.ts test/m1-*.spec.ts"
+    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals scripts/generate-events.mts scripts/generate-openapi.mts src/index.ts src/d0/index.ts src/d0/schema.ts src/events/*.ts src/feed/card-v1.ts src/shared/error.ts src/shared/page.ts src/m1/*.ts test/d0-fixture.contract.spec.ts test/events/*.spec.ts test/feed-card-v1.spec.ts test/openapi.spec.ts test/shared.spec.ts test/synthetic-market-fixture.spec.ts test/m1-*.spec.ts"
   },
   "dependencies": {
     "@ts-rest/core": "3.52.1",

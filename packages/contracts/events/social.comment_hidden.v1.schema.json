@@ -1,0 +1,98 @@
+{
+  "$id": "urn:huoqiu:event:social.comment_hidden:v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "aggregate_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "type": "string"
+    },
+    "event_id": {
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+      "type": "string"
+    },
+    "event_type": {
+      "const": "social.comment_hidden",
+      "type": "string"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": false,
+      "properties": {
+        "author_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "type": "string"
+        },
+        "comment_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "type": "string"
+        },
+        "status": {
+          "const": "hidden",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 19,
+          "minLength": 1,
+          "pattern": "^(?:0|[1-9][0-9]{0,18})$",
+          "type": "string",
+          "x-int64-maximum": "9223372036854775807",
+          "x-int64-minimum": "0",
+          "x-int64-string": true
+        }
+      },
+      "required": ["comment_id", "author_id", "status", "version"],
+      "type": "object"
+    },
+    "producer": {
+      "const": "social",
+      "type": "string"
+    },
+    "sequence": {
+      "maxLength": 19,
+      "minLength": 1,
+      "pattern": "^(?:0|[1-9][0-9]{0,18})$",
+      "type": "string",
+      "x-int64-maximum": "9223372036854775807",
+      "x-int64-minimum": "0",
+      "x-int64-string": true
+    },
+    "trace_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+      "type": "string"
+    },
+    "version": {
+      "const": 1,
+      "type": "number"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_type",
+    "version",
+    "occurred_at",
+    "producer",
+    "aggregate_id",
+    "sequence",
+    "trace_id",
+    "payload"
+  ],
+  "title": "Huoqiu event social.comment_hidden v1",
+  "type": "object",
+  "x-event-type": "social.comment_hidden",
+  "x-producer": "social",
+  "x-version": 1
+}
