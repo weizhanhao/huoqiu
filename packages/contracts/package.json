@@ -11,6 +11,7 @@
     "./events": "./src/events/index.ts",
     "./feed/card-v1": "./src/feed/card-v1.ts",
     "./m1": "./src/m1/index.ts",
+    "./m1/auth-schemas": "./src/m1/auth.schemas.ts",
     "./m1/fixture": "./src/m1/fixture-schema.ts",
     "./m1/fixture-data": "./fixtures/m1.v1.json",
     "./shared/error": "./src/shared/error.ts",

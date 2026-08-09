@@ -1,6 +1,10 @@
-import { m1Router } from "@huoqiu/contracts/m1";
-import { NextResponse, type NextRequest } from "next/server";
+import {
+  authLoginBodySchema,
+  authRegisterBodySchema,
+} from "@huoqiu/contracts/m1/auth-schemas";
+import type { NextRequest } from "next/server";
 
+import { NextResponse } from "./next-edge-response";
 import {
   loadZeroTrustConfiguration,
   type ZeroTrustConfiguration,
@@ -416,10 +420,10 @@ const hasValidWebAuthBody = (
   parsedBody: unknown,
 ): boolean => {
   if (pathname === "/register") {
-    return m1Router.authRegister.body.safeParse(parsedBody).success;
+    return authRegisterBodySchema.safeParse(parsedBody).success;
   }
 
-  const result = m1Router.authLogin.body.safeParse(parsedBody);
+  const result = authLoginBodySchema.safeParse(parsedBody);
   return result.success && result.data.transport === "cookie";
 };
 

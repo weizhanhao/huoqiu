@@ -1,18 +1,21 @@
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 
-import { m1Router as publicM1Router } from "@huoqiu/contracts/m1";
 import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { m1Router as authoritativeM1Router } from "../../../packages/contracts/src/m1/router";
-import nextConfig, { M1_ROUTER_WEBPACK_SOURCE } from "../next.config";
+import nextConfig from "../next.config";
 import {
   config as middlewareConfig,
   enforceWebBoundary,
   middleware,
   WEB_SESSION_COOKIE,
 } from "./middleware";
+import {
+  NEXT_EDGE_RESPONSE_ADAPTER_VERSION,
+  NextResponse as NarrowNextResponse,
+} from "./next-edge-response";
 import {
   assertZeroTrustStartupConfiguration,
   loadZeroTrustConfiguration,
@@ -98,6 +101,19 @@ const enforce = (request: NextRequest) =>
   });
 
 describe("Zero Trust startup configuration", () => {
+  it("pins the Next version used by the narrow Edge response adapter", () => {
+    const packageJson = JSON.parse(
+      readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+    ) as { dependencies: { next: string } };
+
+    expect(packageJson.dependencies.next).toBe(
+      NEXT_EDGE_RESPONSE_ADAPTER_VERSION,
+    );
+    expect(NarrowNextResponse.next().headers.get("x-middleware-next")).toBe(
+      "1",
+    );
+  });
+
   it.each(["production", "staging"])(
     "fails closed in %s when the verifier is missing",
     (appEnvironment) => {
@@ -197,62 +213,60 @@ describe("Zero Trust startup configuration", () => {
     );
   });
 
-  it("maps only the exact public M1 subpath to the authoritative router", () => {
-    const configuration = { resolve: { alias: {} } };
+  it("scopes NodeNext extension resolution to contracts without module aliases", () => {
+    const configuration = {
+      module: { rules: [] as unknown[] },
+      resolve: { alias: {} },
+    };
+
+    expect(nextConfig.webpack).toBeTypeOf("function");
     const adapted = nextConfig.webpack?.(configuration as never, {} as never);
-    const aliases = configuration.resolve.alias as Record<string, unknown>;
+    const [contractRule] = configuration.module.rules as {
+      include?: RegExp;
+      resolve?: { extensionAlias?: Record<string, string[]> };
+    }[];
 
     expect(adapted).toBe(configuration);
-    expect(M1_ROUTER_WEBPACK_SOURCE).toMatch(
-      /packages\/contracts\/src\/m1\/router\.ts$/u,
-    );
-    expect(aliases["@huoqiu/contracts/m1$"]).toBe(M1_ROUTER_WEBPACK_SOURCE);
+    expect(contractRule?.resolve?.extensionAlias).toEqual({
+      ".js": [".ts", ".tsx", ".js"],
+    });
     expect(
-      Object.keys(aliases).filter((specifier) =>
-        specifier.startsWith("@huoqiu/contracts/m1"),
+      contractRule?.include?.test(
+        "/workspace/packages/contracts/src/m1/auth.schemas.ts",
       ),
-    ).toEqual(["@huoqiu/contracts/m1$"]);
-    expect(authoritativeM1Router).toBe(publicM1Router);
-    expect(authoritativeM1Router.authRegister).toBe(
-      publicM1Router.authRegister,
-    );
-    expect(authoritativeM1Router.authLogin).toBe(publicM1Router.authLogin);
-    expect(authoritativeM1Router.authGetSession).toBe(
-      publicM1Router.authGetSession,
-    );
-    expect(authoritativeM1Router.authLogout).toBe(publicM1Router.authLogout);
-    expect(authoritativeM1Router.authRegister.body).toBe(
-      publicM1Router.authRegister.body,
-    );
-    expect(authoritativeM1Router.authRegister.headers).toBe(
-      publicM1Router.authRegister.headers,
-    );
-    expect(authoritativeM1Router.authLogin.body).toBe(
-      publicM1Router.authLogin.body,
-    );
-    expect(authoritativeM1Router.authLogin.headers).toBe(
-      publicM1Router.authLogin.headers,
-    );
-    expect(authoritativeM1Router.authLogout.body).toBe(
-      publicM1Router.authLogout.body,
-    );
-    expect(authoritativeM1Router.authLogout.headers).toBe(
-      publicM1Router.authLogout.headers,
-    );
-    expect(authoritativeM1Router.authGetSession).not.toHaveProperty("body");
+    ).toBe(true);
     expect(
-      (
-        authoritativeM1Router.authGetSession as typeof authoritativeM1Router.authGetSession & {
-          headers: unknown;
-        }
-      ).headers,
-    ).toBe(
-      (
-        publicM1Router.authGetSession as typeof publicM1Router.authGetSession & {
-          headers: unknown;
-        }
-      ).headers,
+      contractRule?.include?.test(
+        "/workspace/node_modules/next/dist/esm/api/server.js",
+      ),
+    ).toBe(false);
+    expect(configuration.resolve.alias).toEqual({});
+  });
+
+  it("keeps production Edge artifacts free of test-only Node shims and embedded sources", () => {
+    class CapturingDefinePlugin {
+      constructor(readonly definitions: Readonly<Record<string, string>>) {}
+    }
+    const configuration = {
+      devtool: "source-map",
+      module: { rules: [] as unknown[] },
+      plugins: [] as CapturingDefinePlugin[],
+    };
+
+    nextConfig.webpack?.(
+      configuration as never,
+      {
+        dev: false,
+        nextRuntime: "edge",
+        webpack: { DefinePlugin: CapturingDefinePlugin },
+      } as never,
     );
+
+    expect(configuration.devtool).toBe("hidden-nosources-source-map");
+    expect(configuration.plugins).toHaveLength(1);
+    expect(configuration.plugins[0]?.definitions).toEqual({
+      "process.env.NEXT_PRIVATE_TEST_PROXY": JSON.stringify("false"),
+    });
   });
 });
 
