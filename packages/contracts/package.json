@@ -14,9 +14,10 @@
     "./shared/page": "./src/shared/page.ts"
   },
   "scripts": {
-    "lint": "eslint --config ../config/eslint/base.mjs src test",
+    "generate:openapi": "tsx scripts/generate-openapi.mts",
+    "lint": "eslint --config ../config/eslint/base.mjs scripts src test",
     "test": "vitest run --config ../config/vitest/base.ts test",
-    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals src/index.ts src/d0/index.ts src/d0/schema.ts src/feed/card-v1.ts src/shared/error.ts src/shared/page.ts src/m1/*.ts test/d0-fixture.contract.spec.ts test/feed-card-v1.spec.ts test/shared.spec.ts test/synthetic-market-fixture.spec.ts test/m1-*.spec.ts"
+    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals scripts/generate-openapi.mts src/index.ts src/d0/index.ts src/d0/schema.ts src/feed/card-v1.ts src/shared/error.ts src/shared/page.ts src/m1/*.ts test/d0-fixture.contract.spec.ts test/feed-card-v1.spec.ts test/openapi.spec.ts test/shared.spec.ts test/synthetic-market-fixture.spec.ts test/m1-*.spec.ts"
   },
   "dependencies": {
     "@ts-rest/core": "3.52.1",
@@ -24,7 +25,10 @@
     "zod4": "npm:zod@4.4.3"
   },
   "devDependencies": {
-    "@huoqiu/config": "workspace:*"
+    "@huoqiu/config": "workspace:*",
+    "@ts-rest/open-api": "3.52.1",
+    "tsx": "4.23.9",
+    "yaml": "2.9.0"
   },
   "peerDependencies": {
     "eslint": "10.8.0",
