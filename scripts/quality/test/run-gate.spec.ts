@@ -72,6 +72,7 @@ const temporaryRoots: string[] = [];
 const reviewEnvironments = new Map<string, NodeJS.ProcessEnv>();
 const authorshipEnvironments = new Map<string, NodeJS.ProcessEnv>();
 const registrySigners = new Map<string, (unsigned: unknown) => string>();
+const TEST_EXECUTION_IMAGE_DIGEST = `sha256:${"e".repeat(64)}`;
 
 const canonicalJsonForTesting = (value: unknown): string => {
   if (Array.isArray(value))
@@ -187,34 +188,72 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
   );
   temporaryRoots.push(launcherRoot);
   const launcherPath = resolve(launcherRoot, "launcher.mjs");
+  const protectedNode = await realpath(process.execPath);
+  const protectedPnpm = await realpath(
+    resolve(
+      dirname(protectedNode),
+      process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+    ),
+  );
   await writeFile(
     launcherPath,
     [
       "#!/usr/bin/env node",
       "import { spawn } from 'node:child_process';",
+      "import { delimiter, dirname, isAbsolute } from 'node:path';",
       "const marker = process.argv[1];",
       "const encoded = process.argv[2];",
-      "if (marker !== '--huoqiu-request-v2' || encoded === undefined) process.exit(90);",
+      "if (marker !== '--huoqiu-request-v3' || encoded === undefined) process.exit(90);",
       "const request = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));",
-      "const environment = { PATH: process.env.PATH, LANG: 'C', LC_ALL: 'C', TZ: 'UTC', HUOQIU_PROCESS_TREE_TOKEN: process.env.HUOQIU_PROCESS_TREE_TOKEN };",
+      `const protectedNode = ${JSON.stringify(protectedNode)};`,
+      `const protectedPnpm = ${JSON.stringify(protectedPnpm)};`,
+      `const expectedImage = ${JSON.stringify(TEST_EXECUTION_IMAGE_DIGEST)};`,
+      "const exactKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join('\\0') === [...keys].sort().join('\\0');",
+      "if (!exactKeys(request, ['schema_version','workspace','install','command','isolation_profile','execution_image_digest','limits'])) process.exit(91);",
+      "if (request.schema_version !== 3 || typeof request.workspace !== 'string' || !isAbsolute(request.workspace) || request.isolation_profile !== 'container-v1:no-network,read-only-source,owned-process-tree' || request.execution_image_digest !== expectedImage || typeof request.install !== 'boolean') process.exit(92);",
+      "if (!exactKeys(request.limits, ['timeout_ms','max_output_bytes']) || !Number.isSafeInteger(request.limits.timeout_ms) || request.limits.timeout_ms <= 0 || !Number.isSafeInteger(request.limits.max_output_bytes) || request.limits.max_output_bytes <= 0) process.exit(93);",
+      "if (!exactKeys(request.command, ['executable','args']) || typeof request.command.executable !== 'string' || !Array.isArray(request.command.args) || !request.command.args.every((arg) => typeof arg === 'string')) process.exit(94);",
+      "const platformName = (value) => process.platform === 'win32' ? value.toLowerCase() : value;",
+      "const allowedCommand = (command) => {",
+      "  if (command.executable === protectedNode) return command.args.length > 0 && !command.args[0].startsWith('-') && /\\.(?:cjs|js|mjs)$/i.test(command.args[0]) && !command.args.some((arg) => ['-e','-p','--eval','--print'].includes(arg));",
+      "  if (platformName(command.executable) !== 'pnpm' || command.args[0] !== 'exec') return false;",
+      "  let index = 1; while (command.args[index] === '--') index += 1;",
+      "  const target = command.args[index]; const canonicalTarget = typeof target === 'string' ? platformName(target) : '';",
+      "  if (!['tsx','vitest','playwright'].includes(canonicalTarget) || target.includes('/') || target.includes('\\\\')) return false;",
+      "  const args = command.args.slice(index + 1); const forbidden = new Set(['codegen','-w','--watch','--watchall','--watch-all','--ui','--ui-host','--ui-port','--debug','--inspect','--inspect-brk','--inspect-wait','--headed','--show-report']);",
+      "  if (args.some((arg) => forbidden.has(arg.split('=', 1)[0].toLowerCase()))) return false;",
+      "  if (canonicalTarget === 'tsx') return typeof args[0] === 'string' && !args[0].startsWith('-') && /\\.(?:[cm]?[jt]s|[jt]sx)$/i.test(args[0]);",
+      "  return args[0] === (canonicalTarget === 'vitest' ? 'run' : 'test');",
+      "};",
+      "if (!allowedCommand(request.command)) process.exit(95);",
+      "const systemPath = process.platform === 'win32' ? 'C:\\\\Windows\\\\System32;C:\\\\Windows' : '/usr/bin:/bin';",
+      "const environment = { PATH: [dirname(protectedNode), systemPath].join(delimiter), LANG: 'C', LC_ALL: 'C', TZ: 'UTC', HUOQIU_PROCESS_TREE_TOKEN: process.env.HUOQIU_PROCESS_TREE_TOKEN };",
+      "const physical = (logical) => platformName(logical.executable) === 'pnpm' && logical.args[0] === 'exec' && platformName(logical.args[1] ?? '') === 'tsx' && /\\.mjs$/.test(logical.args[2] ?? '') ? { executable: protectedNode, args: logical.args.slice(2) } : platformName(logical.executable) === 'pnpm' ? { executable: protectedNode, args: [protectedPnpm, ...logical.args] } : logical.executable === protectedNode ? logical : null;",
       "const run = (command) => new Promise((resolve, reject) => {",
-      "  const child = spawn(command.executable, command.args, { cwd: request.workspace, env: environment, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });",
-      "  let stdout = ''; let stderr = '';",
+      "  const mapped = physical(command); if (mapped === null) { reject(new Error('unmapped command')); return; }",
+      "  const child = spawn(mapped.executable, mapped.args, { cwd: request.workspace, detached: process.platform !== 'win32', env: environment, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });",
+      "  let stdout = ''; let stderr = ''; let outputBytes = 0; let terminalError = null; let settled = false;",
+      "  const terminate = () => { if (child.pid === undefined) return; try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); } };",
+      "  const timeout = setTimeout(() => { terminalError = { code: 'COMMAND_TIMEOUT', message: `exceeded ${request.limits.timeout_ms}ms` }; terminate(); }, request.limits.timeout_ms);",
+      "  const append = (stream, chunk) => { outputBytes += Buffer.byteLength(chunk); if (outputBytes > request.limits.max_output_bytes) { terminalError = { code: 'COMMAND_OUTPUT_LIMIT', message: `exceeded ${request.limits.max_output_bytes} bytes` }; terminate(); return; } if (stream === 'stdout') stdout += chunk; else stderr += chunk; };",
       "  child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');",
-      "  child.stdout.on('data', (chunk) => { stdout += chunk; });",
-      "  child.stderr.on('data', (chunk) => { stderr += chunk; });",
-      "  child.once('error', reject);",
-      "  child.once('close', (code, signal) => resolve({ code: code ?? -1, signal, stdout, stderr }));",
+      "  child.stdout.on('data', (chunk) => append('stdout', chunk));",
+      "  child.stderr.on('data', (chunk) => append('stderr', chunk));",
+      "  child.once('error', (error) => { if (settled) return; settled = true; clearTimeout(timeout); terminate(); reject(error); });",
+      "  child.once('close', (code, signal) => { if (settled) return; settled = true; clearTimeout(timeout); terminate(); resolve({ code: code ?? -1, signal, stdout, stderr, terminalError }); });",
       "});",
-      "if (request.install_command !== null) {",
-      "  const install = await run(request.install_command);",
-      "  if (install.code !== 0 || install.signal !== null) { process.stderr.write(install.stderr); process.exit(91); }",
+      "if (request.install) {",
+      "  const install = await run({ executable: 'pnpm', args: ['install','--offline','--frozen-lockfile','--strict-peer-dependencies'] });",
+      "  if (install.terminalError !== null) { const envelope = { schema_version: 3, status: 'error', error: install.terminalError }; process.stdout.write(`HUOQIU_PROTECTED_EXECUTION_RESULT ${Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64')}\\n`); process.exit(0); }",
+      "  if (install.code !== 0 || install.signal !== null) { process.stderr.write(install.stderr); process.exit(96); }",
       "}",
       "const startedAt = new Date().toISOString();",
-      "const result = await run(request.execution_command);",
+      "const result = await run(request.command);",
       "const finishedAt = new Date().toISOString();",
+      "if (result.terminalError !== null) { const envelope = { schema_version: 3, status: 'error', error: result.terminalError }; process.stdout.write(`HUOQIU_PROTECTED_EXECUTION_RESULT ${Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64')}\\n`); process.exit(0); }",
       "const report = { schema_version: 1, command: request.command, started_at: startedAt, finished_at: finishedAt, exit_code: result.code, signal: result.signal, stdout: result.stdout, stderr: result.stderr };",
-      "process.stdout.write(`HUOQIU_PROTECTED_EXECUTION_RESULT ${Buffer.from(JSON.stringify(report), 'utf8').toString('base64')}\\n`);",
+      "const envelope = { schema_version: 3, status: 'ok', report };",
+      "process.stdout.write(`HUOQIU_PROTECTED_EXECUTION_RESULT ${Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64')}\\n`);",
       "",
     ].join("\n"),
     "utf8",
@@ -232,6 +271,7 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
     expires_at: "2099-01-01T00:00:00.000Z",
     verifier_sha256: verifierSha,
     execution_launcher_sha256: launcherSha,
+    execution_image_digest: TEST_EXECUTION_IMAGE_DIGEST,
     keys: {
       [keyId]: {
         subject_id: "github:200",
@@ -330,6 +370,7 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
     HUOQIU_VERIFIER_ENTRYPOINT_PATH: verifierEntrypoint,
     HUOQIU_EXECUTION_LAUNCHER_PATH: launcherPath,
     HUOQIU_EXECUTION_LAUNCHER_SHA256: launcherSha,
+    HUOQIU_EXECUTION_IMAGE_DIGEST: TEST_EXECUTION_IMAGE_DIGEST,
     HUOQIU_EXECUTION_ISOLATION_PROFILE:
       "container-v1:no-network,read-only-source,owned-process-tree",
     HUOQIU_REPOSITORY_ID: "9001",
@@ -368,6 +409,7 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
     HUOQIU_VERIFIER_ENTRYPOINT_PATH: verifierEntrypoint,
     HUOQIU_EXECUTION_LAUNCHER_PATH: launcherPath,
     HUOQIU_EXECUTION_LAUNCHER_SHA256: launcherSha,
+    HUOQIU_EXECUTION_IMAGE_DIGEST: TEST_EXECUTION_IMAGE_DIGEST,
     HUOQIU_EXECUTION_ISOLATION_PROFILE:
       "container-v1:no-network,read-only-source,owned-process-tree",
     HUOQIU_REPOSITORY_ID: "9001",
@@ -554,6 +596,31 @@ const writeCapabilityProgram = async (
   await mkdir(dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, source, "utf8");
   return { executable: process.execPath, args: [relativePath] };
+};
+
+const replaceFirstCapabilityProgram = async (
+  root: string,
+  name: string,
+  source: string,
+): Promise<void> => {
+  const manifestPath = resolve(root, "quality/manifests/d0-required.json");
+  const manifest = await json(manifestPath);
+  const first = (manifest.required_caps as Record<string, unknown>[])[0];
+  if (first === undefined) throw new Error("missing test capability");
+  first.command = await writeCapabilityProgram(root, name, source);
+  await writeJson(manifestPath, manifest);
+  await execFile(
+    "git",
+    [
+      "add",
+      "quality/manifests/d0-required.json",
+      `scripts/quality/${name}.mjs`,
+    ],
+    { cwd: root },
+  );
+  await execFile("git", ["commit", "-q", "-m", `exercise ${name}`], {
+    cwd: root,
+  });
 };
 
 const setupRepository = async (
@@ -1247,6 +1314,24 @@ describe("argv-only capability execution", () => {
     },
   );
 
+  it.skipIf(process.platform === "win32")(
+    "compares pnpm exec targets with Unix case sensitivity",
+    () => {
+      for (const [target, args] of [
+        ["TSX", ["scripts/quality/check.mts"]],
+        ["Vitest", ["run"]],
+        ["PLAYWRIGHT", ["test"]],
+      ] as const) {
+        expect(() =>
+          validateCommand({
+            executable: "pnpm",
+            args: ["exec", target, ...args],
+          }),
+        ).toThrow("COMMAND_INVALID");
+      }
+    },
+  );
+
   it.each([
     ["/bin/sh", ["dash", "ksh"]],
     ["/usr/bin/bash", ["csh", "tcsh"]],
@@ -1702,6 +1787,56 @@ describe("strict CLI normalization", () => {
 
 describe("current evidence and independent review binding", () => {
   it.skipIf(process.platform === "win32")(
+    "never resolves a Node runtime through caller PATH",
+    async () => {
+      const root = await setupRepository();
+      const manifestPath = resolve(root, "quality/manifests/d0-required.json");
+      const manifest = await json(manifestPath);
+      const first = (manifest.required_caps as Record<string, unknown>[])[0];
+      if (first === undefined) throw new Error("missing test capability");
+      first.command = {
+        executable: "pnpm",
+        args: ["exec", "tsx", "scripts/quality/test-capability.mjs", "d0.v1"],
+      };
+      await writeJson(manifestPath, manifest);
+      await execFile("git", ["add", "quality/manifests/d0-required.json"], {
+        cwd: root,
+      });
+      await execFile("git", ["commit", "-q", "-m", "node runner probe"], {
+        cwd: root,
+      });
+      const hostileBin = await mkdtemp(
+        resolve(tmpdir(), "huoqiu-hostile-node-"),
+      );
+      temporaryRoots.push(hostileBin);
+      const marker = resolve(hostileBin, "fake-node-executed");
+      const fakeNode = resolve(hostileBin, "node");
+      await writeFile(
+        fakeNode,
+        [
+          "#!/bin/sh",
+          `printf escaped > ${JSON.stringify(marker)}`,
+          "exit 97",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      await chmod(fakeNode, 0o700);
+      const originalPath = process.env.PATH;
+      process.env.PATH = `${hostileBin}:${originalPath ?? ""}`;
+      try {
+        await expect(
+          runTrustedCapability(root, "d0", "CAP-ID-001"),
+        ).resolves.toMatchObject({ cap_id: "CAP-ID-001" });
+        await expect(readFile(marker)).rejects.toThrow();
+      } finally {
+        if (originalPath === undefined) delete process.env.PATH;
+        else process.env.PATH = originalPath;
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
     "never resolves a pnpm capability runner through caller PATH",
     async () => {
       const root = await setupRepository();
@@ -1752,7 +1887,7 @@ describe("current evidence and independent review binding", () => {
       try {
         await expect(
           runTrustedCapability(root, "d0", "CAP-ID-001"),
-        ).rejects.toThrow("CAPABILITY_COMMAND_FAILED");
+        ).resolves.toMatchObject({ cap_id: "CAP-ID-001" });
         await expect(readFile(marker)).rejects.toThrow();
       } finally {
         if (originalPath === undefined) delete process.env.PATH;
@@ -1760,6 +1895,129 @@ describe("current evidence and independent review binding", () => {
       }
     },
   );
+
+  it("binds the complete execution image digest through the signed registry", async () => {
+    const root = await setupRepository();
+    const environment = reviewEnvironments.get(root);
+    if (environment === undefined)
+      throw new Error("missing protected review environment");
+    environment.HUOQIU_EXECUTION_IMAGE_DIGEST = `sha256:${"f".repeat(64)}`;
+    await expect(
+      runCapability(root, "d0", "CAP-ID-001", { environment }),
+    ).rejects.toThrow("PROTECTED_EXECUTION_LAUNCHER_REQUIRED");
+  });
+
+  it("propagates a production-launcher command timeout envelope", async () => {
+    const root = await setupRepository();
+    await replaceFirstCapabilityProgram(
+      root,
+      "protected-timeout",
+      "setInterval(() => {}, 1000);\n",
+    );
+    await expect(
+      runCapability(root, "d0", "CAP-ID-001", {
+        environment: reviewEnvironments.get(root) ?? {},
+        timeoutMs: 1_000,
+      }),
+    ).rejects.toThrow("COMMAND_TIMEOUT");
+  });
+
+  it("propagates a production-launcher combined output-limit envelope", async () => {
+    const root = await setupRepository();
+    await replaceFirstCapabilityProgram(
+      root,
+      "protected-output-limit",
+      "console.log('x'.repeat(10000));\n",
+    );
+    await expect(
+      runCapability(root, "d0", "CAP-ID-001", {
+        environment: reviewEnvironments.get(root) ?? {},
+        maxOutputBytes: 4_096,
+      }),
+    ).rejects.toThrow("COMMAND_OUTPUT_LIMIT");
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "kills production-launcher descendants after a normally exiting command",
+    async () => {
+      const root = await setupRepository();
+      const markerRoot = await mkdtemp(
+        resolve(tmpdir(), "huoqiu-protected-descendant-"),
+      );
+      temporaryRoots.push(markerRoot);
+      const marker = resolve(markerRoot, "escaped");
+      const summary = `HUOQIU_CAPABILITY_RESULT ${JSON.stringify({
+        fixture_version: "d0.v1",
+        passed: 1,
+        failed: 0,
+        skipped: 0,
+        invalid_test_markers: [],
+        p0: 0,
+        p1: 0,
+      })}`;
+      const escapedSource = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'escaped'), 350);`;
+      await replaceFirstCapabilityProgram(
+        root,
+        "protected-descendant",
+        [
+          "import { spawn } from 'node:child_process';",
+          `spawn(process.execPath, ['-e', ${JSON.stringify(escapedSource)}], { stdio: 'ignore' }).unref();`,
+          `console.log(${JSON.stringify(summary)});`,
+          "",
+        ].join("\n"),
+      );
+      await expect(
+        runCapability(root, "d0", "CAP-ID-001", {
+          environment: reviewEnvironments.get(root) ?? {},
+        }),
+      ).resolves.toMatchObject({ cap_id: "CAP-ID-001" });
+      await new Promise<void>((resolvePromise) =>
+        setTimeout(resolvePromise, 600),
+      );
+      await expect(readFile(marker)).rejects.toThrow();
+    },
+  );
+
+  it("rejects unknown fields in a v3 launcher result envelope", async () => {
+    const root = await setupRepository();
+    const environment = reviewEnvironments.get(root);
+    const authorshipEnvironment = authorshipEnvironments.get(root);
+    const launcherPath = environment?.HUOQIU_EXECUTION_LAUNCHER_PATH;
+    if (
+      environment === undefined ||
+      authorshipEnvironment === undefined ||
+      launcherPath === undefined
+    ) {
+      throw new Error("missing protected launcher fixture");
+    }
+    const original = await readFile(launcherPath, "utf8");
+    const modified = original.replace(
+      "const envelope = { schema_version: 3, status: 'ok', report };",
+      "const envelope = { schema_version: 3, status: 'ok', report, attacker_field: true };",
+    );
+    expect(modified).not.toBe(original);
+    await writeFile(launcherPath, modified, "utf8");
+    await chmod(launcherPath, 0o700);
+    const digest = createHash("sha256")
+      .update(await readFile(launcherPath))
+      .digest("hex");
+    await resignTrustRegistry(root, (unsigned) => {
+      unsigned.execution_launcher_sha256 = digest;
+    });
+    await execFile("git", ["add", "quality/reviewers/trust-registry.v2.json"], {
+      cwd: root,
+    });
+    await execFile(
+      "git",
+      ["commit", "-q", "-m", "exercise strict launcher envelope"],
+      { cwd: root },
+    );
+    environment.HUOQIU_EXECUTION_LAUNCHER_SHA256 = digest;
+    authorshipEnvironment.HUOQIU_EXECUTION_LAUNCHER_SHA256 = digest;
+    await expect(
+      runCapability(root, "d0", "CAP-ID-001", { environment }),
+    ).rejects.toThrow("PROTECTED_EXECUTION_FAILED");
+  });
 
   it.skipIf(process.platform === "win32")(
     "verifies protected trust before any PATH-resolved Git can execute",

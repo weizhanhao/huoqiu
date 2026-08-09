@@ -325,7 +325,12 @@ export interface RunCommand {
 }
 
 const executableBasename = (executable: string): string | undefined =>
-  executable.replaceAll("\\", "/").split("/").at(-1)?.toLowerCase();
+  executable.replaceAll("\\", "/").split("/").at(-1);
+
+const platformExecutableBasename = (executable: string): string | undefined => {
+  const basename = executableBasename(executable);
+  return process.platform === "win32" ? basename?.toLowerCase() : basename;
+};
 
 const NODE_EXECUTABLES = new Set(["node", "node.exe"]);
 const PNPM_EXECUTABLES = new Set(["pnpm", "pnpm.cmd", "pnpm.exe"]);
@@ -359,7 +364,7 @@ const assertAllowedRunner = (
   args: readonly string[],
   code: string,
 ): void => {
-  const basename = executableBasename(executable);
+  const basename = platformExecutableBasename(executable);
   if (basename !== undefined && NODE_EXECUTABLES.has(basename)) {
     if (
       isBareExecutable(executable) ||
@@ -395,7 +400,7 @@ const assertAllowedRunner = (
     args[targetIndex] ??
     fail(code, "pnpm exec requires an allowlisted executable");
   const targetBasename =
-    executableBasename(target) ??
+    platformExecutableBasename(target) ??
     fail(code, "pnpm exec requires an allowlisted executable");
   if (
     !isBareExecutable(target) ||
@@ -1527,7 +1532,7 @@ const executeSpawn = async (
   }
   const startedAt = clock().toISOString();
   const ownershipToken = randomUUID();
-  const gitExecution = executableBasename(executable) === "git";
+  const gitExecution = platformExecutableBasename(executable) === "git";
   const baselineWorkspacePids = gitExecution
     ? new Set<number>()
     : new Set(await processIdsUsingWorkspace(root));
@@ -2374,16 +2379,18 @@ interface ProtectedExecutionLauncher {
   sha256: string;
   source: string;
   identity: ProtectedFileIdentity;
-}
-
-interface ProtectedPnpmRunner {
-  path: string;
-  sha256: string;
-  identity: ProtectedFileIdentity;
+  imageDigest: string;
 }
 
 const PROTECTED_ISOLATION_PROFILE =
   "container-v1:no-network,read-only-source,owned-process-tree";
+const PROTECTED_LAUNCHER_GRACE_MS = 2_000;
+const PROTECTED_LAUNCHER_ERROR_CODES = new Set([
+  "COMMAND_EXECUTION_FAILED",
+  "COMMAND_OUTPUT_LIMIT",
+  "COMMAND_TIMEOUT",
+  "PROCESS_TREE_CLEANUP_FAILED",
+]);
 
 const protectedExecutionLauncher = async (
   root: string,
@@ -2420,6 +2427,17 @@ const protectedExecutionLauncher = async (
   const registry = await loadTrustRegistry(root, environment);
   if (registry.registry.execution_launcher_sha256 !== measuredSha)
     fail(code, "launcher digest is not authorized by the trust registry");
+  const imageDigest = requirePatternString(
+    environment.HUOQIU_EXECUTION_IMAGE_DIGEST,
+    code,
+    "HUOQIU_EXECUTION_IMAGE_DIGEST",
+    /^sha256:[a-f0-9]{64}$/,
+  );
+  if (registry.registry.execution_image_digest !== imageDigest)
+    fail(
+      code,
+      "execution image digest is not authorized by the trust registry",
+    );
   const source = assertSelfContainedBuiltInModule(
     snapshot.bytes,
     code,
@@ -2430,54 +2448,9 @@ const protectedExecutionLauncher = async (
     sha256: measuredSha,
     source,
     identity: snapshot.identity,
+    imageDigest,
   };
 };
-
-const protectedPnpmRunner = async (
-  root: string,
-): Promise<ProtectedPnpmRunner> => {
-  const code = "PROTECTED_EXECUTION_LAUNCHER_REQUIRED";
-  const adjacentPnpm = resolve(
-    dirname(PROTECTED_NODE_EXECUTABLE),
-    process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-  );
-  const resolvedPnpm = await realpath(adjacentPnpm).catch(() =>
-    fail(code, "pnpm is not installed beside the protected Node runtime"),
-  );
-  const snapshot = await readProtectedFile(
-    resolvedPnpm,
-    root,
-    code,
-    "protected pnpm runner",
-    true,
-  );
-  return {
-    path: snapshot.path,
-    sha256: sha256(snapshot.bytes),
-    identity: snapshot.identity,
-  };
-};
-
-const protectedPnpmCommand = (
-  runner: ProtectedPnpmRunner,
-  args: readonly string[],
-): RunCommand => {
-  if (/\.(?:cjs|js|mjs)$/iu.test(runner.path)) {
-    return {
-      executable: PROTECTED_NODE_EXECUTABLE,
-      args: [runner.path, ...args],
-    };
-  }
-  return { executable: runner.path, args: [...args] };
-};
-
-const protectedExecutionCommand = (
-  command: RunCommand,
-  pnpm: ProtectedPnpmRunner,
-): RunCommand =>
-  PNPM_EXECUTABLES.has(executableBasename(command.executable) ?? "")
-    ? protectedPnpmCommand(pnpm, command.args)
-    : command;
 
 const executeWithProtectedLauncher = async (
   root: string,
@@ -2487,30 +2460,34 @@ const executeWithProtectedLauncher = async (
   options: ExecuteCommandOptions,
 ): Promise<SpawnResult> => {
   const safeCommand = validateCommand(command);
-  const pnpm = await protectedPnpmRunner(root);
-  const executionCommand = protectedExecutionCommand(safeCommand, pnpm);
-  const installCommand = install
-    ? protectedPnpmCommand(pnpm, [
-        "install",
-        "--offline",
-        "--frozen-lockfile",
-        "--strict-peer-dependencies",
-      ])
-    : null;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS;
+  const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+  if (
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs <= 0 ||
+    !Number.isSafeInteger(maxOutputBytes) ||
+    maxOutputBytes <= 0
+  ) {
+    fail(
+      "COMMAND_INVALID",
+      "timeout and output limit must be positive safe integers",
+    );
+  }
   const request = Buffer.from(
     canonicalJson({
-      schema_version: 2,
+      schema_version: 3,
       workspace: root,
-      install_command: installCommand,
-      execution_command: executionCommand,
+      install,
       command: safeCommand,
       isolation_profile: PROTECTED_ISOLATION_PROFILE,
+      execution_image_digest: launcher.imageDigest,
+      limits: { timeout_ms: timeoutMs, max_output_bytes: maxOutputBytes },
     }),
     "utf8",
   ).toString("base64");
   const launcherCommand = {
     executable: launcher.path,
-    args: ["--huoqiu-request-v2", request],
+    args: ["--huoqiu-request-v3", request],
   };
   const launcherResult = await executeSpawn(
     root,
@@ -2524,9 +2501,10 @@ const executeWithProtectedLauncher = async (
       ...launcherCommand.args,
     ],
     {
-      ...(options.timeoutMs === undefined
-        ? {}
-        : { timeoutMs: options.timeoutMs }),
+      timeoutMs: Math.min(
+        Number.MAX_SAFE_INTEGER,
+        timeoutMs + PROTECTED_LAUNCHER_GRACE_MS,
+      ),
       maxOutputBytes: DEFAULT_MAX_OUTPUT_BYTES * 2,
       ...(options.environment === undefined
         ? {}
@@ -2555,21 +2533,17 @@ const executeWithProtectedLauncher = async (
       "PROTECTED_EXECUTION_FAILED",
       "launcher result is not canonical base64",
     );
-  const result = validateRawReport(
+  const unknownEnvelope = requireRecord(
     parseJson(
       bytes.toString("utf8"),
       "PROTECTED_EXECUTION_FAILED",
       "protected launcher result",
     ),
+    "PROTECTED_EXECUTION_FAILED",
+    "protected launcher envelope",
   );
-  if (canonicalJson(result.command) !== canonicalJson(safeCommand))
-    fail("PROTECTED_EXECUTION_FAILED", "launcher changed the command scope");
-  if (
-    Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr) >
-    DEFAULT_MAX_OUTPUT_BYTES
-  ) {
-    fail("COMMAND_OUTPUT_LIMIT", `exceeded ${DEFAULT_MAX_OUTPUT_BYTES} bytes`);
-  }
+  if (unknownEnvelope.schema_version !== 3)
+    fail("PROTECTED_EXECUTION_FAILED", "launcher result schema is invalid");
   const postExecutionMetadata = await lstat(launcher.path).catch(() =>
     fail(
       "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
@@ -2586,21 +2560,54 @@ const executeWithProtectedLauncher = async (
       "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
       "launcher filesystem identity changed during execution",
     );
-  const postPnpm = await readProtectedFile(
-    pnpm.path,
-    root,
-    "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
-    "protected pnpm runner",
-    true,
-  );
-  if (
-    !sameProtectedFileIdentity(pnpm.identity, postPnpm.identity) ||
-    sha256(postPnpm.bytes) !== pnpm.sha256
-  ) {
-    fail(
-      "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
-      "protected pnpm runner changed during execution",
+  if (unknownEnvelope.status === "error") {
+    assertExactKeys(
+      unknownEnvelope,
+      ["schema_version", "status", "error"],
+      "PROTECTED_EXECUTION_FAILED",
+      "protected launcher error envelope",
     );
+    const launcherError = requireRecord(
+      unknownEnvelope.error,
+      "PROTECTED_EXECUTION_FAILED",
+      "protected launcher error",
+    );
+    assertExactKeys(
+      launcherError,
+      ["code", "message"],
+      "PROTECTED_EXECUTION_FAILED",
+      "protected launcher error",
+    );
+    const errorCode = requireString(
+      launcherError.code,
+      "PROTECTED_EXECUTION_FAILED",
+      "protected launcher error code",
+    );
+    const errorMessage = requireString(
+      launcherError.message,
+      "PROTECTED_EXECUTION_FAILED",
+      "protected launcher error message",
+    );
+    if (!PROTECTED_LAUNCHER_ERROR_CODES.has(errorCode))
+      fail("PROTECTED_EXECUTION_FAILED", "launcher error code is invalid");
+    throw new QualityGateError(errorCode, errorMessage);
+  }
+  assertExactKeys(
+    unknownEnvelope,
+    ["schema_version", "status", "report"],
+    "PROTECTED_EXECUTION_FAILED",
+    "protected launcher result envelope",
+  );
+  if (unknownEnvelope.status !== "ok")
+    fail("PROTECTED_EXECUTION_FAILED", "launcher result status is invalid");
+  const result = validateRawReport(unknownEnvelope.report);
+  if (canonicalJson(result.command) !== canonicalJson(safeCommand))
+    fail("PROTECTED_EXECUTION_FAILED", "launcher changed the command scope");
+  if (
+    Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr) >
+    maxOutputBytes
+  ) {
+    fail("COMMAND_OUTPUT_LIMIT", `exceeded ${maxOutputBytes} bytes`);
   }
   return result;
 };
@@ -2765,7 +2772,12 @@ export const runCapability = async (
   root: string,
   milestone: Milestone,
   capId: string,
-  options: { clock?: () => Date; environment?: NodeJS.ProcessEnv } = {},
+  options: {
+    clock?: () => Date;
+    environment?: NodeJS.ProcessEnv;
+    timeoutMs?: number;
+    maxOutputBytes?: number;
+  } = {},
 ): Promise<Evidence> => {
   const environment = options.environment ?? process.env;
   // Establish both protected code identities before parsing candidate
@@ -2789,6 +2801,10 @@ export const runCapability = async (
   if (options.clock !== undefined) commandOptions.clock = options.clock;
   if (options.environment !== undefined)
     commandOptions.environment = options.environment;
+  if (options.timeoutMs !== undefined)
+    commandOptions.timeoutMs = options.timeoutMs;
+  if (options.maxOutputBytes !== undefined)
+    commandOptions.maxOutputBytes = options.maxOutputBytes;
   const execution = await executeInDetachedSnapshot(
     root,
     context,
@@ -3042,6 +3058,7 @@ interface TrustRegistry {
   expires_at: string;
   verifier_sha256: string;
   execution_launcher_sha256: string;
+  execution_image_digest: string;
   keys: Record<string, TrustPolicy>;
   signature: {
     algorithm: "Ed25519";
@@ -3072,6 +3089,7 @@ const validateTrustRegistry = (value: unknown): TrustRegistry => {
       "expires_at",
       "verifier_sha256",
       "execution_launcher_sha256",
+      "execution_image_digest",
       "keys",
       "signature",
     ],
@@ -3274,6 +3292,12 @@ const validateTrustRegistry = (value: unknown): TrustRegistry => {
       "execution_launcher_sha256",
       /^[a-f0-9]{64}$/,
     ),
+    execution_image_digest: requirePatternString(
+      registry.execution_image_digest,
+      code,
+      "execution_image_digest",
+      /^sha256:[a-f0-9]{64}$/,
+    ),
     keys,
     signature,
   };
@@ -3290,6 +3314,7 @@ const unsignedTrustRegistry = (
   expires_at: registry.expires_at,
   verifier_sha256: registry.verifier_sha256,
   execution_launcher_sha256: registry.execution_launcher_sha256,
+  execution_image_digest: registry.execution_image_digest,
   keys: registry.keys,
 });
 

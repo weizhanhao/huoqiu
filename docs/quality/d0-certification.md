@@ -14,10 +14,14 @@ candidate checkout before `.github/workflows/d0-quality-review.yml` can pass:
    from a login, display name, commit email, or local Git configuration.
 2. Install the pinned verifier distribution and execution launcher on a
    dedicated Apple Silicon self-hosted runner labelled
-   `huoqiu-quality-macos`. Register their exact
-   digests, paths, repository ID, root public key, registry epoch, and isolation
-   profile as protected environment variables. The runner must provide the
-   no-network, read-only-source, complete-process-tree boundary described in
+   `huoqiu-quality-macos`. The launcher and
+   every parent directory in its ownership chain must be protected from
+   candidate writes. Register the launcher's exact SHA-256 and path, the
+   immutable execution-image digest, repository ID, root public key, registry
+   epoch, and isolation profile as protected environment variables. The same
+   launcher SHA-256 and image digest must be authorized by the root-signed trust
+   registry. The runner must provide the no-network, read-only-source,
+   complete-process-tree boundary described in
    `docs/engineering/quality-trust-model.md`; there is no local fallback.
    It must also provide the root-owned mobile toolchain registry documented by
    `scripts/quality/mobile-d0-evidence.mts`, a bootable iOS Simulator, a
@@ -72,3 +76,22 @@ and the D0 manifests still contain explicit pending sentinels. Therefore the
 repository is not currently externally certifiable. This is an honest external
 configuration blocker, not a test pass and not a reason to fabricate IDs,
 keys, evidence, or a weaker gate.
+
+## Protected launcher v3 contract
+
+The independently installed launcher must accept only the
+`--huoqiu-request-v3` protocol and strictly reject missing or extra fields. It
+must validate the exact isolation profile, immutable image digest, logical
+allowlisted command, install boolean, timeout, and combined-output limit before
+starting any candidate process. The image identified by that digest must bind
+the complete Node, pnpm, Corepack/pnpm implementation, and allowlisted target
+CLI closure; pinning only a Corepack shim is insufficient.
+
+Inside the launcher boundary, `PATH` must start with the protected image's Node
+directory and contain only required system directories. Caller-provided tool
+directories must not be inherited. The launcher returns one strict v3 result
+envelope, owns and terminates the entire process tree on success or failure,
+and reports timeout/output-limit failures through the allowlisted error
+envelope. A platform that cannot prove argv-only execution and complete process
+ownership (including Windows `.cmd` handling) must fail closed rather than use
+a shell fallback.

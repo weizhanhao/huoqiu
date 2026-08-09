@@ -1,14 +1,14 @@
+import { execFile as execFileCallback } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { promisify } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  executeCommandForTesting,
-  parseCapabilitySummary,
-} from "../gate-core.mts";
+import { parseCapabilitySummary } from "../gate-core.mts";
 
 const sourceRoot = resolve(import.meta.dirname, "..", "..", "..");
+const execFile = promisify(execFileCallback);
 
 describe("D0 capability certification commands", () => {
   it("keeps manifest registration fail-closed until implementer identity is supplied", async () => {
@@ -53,6 +53,7 @@ describe("D0 capability certification commands", () => {
     expect(workflow).toContain("secrets.HUOQIU_REVIEW_PRIVATE_KEY_B64");
     expect(workflow).toContain("secrets.HUOQIU_REVIEW_CHECKLIST_B64");
     expect(workflow).toContain('"$HUOQIU_PROTECTED_VERIFIER_CLI" gate');
+    expect(workflow).toContain("HUOQIU_EXECUTION_IMAGE_DIGEST");
     expect(workflow).not.toMatch(/BEGIN (?:OPENSSH|PRIVATE) KEY/u);
     expect(guide).toContain("github:<numeric-id>");
     expect(guide).toContain("Ed25519");
@@ -63,18 +64,18 @@ describe("D0 capability certification commands", () => {
   });
 
   it("runs one real Web and App feed capability and emits one normalized passing result", async () => {
-    const execution = await executeCommandForTesting(sourceRoot, {
-      executable: "pnpm",
-      args: [
+    const execution = await execFile(
+      "pnpm",
+      [
         "exec",
         "tsx",
         "scripts/quality/d0-capability-gate.mts",
         "--cap",
         "CAP-FEED-001",
       ],
-    });
+      { cwd: sourceRoot },
+    );
 
-    expect(execution.exit_code).toBe(0);
     expect(parseCapabilitySummary(execution.stdout)).toMatchObject({
       failed: 0,
       fixture_version: "d0.v1",
