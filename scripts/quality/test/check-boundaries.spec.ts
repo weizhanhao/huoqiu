@@ -34,6 +34,7 @@ interface CheckerResult {
 const exactWorkspacePolicy = `packages:
   - apps/*
   - packages/*
+  - spikes/auth
 
 minimumReleaseAge: 1440
 minimumReleaseAgeStrict: true
@@ -112,6 +113,11 @@ const createRepository = async (): Promise<string> => {
     root,
     "packages/config/package.json",
     workspacePackage("@huoqiu/config", { typescript: "6.0.3" }),
+  );
+  await writeJson(
+    root,
+    "spikes/auth/package.json",
+    workspacePackage("@huoqiu/auth-spike", { typescript: "6.0.3" }),
   );
   await writeText(
     root,
@@ -648,6 +654,38 @@ describe("workspace and supply-chain boundaries", () => {
       expect(result.stderr).toContain("DIRECT_DEPENDENCY_NOT_EXACT");
     },
   );
+
+  it("accepts an npm alias only when its target is exactly pinned", async () => {
+    const root = await createRepository();
+    const path = "packages/config/package.json";
+    const manifest = await readManifest(root, path);
+    (manifest.dependencies as Record<string, string>).zod4 = "npm:zod@4.4.3";
+    await writeJson(root, path, manifest);
+
+    const result = await runChecker(root);
+
+    expect(result).toEqual({ code: 0, stderr: "" });
+  });
+
+  it.each([
+    "npm:zod@^4.4.3",
+    "npm:zod@~4.4.3",
+    "npm:zod@latest",
+    "npm:zod",
+    "npm:file:../zod@4.4.3",
+    "npm:@scope/pkg@^1.2.3",
+  ])("rejects a non-exact or malformed npm alias %s", async (version) => {
+    const root = await createRepository();
+    const path = "packages/config/package.json";
+    const manifest = await readManifest(root, path);
+    (manifest.dependencies as Record<string, string>).zod4 = version;
+    await writeJson(root, path, manifest);
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("DIRECT_DEPENDENCY_NOT_EXACT");
+  });
 
   it.each([
     "git+ssh://git@example.invalid/repo.git#deadbeef",

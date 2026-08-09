@@ -69,8 +69,24 @@ const EXCLUDED_IMPORT_TARGET_SEGMENTS = new Set([
 ]);
 const EXACT_VERSION =
   /^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/;
+const EXACT_ALIAS_PACKAGE_NAME =
+  /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u;
 const FORBIDDEN_SOURCE =
   /^(?:bitbucket:|file:|git(?:\+[^:]+)?:|github:|gitlab:|https?:|link:)/i;
+
+const isExactExternalDependency = (version: string): boolean => {
+  if (EXACT_VERSION.test(version)) return true;
+  if (!version.startsWith("npm:")) return false;
+  const aliasedTarget = version.slice("npm:".length);
+  const versionSeparator = aliasedTarget.lastIndexOf("@");
+  if (versionSeparator <= 0) return false;
+  const packageName = aliasedTarget.slice(0, versionSeparator);
+  const targetVersion = aliasedTarget.slice(versionSeparator + 1);
+  return (
+    EXACT_ALIAS_PACKAGE_NAME.test(packageName) &&
+    EXACT_VERSION.test(targetVersion)
+  );
+};
 
 interface InventoryAction {
   commit_sha: string;
@@ -166,7 +182,7 @@ const CANONICAL_QUALITY_STEPS: readonly Record<string, unknown>[] = [
   {
     name: "Run fixed quality lane",
     shell: "bash",
-    run: 'set -euo pipefail\ncase "${{ matrix.lane }}" in\n  format) pnpm format:check ;;\n  lint) pnpm lint ;;\n  typecheck) pnpm typecheck ;;\n  test)\n    mkdir -p test-results\n    pnpm test 2>&1 | tee test-results/unit.log\n    ;;\n  build) pnpm build ;;\n  boundaries) pnpm qa:boundaries ;;\n  *) exit 64 ;;\nesac\n',
+    run: 'set -euo pipefail\ncase "${{ matrix.lane }}" in\n  format) pnpm format:check ;;\n  lint) pnpm lint ;;\n  typecheck) pnpm typecheck ;;\n  test)\n    mkdir -p test-results\n    pnpm test 2>&1 | tee test-results/unit.log\n    ;;\n  build) pnpm build ;;\n  boundaries) pnpm qa:boundaries ;;\n  dependency-audit) pnpm qa:dependency-patch ;;\n  *) exit 64 ;;\nesac\n',
   },
   {
     name: "Upload unit-test log",
@@ -325,10 +341,34 @@ const discoverWorkspaceProjects = async (
       projects.push(await parseManifest(root, manifestPath, kind));
     }
   }
+  const authSpikeManifestPath = resolve(root, "spikes/auth/package.json");
+  try {
+    const status = await lstat(authSpikeManifestPath);
+    if (status.isSymbolicLink())
+      fail(
+        "WORKSPACE_SYMLINK_FORBIDDEN",
+        repositoryPath(root, authSpikeManifestPath),
+      );
+    if (!status.isFile())
+      fail(
+        "WORKSPACE_MANIFEST_UNREADABLE",
+        "spikes/auth/package.json must be a file",
+      );
+    projects.push(await parseManifest(root, authSpikeManifestPath, "package"));
+  } catch (error) {
+    if (error instanceof QualityGateError) throw error;
+    const detail =
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+        ? "required manifest is missing"
+        : error instanceof Error
+          ? error.message
+          : "unreadable file";
+    fail("WORKSPACE_MANIFEST_UNREADABLE", `spikes/auth: ${detail}`);
+  }
   if (projects.length === 0)
     fail(
       "WORKSPACE_PROJECTS_MISSING",
-      "no apps/* or packages/* manifests found",
+      "no apps/*, packages/*, or spikes/auth manifests found",
     );
   return projects;
 };
@@ -388,7 +428,7 @@ const validateDependencyGraph = (
         }
         continue;
       }
-      if (!EXACT_VERSION.test(version)) {
+      if (!isExactExternalDependency(version)) {
         fail(
           "DIRECT_DEPENDENCY_NOT_EXACT",
           `${project.manifestPath}: ${name}@${version}`,
@@ -1228,13 +1268,14 @@ const validatePnpmPolicy = async (root: string): Promise<void> => {
   const packagePatterns = parsed.blocks.get("packages");
   if (
     packagePatterns === undefined ||
-    packagePatterns.length !== 2 ||
+    packagePatterns.length !== 3 ||
     packagePatterns[0] !== "- apps/*" ||
-    packagePatterns[1] !== "- packages/*"
+    packagePatterns[1] !== "- packages/*" ||
+    packagePatterns[2] !== "- spikes/auth"
   ) {
     fail(
       "PNPM_WORKSPACE_GLOBS_INVALID",
-      "packages must be exactly apps/* and packages/*",
+      "packages must be exactly apps/*, packages/*, and spikes/auth",
     );
   }
 };
@@ -1935,6 +1976,7 @@ const validateMatrix = (model: WorkflowModel): void => {
     "test",
     "build",
     "boundaries",
+    "dependency-audit",
   ];
   if (
     strategy["fail-fast"] !== false ||
@@ -1942,7 +1984,7 @@ const validateMatrix = (model: WorkflowModel): void => {
     lanes.length !== expectedLanes.length ||
     lanes.some((lane, index) => lane !== expectedLanes[index])
   )
-    fail("CI_MATRIX_INVALID", "matrix must contain the six fixed lanes");
+    fail("CI_MATRIX_INVALID", "matrix must contain the seven fixed lanes");
   const qualityRuns = runCommands(jobSteps(model.jobs, "quality"));
   const script = qualityRuns.find((run) => run.includes("matrix.lane"));
   if (
@@ -1962,6 +2004,7 @@ const validateMatrix = (model: WorkflowModel): void => {
     "typecheck) pnpm typecheck ;;",
     "build) pnpm build ;;",
     "boundaries) pnpm qa:boundaries ;;",
+    "dependency-audit) pnpm qa:dependency-patch ;;",
     "*) exit 64 ;;",
   ])
     if (!fixedScript.includes(command))

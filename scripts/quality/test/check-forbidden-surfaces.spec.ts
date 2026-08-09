@@ -1276,6 +1276,40 @@ describe("forbidden runtime surfaces", () => {
     expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
   });
 
+  it.each([
+    'import { z } from "zod"; const safeDeepLinkSchema = z.string(); export const notificationSchema = z.object({ deep_link: safeDeepLinkSchema });',
+    'import { z as schema } from "zod"; const safeDeepLinkSchema = schema.string(); export const notificationSchema = schema.strictObject({ deep_link: safeDeepLinkSchema });',
+  ])(
+    "accepts a Zod object field named deep_link without treating its schema as a runtime value %s",
+    async (source) => {
+      const root = await createRepository();
+      await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+      await writeCandidate(
+        root,
+        source,
+        "packages/contracts/src/notification.contract.ts",
+      );
+
+      expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+    },
+  );
+
+  it("still rejects a dynamic deep_link on an ordinary runtime object", async () => {
+    const root = await createRepository();
+    const relativePath = "apps/web/src/notification.ts";
+    await writeCandidate(
+      root,
+      "const value = resolveRuntimeDeepLink(); export const notification = { deep_link: value };",
+      relativePath,
+    );
+
+    const result = await runScanner(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+    expect(result.stderr).toContain(relativePath);
+  });
+
   it("accepts an ordinary exported feed card schema", async () => {
     const root = await createRepository();
     await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));

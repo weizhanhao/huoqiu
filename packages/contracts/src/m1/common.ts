@@ -232,7 +232,7 @@ const isApprovedAppDeepLink = (value: string): boolean => {
   const { target, query } = splitDeepLinkQuery(value.slice("huoqiu://".length));
   const pathIndex = target.indexOf("/");
   const authority = pathIndex === -1 ? target : target.slice(0, pathIndex);
-  const path = pathIndex === -1 ? "" : target.slice(pathIndex);
+  const targetPath = pathIndex === -1 ? "" : target.slice(pathIndex);
 
   if (
     authority.length === 0 ||
@@ -244,7 +244,7 @@ const isApprovedAppDeepLink = (value: string): boolean => {
   }
   if (approvedStaticAppTargets.has(authority)) {
     return (
-      path.length === 0 &&
+      targetPath.length === 0 &&
       (authority === "search"
         ? isApprovedSearchQuery(query)
         : query === undefined)
@@ -253,8 +253,8 @@ const isApprovedAppDeepLink = (value: string): boolean => {
   return (
     approvedAppResourceTargets.has(authority) &&
     query === undefined &&
-    path.startsWith("/") &&
-    isApprovedResourceId(path.slice(1))
+    targetPath.startsWith("/") &&
+    isApprovedResourceId(targetPath.slice(1))
   );
 };
 

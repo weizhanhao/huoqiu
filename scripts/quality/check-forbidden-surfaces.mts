@@ -593,6 +593,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   const topLevelFunctions = new Map<string, ts.FunctionDeclaration>();
   const nestRouteDecoratorAliases = new Set<string>();
   const nestNamespaces = new Set<string>();
+  const zodObjectFactoryAliases = new Set<string>();
   const surfaces = new Set<string>();
   const evaluating = new Set<string>();
 
@@ -693,6 +694,25 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   }
 
   for (const statement of sourceFile.statements) {
+    if (
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteralLike(statement.moduleSpecifier) &&
+      statement.moduleSpecifier.text === "zod" &&
+      statement.importClause?.isTypeOnly !== true
+    ) {
+      const importClause = statement.importClause;
+      if (importClause?.name !== undefined)
+        zodObjectFactoryAliases.add(importClause.name.text);
+      const bindings = importClause?.namedBindings;
+      if (bindings !== undefined && ts.isNamespaceImport(bindings))
+        zodObjectFactoryAliases.add(bindings.name.text);
+      else if (bindings !== undefined)
+        for (const element of bindings.elements) {
+          if (element.isTypeOnly) continue;
+          if ((element.propertyName ?? element.name).text === "z")
+            zodObjectFactoryAliases.add(element.name.text);
+        }
+    }
     if (
       ts.isImportEqualsDeclaration(statement) &&
       !statement.isTypeOnly &&
@@ -871,6 +891,23 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       /^(?:commands|deep[-_]?links|deeplinks|hrefs|paths|pathnames|routes)$/i.test(
         value,
       )
+    );
+  };
+
+  const isZodObjectShapeProperty = (node: ts.PropertyAssignment): boolean => {
+    const shape = node.parent;
+    if (!ts.isObjectLiteralExpression(shape)) return false;
+    const call = shape.parent;
+    if (
+      !ts.isCallExpression(call) ||
+      call.arguments[0] !== shape ||
+      !ts.isPropertyAccessExpression(call.expression) ||
+      !["object", "strictObject"].includes(call.expression.name.text)
+    )
+      return false;
+    const factory = unwrapExpression(call.expression.expression);
+    return (
+      ts.isIdentifier(factory) && zodObjectFactoryAliases.has(factory.text)
     );
   };
 
@@ -1766,12 +1803,17 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     if (
       ts.isPropertyAssignment(node) &&
       runtimeField(node.name) &&
-      staticPropertyName(node.name) !== "path"
+      staticPropertyName(node.name) !== "path" &&
+      !isZodObjectShapeProperty(node)
     ) {
       requireStatic(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
     }
-    if (ts.isPropertyAssignment(node) && runtimeContainerField(node.name)) {
+    if (
+      ts.isPropertyAssignment(node) &&
+      runtimeContainerField(node.name) &&
+      !isZodObjectShapeProperty(node)
+    ) {
       requireStaticRegistry(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
     }
