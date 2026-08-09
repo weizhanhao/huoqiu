@@ -117,6 +117,41 @@ describe("M1 PostgreSQL schema physical constraints", () => {
     );
   });
 
+  it("persists the approved instrument and listing search fields and trigram indexes", () => {
+    const instrumentConfig = getTableConfig(publicSchema.instruments);
+    const listingConfig = getTableConfig(publicSchema.listings);
+    const instrumentColumns = new Map(
+      instrumentConfig.columns.map((column) => [column.name, column]),
+    );
+    const listingColumns = new Map(
+      listingConfig.columns.map((column) => [column.name, column]),
+    );
+
+    expect(instrumentColumns.get("name_pinyin")?.getSQLType()).toBe("text");
+    expect(instrumentColumns.get("name_pinyin")?.notNull).toBe(true);
+    expect(instrumentColumns.get("aliases")?.getSQLType()).toBe("jsonb");
+    expect(instrumentColumns.get("aliases")?.notNull).toBe(true);
+    expect(instrumentColumns.get("aliases")?.hasDefault).toBe(true);
+    expect(listingColumns.get("symbol_aliases")?.getSQLType()).toBe("jsonb");
+    expect(listingColumns.get("symbol_aliases")?.notNull).toBe(true);
+    expect(listingColumns.get("symbol_aliases")?.hasDefault).toBe(true);
+    expect(listingColumns.has("name_pinyin")).toBe(false);
+
+    expect(instrumentConfig.indexes.map((item) => item.config.name)).toEqual(
+      expect.arrayContaining([
+        "instruments_aliases_trgm_idx",
+        "instruments_name_pinyin_trgm_idx",
+        "instruments_name_trgm_idx",
+      ]),
+    );
+    expect(listingConfig.indexes.map((item) => item.config.name)).toEqual(
+      expect.arrayContaining([
+        "listings_symbol_aliases_trgm_idx",
+        "listings_symbol_trgm_idx",
+      ]),
+    );
+  });
+
   it("proves the metadata checks reject representative physical mutants", () => {
     const missingCreatedAt = pgTable("mutant_missing_created_at", {
       id: text("id").primaryKey(),

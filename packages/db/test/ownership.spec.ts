@@ -51,6 +51,68 @@ const allTables = {
   ...authProviderPrivateSchema,
 };
 
+const approvedPublicTables = [
+  "content_post_revisions",
+  "content_posts",
+  "exchange_calendars",
+  "exchanges",
+  "feed_channels",
+  "feed_items",
+  "feed_ranking_snapshots",
+  "idempotency_records",
+  "identity_profiles",
+  "identity_users",
+  "inbox_receipts",
+  "instruments",
+  "listings",
+  "market_bars",
+  "market_entitlement_projection",
+  "market_observations",
+  "market_quotes",
+  "moderation_appeals",
+  "moderation_audit",
+  "moderation_cases",
+  "moderation_decisions",
+  "moderation_evidence",
+  "moderation_reports",
+  "notification_delivery_attempts",
+  "notification_read_state",
+  "notifications",
+  "operations_admin_audit",
+  "outbox_events",
+  "portfolio_ledger_entries",
+  "portfolio_position_projection",
+  "portfolio_valuation_snapshots",
+  "portfolios",
+  "search_documents",
+  "social_blocks",
+  "social_bookmarks",
+  "social_comments",
+  "social_follows",
+  "social_reactions",
+  "watchlist_items",
+  "watchlists",
+] as const;
+
+const approvedPrivateTables = [
+  "auth_accounts",
+  "auth_sessions",
+  "auth_users",
+  "auth_verifications",
+] as const;
+
+const collectApprovedSurfaceDelta = (
+  actual: readonly string[],
+  approved: readonly string[],
+) => {
+  const actualSet = new Set(actual);
+  const approvedSet = new Set(approved);
+  return {
+    extra: actual.filter((table) => !approvedSet.has(table)),
+    missing: approved.filter((table) => !actualSet.has(table)),
+  };
+};
+
 const collectForeignKeyOwnershipViolations = (
   tables: readonly AnyPgTable[],
   owners: Readonly<Record<string, string>>,
@@ -68,6 +130,40 @@ const collectForeignKeyOwnershipViolations = (
   });
 
 describe("M1 physical table ownership", () => {
+  it("matches the independent approved 40 public and 4 private table surface", () => {
+    const publicPhysicalNames = Object.values(publicSchema).map((table) =>
+      getTableName(table),
+    );
+    const privatePhysicalNames = Object.values(authProviderPrivateSchema).map(
+      (table) => getTableName(table),
+    );
+
+    expect(approvedPublicTables).toHaveLength(40);
+    expect(approvedPrivateTables).toHaveLength(4);
+    expect(publicPhysicalNames).toHaveLength(40);
+    expect(privatePhysicalNames).toHaveLength(4);
+    expect(
+      collectApprovedSurfaceDelta(publicPhysicalNames, approvedPublicTables),
+    ).toEqual({ extra: [], missing: [] });
+    expect(
+      collectApprovedSurfaceDelta(privatePhysicalNames, approvedPrivateTables),
+    ).toEqual({ extra: [], missing: [] });
+  });
+
+  it("proves the approved surface rejects missing and extra table mutants", () => {
+    const mutantSurface = [
+      ...approvedPublicTables.filter((table) => table !== "identity_users"),
+      "unapproved_shadow_table",
+    ];
+
+    expect(
+      collectApprovedSurfaceDelta(mutantSurface, approvedPublicTables),
+    ).toEqual({
+      extra: ["unapproved_shadow_table"],
+      missing: ["identity_users"],
+    });
+  });
+
   it("assigns every approved physical table to exactly one owner", async () => {
     const manifest = await readOwnershipManifest();
     const physicalTableNames = Object.values(allTables)

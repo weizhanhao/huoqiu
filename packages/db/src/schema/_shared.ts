@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { bigint, numeric, text, timestamp } from "drizzle-orm/pg-core";
 
 export const textId = (name = "id") => text(name).primaryKey();
@@ -13,7 +14,9 @@ export const updatedAt = () =>
     .notNull();
 
 export const aggregateVersion = () =>
-  bigint("version", { mode: "bigint" }).default(1n).notNull();
+  bigint("version", { mode: "bigint" })
+    .default(sql`1`)
+    .notNull();
 
 export const decimal = <Name extends string>(name: Name) =>
   numeric(name, { precision: 38, scale: 18 }).notNull();

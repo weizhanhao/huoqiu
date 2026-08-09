@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   jsonb,
   pgTable,
@@ -26,7 +27,7 @@ export const outboxEvents = pgTable(
       mode: "date",
       withTimezone: true,
     }),
-    attempts: bigintCounter("attempts").default(0n),
+    attempts: bigintCounter("attempts").default(sql`0`),
     createdAt: createdAt(),
   },
   (table) => [uniqueIndex("outbox_events_event_id_unique").on(table.eventId)],
