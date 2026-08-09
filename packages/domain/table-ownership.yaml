@@ -1,0 +1,208 @@
+version: 1
+
+policies:
+  crossOwnerForeignKeys: forbidden
+  crossOwnerWrites: forbidden
+  stableIdReferences: required
+  coordinatedTransactions: authority-ports-only
+
+projectionRules:
+  search:
+    businessAuthority: false
+    writesOnly:
+      - search_documents
+  operations:
+    businessAuthority: false
+    writesOnly:
+      - operations_admin_audit
+
+tables:
+  auth_users:
+    owner: auth-provider-private
+    authority: provider-private
+    mutable: false
+  auth_sessions:
+    owner: auth-provider-private
+    authority: provider-private
+    mutable: false
+  auth_accounts:
+    owner: auth-provider-private
+    authority: provider-private
+    mutable: false
+  auth_verifications:
+    owner: auth-provider-private
+    authority: provider-private
+    mutable: false
+
+  identity_users:
+    owner: identity
+    authority: aggregate
+    mutable: true
+  identity_profiles:
+    owner: identity
+    authority: aggregate
+    mutable: true
+
+  instruments:
+    owner: instrument-reference
+    authority: aggregate
+    mutable: true
+  listings:
+    owner: instrument-reference
+    authority: aggregate
+    mutable: true
+  exchanges:
+    owner: instrument-reference
+    authority: aggregate
+    mutable: true
+  exchange_calendars:
+    owner: instrument-reference
+    authority: aggregate
+    mutable: true
+
+  market_observations:
+    owner: market-data
+    authority: append-only
+    mutable: false
+  market_quotes:
+    owner: market-data
+    authority: aggregate
+    mutable: true
+  market_bars:
+    owner: market-data
+    authority: append-only
+    mutable: false
+  market_entitlement_projection:
+    owner: market-data
+    authority: projection-only
+    mutable: true
+
+  content_posts:
+    owner: content
+    authority: aggregate
+    mutable: true
+  content_post_revisions:
+    owner: content
+    authority: append-only
+    mutable: false
+
+  social_comments:
+    owner: social
+    authority: aggregate
+    mutable: true
+  social_reactions:
+    owner: social
+    authority: aggregate
+    mutable: true
+  social_follows:
+    owner: social
+    authority: aggregate
+    mutable: true
+  social_bookmarks:
+    owner: social
+    authority: aggregate
+    mutable: true
+  social_blocks:
+    owner: social
+    authority: aggregate
+    mutable: true
+
+  moderation_reports:
+    owner: moderation
+    authority: aggregate
+    mutable: true
+  moderation_cases:
+    owner: moderation
+    authority: aggregate
+    mutable: true
+  moderation_evidence:
+    owner: moderation
+    authority: append-only
+    mutable: false
+  moderation_decisions:
+    owner: moderation
+    authority: append-only
+    mutable: false
+  moderation_appeals:
+    owner: moderation
+    authority: aggregate
+    mutable: true
+  moderation_audit:
+    owner: moderation
+    authority: audit-only
+    mutable: false
+
+  feed_channels:
+    owner: feed
+    authority: projection-only
+    mutable: true
+  feed_items:
+    owner: feed
+    authority: projection-only
+    mutable: true
+  feed_ranking_snapshots:
+    owner: feed
+    authority: projection-only
+    mutable: false
+
+  watchlists:
+    owner: watchlist
+    authority: aggregate
+    mutable: true
+  watchlist_items:
+    owner: watchlist
+    authority: aggregate
+    mutable: true
+
+  notifications:
+    owner: notification
+    authority: projection-only
+    mutable: true
+  notification_read_state:
+    owner: notification
+    authority: aggregate
+    mutable: true
+  notification_delivery_attempts:
+    owner: notification
+    authority: append-only
+    mutable: false
+
+  portfolios:
+    owner: portfolio
+    authority: aggregate
+    mutable: true
+  portfolio_ledger_entries:
+    owner: portfolio
+    authority: append-only
+    mutable: false
+  portfolio_position_projection:
+    owner: portfolio
+    authority: projection-only
+    mutable: true
+  portfolio_valuation_snapshots:
+    owner: portfolio
+    authority: append-only
+    mutable: false
+
+  search_documents:
+    owner: search
+    authority: projection-only
+    mutable: true
+
+  operations_admin_audit:
+    owner: operations
+    authority: audit-only
+    mutable: false
+
+  outbox_events:
+    owner: platform-events
+    authority: append-only
+    mutable: false
+  inbox_receipts:
+    owner: platform-events
+    authority: append-only
+    mutable: false
+  idempotency_records:
+    owner: platform-events
+    authority: append-only
+    mutable: false

@@ -1,0 +1,28 @@
+{
+  "name": "@huoqiu/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/schema/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint --config ../config/eslint/base.mjs src test drizzle.config.ts",
+    "test": "vitest run --config ../config/vitest/base.ts test",
+    "typecheck": "tsc --noEmit --skipLibCheck --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals drizzle.config.ts src/schema/*.ts test/*.spec.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2"
+  },
+  "devDependencies": {
+    "@huoqiu/config": "workspace:*",
+    "drizzle-kit": "0.31.10",
+    "yaml": "2.9.0"
+  },
+  "peerDependencies": {
+    "eslint": "10.8.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
