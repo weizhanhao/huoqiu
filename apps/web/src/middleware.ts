@@ -27,13 +27,27 @@ const EDGE_ISSUED_AT_HEADER = "x-huoqiu-edge-issued-at";
 const EDGE_SIGNATURE_HEADER = "x-huoqiu-edge-signature";
 const MAX_IDENTITY_FIELD_LENGTH = 256;
 const CONTROL_CHARACTER_PATTERN = /\p{C}/u;
+const EDGE_TEXT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@/-]*$/u;
+const ALPHA_VALUE_PATTERN = /^[^,\s]{0,16}$/u;
 const UNIX_SECONDS_PATTERN = /^(?:0|[1-9]\d*)$/u;
 const SIGNATURE_PATTERN = /^v1=([0-9a-f]{64})$/u;
 const MAX_SESSION_COOKIE_LENGTH = 4096;
+const MAX_INSPECTED_BODY_BYTES = 8 * 1024;
+const MAX_INSPECTED_BODY_NODES = 1024;
+const MAX_BODY_READ_MILLISECONDS = 1_000;
+const MAX_PERCENT_DECODE_PASSES = 4;
+const NEXT_STATIC_PREFIX = "/_next/static/";
 const SAFE_PUBLIC_METHODS = new Set(["GET", "HEAD"]);
 const SESSION_OPTIONAL_PATHS = new Set(["/login", "/register"]);
-const FORBIDDEN_QUERY_CREDENTIALS = new Set(["access_token", "session_token"]);
+const CREDENTIAL_FIELD_FRAGMENTS = [
+  "authorization",
+  "bearer",
+  "invite",
+  "token",
+] as const;
+const BEARER_VALUE_PATTERN = /^\s*(?:basic|bearer)\s+\S/iu;
 const textEncoder = new TextEncoder();
+const BODY_READ_TIMEOUT = Symbol("BODY_READ_TIMEOUT");
 
 const rejection = (status: 401 | 403 | 503, message: string): NextResponse =>
   new NextResponse(message, {
@@ -53,7 +67,8 @@ const isValidIdentityField = (value: string | null): value is string =>
   value.length > 0 &&
   value.length <= MAX_IDENTITY_FIELD_LENGTH &&
   value.trim() === value &&
-  !hasControlCharacter(value);
+  !hasControlCharacter(value) &&
+  EDGE_TEXT_PATTERN.test(value);
 
 const decodeHex = (value: string): Uint8Array<ArrayBuffer> => {
   const bytes = new Uint8Array(value.length / 2);
@@ -102,6 +117,7 @@ const hasValidEdgeProof = async (
   if (
     !isValidIdentityField(subject) ||
     !isValidIdentityField(issuer) ||
+    !ALPHA_VALUE_PATTERN.test(alphaAccess) ||
     issuer !== configuration.issuer ||
     issuedAtValue === null ||
     !UNIX_SECONDS_PATTERN.test(issuedAtValue) ||
@@ -138,26 +154,51 @@ const hasValidEdgeProof = async (
   return verifyHmac(configuration.hmacSecret, canonical, signatureMatch[1]);
 };
 
-const isValidImageRequest = (request: NextRequest): boolean => {
-  const parameters = request.nextUrl.searchParams;
-  const urlValues = parameters.getAll("url");
-  const widthValues = parameters.getAll("w");
-  const qualityValues = parameters.getAll("q");
-  const parameterNames = [...parameters.keys()];
+const recursivelyDecodePercentEncoding = (
+  value: string,
+): string | undefined => {
+  let decoded = value;
+  for (let pass = 0; pass < MAX_PERCENT_DECODE_PASSES; pass += 1) {
+    if (!decoded.includes("%")) return decoded;
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) return undefined;
+      decoded = next;
+    } catch {
+      return undefined;
+    }
+  }
+  return decoded.includes("%") ? undefined : decoded;
+};
 
+const isCredentialFieldName = (fieldName: string): boolean => {
+  const decodedName = recursivelyDecodePercentEncoding(fieldName);
+  if (decodedName === undefined) return true;
+
+  const normalizedName = decodedName
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]/gu, "");
+  return CREDENTIAL_FIELD_FRAGMENTS.some((fragment) =>
+    normalizedName.includes(fragment),
+  );
+};
+
+const isSafeNextStaticPath = (pathname: string): boolean => {
+  if (!pathname.startsWith(NEXT_STATIC_PREFIX)) return false;
+
+  const decoded = recursivelyDecodePercentEncoding(pathname);
+  if (decoded === undefined || decoded !== pathname) return false;
+
+  const segments = decoded.slice(NEXT_STATIC_PREFIX.length).split("/");
   return (
-    parameterNames.length === 3 &&
-    parameterNames.every(
-      (name) => name === "url" || name === "w" || name === "q",
-    ) &&
-    urlValues.length === 1 &&
-    urlValues[0] !== undefined &&
-    urlValues[0].length > 0 &&
-    urlValues[0].length <= 2048 &&
-    widthValues.length === 1 &&
-    /^(?:[1-9]\d*)$/u.test(widthValues[0] ?? "") &&
-    qualityValues.length === 1 &&
-    /^(?:[1-9]\d*)$/u.test(qualityValues[0] ?? "")
+    segments.length > 0 &&
+    segments.every(
+      (segment) =>
+        segment.length > 0 &&
+        segment !== "." &&
+        segment !== ".." &&
+        !segment.includes("\\"),
+    )
   );
 };
 
@@ -172,14 +213,10 @@ const isFullyPublicRequest = (request: NextRequest): boolean => {
   }
 
   if (pathname === "/icon.svg") {
-    return true;
+    return search.length === 0;
   }
 
-  if (pathname.startsWith("/_next/static/")) {
-    return pathname.length > "/_next/static/".length;
-  }
-
-  return pathname === "/_next/image" && isValidImageRequest(request);
+  return search.length === 0 && isSafeNextStaticPath(pathname);
 };
 
 const hasForbiddenNonCookieCredential = (request: NextRequest): boolean => {
@@ -188,12 +225,157 @@ const hasForbiddenNonCookieCredential = (request: NextRequest): boolean => {
   }
 
   for (const parameterName of request.nextUrl.searchParams.keys()) {
-    if (FORBIDDEN_QUERY_CREDENTIALS.has(parameterName)) {
-      return true;
-    }
+    if (isCredentialFieldName(parameterName)) return true;
   }
 
   return false;
+};
+
+type BodyKind = "form" | "json";
+
+const bodyKind = (request: NextRequest): BodyKind | undefined => {
+  const rawContentType = request.headers.get("content-type");
+  if (rawContentType === null || rawContentType.includes(",")) return undefined;
+
+  const [rawMediaType, ...rawParameters] = rawContentType.split(";");
+  const mediaType = rawMediaType?.trim().toLowerCase();
+  const parametersAreUtf8 = rawParameters.every((parameter) =>
+    /^charset=utf-8$/iu.test(parameter.trim()),
+  );
+  if (!parametersAreUtf8) return undefined;
+  if (mediaType === "application/json") return "json";
+  if (mediaType === "application/x-www-form-urlencoded") return "form";
+  return undefined;
+};
+
+type BodyReadResult =
+  | Readonly<{ bytes: Uint8Array<ArrayBuffer>; ok: true }>
+  | Readonly<{ ok: false }>;
+
+const readBoundedBody = async (
+  request: NextRequest,
+): Promise<BodyReadResult> => {
+  const rawContentLength = request.headers.get("content-length");
+  if (rawContentLength !== null) {
+    if (!UNIX_SECONDS_PATTERN.test(rawContentLength)) return { ok: false };
+    const contentLength = Number(rawContentLength);
+    if (
+      !Number.isSafeInteger(contentLength) ||
+      contentLength > MAX_INSPECTED_BODY_BYTES
+    ) {
+      return { ok: false };
+    }
+  }
+
+  let clone: Request;
+  try {
+    clone = request.clone();
+  } catch {
+    return { ok: false };
+  }
+  if (clone.body === null) return { bytes: new Uint8Array(), ok: true };
+
+  const reader = clone.body.getReader();
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+  let totalBytes = 0;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<typeof BODY_READ_TIMEOUT>((resolve) => {
+    timeoutId = setTimeout(
+      () => resolve(BODY_READ_TIMEOUT),
+      MAX_BODY_READ_MILLISECONDS,
+    );
+  });
+  try {
+    while (true) {
+      const result = await Promise.race([reader.read(), deadline]);
+      if (result === BODY_READ_TIMEOUT) {
+        void reader.cancel().catch(() => undefined);
+        return { ok: false };
+      }
+      if (result.done) break;
+      totalBytes += result.value.byteLength;
+      if (totalBytes > MAX_INSPECTED_BODY_BYTES) {
+        void reader.cancel().catch(() => undefined);
+        return { ok: false };
+      }
+      chunks.push(result.value);
+    }
+  } catch {
+    void reader.cancel().catch(() => undefined);
+    return { ok: false };
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { bytes, ok: true };
+};
+
+const containsSensitiveValue = (value: unknown): boolean => {
+  const pending: unknown[] = [value];
+  let inspectedNodes = 0;
+  while (pending.length > 0) {
+    inspectedNodes += 1;
+    if (inspectedNodes > MAX_INSPECTED_BODY_NODES) return true;
+    const candidate = pending.pop();
+    if (typeof candidate === "string") {
+      if (BEARER_VALUE_PATTERN.test(candidate)) return true;
+      continue;
+    }
+    if (Array.isArray(candidate)) {
+      pending.push(...candidate);
+      continue;
+    }
+    if (candidate !== null && typeof candidate === "object") {
+      for (const [field, nestedValue] of Object.entries(candidate)) {
+        if (isCredentialFieldName(field)) return true;
+        pending.push(nestedValue);
+      }
+    }
+  }
+  return false;
+};
+
+const hasSafeCredentialFreeBody = async (
+  request: NextRequest,
+): Promise<boolean> => {
+  if (request.body === null) return true;
+  if (
+    request.headers.has("content-encoding") &&
+    request.headers.get("content-encoding") !== "identity"
+  ) {
+    return false;
+  }
+
+  const kind = bodyKind(request);
+  if (kind === undefined) return false;
+  const result = await readBoundedBody(request);
+  if (!result.ok) return false;
+
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(result.bytes);
+  } catch {
+    return false;
+  }
+
+  if (kind === "form") {
+    return ![...new URLSearchParams(text)].some(
+      ([field, formValue]) =>
+        isCredentialFieldName(field) || BEARER_VALUE_PATTERN.test(formValue),
+    );
+  }
+
+  try {
+    return !containsSensitiveValue(JSON.parse(text) as unknown);
+  } catch {
+    return false;
+  }
 };
 
 const hasSingleSessionCookie = (request: NextRequest): boolean => {
@@ -227,6 +409,10 @@ export const enforceWebBoundary = async (
   request: NextRequest,
   runtime: WebBoundaryRuntime,
 ): Promise<NextResponse> => {
+  if (hasForbiddenNonCookieCredential(request)) {
+    return rejection(401, "Unauthorized");
+  }
+
   if (isFullyPublicRequest(request)) {
     return NextResponse.next();
   }
@@ -246,7 +432,7 @@ export const enforceWebBoundary = async (
     return rejection(403, "Forbidden");
   }
 
-  if (hasForbiddenNonCookieCredential(request)) {
+  if (!(await hasSafeCredentialFreeBody(request))) {
     return rejection(401, "Unauthorized");
   }
 
@@ -271,5 +457,5 @@ export const middleware = (request: NextRequest): Promise<NextResponse> =>
 
 // Keep this literal so Next can statically analyze the matcher at build time.
 export const config = {
-  matcher: ["/((?!_next/static/|icon\\.svg$).*)"],
+  matcher: ["/:path*"],
 };

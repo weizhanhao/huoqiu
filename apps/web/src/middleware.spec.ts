@@ -139,6 +139,10 @@ describe("Zero Trust startup configuration", () => {
   it.each([
     ["short secret", { ZERO_TRUST_HMAC_SECRET: "short" }],
     ["trimmed issuer", { ZERO_TRUST_ISSUER: " issuer " }],
+    [
+      "issuer with internal whitespace",
+      { ZERO_TRUST_ISSUER: "https://access. huoqiu.test" },
+    ],
     ["control issuer", { ZERO_TRUST_ISSUER: "issuer\nvalue" }],
     ["Unicode control issuer", { ZERO_TRUST_ISSUER: "issuer\u0085value" }],
     ["zero skew", { ZERO_TRUST_MAX_SKEW_SECONDS: "0" }],
@@ -176,6 +180,19 @@ describe("Zero Trust startup configuration", () => {
       );
     },
   );
+
+  it("wires NODE_ENV=production with missing APP_ENV into Next startup", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("APP_ENV", "");
+    vi.stubEnv("ZERO_TRUST_HMAC_SECRET", "");
+    vi.stubEnv("ZERO_TRUST_ISSUER", "");
+    vi.stubEnv("ZERO_TRUST_MAX_SKEW_SECONDS", "");
+    vi.resetModules();
+
+    await expect(import("../next.config")).rejects.toThrowError(
+      "ZERO_TRUST_CONFIGURATION_INVALID",
+    );
+  });
 });
 
 describe("Web Alpha boundary", () => {
@@ -202,6 +219,65 @@ describe("Web Alpha boundary", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
+
+  it("rejects a correctly signed subject containing internal whitespace", async () => {
+    const target = "/watchlist";
+    const response = await enforce(
+      protectedRequest(target, {
+        headers: edgeHeadersFor(target, { subject: "employee 001" }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it.each([
+    ["x-huoqiu-edge-subject", ["employee-001", "employee-002"]],
+    [
+      "x-huoqiu-edge-issuer",
+      [validEnvironment.ZERO_TRUST_ISSUER, "https://second.invalid"],
+    ],
+    ["x-huoqiu-alpha-access", ["true", "true"]],
+    [
+      "x-huoqiu-edge-issued-at",
+      [String(fixedNowSeconds), String(fixedNowSeconds)],
+    ],
+    ["x-huoqiu-edge-signature", ["placeholder", "placeholder"]],
+  ] as const)(
+    "rejects duplicate %s values after Headers collapse",
+    async (headerName, values) => {
+      const target = "/watchlist";
+      const combined = values.join(", ");
+      const options: EdgeProofOptions =
+        headerName === "x-huoqiu-edge-subject"
+          ? { subject: combined }
+          : headerName === "x-huoqiu-edge-issuer"
+            ? { issuer: combined }
+            : headerName === "x-huoqiu-alpha-access"
+              ? { alphaAccess: combined }
+              : headerName === "x-huoqiu-edge-issued-at"
+                ? { issuedAt: combined }
+                : {};
+      const headers = new Headers(edgeHeadersFor(target, options));
+      const validSignature = headers.get("x-huoqiu-edge-signature");
+      headers.delete(headerName);
+      for (const value of values) headers.append(headerName, value);
+      if (headerName === "x-huoqiu-edge-signature" && validSignature !== null) {
+        headers.delete(headerName);
+        headers.append(headerName, validSignature);
+        headers.append(headerName, validSignature);
+      }
+
+      expect(headers.get(headerName)).toBe(
+        headerName === "x-huoqiu-edge-signature"
+          ? `${validSignature}, ${validSignature}`
+          : combined,
+      );
+      const response = await enforce(protectedRequest(target, { headers }));
+
+      expect(response.status).toBe(401);
+    },
+  );
 
   it.each([
     [
@@ -406,6 +482,210 @@ describe("Web Alpha boundary", () => {
     expect(response.status).toBe(401);
   });
 
+  it.each([
+    ["uppercase access token", "/watchlist?ACCESS_TOKEN=query-secret"],
+    ["session token", "/watchlist?session-token=query-secret"],
+    ["refresh token", "/watchlist?refreshToken=query-secret"],
+    ["ID token", "/watchlist?ID%5FToken=query-secret"],
+    ["authorization", "/watchlist?authorization=query-secret"],
+    ["Bearer", "/watchlist?Bearer=query-secret"],
+    ["generic token", "/watchlist?token=query-secret"],
+    ["invite", "/watchlist?return_invite=query-secret"],
+    ["single-encoded key", "/watchlist?%61ccess_token=query-secret"],
+    ["double-encoded key", "/watchlist?%2561ccess_token=query-secret"],
+    ["multi-encoded key", "/watchlist?%252561ccess_token=query-secret"],
+    [
+      "still-encoded key after the decode bound",
+      "/watchlist?%25252525252561ccess_token=query-secret",
+    ],
+    ["malformed encoded key", "/watchlist?%ZZ=query-secret"],
+  ])(
+    "rejects a valid Cookie request carrying a %s query credential",
+    async (_label, target) => {
+      const request = protectedRequest(target, {
+        headers: edgeHeadersFor(target),
+      });
+      expect(`${request.nextUrl.pathname}${request.nextUrl.search}`).toBe(
+        target,
+      );
+
+      const response = await enforce(request);
+
+      expect(response.status).toBe(401);
+    },
+  );
+
+  it("allows a signed non-credential query on a protected route", async () => {
+    const target = "/watchlist?page=1";
+    const response = await enforce(
+      protectedRequest(target, { headers: edgeHeadersFor(target) }),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it.each([
+    [
+      "JSON credential field",
+      "application/json",
+      JSON.stringify({ session_token: "body-secret" }),
+    ],
+    [
+      "nested Bearer value",
+      "application/json; charset=utf-8",
+      JSON.stringify({ payload: { value: "Bearer body-secret" } }),
+    ],
+    [
+      "form credential field",
+      "application/x-www-form-urlencoded",
+      "session_token=body-secret",
+    ],
+    [
+      "refresh token field",
+      "application/json",
+      JSON.stringify({ refreshToken: "body-secret" }),
+    ],
+    [
+      "ID token field",
+      "application/json",
+      JSON.stringify({ ID_TOKEN: "body-secret" }),
+    ],
+    [
+      "invite credential field",
+      "application/x-www-form-urlencoded",
+      "return_invite=body-secret",
+    ],
+    [
+      "double-encoded credential field",
+      "application/x-www-form-urlencoded",
+      "%2561ccess_token=body-secret",
+    ],
+  ])(
+    "rejects a Cookie request carrying a %s",
+    async (_label, contentType, body) => {
+      const target = "/watchlist";
+      const request = protectedRequest(target, {
+        body,
+        headers: {
+          ...edgeHeadersFor(target, { requestMethod: "POST" }),
+          "content-type": contentType,
+        },
+        method: "POST",
+      });
+
+      const response = await enforce(request);
+
+      expect(response.status).toBe(401);
+      expect(request.bodyUsed).toBe(false);
+      await expect(request.text()).resolves.toBe(body);
+    },
+  );
+
+  it.each([
+    ["malformed JSON", "{", "application/json"],
+    ["unsupported content type", "safe text", "text/plain"],
+    [
+      "oversized JSON",
+      JSON.stringify({ payload: "x".repeat(9_000) }),
+      "application/json",
+    ],
+  ])(
+    "fails closed for %s without consuming the handler body",
+    async (_label, body, contentType) => {
+      const target = "/watchlist";
+      const request = protectedRequest(target, {
+        body,
+        headers: {
+          ...edgeHeadersFor(target, { requestMethod: "POST" }),
+          "content-type": contentType,
+        },
+        method: "POST",
+      });
+
+      const response = await enforce(request);
+
+      expect(response.status).toBe(401);
+      expect(request.bodyUsed).toBe(false);
+      await expect(request.text()).resolves.toBe(body);
+    },
+  );
+
+  it("fails closed for invalid UTF-8 without consuming the handler body", async () => {
+    const target = "/watchlist";
+    const body = new Uint8Array([0xc3, 0x28]);
+    const request = protectedRequest(target, {
+      body,
+      headers: {
+        ...edgeHeadersFor(target, { requestMethod: "POST" }),
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+
+    const response = await enforce(request);
+
+    expect(response.status).toBe(401);
+    expect(request.bodyUsed).toBe(false);
+    await expect(request.arrayBuffer()).resolves.toEqual(body.buffer);
+  });
+
+  it("fails closed on an unfinished body without waiting forever", async () => {
+    const target = "/watchlist";
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        controller = streamController;
+        streamController.enqueue(new TextEncoder().encode("{"));
+      },
+    });
+    const request = protectedRequest(target, {
+      body,
+      duplex: "half",
+      headers: {
+        ...edgeHeadersFor(target, { requestMethod: "POST" }),
+        "content-type": "application/json",
+      },
+      method: "POST",
+    } as NextRequestInit);
+
+    vi.useFakeTimers();
+    const responsePromise = enforce(request);
+    let settled = false;
+    void responsePromise.then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(1_001);
+    const settledBeforeSourceClosed = settled;
+    controller.close();
+    const response = await responsePromise;
+    vi.useRealTimers();
+
+    expect(settledBeforeSourceClosed).toBe(true);
+    expect(response.status).toBe(401);
+    expect(request.bodyUsed).toBe(false);
+    await request.body?.cancel();
+  });
+
+  it("preserves a safe bounded JSON body for the protected handler", async () => {
+    const target = "/watchlist";
+    const body = JSON.stringify({ note: "safe body" });
+    const request = protectedRequest(target, {
+      body,
+      headers: {
+        ...edgeHeadersFor(target, { requestMethod: "POST" }),
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+
+    const response = await enforce(request);
+
+    expect(response.status).toBe(200);
+    expect(request.bodyUsed).toBe(false);
+    await expect(request.text()).resolves.toBe(body);
+  });
+
   it("declares the exact API-issued Web cookie invariants", () => {
     expect(WEB_SESSION_COOKIE).toEqual({
       httpOnly: true,
@@ -438,7 +718,6 @@ describe("Web Alpha boundary", () => {
     ["health", "/healthz", "GET"],
     ["health HEAD", "/healthz", "HEAD"],
     ["Next static", "/_next/static/chunks/app.js", "GET"],
-    ["Next image", "/_next/image?url=%2Ficon.svg&w=64&q=75", "GET"],
     ["app icon", "/icon.svg", "GET"],
   ])(
     "allows the exact public %s request without credentials",
@@ -451,11 +730,60 @@ describe("Web Alpha boundary", () => {
   );
 
   it.each([
+    ["health", "/healthz"],
+    ["Next static", "/_next/static/chunks/app.js"],
+    ["app icon", "/icon.svg"],
+  ])(
+    "rejects an Authorization credential on the public %s route",
+    async (_label, target) => {
+      const response = await enforce(
+        protectedRequest(target, {
+          headers: { authorization: "Bearer must-not-bypass" },
+        }),
+      );
+
+      expect(response.status).toBe(401);
+    },
+  );
+
+  it.each([
+    "/_next/static/chunks/app.js?access_token=must-not-bypass",
+    "/_next/static/chunks/app.js?session_token=must-not-bypass",
+    "/icon.svg?access_token=must-not-bypass",
+    "/icon.svg?session_token=must-not-bypass",
+    "/_next/static/chunks/app.js?v=1",
+    "/icon.svg?v=1",
+  ])(
+    "requires an exact query-free public asset request for %s",
+    async (target) => {
+      const response = await enforce(protectedRequest(target));
+
+      expect(response.status).toBe(401);
+    },
+  );
+
+  it.each(["/_next/static/chunks/app.js", "/icon.svg"])(
+    "does not mistake an ordinary Cookie header for a credential on %s",
+    async (target) => {
+      const response = await enforce(
+        protectedRequest(target, { headers: { cookie: "theme=dark" } }),
+      );
+
+      expect(response.status).toBe(200);
+    },
+  );
+
+  it.each([
     ["health prefix", "/healthz/private", "GET"],
     ["health query", "/healthz?verbose=true", "GET"],
     ["health POST", "/healthz", "POST"],
     ["static lookalike", "/_next/staticish/chunks/app.js", "GET"],
     ["bare static prefix", "/_next/static", "GET"],
+    [
+      "unused Next image optimizer",
+      "/_next/image?url=%2Ficon.svg&w=64&q=75",
+      "GET",
+    ],
     ["image without q", "/_next/image?url=%2Ficon.svg&w=64", "GET"],
     [
       "image duplicate url",
@@ -474,6 +802,22 @@ describe("Web Alpha boundary", () => {
     "does not broaden the public allowlist for %s",
     async (_label, target, method) => {
       const response = await enforce(protectedRequest(target, { method }));
+
+      expect(response.status).toBe(401);
+    },
+  );
+
+  it.each([
+    "/_next/static/chunks/%252e%252e%252fsecret.js",
+    "/_next/static/chunks/%25252e%25252e%25252fsecret.js",
+    "/_next/static/chunks/%252fsecret.js",
+    "/_next/static/chunks/%255c..%255csecret.js",
+    "/_next/static/chunks/%25still-encoded.js",
+    "/_next/static//chunks/app.js",
+  ])(
+    "rejects an encoded or ambiguous public static path %s",
+    async (target) => {
+      const response = await enforce(protectedRequest(target));
 
       expect(response.status).toBe(401);
     },
@@ -564,14 +908,14 @@ describe("Next 16 middleware matcher", () => {
     "/_next/static/chunks/app.js",
     "/_next/static/css/app.css",
     "/icon.svg",
-  ])("does not invoke Proxy for the essential static asset %s", (url) => {
+  ])("keeps middleware active for the public static asset %s", (url) => {
     expect(
       unstable_doesMiddlewareMatch({
         config: middlewareConfig,
         nextConfig: {},
         url,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it.each([

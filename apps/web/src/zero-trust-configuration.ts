@@ -10,6 +10,7 @@ const DEFAULT_MAX_SKEW_SECONDS = 300;
 const MAX_MAX_SKEW_SECONDS = 3600;
 const MAX_IDENTITY_FIELD_LENGTH = 256;
 const CONTROL_CHARACTER_PATTERN = /\p{C}/u;
+const EDGE_TEXT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@/-]*$/u;
 const POSITIVE_DECIMAL_PATTERN = /^[1-9]\d*$/u;
 
 const configurationFailure = (): Error =>
@@ -23,7 +24,8 @@ const isValidIdentityField = (value: string | undefined): value is string =>
   value.length > 0 &&
   value.length <= MAX_IDENTITY_FIELD_LENGTH &&
   value.trim() === value &&
-  !hasControlCharacter(value);
+  !hasControlCharacter(value) &&
+  EDGE_TEXT_PATTERN.test(value);
 
 const readMaxSkewSeconds = (value: string | undefined): number => {
   if (value === undefined) {
@@ -72,7 +74,8 @@ export const assertZeroTrustStartupConfiguration = (
 ): void => {
   if (
     environment.APP_ENV === "production" ||
-    environment.APP_ENV === "staging"
+    environment.APP_ENV === "staging" ||
+    environment.NODE_ENV === "production"
   ) {
     loadZeroTrustConfiguration(environment);
   }

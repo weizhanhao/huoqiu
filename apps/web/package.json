@@ -6,9 +6,9 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "lint": "eslint --config ../../packages/config/eslint/react.mjs src tests next.config.ts vitest.config.ts",
-    "start": "next start",
-    "test": "vitest run --config vitest.config.ts tests src/middleware.spec.ts",
+    "lint": "eslint --config ../../packages/config/eslint/react.mjs src scripts tests next.config.ts vitest.config.ts",
+    "start": "node scripts/start.mjs",
+    "test": "vitest run --config vitest.config.ts tests src/middleware.spec.ts src/start.spec.ts",
     "test:d0": "vitest run --config vitest.config.ts tests/component/d0",
     "typecheck": "tsc --noEmit"
   },
