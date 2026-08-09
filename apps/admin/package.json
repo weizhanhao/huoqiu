@@ -8,7 +8,7 @@
     "dev": "next dev",
     "lint": "eslint --config ../../packages/config/eslint/react.mjs src tests next.config.ts vitest.config.ts",
     "start": "next start",
-    "test": "vitest run --config vitest.config.ts tests",
+    "test": "vitest run --config vitest.config.ts tests src/middleware.spec.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
