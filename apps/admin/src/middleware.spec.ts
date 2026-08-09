@@ -17,6 +17,7 @@ const NOW_SECONDS = Math.floor(NOW_MILLISECONDS / 1000);
 const ZERO_TRUST_ISSUER = "huoqiu-zero-trust";
 const ZERO_TRUST_SECRET = "0123456789abcdef0123456789abcdef";
 const SESSION_TOKEN = "opaque-better-auth-session";
+const INGRESS_BODYLESS_PROOF_HEADER = "x-huoqiu-ingress-bodyless-proof";
 
 const runtimeConfig = loadAdminAccessConfig({
   APP_ENV: "test",
@@ -63,6 +64,33 @@ const signEdgeProof = async (properties: {
   return `v1=${encodeHex(signature)}`;
 };
 
+const signIngressBodylessProof = async (
+  method: string,
+  pathAndSearch: string,
+): Promise<string> => {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(ZERO_TRUST_SECRET),
+    { hash: "SHA-256", name: "HMAC" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(
+      [
+        "huoqiu-ingress-bodyless-v1",
+        method.toUpperCase(),
+        pathAndSearch,
+        "bodyless",
+      ].join("\n"),
+    ),
+  );
+  return `v1=${encodeHex(signature)}`;
+};
+
 type RequestOverrides = Readonly<{
   adminRole?: string | null;
   alphaAccess?: string | null;
@@ -73,6 +101,7 @@ type RequestOverrides = Readonly<{
   contentType?: string | null;
   cookie?: string | null;
   issuedAt?: string | null;
+  ingressBodylessProof?: string | null;
   method?: string;
   signature?: string | null;
   subject?: string | null;
@@ -135,6 +164,12 @@ const createSignedRequest = async (
   }
   if (overrides.contentType !== null && overrides.contentType !== undefined) {
     headers.set("content-type", overrides.contentType);
+  }
+  if (
+    overrides.ingressBodylessProof !== null &&
+    overrides.ingressBodylessProof !== undefined
+  ) {
+    headers.set(INGRESS_BODYLESS_PROOF_HEADER, overrides.ingressBodylessProof);
   }
 
   if (overrides.signature !== null) {
@@ -803,6 +838,44 @@ describe("state-changing Admin request body boundary", () => {
       expect(request.body).toBeNull();
     },
   );
+
+  it("accepts only an HMAC-attested ingress-empty stream and strips the proof", async () => {
+    const pathAndSearch = "/admin/moderation?queue=reviewing";
+    const request = await createSignedRequest({
+      body: new Uint8Array().buffer,
+      ingressBodylessProof: await signIngressBodylessProof(
+        "POST",
+        pathAndSearch,
+      ),
+      method: "POST",
+    });
+
+    const response = await gate(request);
+    const forwardedNames = new Set(
+      (response.headers.get("x-middleware-override-headers") ?? "")
+        .split(",")
+        .filter(Boolean),
+    );
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(forwardedNames).not.toContain(INGRESS_BODYLESS_PROOF_HEADER);
+    expect(
+      response.headers.get(
+        `x-middleware-request-${INGRESS_BODYLESS_PROOF_HEADER}`,
+      ),
+    ).toBeNull();
+    expect(request.bodyUsed).toBe(false);
+  });
+
+  it("rejects a forged ingress bodyless proof", async () => {
+    const request = await createSignedRequest({
+      body: new Uint8Array().buffer,
+      ingressBodylessProof: `v1=${"0".repeat(64)}`,
+      method: "POST",
+    });
+
+    expect((await gate(request)).status).toBe(403);
+    expect(request.bodyUsed).toBe(false);
+  });
 
   it("allows an explicitly zero-length body only after verifying it is empty", async () => {
     const emptyRequest = await createSignedRequest({

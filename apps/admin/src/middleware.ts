@@ -16,6 +16,7 @@ const MAX_BODY_NODES = 2048;
 const MAX_STREAM_CHUNKS = 1024;
 const DEFAULT_BODY_READ_DEADLINE_MILLISECONDS = 1000;
 const MAX_BODY_READ_DEADLINE_MILLISECONDS = 10_000;
+const INGRESS_BODYLESS_PROOF_HEADER = "x-huoqiu-ingress-bodyless-proof";
 
 const EDGE_HEADERS = Object.freeze({
   alphaAccess: "x-huoqiu-alpha-access",
@@ -52,8 +53,9 @@ const STRUCTURED_CREDENTIAL_ROOTS = new Set([
 
 const STATE_CHANGING_METHODS = new Set(["DELETE", "PATCH", "POST", "PUT"]);
 
-const UNTRUSTED_AUTHORIZATION_HEADERS = [
+const UNTRUSTED_FORWARD_HEADERS = [
   "authorization",
+  INGRESS_BODYLESS_PROOF_HEADER,
   "x-huoqiu-action-authorized",
   "x-huoqiu-admin-role",
   "x-huoqiu-admin-roles",
@@ -727,9 +729,52 @@ const isSafeJsonValue = (
   return true;
 };
 
+const verifyIngressBodylessProof = async (
+  request: NextRequest,
+  secret: string,
+): Promise<boolean> => {
+  const rawProof = request.headers.get(INGRESS_BODYLESS_PROOF_HEADER);
+  if (rawProof === null) {
+    return false;
+  }
+
+  const signature = decodeSignature(rawProof);
+  if (signature === undefined) {
+    return false;
+  }
+
+  const requestUrl = new URL(request.url);
+  const canonical = [
+    "huoqiu-ingress-bodyless-v1",
+    request.method.toUpperCase(),
+    `${requestUrl.pathname}${requestUrl.search}`,
+    "bodyless",
+  ].join("\n");
+  const encoder = new TextEncoder();
+
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(secret),
+      { hash: "SHA-256", name: "HMAC" },
+      false,
+      ["verify"],
+    );
+    return await crypto.subtle.verify(
+      "HMAC",
+      key,
+      signature,
+      encoder.encode(canonical),
+    );
+  } catch {
+    return false;
+  }
+};
+
 const hasSafeStateChangingBody = async (
   request: NextRequest,
   deadlineMilliseconds: number,
+  secret: string,
 ): Promise<boolean> => {
   if (!STATE_CHANGING_METHODS.has(request.method.toUpperCase())) {
     return true;
@@ -754,6 +799,23 @@ const hasSafeStateChangingBody = async (
   const contentTypeIsAbsentOrSupported =
     request.headers.get("content-type") === null ||
     readSupportedBodyType(request) !== undefined;
+  const rawIngressBodylessProof = request.headers.get(
+    INGRESS_BODYLESS_PROOF_HEADER,
+  );
+  const ingressBodylessProofIsValid = await verifyIngressBodylessProof(
+    request,
+    secret,
+  );
+  if (rawIngressBodylessProof !== null && !ingressBodylessProofIsValid) {
+    return false;
+  }
+  if (ingressBodylessProofIsValid) {
+    return (
+      request.headers.get("transfer-encoding") === null &&
+      (contentLength.kind === "absent" || contentLength.bytes === 0) &&
+      contentTypeIsAbsentOrSupported
+    );
+  }
 
   if (request.body === null) {
     const lengthIsEmpty =
@@ -872,6 +934,7 @@ export const evaluateAdminAccess = async (
       request,
       options.bodyReadDeadlineMilliseconds ??
         DEFAULT_BODY_READ_DEADLINE_MILLISECONDS,
+      accessConfig.secret,
     ))
   ) {
     return {
@@ -902,7 +965,7 @@ const forwardWithoutAuthorizationAssertions = (
   request: NextRequest,
 ): NextResponse => {
   const forwardedHeaders = new Headers(request.headers);
-  for (const headerName of UNTRUSTED_AUTHORIZATION_HEADERS) {
+  for (const headerName of UNTRUSTED_FORWARD_HEADERS) {
     forwardedHeaders.delete(headerName);
   }
 
