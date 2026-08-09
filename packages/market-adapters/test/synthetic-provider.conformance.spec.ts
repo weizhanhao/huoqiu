@@ -8,10 +8,15 @@ import { SyntheticMarketDataProvider } from "../src/synthetic/synthetic-provider
 
 const listingId = createListingId("listing_syn_0001");
 const snapshot = "2026-08-08T06:00:00.000Z";
+const cursorEncryptionKey = Uint8Array.from(
+  { length: 32 },
+  (_, index) => index + 1,
+);
 
 const createProvider = () =>
   new SyntheticMarketDataProvider({
     seed: "huoqiu-m1-seed",
+    cursorEncryptionKey,
     clock: () => snapshot,
     exchangeTimezone: "Asia/Shanghai",
     pageSize: 7,
@@ -95,8 +100,15 @@ describe("SyntheticMarketDataProvider conformance", () => {
 
     const firstPage = await provider.getBars(listingId, "1d");
     expect(firstPage.next_cursor).toMatch(
-      /^syn1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u,
+      /^syn1\.[A-Za-z0-9_-]{1,32}\.[A-Za-z0-9_-]+$/u,
     );
+    const encryptedPayload = firstPage.next_cursor?.split(".")[2] ?? "";
+    const decodedCiphertext = Buffer.from(
+      encryptedPayload,
+      "base64url",
+    ).toString("utf8");
+    expect(decodedCiphertext).not.toContain(listingId);
+    expect(decodedCiphertext).not.toContain(snapshot);
     await expect(
       provider.getBars(
         createListingId("listing_syn_other"),
@@ -113,6 +125,7 @@ describe("SyntheticMarketDataProvider conformance", () => {
     let clockValue = snapshot;
     const provider = new SyntheticMarketDataProvider({
       seed: "stable-clock-seed",
+      cursorEncryptionKey,
       clock: () => clockValue,
       pageSize: 3,
       historySize: 6,
@@ -128,7 +141,7 @@ describe("SyntheticMarketDataProvider conformance", () => {
     expect(continuation.items.every((bar) => bar.as_of === snapshot)).toBe(
       true,
     );
-    expect(continuation.items[0]?.starts_at).toBe("2026-08-04T00:00:00.000Z");
+    expect(continuation.items[0]?.starts_at).toBe("2026-08-03T16:00:00.000Z");
   });
 
   it("binds cursors to the configured seed", async () => {
@@ -136,6 +149,7 @@ describe("SyntheticMarketDataProvider conformance", () => {
     const cursor = (await first.getBars(listingId, "1d")).next_cursor;
     const differentSeed = new SyntheticMarketDataProvider({
       seed: "different-seed",
+      cursorEncryptionKey,
       clock: () => snapshot,
       pageSize: 7,
       historySize: 23,
@@ -144,6 +158,49 @@ describe("SyntheticMarketDataProvider conformance", () => {
     await expect(
       differentSeed.getBars(listingId, "1d", cursor ?? undefined),
     ).rejects.toThrow("cursor");
+  });
+
+  it("binds encrypted cursors to the exchange timezone", async () => {
+    const shanghai = createProvider();
+    const cursor = (await shanghai.getBars(listingId, "1d")).next_cursor;
+    const newYork = new SyntheticMarketDataProvider({
+      seed: "huoqiu-m1-seed",
+      cursorEncryptionKey,
+      clock: () => snapshot,
+      exchangeTimezone: "America/New_York",
+      pageSize: 7,
+      historySize: 23,
+    });
+
+    await expect(
+      newYork.getBars(listingId, "1d", cursor ?? undefined),
+    ).rejects.toThrow("cursor");
+  });
+
+  it("uses the exchange-local calendar day and local midnight", async () => {
+    const newYork = new SyntheticMarketDataProvider({
+      seed: "timezone-seed",
+      cursorEncryptionKey,
+      clock: () => "2026-08-10T02:00:00.000Z",
+      exchangeTimezone: "America/New_York",
+      pageSize: 1,
+      historySize: 1,
+    });
+    const shanghai = new SyntheticMarketDataProvider({
+      seed: "timezone-seed",
+      cursorEncryptionKey,
+      clock: () => "2026-08-09T16:30:00.000Z",
+      exchangeTimezone: "Asia/Shanghai",
+      pageSize: 1,
+      historySize: 1,
+    });
+
+    expect((await newYork.getBars(listingId, "1d")).items[0]?.starts_at).toBe(
+      "2026-08-07T04:00:00.000Z",
+    );
+    expect((await shanghai.getBars(listingId, "1d")).items[0]?.starts_at).toBe(
+      "2026-08-09T16:00:00.000Z",
+    );
   });
 
   it("maintains exact decimal OHLC invariants without floating point output", async () => {
@@ -189,13 +246,22 @@ describe("SyntheticMarketDataProvider conformance", () => {
   it("rejects invalid snapshots and unsupported construction bounds", async () => {
     const provider = createProvider();
 
-    await expect(provider.getQuote(listingId, "2026-08-08")).rejects.toThrow(
-      "instant",
-    );
+    for (const invalidSnapshot of [
+      "2026-08-08",
+      "08/10/2026 00:00:00 +00:00",
+      "August 10, 2026 00:00:00 +00:00",
+      "2026-02-30T00:00:00.000Z",
+      "2026-08-10T00:00:00+24:00",
+    ]) {
+      await expect(
+        provider.getQuote(listingId, invalidSnapshot),
+      ).rejects.toThrow("instant");
+    }
     expect(
       () =>
         new SyntheticMarketDataProvider({
           seed: "",
+          cursorEncryptionKey,
           clock: () => snapshot,
         }),
     ).toThrow("seed");
@@ -203,6 +269,7 @@ describe("SyntheticMarketDataProvider conformance", () => {
       () =>
         new SyntheticMarketDataProvider({
           seed: "   ",
+          cursorEncryptionKey,
           clock: () => snapshot,
         }),
     ).toThrow("seed");
@@ -210,9 +277,42 @@ describe("SyntheticMarketDataProvider conformance", () => {
       () =>
         new SyntheticMarketDataProvider({
           seed: "seed",
+          cursorEncryptionKey,
           clock: () => snapshot,
           pageSize: 0,
         }),
     ).toThrow("pageSize");
+
+    expect(
+      () =>
+        new SyntheticMarketDataProvider({
+          seed: "seed",
+          clock: () => snapshot,
+        } as never),
+    ).toThrow("cursorEncryptionKey");
+    expect(
+      () =>
+        new SyntheticMarketDataProvider({
+          seed: "seed",
+          cursorEncryptionKey: new Uint8Array(16),
+          clock: () => snapshot,
+        }),
+    ).toThrow("cursorEncryptionKey");
+
+    for (const exchangeTimezone of [
+      "Mars/Olympus",
+      `A/${"A".repeat(100)}`,
+      { zone: "Asia/Shanghai" },
+    ]) {
+      expect(
+        () =>
+          new SyntheticMarketDataProvider({
+            seed: "seed",
+            cursorEncryptionKey,
+            clock: () => snapshot,
+            exchangeTimezone: exchangeTimezone as never,
+          }),
+      ).toThrow("exchangeTimezone");
+    }
   });
 });

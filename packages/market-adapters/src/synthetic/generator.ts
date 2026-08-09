@@ -108,8 +108,107 @@ export const shiftTradingDays = (
   return dayFromEpoch(epoch);
 };
 
-export const tradingDayFromInstant = (instant: string): string =>
-  previousOrSameTradingDay(instant.slice(0, 10));
+interface ZonedCalendarParts {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number;
+  readonly hour: number;
+  readonly minute: number;
+  readonly second: number;
+}
+
+const zonedCalendarParts = (
+  epoch: number,
+  exchangeTimezone: string,
+): ZonedCalendarParts => {
+  const formatter = new Intl.DateTimeFormat("en-CA-u-ca-gregory-nu-latn", {
+    timeZone: exchangeTimezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  const values = new Map<string, string>(
+    formatter
+      .formatToParts(new Date(epoch))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  const numberPart = (name: string): number => {
+    const value = values.get(name);
+    if (value === undefined || !/^\d+$/u.test(value)) {
+      throw new RangeError("exchange timezone calendar conversion failed");
+    }
+    return Number(value);
+  };
+  return {
+    year: numberPart("year"),
+    month: numberPart("month"),
+    day: numberPart("day"),
+    hour: numberPart("hour"),
+    minute: numberPart("minute"),
+    second: numberPart("second"),
+  };
+};
+
+const calendarDay = (parts: ZonedCalendarParts): string =>
+  `${parts.year.toString().padStart(4, "0")}-${parts.month
+    .toString()
+    .padStart(2, "0")}-${parts.day.toString().padStart(2, "0")}`;
+
+export const tradingDayFromInstant = (
+  instant: string,
+  exchangeTimezone: string,
+): string => {
+  const epoch = Date.parse(instant);
+  if (!Number.isFinite(epoch)) {
+    throw new RangeError("instant cannot be converted to a trading day");
+  }
+  return previousOrSameTradingDay(
+    calendarDay(zonedCalendarParts(epoch, exchangeTimezone)),
+  );
+};
+
+const localMidnightInstant = (
+  tradingDay: string,
+  exchangeTimezone: string,
+): string => {
+  const desiredEpoch = parseTradingDay(tradingDay);
+  let candidate = desiredEpoch;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const observed = zonedCalendarParts(candidate, exchangeTimezone);
+    const observedAsUtc = Date.UTC(
+      observed.year,
+      observed.month - 1,
+      observed.day,
+      observed.hour,
+      observed.minute,
+      observed.second,
+    );
+    const correction = desiredEpoch - observedAsUtc;
+    if (correction === 0) {
+      const verified = zonedCalendarParts(candidate, exchangeTimezone);
+      if (
+        calendarDay(verified) === tradingDay &&
+        verified.hour === 0 &&
+        verified.minute === 0 &&
+        verified.second === 0
+      ) {
+        return new Date(candidate).toISOString();
+      }
+      break;
+    }
+    candidate += correction;
+  }
+
+  throw new RangeError(
+    "trading day has no representable midnight in the exchange timezone",
+  );
+};
 
 const daySequence = (tradingDay: string): string => {
   const sequence = BigInt(
@@ -158,7 +257,10 @@ export const generateSyntheticBar = (
 ): NormalizedBar => {
   const prices = priceParts(context);
   return {
-    starts_at: `${context.tradingDay}T00:00:00.000Z`,
+    starts_at: localMidnightInstant(
+      context.tradingDay,
+      context.exchangeTimezone,
+    ),
     open: cents(prices.open),
     high: cents(prices.high),
     low: cents(prices.low),

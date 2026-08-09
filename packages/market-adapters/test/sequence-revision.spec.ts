@@ -102,10 +102,31 @@ describe("synthetic quote sequence and revision reduction", () => {
     ).toThrow("conflicting");
     expect(() =>
       applyQuoteObservation(initial.state, quote("-1", "0")),
-    ).toThrow("sequence");
+    ).toThrow("contract");
     expect(() =>
       applyQuoteObservation(initial.state, quote("20", "9223372036854775808")),
-    ).toThrow("revision");
+    ).toThrow("contract");
+    expect(() =>
+      applyQuoteObservation(initial.state, quote(20 as unknown as string, "1")),
+    ).toThrow("contract");
+  });
+
+  it("validates every runtime observation against the authoritative M1 contract", () => {
+    const invalidObservations = [
+      { ...quote("20", "0"), source: "external-real-feed" },
+      { ...quote("20", "0"), entitlement: "revoked" },
+      { ...quote("20", "0"), price: "1e3" },
+      { ...quote("20", "0"), exchange_timezone: "Mars/Olympus" },
+    ];
+
+    for (const invalid of invalidObservations) {
+      expect(() =>
+        applyQuoteObservation(
+          createQuoteObservationState(listingId),
+          invalid as unknown as NormalizedQuote,
+        ),
+      ).toThrow("contract");
+    }
   });
 
   it("emits a revision notice for a historical sequence without replacing the latest quote", () => {
@@ -144,5 +165,25 @@ describe("synthetic quote sequence and revision reduction", () => {
         other,
       ),
     ).toThrow("listing");
+  });
+
+  it("fails closed at the configured history capacity while preserving duplicates", () => {
+    const initial = applyQuoteObservation(
+      createQuoteObservationState(listingId, { maxHistory: 2 }),
+      quote("20", "0", "120"),
+    );
+    const full = applyQuoteObservation(initial.state, quote("21", "0", "121"));
+
+    expect(full.state.history).toHaveLength(2);
+    expect(() =>
+      applyQuoteObservation(full.state, quote("22", "0", "122")),
+    ).toThrow("capacity");
+
+    const duplicate = applyQuoteObservation(
+      full.state,
+      quote("21", "0", "121"),
+    );
+    expect(duplicate.reason).toBe("duplicate");
+    expect(duplicate.state).toBe(full.state);
   });
 });

@@ -1,4 +1,5 @@
 import type { CursorPage } from "@huoqiu/contracts/shared/page";
+import { m1Router } from "@huoqiu/contracts/m1";
 import type { ListingId } from "@huoqiu/domain/shared/ids";
 
 export const SYNTHETIC_MARKET_SOURCE = "huoqiu-synthetic" as const;
@@ -54,6 +55,7 @@ export interface QuoteObservationState {
   readonly listing_id: ListingId;
   readonly current: NormalizedQuote | null;
   readonly history: readonly NormalizedQuote[];
+  readonly max_history: number;
 }
 
 export type QuoteObservationReason =
@@ -74,12 +76,16 @@ export interface QuoteObservationResult {
 
 const MAX_INT64 = 9_223_372_036_854_775_807n;
 const INT64_PATTERN = /^(?:0|[1-9][0-9]{0,18})$/u;
+const DEFAULT_MAX_OBSERVATION_HISTORY = 256;
+const MAX_OBSERVATION_HISTORY = 4_096;
+const quoteContractSchema = m1Router.listingGetQuote.responses[200].shape.quote;
+const listingIdContractSchema = m1Router.listingGetQuote.pathParams.shape.id;
 
 const parseVersion = (
   value: string,
   field: "sequence" | "revision",
 ): bigint => {
-  if (!INT64_PATTERN.test(value)) {
+  if (typeof value !== "string" || !INT64_PATTERN.test(value)) {
     throw new TypeError(`${field} must be a non-negative int64 string`);
   }
   const parsed = BigInt(value);
@@ -124,11 +130,86 @@ const revisionNotice = (
 
 export const createQuoteObservationState = (
   listingId: ListingId,
-): QuoteObservationState => ({
-  listing_id: listingId,
-  current: null,
-  history: [],
-});
+  options: Readonly<{ maxHistory?: number }> = {},
+): QuoteObservationState => {
+  if (!listingIdContractSchema.safeParse(listingId).success) {
+    throw new TypeError("listing id violates the authoritative M1 contract");
+  }
+  const maxHistory = options.maxHistory ?? DEFAULT_MAX_OBSERVATION_HISTORY;
+  if (
+    !Number.isSafeInteger(maxHistory) ||
+    maxHistory < 1 ||
+    maxHistory > MAX_OBSERVATION_HISTORY
+  ) {
+    throw new RangeError(
+      `maxHistory must be between 1 and ${MAX_OBSERVATION_HISTORY}`,
+    );
+  }
+  return {
+    listing_id: listingId,
+    current: null,
+    history: [],
+    max_history: maxHistory,
+  };
+};
+
+const assertRealExchangeTimezone = (value: string): void => {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value }).format(new Date(0));
+  } catch {
+    throw new TypeError("quote violates the authoritative M1 contract");
+  }
+};
+
+const assertQuoteContract = (value: NormalizedQuote): void => {
+  const result = quoteContractSchema.safeParse(value);
+  if (!result.success) {
+    throw new TypeError("quote violates the authoritative M1 contract");
+  }
+  assertRealExchangeTimezone(result.data.exchange_timezone);
+};
+
+const assertObservationState = (state: QuoteObservationState): void => {
+  if (
+    typeof state !== "object" ||
+    state === null ||
+    !listingIdContractSchema.safeParse(state.listing_id).success ||
+    !Number.isSafeInteger(state.max_history) ||
+    state.max_history < 1 ||
+    state.max_history > MAX_OBSERVATION_HISTORY ||
+    !Array.isArray(state.history) ||
+    state.history.length > state.max_history ||
+    (state.current !== null && typeof state.current !== "object")
+  ) {
+    throw new TypeError("quote observation state violates its contract");
+  }
+
+  const versions = new Set<string>();
+  for (const observation of state.history) {
+    assertQuoteContract(observation);
+    if (observation.listing_id !== state.listing_id) {
+      throw new TypeError("quote observation state contains another listing");
+    }
+    const versionKey = `${observation.sequence}\u001f${observation.revision}`;
+    if (versions.has(versionKey)) {
+      throw new TypeError(
+        "quote observation state contains duplicate versions",
+      );
+    }
+    versions.add(versionKey);
+  }
+
+  if (state.current !== null) {
+    const current = state.current;
+    assertQuoteContract(current);
+    if (
+      current.listing_id !== state.listing_id ||
+      !state.history.some((item) => quoteContentMatches(item, current))
+    ) {
+      throw new TypeError("current quote is absent from observation history");
+    }
+  }
+};
 
 /**
  * Pure ingestion semantics for a synthetic quote observation.
@@ -142,6 +223,8 @@ export const applyQuoteObservation = (
   state: QuoteObservationState,
   incoming: NormalizedQuote,
 ): QuoteObservationResult => {
+  assertObservationState(state);
+  assertQuoteContract(incoming);
   if (incoming.listing_id !== state.listing_id) {
     throw new TypeError(
       "quote listing does not match observation state listing",
@@ -169,6 +252,12 @@ export const applyQuoteObservation = (
       state,
       revision_notices: [],
     };
+  }
+
+  if (state.history.length >= state.max_history) {
+    throw new RangeError(
+      "quote observation history capacity reached; persist before accepting more",
+    );
   }
 
   if (current === null) {
