@@ -71,7 +71,7 @@ const canonicalInstant = (value: string): string => {
 };
 
 const assertListingId = (listingId: ListingId): void => {
-  if (!LISTING_ID_PATTERN.test(listingId)) {
+  if (typeof listingId !== "string" || !LISTING_ID_PATTERN.test(listingId)) {
     throw new TypeError("listing id must be a bounded safe opaque identifier");
   }
 };
@@ -128,7 +128,9 @@ export class SyntheticMarketDataProvider implements MarketDataProvider {
     if (
       typeof options.seed !== "string" ||
       options.seed.length < 1 ||
-      options.seed.length > MAX_SEED_LENGTH
+      options.seed.length > MAX_SEED_LENGTH ||
+      options.seed.trim() !== options.seed ||
+      /\p{Cc}/u.test(options.seed)
     ) {
       throw new RangeError(
         `seed must contain between 1 and ${MAX_SEED_LENGTH} characters`,

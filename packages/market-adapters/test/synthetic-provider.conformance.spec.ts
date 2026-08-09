@@ -65,6 +65,8 @@ describe("SyntheticMarketDataProvider conformance", () => {
       stale: false,
     });
     expect(bars.items).toHaveLength(7);
+    expect(quote.price).toBe(bars.items[0]?.close);
+    expect(quote.sequence).toBe(bars.items[0]?.sequence);
     expect(
       bars.items.every(
         (bar) =>
@@ -104,6 +106,43 @@ describe("SyntheticMarketDataProvider conformance", () => {
     ).rejects.toThrow("cursor");
     await expect(
       provider.getBars(listingId, "1d", `${firstPage.next_cursor ?? ""}x`),
+    ).rejects.toThrow("cursor");
+  });
+
+  it("binds continuation pages to their original clock snapshot", async () => {
+    let clockValue = snapshot;
+    const provider = new SyntheticMarketDataProvider({
+      seed: "stable-clock-seed",
+      clock: () => clockValue,
+      pageSize: 3,
+      historySize: 6,
+    });
+    const first = await provider.getBars(listingId, "1d");
+    clockValue = "2027-08-08T06:00:00.000Z";
+    const continuation = await provider.getBars(
+      listingId,
+      "1d",
+      first.next_cursor ?? undefined,
+    );
+
+    expect(continuation.items.every((bar) => bar.as_of === snapshot)).toBe(
+      true,
+    );
+    expect(continuation.items[0]?.starts_at).toBe("2026-08-04T00:00:00.000Z");
+  });
+
+  it("binds cursors to the configured seed", async () => {
+    const first = createProvider();
+    const cursor = (await first.getBars(listingId, "1d")).next_cursor;
+    const differentSeed = new SyntheticMarketDataProvider({
+      seed: "different-seed",
+      clock: () => snapshot,
+      pageSize: 7,
+      historySize: 23,
+    });
+
+    await expect(
+      differentSeed.getBars(listingId, "1d", cursor ?? undefined),
     ).rejects.toThrow("cursor");
   });
 
@@ -157,6 +196,13 @@ describe("SyntheticMarketDataProvider conformance", () => {
       () =>
         new SyntheticMarketDataProvider({
           seed: "",
+          clock: () => snapshot,
+        }),
+    ).toThrow("seed");
+    expect(
+      () =>
+        new SyntheticMarketDataProvider({
+          seed: "   ",
           clock: () => snapshot,
         }),
     ).toThrow("seed");
