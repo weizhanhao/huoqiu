@@ -43,7 +43,10 @@ trustLockfile: false
 blockExoticSubdeps: true
 
 allowBuilds:
+  cpu-features: false
   esbuild: true
+  protobufjs: false
+  ssh2: false
 `;
 
 const exactContainerInventory = {
@@ -957,13 +960,19 @@ describe("workspace and supply-chain boundaries", () => {
 
   it.each([
     exactWorkspacePolicy.replace("esbuild: true", "esbuild: false"),
+    exactWorkspacePolicy.replace("cpu-features: false", "cpu-features: true"),
+    exactWorkspacePolicy.replace("protobufjs: false", "protobufjs: true"),
+    exactWorkspacePolicy.replace("ssh2: false", "ssh2: true"),
     exactWorkspacePolicy.replace(
-      "  esbuild: true",
-      "  esbuild: true\n  sharp: true",
+      "  ssh2: false",
+      "  ssh2: false\n  sharp: true",
     ),
-    exactWorkspacePolicy.replace("allowBuilds:\n  esbuild: true\n", ""),
+    exactWorkspacePolicy.replace(
+      "allowBuilds:\n  cpu-features: false\n  esbuild: true\n  protobufjs: false\n  ssh2: false\n",
+      "",
+    ),
   ])(
-    "rejects any install-script allowlist except esbuild true",
+    "rejects any install-script policy except the exact reviewed allow/deny map",
     async (policy) => {
       const root = await createRepository();
       await writeText(root, "pnpm-workspace.yaml", policy);

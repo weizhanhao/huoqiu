@@ -13,11 +13,15 @@
     "typecheck": "tsc --noEmit --skipLibCheck --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals drizzle.config.ts src/schema/*.ts test/*.spec.ts"
   },
   "dependencies": {
-    "drizzle-orm": "0.45.2"
+    "@huoqiu/contracts": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "postgres": "3.4.9"
   },
   "devDependencies": {
     "@huoqiu/config": "workspace:*",
     "drizzle-kit": "0.31.10",
+    "testcontainers": "12.1.0",
+    "tsx": "4.23.9",
     "yaml": "2.9.0"
   },
   "peerDependencies": {

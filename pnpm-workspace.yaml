@@ -13,7 +13,10 @@ overrides:
   "@nestjs/platform-fastify>find-my-way": 9.7.0
 
 allowBuilds:
+  cpu-features: false
   esbuild: true
+  protobufjs: false
+  ssh2: false
 
 patchedDependencies:
   image-size@1.2.1: patches/image-size@1.2.1.patch

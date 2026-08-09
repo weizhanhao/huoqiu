@@ -1375,14 +1375,20 @@ const validatePnpmPolicy = async (root: string): Promise<void> => {
       fail("PNPM_ALLOW_BUILDS_INVALID", `${obsoleteKey} is forbidden`);
   }
   const allowBuilds = parsed.blocks.get("allowBuilds");
+  const reviewedBuildPolicy = [
+    "cpu-features: false",
+    "esbuild: true",
+    "protobufjs: false",
+    "ssh2: false",
+  ];
   if (
     allowBuilds === undefined ||
-    allowBuilds.length !== 1 ||
-    allowBuilds[0] !== "esbuild: true"
+    allowBuilds.length !== reviewedBuildPolicy.length ||
+    allowBuilds.some((entry, index) => entry !== reviewedBuildPolicy[index])
   ) {
     fail(
       "PNPM_ALLOW_BUILDS_INVALID",
-      "allowBuilds must contain only esbuild: true",
+      "allowBuilds must equal the reviewed allow/deny map",
     );
   }
   const packagePatterns = parsed.blocks.get("packages");
