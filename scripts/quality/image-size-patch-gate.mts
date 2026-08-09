@@ -1,8 +1,11 @@
 import { execFile as execFileCallback } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { parse } from "yaml";
 
 import { isMainModule, runCli } from "./cli.mts";
 import { QualityGateError } from "./gate-core.mts";
@@ -112,19 +115,63 @@ export const dependencyAuditArguments = (): readonly string[] => [
   "--registry=https://registry.npmjs.org",
   "--audit-level",
   "high",
-  ...patchedImageSizeAdvisories.flatMap((advisory) => ["--ignore", advisory]),
 ];
 
-const verifyRemainingDependencyAudit = async (): Promise<void> => {
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+export const verifyAuditIgnorePolicy = async (
+  workspaceYaml?: string,
+): Promise<void> => {
+  const workspaceDocument: unknown = parse(
+    workspaceYaml ??
+      (await readFile(resolve(repositoryRoot, "pnpm-workspace.yaml"), "utf8")),
+  );
+  const auditConfig =
+    isRecord(workspaceDocument) && isRecord(workspaceDocument.auditConfig)
+      ? workspaceDocument.auditConfig
+      : undefined;
+  const ignoredAdvisories = auditConfig?.ignoreGhsas;
+  const expectedAdvisories = [...patchedImageSizeAdvisories].sort();
+  const actualAdvisories = Array.isArray(ignoredAdvisories)
+    ? ignoredAdvisories.filter(
+        (advisory): advisory is string => typeof advisory === "string",
+      )
+    : [];
+
+  if (
+    !Array.isArray(ignoredAdvisories) ||
+    actualAdvisories.length !== ignoredAdvisories.length ||
+    JSON.stringify([...actualAdvisories].sort()) !==
+      JSON.stringify(expectedAdvisories)
+  ) {
+    throw new QualityGateError(
+      "DEPENDENCY_AUDIT_IGNORE_POLICY_INVALID",
+      `expected exactly ${expectedAdvisories.join(",")}`,
+    );
+  }
+};
+
+export type DependencyAuditRunner = (
+  arguments_: readonly string[],
+) => Promise<void>;
+
+const executeDependencyAudit: DependencyAuditRunner = async (arguments_) => {
   const npmExecPath = process.env.npm_execpath;
   const command = npmExecPath === undefined ? "pnpm" : process.execPath;
   const prefix = npmExecPath === undefined ? [] : [npmExecPath];
+  await execFile(command, [...prefix, ...arguments_], {
+    cwd: repositoryRoot,
+    env: { ...process.env, CI: "true" },
+    maxBuffer: 4 * 1024 * 1024,
+  });
+};
+
+export const verifyRemainingDependencyAudit = async (
+  runAudit: DependencyAuditRunner = executeDependencyAudit,
+): Promise<void> => {
   try {
-    await execFile(command, [...prefix, ...dependencyAuditArguments()], {
-      cwd: repositoryRoot,
-      env: { ...process.env, CI: "true" },
-      maxBuffer: 4 * 1024 * 1024,
-    });
+    await runAudit(dependencyAuditArguments());
   } catch (error) {
     const failure = error as Error & { stderr?: string; stdout?: string };
     throw new QualityGateError(
@@ -138,6 +185,7 @@ const verifyRemainingDependencyAudit = async (): Promise<void> => {
 
 export const main = async (): Promise<void> => {
   await verifyImageSizePatch();
+  await verifyAuditIgnorePolicy();
   await verifyRemainingDependencyAudit();
   process.stdout.write(
     `DEPENDENCY_PATCH VERIFIED image-size=1.2.1 advisories=${patchedImageSizeAdvisories.join(",")} audit=passed\n`,

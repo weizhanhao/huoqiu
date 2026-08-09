@@ -53,7 +53,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lane: [format, lint, typecheck, test, build, boundaries]
+        lane:
+          [format, lint, typecheck, test, build, boundaries, dependency-audit]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -83,6 +84,7 @@ jobs:
               ;;
             build) pnpm build ;;
             boundaries) pnpm qa:boundaries ;;
+            dependency-audit) pnpm qa:dependency-patch ;;
             *) exit 64 ;;
           esac
       - name: Upload unit-test log
