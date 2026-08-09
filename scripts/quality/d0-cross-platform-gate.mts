@@ -1,4 +1,4 @@
-import { runMobileD0Evidence } from "./mobile-d0-evidence.mts";
+import { runPreparedMobileD0Evidence } from "./mobile-d0-evidence.mts";
 import { QualityGateError } from "./gate-core.mts";
 import {
   runWebD0GoldenEvidence,
@@ -8,15 +8,27 @@ import {
 type Platform = "android" | "ios";
 type CheckSummary = D0WebGoldenSummary;
 
+export type D0PreparedMobileRunner = (
+  platform: Platform,
+  workspace: string,
+) => Promise<CheckSummary>;
+
 export interface D0CrossPlatformDependencies {
   runMobile: (platform: Platform) => Promise<CheckSummary>;
   runWeb: () => Promise<CheckSummary>;
 }
 
-const runMobile = async (platform: Platform): Promise<CheckSummary> => {
-  await runMobileD0Evidence(["--platform", platform]);
-  return { failed: 0, passed: 1, skipped: 0 };
+export const runPreparedMobileInWorkspace = async (
+  platform: Platform,
+  workspace: string,
+  runPrepared: D0PreparedMobileRunner = runPreparedMobileD0Evidence,
+): Promise<CheckSummary> => {
+  const { failed, passed, skipped } = await runPrepared(platform, workspace);
+  return { failed, passed, skipped };
 };
+
+const runMobile = async (platform: Platform): Promise<CheckSummary> =>
+  await runPreparedMobileInWorkspace(platform, process.cwd());
 
 const exact = (
   label: string,
@@ -40,9 +52,10 @@ export const runD0CrossPlatformEvidence = async (
     runWeb: runWebD0GoldenEvidence,
   },
 ): Promise<CheckSummary> => {
-  // The protected macOS runner owns both simulator processes. Running these in
-  // sequence prevents shared ports, build directories, and device state from
-  // contaminating the evidence of another platform.
+  // The protected macOS launcher owns this detached workspace plus both
+  // simulator process trees. Running the raw prepared executors in sequence
+  // prevents shared ports, build directories, and device state from
+  // contaminating another platform's evidence.
   const web = await dependencies.runWeb();
   exact("web", web, 3);
   const ios = await dependencies.runMobile("ios");
