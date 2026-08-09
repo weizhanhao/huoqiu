@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   mkdir,
   mkdtemp,
+  readdir,
   readFile,
   realpath,
   rm,
@@ -10,7 +11,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, parse, resolve } from "node:path";
+import { dirname, isAbsolute, join, parse, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -22,13 +23,16 @@ import {
 import { QualityGateError } from "./gate-core.mts";
 
 export type MobileD0Platform = "android" | "ios";
-type ToolName = "adb" | "git" | "maestro" | "node" | "pnpm" | "tar" | "xcrun";
+export type MobileD0ToolName =
+  "adb" | "git" | "maestro" | "node" | "pnpm" | "pod" | "tar" | "xcrun";
+type ToolName = MobileD0ToolName;
 
 export interface CommandRequest {
   args: string[];
   cwd: string;
   executable: string;
   label: string;
+  platform: MobileD0Platform;
   timeoutMs?: number;
 }
 
@@ -48,23 +52,39 @@ interface Snapshot {
 }
 
 export interface ToolIdentity {
-  components: ToolComponentIdentity[];
-  executable: string;
-  prefixArgs: string[];
-  realpath: string;
-  sha256: string;
-  version?: string;
+  readonly components: readonly ToolComponentIdentity[];
+  readonly executable: string;
+  readonly expectedVersion: string;
+  readonly name: MobileD0ToolName;
+  readonly prefixArgs: readonly string[];
+  readonly realpath: string;
+  readonly registry: ToolComponentIdentity;
+  readonly sha256: string;
 }
 
 export interface ToolComponentIdentity {
+  readonly mode: number;
+  readonly path: string;
+  readonly realpath: string;
+  readonly sha256: string;
+  readonly uid: number;
+}
+
+export type ToolSet = Readonly<Partial<Record<MobileD0ToolName, ToolIdentity>>>;
+
+export interface ToolchainPathMetadata {
+  isDirectory: () => boolean;
+  isFile: () => boolean;
   mode: number;
-  path: string;
-  realpath: string;
-  sha256: string;
   uid: number;
 }
 
-type ToolSet = Partial<Record<ToolName, ToolIdentity>>;
+export interface ToolchainResolverDependencies {
+  readDirectory: (path: string) => Promise<readonly string[]>;
+  readBytes: (path: string) => Promise<Uint8Array>;
+  realpath: (path: string) => Promise<string>;
+  stat: (path: string) => Promise<ToolchainPathMetadata>;
+}
 
 export interface MobileD0EvidenceDependencies {
   artifactDirectory: (commit: string, platform: MobileD0Platform) => string;
@@ -84,7 +104,7 @@ export interface MobileD0EvidenceDependencies {
   ) => Promise<void>;
 }
 
-interface MobileTarget {
+export interface MobileTarget {
   id: string;
   state?: string;
 }
@@ -105,6 +125,11 @@ const repositoryRoot = resolve(
   "..",
 );
 const SHA_PATTERN = /^[a-f0-9]{40,64}$/u;
+const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+const SAFE_VERSION_PATTERN = /^[\x20-\x7e]+(?:\n[\x20-\x7e]+)*$/u;
+const MAX_VERSION_BYTES = 4096;
+const MAX_REGISTRY_BYTES = 64 * 1024 * 1024;
+const MAX_TOOL_COMPONENTS = 262_144;
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 const BUILD_TIMEOUT_MS = 30 * 60 * 1000;
 const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
@@ -112,17 +137,133 @@ const ANSI_COLOR_PATTERN = new RegExp(
   `${String.fromCodePoint(27)}\\[[0-9;]*m`,
   "gu",
 );
+const MOBILE_D0_TOOLCHAIN_ROOT = "/opt/huoqiu-quality/mobile-d0";
+export const MOBILE_D0_TOOLCHAIN_REGISTRY_PATH = `${MOBILE_D0_TOOLCHAIN_ROOT}/toolchain.v1.json`;
+const PROTECTED_TOOL_PATHS = {
+  adb: `${MOBILE_D0_TOOLCHAIN_ROOT}/android/platform-tools/adb`,
+  java: `${MOBILE_D0_TOOLCHAIN_ROOT}/java/bin/java`,
+  maestro: `${MOBILE_D0_TOOLCHAIN_ROOT}/maestro/maestro-cli.jar`,
+  node: `${MOBILE_D0_TOOLCHAIN_ROOT}/node/bin/node`,
+  pnpm: `${MOBILE_D0_TOOLCHAIN_ROOT}/pnpm/pnpm.cjs`,
+  pod: `${MOBILE_D0_TOOLCHAIN_ROOT}/ios/bin/pod`,
+} as const;
+const PROTECTED_PNPM_STORE = `${MOBILE_D0_TOOLCHAIN_ROOT}/pnpm/store`;
+const PROTECTED_EXPO_CLI = "apps/mobile/node_modules/expo/bin/cli";
+const PROTECTED_ANDROID_SDK = `${MOBILE_D0_TOOLCHAIN_ROOT}/android`;
+const PROTECTED_ANDROID_GRADLE_SEED_MARKER = `${PROTECTED_ANDROID_SDK}/gradle-home-seed/.huoqiu-reviewed`;
+const PROTECTED_IOS_SUPPORT_ROOT = `${MOBILE_D0_TOOLCHAIN_ROOT}/ios`;
+const PROTECTED_IOS_POD = `${PROTECTED_IOS_SUPPORT_ROOT}/bin/pod`;
+const PROTECTED_IOS_CACHE_SEED_MARKER = `${PROTECTED_IOS_SUPPORT_ROOT}/native-home-seed/.huoqiu-reviewed`;
+const PROTECTED_JAVA_HOME = `${MOBILE_D0_TOOLCHAIN_ROOT}/java`;
+const PROTECTED_NODE_BIN = `${MOBILE_D0_TOOLCHAIN_ROOT}/node/bin`;
+const IOS_DEVELOPER_DIRECTORY = "/Applications/Xcode.app/Contents/Developer";
+const TRUSTED_COMPONENT_ROOTS: Readonly<Record<ToolName, readonly string[]>> = {
+  adb: [`${MOBILE_D0_TOOLCHAIN_ROOT}/android`],
+  git: ["/usr/bin"],
+  maestro: [
+    `${MOBILE_D0_TOOLCHAIN_ROOT}/java`,
+    `${MOBILE_D0_TOOLCHAIN_ROOT}/maestro`,
+  ],
+  node: [`${MOBILE_D0_TOOLCHAIN_ROOT}/node`],
+  pnpm: [
+    `${MOBILE_D0_TOOLCHAIN_ROOT}/node`,
+    `${MOBILE_D0_TOOLCHAIN_ROOT}/pnpm`,
+  ],
+  pod: [PROTECTED_IOS_SUPPORT_ROOT],
+  tar: ["/usr/bin"],
+  xcrun: ["/usr/bin"],
+};
+const COMPLETE_COMPONENT_ROOTS: Readonly<Record<ToolName, readonly string[]>> =
+  {
+    adb: [`${MOBILE_D0_TOOLCHAIN_ROOT}/android`],
+    git: [],
+    maestro: [
+      `${MOBILE_D0_TOOLCHAIN_ROOT}/java`,
+      `${MOBILE_D0_TOOLCHAIN_ROOT}/maestro`,
+    ],
+    node: [`${MOBILE_D0_TOOLCHAIN_ROOT}/node`],
+    pnpm: [
+      `${MOBILE_D0_TOOLCHAIN_ROOT}/node`,
+      `${MOBILE_D0_TOOLCHAIN_ROOT}/pnpm`,
+    ],
+    pod: [PROTECTED_IOS_SUPPORT_ROOT],
+    tar: [],
+    xcrun: [],
+  };
+const REQUIRED_COMPONENT_DIRECTORIES: Readonly<
+  Record<ToolName, readonly string[]>
+> = {
+  adb: [],
+  git: [],
+  maestro: [],
+  node: [],
+  pnpm: [PROTECTED_PNPM_STORE],
+  pod: [],
+  tar: [],
+  xcrun: [],
+};
+const REQUIRED_COMPONENT_FILES: Readonly<Record<ToolName, readonly string[]>> =
+  {
+    adb: [PROTECTED_ANDROID_GRADLE_SEED_MARKER],
+    git: [],
+    maestro: [],
+    node: [],
+    pnpm: [],
+    pod: [PROTECTED_IOS_POD, PROTECTED_IOS_CACHE_SEED_MARKER],
+    tar: [],
+    xcrun: [],
+  };
+
+const defaultToolchainResolverDependencies: ToolchainResolverDependencies = {
+  readDirectory: async (path) => await readdir(path),
+  readBytes: async (path) => await readFile(path),
+  realpath,
+  stat,
+};
+
+const isWithinPath = (root: string, candidate: string): boolean => {
+  const relation = relative(root, candidate);
+  return (
+    relation === "" || (!relation.startsWith("..") && !isAbsolute(relation))
+  );
+};
+
+const isMobileD0Platform = (value: unknown): value is MobileD0Platform =>
+  value === "android" || value === "ios";
+
+const isDeclaredComponentPathAllowed = (
+  name: ToolName,
+  candidate: string,
+): boolean =>
+  isAbsolute(candidate) &&
+  resolve(candidate) === candidate &&
+  TRUSTED_COMPONENT_ROOTS[name].some((root) => isWithinPath(root, candidate));
+
+const isCanonicalComponentPathAllowed = async (
+  name: ToolName,
+  candidate: string,
+  dependencies: ToolchainResolverDependencies,
+): Promise<boolean> => {
+  for (const root of TRUSTED_COMPONENT_ROOTS[name]) {
+    const canonicalRoot = await dependencies.realpath(root);
+    if (canonicalRoot !== root) continue;
+    if (isWithinPath(canonicalRoot, candidate)) return true;
+  }
+  return false;
+};
 
 const parsePlatform = (args: string[]): MobileD0Platform => {
   const flags = parseStrictFlags(args, new Set(["--platform"]));
   const platform = requiredFlag(flags, "--platform");
-  if (platform !== "ios" && platform !== "android")
+  if (!isMobileD0Platform(platform))
     throw new QualityGateError(
       "CLI_ARGUMENT_INVALID",
       "--platform must be ios or android",
     );
   return platform;
 };
+
+export const parseMobileD0Platform = parsePlatform;
 
 const normalizedReason = (value: string): string => {
   const line = value
@@ -207,16 +348,37 @@ const androidTarget = (stdout: string): MobileTarget | undefined => {
   return undefined;
 };
 
-const safeEnvironment = (): NodeJS.ProcessEnv => {
+export const parseAndroidMobileTarget = androidTarget;
+export const parseIosMobileTarget = iosTarget;
+
+const safeEnvironment = (platform: MobileD0Platform): NodeJS.ProcessEnv => {
+  if (!isMobileD0Platform(platform))
+    throw new QualityGateError(
+      "CLI_ARGUMENT_INVALID",
+      "platform must be ios or android",
+    );
   return {
+    ...(platform === "android"
+      ? {
+          ANDROID_HOME: PROTECTED_ANDROID_SDK,
+          ANDROID_SDK_ROOT: PROTECTED_ANDROID_SDK,
+        }
+      : { DEVELOPER_DIR: IOS_DEVELOPER_DIRECTORY }),
     CI: "1",
     HOME: "/var/empty",
+    JAVA_HOME: PROTECTED_JAVA_HOME,
     LANG: "C",
     LC_ALL: "C",
-    PATH: "/usr/bin:/bin",
+    NODE: PROTECTED_TOOL_PATHS.node,
+    npm_node_execpath: PROTECTED_TOOL_PATHS.node,
+    PATH: `${PROTECTED_NODE_BIN}:${PROTECTED_JAVA_HOME}/bin${
+      platform === "ios" ? `:${PROTECTED_IOS_SUPPORT_ROOT}/bin` : ""
+    }:/usr/bin:/bin`,
     TMPDIR: "/tmp",
   };
 };
+
+export const mobileD0SafeEnvironment = safeEnvironment;
 
 const defaultRunCommand = async (
   request: CommandRequest,
@@ -227,7 +389,7 @@ const defaultRunCommand = async (
       request.args,
       {
         cwd: request.cwd,
-        env: safeEnvironment(),
+        env: safeEnvironment(request.platform),
         maxBuffer: MAX_OUTPUT_BYTES,
         timeout: request.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         windowsHide: true,
@@ -303,110 +465,502 @@ const discoverCommit = async (): Promise<string> => {
 export const trustedToolCandidates = (
   platform: MobileD0Platform,
 ): Readonly<Record<ToolName, readonly string[]>> => {
-  void platform;
+  if (!isMobileD0Platform(platform))
+    return {
+      adb: [],
+      git: [],
+      maestro: [],
+      node: [],
+      pnpm: [],
+      pod: [],
+      tar: [],
+      xcrun: [],
+    };
   return {
-    adb: [],
+    adb: platform === "android" ? [PROTECTED_TOOL_PATHS.adb] : [],
     git: ["/usr/bin/git"],
-    maestro: [],
-    node: [process.execPath],
-    pnpm: [],
+    maestro: [PROTECTED_TOOL_PATHS.maestro],
+    node: [PROTECTED_TOOL_PATHS.node],
+    pnpm: [PROTECTED_TOOL_PATHS.pnpm],
+    pod: platform === "ios" ? [PROTECTED_TOOL_PATHS.pod] : [],
     tar: ["/usr/bin/tar"],
-    xcrun: ["/usr/bin/xcrun"],
+    xcrun: platform === "ios" ? ["/usr/bin/xcrun"] : [],
   };
 };
 
-const hasRootOwnedImmutableChain = async (path: string): Promise<boolean> => {
+const requiredToolNames = (platform: MobileD0Platform): readonly ToolName[] => {
+  if (!isMobileD0Platform(platform))
+    throw new QualityGateError(
+      "CLI_ARGUMENT_INVALID",
+      "platform must be ios or android",
+    );
+  return [
+    "git",
+    "tar",
+    "node",
+    "pnpm",
+    platform === "ios" ? "xcrun" : "adb",
+    ...(platform === "ios" ? (["pod"] as const) : []),
+    "maestro",
+  ];
+};
+
+export const mobileD0RequiredToolNames = requiredToolNames;
+
+const hasRootOwnedImmutableChain = async (
+  path: string,
+  dependencies: ToolchainResolverDependencies = defaultToolchainResolverDependencies,
+): Promise<boolean> => {
   let cursor = path;
   const filesystemRoot = parse(path).root;
   while (true) {
-    const metadata = await stat(cursor);
+    const metadata = await dependencies.stat(cursor);
     if (metadata.uid !== 0 || (metadata.mode & 0o022) !== 0) return false;
     if (cursor === filesystemRoot) return true;
     cursor = dirname(cursor);
   }
 };
 
-const componentIdentity = async (
+const readComponentIdentity = async (
   candidate: string,
-): Promise<ToolComponentIdentity | undefined> => {
+  dependencies: ToolchainResolverDependencies = defaultToolchainResolverDependencies,
+): Promise<
+  { contents: Uint8Array; identity: ToolComponentIdentity } | undefined
+> => {
   if (!isAbsolute(candidate)) return undefined;
   try {
-    const canonicalPath = await realpath(candidate);
-    const metadata = await stat(canonicalPath);
+    const canonicalPath = await dependencies.realpath(candidate);
+    const metadata = await dependencies.stat(canonicalPath);
     if (
       !metadata.isFile() ||
-      !(await hasRootOwnedImmutableChain(canonicalPath))
+      !(await hasRootOwnedImmutableChain(canonicalPath, dependencies))
     )
       return undefined;
+    const contents = await dependencies.readBytes(canonicalPath);
     return {
-      mode: metadata.mode,
-      path: candidate,
-      realpath: canonicalPath,
-      sha256: createHash("sha256")
-        .update(await readFile(canonicalPath))
-        .digest("hex"),
-      uid: metadata.uid,
+      contents,
+      identity: {
+        mode: metadata.mode,
+        path: candidate,
+        realpath: canonicalPath,
+        sha256: createHash("sha256").update(contents).digest("hex"),
+        uid: metadata.uid,
+      },
     };
   } catch {
     return undefined;
   }
 };
 
-const resolveTool = async (
-  candidates: readonly string[],
-): Promise<ToolIdentity | undefined> => {
-  for (const candidate of candidates) {
-    const component = await componentIdentity(candidate);
-    if (component === undefined) continue;
-    return {
-      components: [component],
-      executable: component.realpath,
-      prefixArgs: [],
-      realpath: component.realpath,
-      sha256: component.sha256,
-    };
-  }
-  return undefined;
+const componentIdentity = async (
+  candidate: string,
+  dependencies: ToolchainResolverDependencies = defaultToolchainResolverDependencies,
+): Promise<ToolComponentIdentity | undefined> =>
+  (await readComponentIdentity(candidate, dependencies))?.identity;
+
+const protectedDirectory = async (
+  directory: string,
+  dependencies: ToolchainResolverDependencies,
+): Promise<boolean> => {
+  const canonicalDirectory = await dependencies.realpath(directory);
+  if (canonicalDirectory !== directory) return false;
+  const metadata = await dependencies.stat(canonicalDirectory);
+  return (
+    metadata.isDirectory() &&
+    (await hasRootOwnedImmutableChain(canonicalDirectory, dependencies))
+  );
 };
 
-const verifyToolIdentity = async (identity: ToolIdentity): Promise<boolean> => {
-  if (identity.components.length === 0) return false;
-  for (const expected of identity.components) {
-    const current = await componentIdentity(expected.path);
+const completeRootInventory = async (
+  root: string,
+  dependencies: ToolchainResolverDependencies,
+): Promise<readonly string[] | undefined> => {
+  try {
+    if (!(await protectedDirectory(root, dependencies))) return undefined;
+    const directories = [root];
+    const visitedDirectories = new Set<string>();
+    const files: string[] = [];
+    while (directories.length > 0) {
+      const directory = directories.pop();
+      if (directory === undefined || visitedDirectories.has(directory))
+        return undefined;
+      visitedDirectories.add(directory);
+      if (visitedDirectories.size + files.length > MAX_TOOL_COMPONENTS)
+        return undefined;
+      const names = await dependencies.readDirectory(directory);
+      const uniqueNames = new Set(names);
+      if (uniqueNames.size !== names.length) return undefined;
+      for (const name of [...uniqueNames].sort()) {
+        if (
+          name.length === 0 ||
+          name === "." ||
+          name === ".." ||
+          name.includes("/") ||
+          name.includes("\0")
+        )
+          return undefined;
+        const child = join(directory, name);
+        const canonicalChild = await dependencies.realpath(child);
+        if (!isWithinPath(root, canonicalChild)) return undefined;
+        const metadata = await dependencies.stat(canonicalChild);
+        if (metadata.isDirectory()) {
+          if (
+            canonicalChild !== child ||
+            !(await hasRootOwnedImmutableChain(canonicalChild, dependencies))
+          )
+            return undefined;
+          directories.push(child);
+        } else if (metadata.isFile()) {
+          if (!(await hasRootOwnedImmutableChain(canonicalChild, dependencies)))
+            return undefined;
+          files.push(child);
+        } else return undefined;
+        if (visitedDirectories.size + files.length > MAX_TOOL_COMPONENTS)
+          return undefined;
+      }
+    }
+    return files.sort();
+  } catch {
+    return undefined;
+  }
+};
+
+const completeComponentPaths = async (
+  name: ToolName,
+  dependencies: ToolchainResolverDependencies,
+): Promise<readonly string[] | undefined> => {
+  try {
+    for (const required of REQUIRED_COMPONENT_DIRECTORIES[name]) {
+      if (!(await protectedDirectory(required, dependencies))) return undefined;
+    }
+    const roots = COMPLETE_COMPONENT_ROOTS[name];
+    const candidate = trustedToolCandidates(
+      name === "xcrun" || name === "pod" ? "ios" : "android",
+    )[name][0];
+    if (candidate === undefined) return undefined;
+    const paths = new Set<string>([candidate]);
+    for (const root of roots) {
+      const inventory = await completeRootInventory(root, dependencies);
+      if (inventory === undefined) return undefined;
+      for (const path of inventory) paths.add(path);
+      if (paths.size > MAX_TOOL_COMPONENTS) return undefined;
+    }
+    if (REQUIRED_COMPONENT_FILES[name].some((path) => !paths.has(path)))
+      return undefined;
+    return [...paths].sort();
+  } catch {
+    return undefined;
+  }
+};
+
+interface RegistryComponent {
+  path: string;
+  sha256: string;
+}
+
+interface RegistryTool {
+  components: RegistryComponent[];
+  expected_version: string;
+}
+
+const hasExactKeys = (value: object, expected: readonly string[]): boolean => {
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return (
+    actual.length === sortedExpected.length &&
+    actual.every((key, index) => key === sortedExpected[index])
+  );
+};
+
+const registryTool = (value: unknown): RegistryTool | undefined => {
+  if (typeof value !== "object" || value === null) return undefined;
+  if (!hasExactKeys(value, ["components", "expected_version"]))
+    return undefined;
+  const candidate = value as Partial<RegistryTool>;
+  if (
+    typeof candidate.expected_version !== "string" ||
+    candidate.expected_version.length > MAX_VERSION_BYTES ||
+    !SAFE_VERSION_PATTERN.test(candidate.expected_version) ||
+    candidate.expected_version.trim() !== candidate.expected_version ||
+    !Array.isArray(candidate.components) ||
+    candidate.components.length === 0 ||
+    candidate.components.length > MAX_TOOL_COMPONENTS
+  )
+    return undefined;
+  const components = candidate.components.filter(
+    (component): component is RegistryComponent =>
+      typeof component === "object" &&
+      component !== null &&
+      hasExactKeys(component, ["path", "sha256"]) &&
+      typeof (component as Partial<RegistryComponent>).path === "string" &&
+      (component as RegistryComponent).path.length <= 4096 &&
+      typeof (component as Partial<RegistryComponent>).sha256 === "string" &&
+      SHA256_PATTERN.test((component as RegistryComponent).sha256),
+  );
+  return components.length === candidate.components.length
+    ? { components, expected_version: candidate.expected_version }
+    : undefined;
+};
+
+const launchIdentity = (
+  name: ToolName,
+  components: ToolComponentIdentity[],
+  expectedVersion: string,
+  registry: ToolComponentIdentity,
+): ToolIdentity | undefined => {
+  const candidate = trustedToolCandidates(
+    name === "xcrun" || name === "pod" ? "ios" : "android",
+  )[name][0];
+  if (candidate === undefined) return undefined;
+  const entrypoint = components.find(({ path }) => path === candidate);
+  if (entrypoint === undefined) return undefined;
+  const launcherPath =
+    name === "pnpm"
+      ? PROTECTED_TOOL_PATHS.node
+      : name === "maestro"
+        ? PROTECTED_TOOL_PATHS.java
+        : candidate;
+  const launcher = components.find(({ path }) => path === launcherPath);
+  if (launcher === undefined) return undefined;
+  const frozenComponents = Object.freeze(
+    components.map((component) => Object.freeze({ ...component })),
+  );
+  const prefixArgs = Object.freeze(
+    name === "pnpm"
+      ? [entrypoint.realpath]
+      : name === "maestro"
+        ? ["-jar", entrypoint.realpath]
+        : [],
+  );
+  return Object.freeze({
+    components: frozenComponents,
+    executable: launcher.realpath,
+    expectedVersion,
+    name,
+    prefixArgs,
+    realpath: entrypoint.realpath,
+    registry: Object.freeze({ ...registry }),
+    sha256: entrypoint.sha256,
+  });
+};
+
+const EMPTY_TOOL_SET: ToolSet = Object.freeze({});
+
+export const resolveTrustedTools = async (
+  platform: MobileD0Platform,
+  dependencies: ToolchainResolverDependencies = defaultToolchainResolverDependencies,
+): Promise<ToolSet> => {
+  if (!isMobileD0Platform(platform)) return EMPTY_TOOL_SET;
+  try {
+    const [protectedRootRealpath, registryRealpath] = await Promise.all([
+      dependencies.realpath(MOBILE_D0_TOOLCHAIN_ROOT),
+      dependencies.realpath(MOBILE_D0_TOOLCHAIN_REGISTRY_PATH),
+    ]);
+    const registryMetadata = await dependencies.stat(registryRealpath);
     if (
-      current === undefined ||
-      current.realpath !== expected.realpath ||
-      current.sha256 !== expected.sha256 ||
-      current.uid !== expected.uid ||
-      current.mode !== expected.mode
+      protectedRootRealpath !== MOBILE_D0_TOOLCHAIN_ROOT ||
+      !registryMetadata.isFile() ||
+      !isWithinPath(protectedRootRealpath, registryRealpath) ||
+      !(await hasRootOwnedImmutableChain(registryRealpath, dependencies))
+    )
+      return EMPTY_TOOL_SET;
+    const registryRead = await readComponentIdentity(
+      MOBILE_D0_TOOLCHAIN_REGISTRY_PATH,
+      dependencies,
+    );
+    if (
+      registryRead === undefined ||
+      registryRead.identity.realpath !== registryRealpath ||
+      registryRead.contents.byteLength > MAX_REGISTRY_BYTES
+    )
+      return EMPTY_TOOL_SET;
+    const parsed = JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(registryRead.contents),
+    ) as { schema_version?: unknown; tools?: unknown };
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !hasExactKeys(parsed, ["schema_version", "tools"]) ||
+      parsed.schema_version !== 1 ||
+      typeof parsed.tools !== "object" ||
+      parsed.tools === null
+    )
+      return EMPTY_TOOL_SET;
+    const names = requiredToolNames(platform);
+    const entries: [ToolName, ToolIdentity][] = [];
+    for (const name of names) {
+      const declaration = registryTool(
+        (parsed.tools as Record<string, unknown>)[name],
+      );
+      if (declaration === undefined) return EMPTY_TOOL_SET;
+      const inventory = await completeComponentPaths(name, dependencies);
+      if (inventory === undefined) return EMPTY_TOOL_SET;
+      const inventoryPaths = new Set(inventory);
+      const components: ToolComponentIdentity[] = [];
+      const declaredPaths = new Set<string>();
+      for (const expected of declaration.components) {
+        if (
+          declaredPaths.has(expected.path) ||
+          !isDeclaredComponentPathAllowed(name, expected.path) ||
+          !inventoryPaths.has(expected.path)
+        )
+          return EMPTY_TOOL_SET;
+        declaredPaths.add(expected.path);
+        const identity = await componentIdentity(expected.path, dependencies);
+        if (
+          identity === undefined ||
+          identity.sha256 !== expected.sha256 ||
+          !(await isCanonicalComponentPathAllowed(
+            name,
+            identity.realpath,
+            dependencies,
+          ))
+        )
+          return EMPTY_TOOL_SET;
+        components.push(identity);
+      }
+      if (declaredPaths.size !== inventoryPaths.size) return EMPTY_TOOL_SET;
+      const identity = launchIdentity(
+        name,
+        components,
+        declaration.expected_version,
+        registryRead.identity,
+      );
+      if (identity === undefined) return EMPTY_TOOL_SET;
+      entries.push([name, identity]);
+    }
+    return Object.freeze(Object.fromEntries(entries)) as ToolSet;
+  } catch {
+    return EMPTY_TOOL_SET;
+  }
+};
+
+export const resolveProtectedMobileTools = async (
+  platform: MobileD0Platform,
+): Promise<ToolSet> =>
+  isMobileD0Platform(platform)
+    ? await resolveTrustedTools(platform)
+    : EMPTY_TOOL_SET;
+
+const sameComponentIdentity = (
+  current: ToolComponentIdentity | undefined,
+  expected: ToolComponentIdentity,
+): boolean =>
+  current !== undefined &&
+  current.realpath === expected.realpath &&
+  current.sha256 === expected.sha256 &&
+  current.uid === expected.uid &&
+  current.mode === expected.mode;
+
+export const verifyTrustedToolIdentity = async (
+  identity: ToolIdentity,
+  dependencies: ToolchainResolverDependencies = defaultToolchainResolverDependencies,
+): Promise<boolean> => {
+  try {
+    if (identity.components.length === 0) return false;
+    if (identity.registry.path !== MOBILE_D0_TOOLCHAIN_REGISTRY_PATH)
+      return false;
+    const protectedRootRealpath = await dependencies.realpath(
+      MOBILE_D0_TOOLCHAIN_ROOT,
+    );
+    if (protectedRootRealpath !== MOBILE_D0_TOOLCHAIN_ROOT) return false;
+    const currentRegistryRead = await readComponentIdentity(
+      identity.registry.path,
+      dependencies,
+    );
+    const currentRegistry = currentRegistryRead?.identity;
+    if (
+      !sameComponentIdentity(currentRegistry, identity.registry) ||
+      currentRegistry === undefined ||
+      currentRegistryRead === undefined ||
+      currentRegistryRead.contents.byteLength > MAX_REGISTRY_BYTES ||
+      !isWithinPath(protectedRootRealpath, currentRegistry.realpath)
     )
       return false;
+    const currentParsed = JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(
+        currentRegistryRead.contents,
+      ),
+    ) as { schema_version?: unknown; tools?: unknown };
+    if (
+      typeof currentParsed !== "object" ||
+      currentParsed === null ||
+      !hasExactKeys(currentParsed, ["schema_version", "tools"]) ||
+      currentParsed.schema_version !== 1 ||
+      typeof currentParsed.tools !== "object" ||
+      currentParsed.tools === null
+    )
+      return false;
+    const declaration = registryTool(
+      (currentParsed.tools as Record<string, unknown>)[identity.name],
+    );
+    const inventory = await completeComponentPaths(identity.name, dependencies);
+    if (
+      declaration === undefined ||
+      inventory === undefined ||
+      declaration.expected_version !== identity.expectedVersion ||
+      declaration.components.length !== identity.components.length ||
+      !declaration.components.every(
+        (component, index) =>
+          component.path === identity.components[index]?.path &&
+          component.sha256 === identity.components[index]?.sha256,
+      )
+    )
+      return false;
+    const declaredPaths = new Set(
+      declaration.components.map(({ path }) => path),
+    );
+    const inventoryPaths = new Set(inventory);
+    if (
+      declaredPaths.size !== declaration.components.length ||
+      inventoryPaths.size !== declaredPaths.size ||
+      declaration.components.some(
+        ({ path }) =>
+          !isDeclaredComponentPathAllowed(identity.name, path) ||
+          !inventoryPaths.has(path),
+      )
+    )
+      return false;
+    for (const expected of identity.components) {
+      const current = await componentIdentity(expected.path, dependencies);
+      if (
+        current === undefined ||
+        !sameComponentIdentity(current, expected) ||
+        !(await isCanonicalComponentPathAllowed(
+          identity.name,
+          current.realpath,
+          dependencies,
+        ))
+      )
+        return false;
+    }
+    const expectedIdentity = launchIdentity(
+      identity.name,
+      [...identity.components],
+      identity.expectedVersion,
+      identity.registry,
+    );
+    return (
+      expectedIdentity !== undefined &&
+      identity.executable === expectedIdentity.executable &&
+      identity.realpath === expectedIdentity.realpath &&
+      identity.sha256 === expectedIdentity.sha256 &&
+      identity.prefixArgs.length === expectedIdentity.prefixArgs.length &&
+      identity.prefixArgs.every(
+        (argument, index) => argument === expectedIdentity.prefixArgs[index],
+      )
+    );
+  } catch {
+    return false;
   }
-  const launcher = identity.components[0];
-  return launcher !== undefined && identity.executable === launcher.realpath;
 };
 
+export const verifyToolIdentity = async (
+  identity: ToolIdentity,
+): Promise<boolean> => await verifyTrustedToolIdentity(identity);
+
 const resolveTools = async (platform: MobileD0Platform): Promise<ToolSet> => {
-  const candidates = trustedToolCandidates(platform);
-  const names: ToolName[] = [
-    "git",
-    "tar",
-    "node",
-    "pnpm",
-    platform === "ios" ? "xcrun" : "adb",
-    "maestro",
-  ];
-  const entries = await Promise.all(
-    names.map(
-      async (name) => [name, await resolveTool(candidates[name])] as const,
-    ),
-  );
-  return Object.fromEntries(
-    entries.filter(
-      (entry): entry is readonly [ToolName, ToolIdentity] =>
-        entry[1] !== undefined,
-    ),
-  );
+  return await resolveProtectedMobileTools(platform);
 };
 
 const createSnapshot = async (): Promise<Snapshot> => {
@@ -449,7 +1003,7 @@ const defaultDependencies: MobileD0EvidenceDependencies = {
 
 const versionContract = (
   name: ToolName,
-): Readonly<{ args: string[]; pattern: RegExp }> => {
+): Readonly<{ args: readonly string[]; pattern: RegExp }> => {
   switch (name) {
     case "git":
       return { args: ["--version"], pattern: /^git version \d+\.\d+/iu };
@@ -457,6 +1011,8 @@ const versionContract = (
       return { args: ["--version"], pattern: /\b(?:bsdtar|tar)\b.*\d+/iu };
     case "pnpm":
       return { args: ["--version"], pattern: /^11\.4\.0\s*$/u };
+    case "pod":
+      return { args: ["--version"], pattern: /^\d+\.\d+\.\d+\s*$/u };
     case "node":
       return { args: ["--version"], pattern: /^v24\.15\.\d+\s*$/u };
     case "xcrun":
@@ -465,8 +1021,15 @@ const versionContract = (
       return { args: ["version"], pattern: /Android Debug Bridge version/iu };
     case "maestro":
       return { args: ["--version"], pattern: /^\d+\.\d+\.\d+/u };
+    default:
+      throw new QualityGateError(
+        "D0_MOBILE_TOOL_UNTRUSTED",
+        "unknown mobile D0 tool",
+      );
   }
 };
+
+export const mobileD0VersionContract = versionContract;
 
 const maestroTotals = (
   output: string,
@@ -498,6 +1061,8 @@ const maestroTotals = (
     ? totals
     : undefined;
 };
+
+export const parseMaestroFlowTotals = maestroTotals;
 
 export const runMobileD0Evidence = async (
   args: string[],
@@ -546,27 +1111,49 @@ export const runMobileD0Evidence = async (
   const tools = await dependencies.resolveTools(platform);
   const invalidTools = new Set<ToolName>();
   const changedTools = new Set<ToolName>();
+  const observedVersions = new Map<ToolName, string>();
   const runTool = async (
     name: ToolName,
-    args: string[],
+    args: readonly string[],
     cwd: string,
     label: string,
     timeoutMs?: number,
+    supportNames: readonly ToolName[] = [],
   ): Promise<CommandResult | undefined> => {
     const tool = tools[name];
     if (tool === undefined) return undefined;
-    if (!(await dependencies.verifyToolIdentity(tool))) {
-      invalidTools.add(name);
-      changedTools.add(name);
-      return undefined;
+    const commandIdentities = [...new Set([name, ...supportNames])];
+    for (const identityName of commandIdentities) {
+      const identity = tools[identityName];
+      if (
+        identity === undefined ||
+        !(await dependencies.verifyToolIdentity(identity))
+      ) {
+        invalidTools.add(identityName);
+        changedTools.add(identityName);
+        return undefined;
+      }
     }
-    return await run({
+    const commandResult = await run({
       args: [...tool.prefixArgs, ...args],
       cwd,
       executable: tool.executable,
       label,
+      platform,
       ...(timeoutMs === undefined ? {} : { timeoutMs }),
     });
+    for (const identityName of commandIdentities) {
+      const identity = tools[identityName];
+      if (
+        identity === undefined ||
+        !(await dependencies.verifyToolIdentity(identity))
+      ) {
+        invalidTools.add(identityName);
+        changedTools.add(identityName);
+        return undefined;
+      }
+    }
+    return commandResult;
   };
 
   for (const name of Object.keys(tools).sort() as ToolName[]) {
@@ -579,9 +1166,14 @@ export const runMobileD0Evidence = async (
     );
     const versionOutput =
       `${probe?.stdout ?? ""}\n${probe?.stderr ?? ""}`.trim();
-    if (probe?.exitCode !== 0 || !contract.pattern.test(versionOutput))
+    if (
+      probe?.exitCode !== 0 ||
+      !contract.pattern.test(versionOutput) ||
+      (tools[name]?.expectedVersion !== undefined &&
+        versionOutput !== tools[name]?.expectedVersion)
+    )
       invalidTools.add(name);
-    else if (tools[name] !== undefined) tools[name].version = versionOutput;
+    else observedVersions.set(name, versionOutput);
   }
   const toolSummary = Object.fromEntries(
     Object.entries(tools).map(([name, identity]) => [
@@ -590,8 +1182,10 @@ export const runMobileD0Evidence = async (
         executable: identity.executable,
         components: identity.components,
         realpath: identity.realpath,
+        registry: identity.registry,
         sha256: identity.sha256,
-        version: identity.version ?? null,
+        expected_version: identity.expectedVersion,
+        version: observedVersions.get(name as ToolName) ?? null,
       },
     ]),
   );
@@ -617,16 +1211,9 @@ export const runMobileD0Evidence = async (
           tools: toolSummary,
           tool_errors: [
             ...invalidTools,
-            ...(
-              [
-                "git",
-                "tar",
-                "node",
-                "pnpm",
-                platform === "ios" ? "xcrun" : "adb",
-                "maestro",
-              ] as ToolName[]
-            ).filter((name) => tools[name] === undefined),
+            ...requiredToolNames(platform).filter(
+              (name) => tools[name] === undefined,
+            ),
           ].sort(),
           verified,
           commands: records,
@@ -685,7 +1272,11 @@ export const runMobileD0Evidence = async (
   let target: MobileTarget | undefined;
   let reason: string | undefined;
   if (platform === "ios") {
-    if (tools.xcrun === undefined || invalidTools.has("xcrun"))
+    if (tools.pod === undefined || invalidTools.has("pod"))
+      reason = `ios_pod_unavailable:tool_identity_${
+        tools.pod === undefined ? "missing" : "invalid"
+      }`;
+    else if (tools.xcrun === undefined || invalidTools.has("xcrun"))
       reason = `ios_xcrun_unavailable:tool_identity_${
         tools.xcrun === undefined ? "missing" : "invalid"
       }`;
@@ -765,43 +1356,44 @@ export const runMobileD0Evidence = async (
 
     const install = await runTool(
       "pnpm",
-      ["install", "--frozen-lockfile", "--offline"],
+      [
+        "install",
+        "--frozen-lockfile",
+        "--offline",
+        "--strict-peer-dependencies",
+        "--store-dir",
+        PROTECTED_PNPM_STORE,
+        "--package-import-method=copy",
+        "--config.verify-store-integrity=true",
+        "--config.side-effects-cache=false",
+      ],
       snapshot.root,
       "snapshot-install",
       BUILD_TIMEOUT_MS,
     );
+    const mobileRoot = join(snapshot.root, "apps", "mobile");
+    const expoCli = join(snapshot.root, PROTECTED_EXPO_CLI);
     const exportResult = await runTool(
-      "pnpm",
+      "node",
       [
-        "--filter",
-        "@huoqiu/mobile",
-        "exec",
-        "expo",
+        expoCli,
         "export",
         "--platform",
         "web",
         "--output-dir",
         join(snapshot.root, ".d0-evidence", "expo-web"),
       ],
-      snapshot.root,
+      mobileRoot,
       "expo-export",
       BUILD_TIMEOUT_MS,
     );
     const prebuild = await runTool(
-      "pnpm",
-      [
-        "--filter",
-        "@huoqiu/mobile",
-        "exec",
-        "expo",
-        "prebuild",
-        "--no-install",
-        "--platform",
-        platform,
-      ],
-      snapshot.root,
+      "node",
+      [expoCli, "prebuild", "--no-install", "--platform", platform],
+      mobileRoot,
       "expo-prebuild",
       BUILD_TIMEOUT_MS,
+      platform === "ios" ? ["xcrun", "pod"] : ["adb", "maestro"],
     );
 
     if (reason !== undefined) return await finishNotVerified(reason);
@@ -843,20 +1435,12 @@ export const runMobileD0Evidence = async (
     }
 
     const launch = await runTool(
-      "pnpm",
-      [
-        "--filter",
-        "@huoqiu/mobile",
-        "exec",
-        "expo",
-        `run:${platform}`,
-        "--no-install",
-        "--device",
-        target.id,
-      ],
-      snapshot.root,
+      "node",
+      [expoCli, `run:${platform}`, "--no-install", "--device", target.id],
+      mobileRoot,
       "app-launch",
       BUILD_TIMEOUT_MS,
+      platform === "ios" ? ["xcrun", "pod"] : ["adb", "maestro"],
     );
     if (launch?.exitCode !== 0)
       return await finishNotVerified(`${platform}_build_or_launch_failed`);
@@ -879,6 +1463,18 @@ export const runMobileD0Evidence = async (
           ? "maestro_flow_result_invalid"
           : "maestro_flow_result_missing",
       );
+    }
+
+    for (const name of requiredToolNames(platform)) {
+      const identity = tools[name];
+      if (
+        identity === undefined ||
+        !(await dependencies.verifyToolIdentity(identity))
+      ) {
+        invalidTools.add(name);
+        changedTools.add(name);
+        return await finishNotVerified(`tool_identity_changed:${name}`);
+      }
     }
 
     await writeSummary(true, null, totals);

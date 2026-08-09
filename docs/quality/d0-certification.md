@@ -23,9 +23,11 @@ candidate checkout before `.github/workflows/d0-quality-review.yml` can pass:
    registry. The runner must provide the no-network, read-only-source,
    complete-process-tree boundary described in
    `docs/engineering/quality-trust-model.md`; there is no local fallback.
-   It must also provide the root-owned mobile toolchain registry documented by
-   `scripts/quality/mobile-d0-evidence.mts`, a bootable iOS Simulator, a
-   connected Android emulator, and the pinned browser required by Playwright.
+   It must also provide the root-owned, hash-bound mobile toolchain registry
+   and offline package store documented by
+   `docs/quality/mobile-d0-toolchain.md`, a bootable iOS Simulator, a connected
+   Android emulator, and the pinned browser required by Playwright. Home- or
+   checkout-local SDK tools are not accepted.
 3. Create two different Ed25519 key pairs outside the repository: one for the
    authorship attestor and one for the independent reviewer. Register only the
    public keys and exact GitHub Actions provenance in the root-signed
