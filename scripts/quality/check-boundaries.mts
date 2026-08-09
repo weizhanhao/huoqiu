@@ -111,6 +111,26 @@ interface InventoryArtifact {
   retention_days: number;
 }
 
+interface InventoryContainerPlatform {
+  compressed_size_bytes: number;
+  config_digest: string;
+  manifest_digest: string;
+  platform: string;
+}
+
+interface InventoryContainerImage {
+  distribution_url: string;
+  immutable_reference: string;
+  licenses: string[];
+  platform_owner: string;
+  platforms: InventoryContainerPlatform[];
+  release: string;
+  repo_digest: string;
+  repository: string;
+  source_commit: string;
+  source_url: string;
+}
+
 const CI_ACTIONS: readonly InventoryAction[] = [
   {
     commit_sha: "3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -147,6 +167,41 @@ const CI_ARTIFACT: InventoryArtifact = {
   path: "test-results/unit.log",
   retention_days: 7,
 };
+
+const APPROVED_CONTAINER_IMAGES: readonly InventoryContainerImage[] = [
+  {
+    distribution_url: "https://hub.docker.com/_/postgres",
+    immutable_reference:
+      "docker.io/library/postgres:17.10-bookworm@sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f",
+    licenses: ["PostgreSQL", "MIT"],
+    platform_owner: "platform-engineering",
+    platforms: [
+      {
+        compressed_size_bytes: 156095657,
+        config_digest:
+          "sha256:8164afa59e26be9f78959e538d6c9da8553d67e601d8ebd0d5e9cbf558c3986e",
+        manifest_digest:
+          "sha256:6e5a6518f9d2ff9e9f4cba2a5a87d8f41b0f067f6f92ac847c344351a6c8d923",
+        platform: "linux/amd64",
+      },
+      {
+        compressed_size_bytes: 154122115,
+        config_digest:
+          "sha256:6878867d6da44d8c000a91f9ce8d31a613bdc3e26b4ae4dde11bc2e22d270458",
+        manifest_digest:
+          "sha256:3aac91d19d5b7aff4c650dddfacc1a26c436459aafd4eb51ab0bf1748e990dbb",
+        platform: "linux/arm64/v8",
+      },
+    ],
+    release: "17.10-bookworm",
+    repo_digest:
+      "sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f",
+    repository: "docker.io/library/postgres",
+    source_commit: "4f9ced003ba58a854656ba150d146243d27ae3ac",
+    source_url:
+      "https://github.com/docker-library/postgres/tree/4f9ced003ba58a854656ba150d146243d27ae3ac/17/bookworm",
+  },
+] as const;
 
 const CANONICAL_PREFLIGHT_STEPS: readonly Record<string, unknown>[] = [
   {
@@ -1460,6 +1515,24 @@ const requireStringField = (
   return value as string;
 };
 
+const requireHttpsUrl = (value: string, code: string, label: string): void => {
+  const parsed = (() => {
+    try {
+      return new URL(value);
+    } catch {
+      return fail(code, `${label} must be an HTTPS URL`);
+    }
+  })();
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.hostname.length === 0 ||
+    parsed.username.length > 0 ||
+    parsed.password.length > 0
+  ) {
+    fail(code, `${label} must be an HTTPS URL without credentials`);
+  }
+};
+
 const parseArtifactInventory = async (
   root: string,
 ): Promise<{ actions: InventoryAction[]; artifacts: InventoryArtifact[] }> => {
@@ -1484,18 +1557,23 @@ const parseArtifactInventory = async (
   );
   exactKeys(
     inventory,
-    ["actions", "artifacts", "schema_version"],
+    ["actions", "artifacts", "container_images", "schema_version"],
     "ARTIFACT_INVENTORY_SCHEMA_INVALID",
     "inventory",
   );
-  if (inventory.schema_version !== 1)
-    fail("ARTIFACT_INVENTORY_SCHEMA_INVALID", "schema_version must equal 1");
+  if (inventory.schema_version !== 2)
+    fail("ARTIFACT_INVENTORY_SCHEMA_INVALID", "schema_version must equal 2");
   const actionValues = inventory.actions;
   const artifactValues = inventory.artifacts;
-  if (!Array.isArray(actionValues) || !Array.isArray(artifactValues)) {
+  const containerImageValues = inventory.container_images;
+  if (
+    !Array.isArray(actionValues) ||
+    !Array.isArray(artifactValues) ||
+    !Array.isArray(containerImageValues)
+  ) {
     fail(
       "ARTIFACT_INVENTORY_SCHEMA_INVALID",
-      "actions and artifacts must be arrays",
+      "actions, artifacts, and container_images must be arrays",
     );
   }
 
@@ -1646,6 +1724,182 @@ const parseArtifactInventory = async (
       };
     },
   );
+
+  const containerImages = (containerImageValues as unknown[]).map(
+    (value, imageIndex): InventoryContainerImage => {
+      const code = "ARTIFACT_INVENTORY_CONTAINER_IMAGE_INVALID";
+      const label = `container_images[${imageIndex}]`;
+      const image = requireRecord(value, code, `${label} must be an object`);
+      exactKeys(
+        image,
+        [
+          "distribution_url",
+          "immutable_reference",
+          "licenses",
+          "platform_owner",
+          "platforms",
+          "release",
+          "repo_digest",
+          "repository",
+          "source_commit",
+          "source_url",
+        ],
+        code,
+        label,
+      );
+
+      const repository = requireStringField(image, "repository", code, label);
+      const release = requireStringField(image, "release", code, label);
+      const repoDigest = requireStringField(image, "repo_digest", code, label);
+      const immutableReference = requireStringField(
+        image,
+        "immutable_reference",
+        code,
+        label,
+      );
+      const sourceCommit = requireStringField(
+        image,
+        "source_commit",
+        code,
+        label,
+      );
+      const sourceUrl = requireStringField(image, "source_url", code, label);
+      const distributionUrl = requireStringField(
+        image,
+        "distribution_url",
+        code,
+        label,
+      );
+      const platformOwner = requireStringField(
+        image,
+        "platform_owner",
+        code,
+        label,
+      );
+
+      if (!/^sha256:[a-f0-9]{64}$/u.test(repoDigest))
+        fail(code, `${label}.repo_digest must be a sha256 digest`);
+      if (immutableReference !== `${repository}:${release}@${repoDigest}`)
+        fail(
+          code,
+          `${label}.immutable_reference must equal repository:release@repo_digest`,
+        );
+      if (!/^[a-f0-9]{40}$/u.test(sourceCommit))
+        fail(code, `${label}.source_commit must be a 40-character commit SHA`);
+      requireHttpsUrl(sourceUrl, code, `${label}.source_url`);
+      requireHttpsUrl(distributionUrl, code, `${label}.distribution_url`);
+
+      if (!Array.isArray(image.licenses) || image.licenses.length === 0)
+        fail(code, `${label}.licenses must be a non-empty array`);
+      const licenses = (image.licenses as unknown[]).map((license, index) => {
+        if (
+          typeof license !== "string" ||
+          license.length === 0 ||
+          license.includes("\0")
+        ) {
+          fail(code, `${label}.licenses[${index}] must be a non-empty string`);
+        }
+        return license as string;
+      });
+      if (new Set(licenses).size !== licenses.length)
+        fail(code, `${label}.licenses must be unique`);
+
+      if (!Array.isArray(image.platforms) || image.platforms.length === 0)
+        fail(code, `${label}.platforms must be a non-empty array`);
+      const platforms = (image.platforms as unknown[]).map(
+        (platformValue, platformIndex): InventoryContainerPlatform => {
+          const platformLabel = `${label}.platforms[${platformIndex}]`;
+          const platform = requireRecord(
+            platformValue,
+            code,
+            `${platformLabel} must be an object`,
+          );
+          exactKeys(
+            platform,
+            [
+              "compressed_size_bytes",
+              "config_digest",
+              "manifest_digest",
+              "platform",
+            ],
+            code,
+            platformLabel,
+          );
+          const platformName = requireStringField(
+            platform,
+            "platform",
+            code,
+            platformLabel,
+          );
+          const manifestDigest = requireStringField(
+            platform,
+            "manifest_digest",
+            code,
+            platformLabel,
+          );
+          const configDigest = requireStringField(
+            platform,
+            "config_digest",
+            code,
+            platformLabel,
+          );
+          const compressedSizeBytes = platform.compressed_size_bytes;
+          if (!/^[a-z0-9]+\/[a-z0-9]+(?:\/[a-z0-9]+)?$/u.test(platformName))
+            fail(code, `${platformLabel}.platform is invalid`);
+          if (!/^sha256:[a-f0-9]{64}$/u.test(manifestDigest))
+            fail(
+              code,
+              `${platformLabel}.manifest_digest must be a sha256 digest`,
+            );
+          if (!/^sha256:[a-f0-9]{64}$/u.test(configDigest))
+            fail(
+              code,
+              `${platformLabel}.config_digest must be a sha256 digest`,
+            );
+          if (
+            !Number.isSafeInteger(compressedSizeBytes) ||
+            (compressedSizeBytes as number) <= 0
+          ) {
+            fail(
+              code,
+              `${platformLabel}.compressed_size_bytes must be a positive safe integer`,
+            );
+          }
+          return {
+            compressed_size_bytes: compressedSizeBytes as number,
+            config_digest: configDigest,
+            manifest_digest: manifestDigest,
+            platform: platformName,
+          };
+        },
+      );
+      if (
+        new Set(platforms.map((platform) => platform.platform)).size !==
+        platforms.length
+      ) {
+        fail(code, `${label}.platforms must be unique`);
+      }
+
+      return {
+        distribution_url: distributionUrl,
+        immutable_reference: immutableReference,
+        licenses,
+        platform_owner: platformOwner,
+        platforms,
+        release,
+        repo_digest: repoDigest,
+        repository,
+        source_commit: sourceCommit,
+        source_url: sourceUrl,
+      };
+    },
+  );
+  if (!isDeepStrictEqual(containerImages, APPROVED_CONTAINER_IMAGES)) {
+    fail(
+      "ARTIFACT_INVENTORY_CONTAINER_IMAGE_INVALID",
+      "inventory must contain exactly the approved PostgreSQL 17 image descriptor",
+    );
+  }
   return { actions, artifacts };
 };
 

@@ -46,6 +46,102 @@ allowBuilds:
   esbuild: true
 `;
 
+const exactContainerInventory = {
+  schema_version: 2,
+  actions: [
+    {
+      owner: "actions",
+      repository: "checkout",
+      release: "v7.0.1",
+      commit_sha: "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      source_url: "https://github.com/actions/checkout",
+      license: "MIT",
+      platform_owner: "platform-engineering",
+    },
+    {
+      owner: "pnpm",
+      repository: "setup",
+      release: "v2.0.0",
+      commit_sha: "c9883cc79df532ad1a7b81bf9ab944ceb090d65c",
+      source_url: "https://github.com/pnpm/setup",
+      license: "MIT",
+      platform_owner: "platform-engineering",
+    },
+    {
+      owner: "actions",
+      repository: "upload-artifact",
+      release: "v7.0.1",
+      commit_sha: "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      source_url: "https://github.com/actions/upload-artifact",
+      license: "MIT",
+      platform_owner: "platform-engineering",
+    },
+  ],
+  artifacts: [
+    {
+      name: "unit-test-log-${{ github.run_id }}-${{ github.run_attempt }}",
+      path: "test-results/unit.log",
+      classification: "internal-ci-test-log",
+      retention_days: 7,
+    },
+  ],
+  container_images: [
+    {
+      repository: "docker.io/library/postgres",
+      release: "17.10-bookworm",
+      immutable_reference:
+        "docker.io/library/postgres:17.10-bookworm@sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f",
+      repo_digest:
+        "sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f",
+      source_commit: "4f9ced003ba58a854656ba150d146243d27ae3ac",
+      source_url:
+        "https://github.com/docker-library/postgres/tree/4f9ced003ba58a854656ba150d146243d27ae3ac/17/bookworm",
+      distribution_url: "https://hub.docker.com/_/postgres",
+      licenses: ["PostgreSQL", "MIT"],
+      platform_owner: "platform-engineering",
+      platforms: [
+        {
+          platform: "linux/amd64",
+          manifest_digest:
+            "sha256:6e5a6518f9d2ff9e9f4cba2a5a87d8f41b0f067f6f92ac847c344351a6c8d923",
+          config_digest:
+            "sha256:8164afa59e26be9f78959e538d6c9da8553d67e601d8ebd0d5e9cbf558c3986e",
+          compressed_size_bytes: 156095657,
+        },
+        {
+          platform: "linux/arm64/v8",
+          manifest_digest:
+            "sha256:3aac91d19d5b7aff4c650dddfacc1a26c436459aafd4eb51ab0bf1748e990dbb",
+          config_digest:
+            "sha256:6878867d6da44d8c000a91f9ce8d31a613bdc3e26b4ae4dde11bc2e22d270458",
+          compressed_size_bytes: 154122115,
+        },
+      ],
+    },
+  ],
+};
+
+type ContainerInventoryFixture = typeof exactContainerInventory;
+type ContainerImageFixture =
+  ContainerInventoryFixture["container_images"][number];
+type ContainerPlatformFixture = ContainerImageFixture["platforms"][number];
+
+const firstContainerImage = (
+  inventory: ContainerInventoryFixture,
+): ContainerImageFixture => {
+  const image = inventory.container_images[0];
+  if (image === undefined) throw new Error("missing container image fixture");
+  return image;
+};
+
+const firstContainerPlatform = (
+  inventory: ContainerInventoryFixture,
+): ContainerPlatformFixture => {
+  const platform = firstContainerImage(inventory).platforms[0];
+  if (platform === undefined) throw new Error("missing platform fixture");
+  return platform;
+};
+
 const writeText = async (
   root: string,
   path: string,
@@ -158,11 +254,14 @@ const readManifest = async (
     unknown
   >;
 
-const runChecker = async (root: string): Promise<CheckerResult> => {
+const runChecker = async (
+  root: string,
+  scope: "ci" | "workspace" = "workspace",
+): Promise<CheckerResult> => {
   try {
     const result = await execFile(
       process.execPath,
-      [tsxCliPath, checkerPath, "--scope", "workspace"],
+      [tsxCliPath, checkerPath, "--scope", scope],
       { cwd: root },
     );
     return { code: 0, stderr: result.stderr };
@@ -173,6 +272,18 @@ const runChecker = async (root: string): Promise<CheckerResult> => {
       stderr: failure.stderr ?? failure.message,
     };
   }
+};
+
+const createCiRepository = async (inventory: unknown): Promise<string> => {
+  const root = await mkdtemp(resolve(tmpdir(), "huoqiu-container-inventory-"));
+  temporaryRoots.push(root);
+  await writeText(
+    root,
+    ".github/workflows/ci.yml",
+    await readFile(resolve(repositoryRoot, ".github/workflows/ci.yml"), "utf8"),
+  );
+  await writeJson(root, "security/artifact-inventory.yml", inventory);
+  return root;
 };
 
 afterEach(async () => {
@@ -1237,5 +1348,265 @@ describe("workspace and supply-chain boundaries", () => {
 
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("WORKSPACE_IMPORT_TARGET_EXCLUDED");
+  });
+});
+
+describe("container image inventory boundaries", () => {
+  it("accepts only the exact approved PostgreSQL 17 image descriptor", async () => {
+    const root = await createCiRepository(exactContainerInventory);
+
+    expect(await runChecker(root, "ci")).toEqual({ code: 0, stderr: "" });
+  });
+
+  it.each([
+    [
+      "missing container_images",
+      (inventory: ContainerInventoryFixture) => {
+        delete (inventory as Partial<ContainerInventoryFixture>)
+          .container_images;
+      },
+    ],
+    [
+      "schema v1",
+      (inventory: ContainerInventoryFixture) => {
+        inventory.schema_version = 1;
+      },
+    ],
+    [
+      "an unknown top-level field",
+      (inventory: ContainerInventoryFixture) => {
+        Object.assign(inventory, { condition: "ignored" });
+      },
+    ],
+  ])("rejects %s in the v2 inventory envelope", async (_label, mutate) => {
+    const inventory = structuredClone(exactContainerInventory);
+    mutate(inventory);
+    const root = await createCiRepository(inventory);
+
+    const result = await runChecker(root, "ci");
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("ARTIFACT_INVENTORY_SCHEMA_INVALID");
+  });
+
+  it.each([
+    [
+      "a missing image field",
+      (inventory: ContainerInventoryFixture) => {
+        delete (
+          firstContainerImage(inventory) as Partial<ContainerImageFixture>
+        ).distribution_url;
+      },
+    ],
+    [
+      "conditional image junk",
+      (inventory: ContainerInventoryFixture) => {
+        Object.assign(firstContainerImage(inventory), {
+          condition: { default: "trusted" },
+        });
+      },
+    ],
+    [
+      "no image",
+      (inventory: ContainerInventoryFixture) => {
+        inventory.container_images = [];
+      },
+    ],
+    [
+      "a duplicate image",
+      (inventory: ContainerInventoryFixture) => {
+        inventory.container_images.push(
+          structuredClone(firstContainerImage(inventory)),
+        );
+      },
+    ],
+    [
+      "an unknown image",
+      (inventory: ContainerInventoryFixture) => {
+        const image = firstContainerImage(inventory);
+        image.repository = "docker.io/library/unknown";
+        image.immutable_reference = `${image.repository}:${image.release}@${image.repo_digest}`;
+      },
+    ],
+    [
+      "a mutable reference",
+      (inventory: ContainerInventoryFixture) => {
+        const image = firstContainerImage(inventory);
+        image.immutable_reference = `${image.repository}:${image.release}`;
+      },
+    ],
+    [
+      "an inconsistent reference",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).immutable_reference =
+          "docker.io/library/postgres:17.9-bookworm@sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f";
+      },
+    ],
+    [
+      "a malformed repository digest",
+      (inventory: ContainerInventoryFixture) => {
+        const image = firstContainerImage(inventory);
+        image.repo_digest = `sha256:${"a".repeat(63)}`;
+        image.immutable_reference = `${image.repository}:${image.release}@${image.repo_digest}`;
+      },
+    ],
+    [
+      "a mismatched repository digest",
+      (inventory: ContainerInventoryFixture) => {
+        const image = firstContainerImage(inventory);
+        image.repo_digest = `sha256:${"a".repeat(64)}`;
+        image.immutable_reference = `${image.repository}:${image.release}@${image.repo_digest}`;
+      },
+    ],
+    [
+      "a malformed source commit",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).source_commit = "f".repeat(39);
+      },
+    ],
+    [
+      "a mismatched source commit",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).source_commit = "f".repeat(40);
+      },
+    ],
+    [
+      "a non-HTTPS source URL",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).source_url =
+          "http://github.com/docker-library/postgres";
+      },
+    ],
+    [
+      "a mismatched source URL",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).source_url =
+          "https://github.com/docker-library/postgres/tree/main/17/bookworm";
+      },
+    ],
+    [
+      "a non-HTTPS distribution URL",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).distribution_url =
+          "http://hub.docker.com/_/postgres";
+      },
+    ],
+    [
+      "a mismatched distribution URL",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).distribution_url =
+          "https://example.com/postgres";
+      },
+    ],
+    [
+      "no license",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).licenses = [];
+      },
+    ],
+    [
+      "a duplicate license",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).licenses = ["MIT", "MIT"];
+      },
+    ],
+    [
+      "a mismatched license order",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).licenses = ["MIT", "PostgreSQL"];
+      },
+    ],
+    [
+      "a mismatched platform owner",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).platform_owner = "application-team";
+      },
+    ],
+    [
+      "no platform",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerImage(inventory).platforms = [];
+      },
+    ],
+    [
+      "a duplicate platform",
+      (inventory: ContainerInventoryFixture) => {
+        const image = firstContainerImage(inventory);
+        image.platforms.push(
+          structuredClone(firstContainerPlatform(inventory)),
+        );
+      },
+    ],
+    [
+      "conditional platform junk",
+      (inventory: ContainerInventoryFixture) => {
+        Object.assign(firstContainerPlatform(inventory), {
+          condition: { default: "trusted" },
+        });
+      },
+    ],
+    [
+      "a missing platform field",
+      (inventory: ContainerInventoryFixture) => {
+        delete (
+          firstContainerPlatform(inventory) as Partial<ContainerPlatformFixture>
+        ).config_digest;
+      },
+    ],
+    [
+      "an unknown platform",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerPlatform(inventory).platform = "linux/s390x";
+      },
+    ],
+    [
+      "a malformed manifest digest",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerPlatform(inventory).manifest_digest = "sha256:bad";
+      },
+    ],
+    [
+      "a mismatched manifest digest",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerPlatform(inventory).manifest_digest =
+          `sha256:${"b".repeat(64)}`;
+      },
+    ],
+    [
+      "a malformed config digest",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerPlatform(inventory).config_digest = "sha256:bad";
+      },
+    ],
+    [
+      "zero compressed bytes",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerPlatform(inventory).compressed_size_bytes = 0;
+      },
+    ],
+    [
+      "fractional compressed bytes",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerPlatform(inventory).compressed_size_bytes = 1.5;
+      },
+    ],
+    [
+      "unsafe compressed bytes",
+      (inventory: ContainerInventoryFixture) => {
+        firstContainerPlatform(inventory).compressed_size_bytes =
+          Number.MAX_SAFE_INTEGER + 1;
+      },
+    ],
+  ] as const)("rejects %s", async (_label, mutate) => {
+    const inventory = structuredClone(exactContainerInventory);
+    mutate(inventory);
+    const root = await createCiRepository(inventory);
+
+    const result = await runChecker(root, "ci");
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(
+      "ARTIFACT_INVENTORY_CONTAINER_IMAGE_INVALID",
+    );
   });
 });

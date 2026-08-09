@@ -122,7 +122,7 @@ jobs:
 `;
 
 const validInventory = {
-  schema_version: 1,
+  schema_version: 2,
   actions: [
     {
       owner: "actions",
@@ -158,6 +158,40 @@ const validInventory = {
       path: "test-results/unit.log",
       classification: "internal-ci-test-log",
       retention_days: 7,
+    },
+  ],
+  container_images: [
+    {
+      repository: "docker.io/library/postgres",
+      release: "17.10-bookworm",
+      immutable_reference:
+        "docker.io/library/postgres:17.10-bookworm@sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f",
+      repo_digest:
+        "sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f",
+      source_commit: "4f9ced003ba58a854656ba150d146243d27ae3ac",
+      source_url:
+        "https://github.com/docker-library/postgres/tree/4f9ced003ba58a854656ba150d146243d27ae3ac/17/bookworm",
+      distribution_url: "https://hub.docker.com/_/postgres",
+      licenses: ["PostgreSQL", "MIT"],
+      platform_owner: "platform-engineering",
+      platforms: [
+        {
+          platform: "linux/amd64",
+          manifest_digest:
+            "sha256:6e5a6518f9d2ff9e9f4cba2a5a87d8f41b0f067f6f92ac847c344351a6c8d923",
+          config_digest:
+            "sha256:8164afa59e26be9f78959e538d6c9da8553d67e601d8ebd0d5e9cbf558c3986e",
+          compressed_size_bytes: 156095657,
+        },
+        {
+          platform: "linux/arm64/v8",
+          manifest_digest:
+            "sha256:3aac91d19d5b7aff4c650dddfacc1a26c436459aafd4eb51ab0bf1748e990dbb",
+          config_digest:
+            "sha256:6878867d6da44d8c000a91f9ce8d31a613bdc3e26b4ae4dde11bc2e22d270458",
+          compressed_size_bytes: 154122115,
+        },
+      ],
     },
   ],
 };
@@ -355,7 +389,7 @@ describe("least-privilege CI workflow and artifact inventory", () => {
   it("parses the artifact inventory as real YAML 1.2", async () => {
     const root = await createRepository();
     const inventoryYaml = [
-      "schema_version: 1",
+      "schema_version: 2",
       "actions:",
       "  - owner: actions",
       "    repository: checkout",
@@ -383,6 +417,25 @@ describe("least-privilege CI workflow and artifact inventory", () => {
       "    path: test-results/unit.log",
       "    classification: internal-ci-test-log",
       "    retention_days: 7",
+      "container_images:",
+      "  - repository: docker.io/library/postgres",
+      "    release: 17.10-bookworm",
+      "    immutable_reference: docker.io/library/postgres:17.10-bookworm@sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f",
+      "    repo_digest: sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f",
+      "    source_commit: 4f9ced003ba58a854656ba150d146243d27ae3ac",
+      "    source_url: https://github.com/docker-library/postgres/tree/4f9ced003ba58a854656ba150d146243d27ae3ac/17/bookworm",
+      "    distribution_url: https://hub.docker.com/_/postgres",
+      "    licenses: [PostgreSQL, MIT]",
+      "    platform_owner: platform-engineering",
+      "    platforms:",
+      "      - platform: linux/amd64",
+      "        manifest_digest: sha256:6e5a6518f9d2ff9e9f4cba2a5a87d8f41b0f067f6f92ac847c344351a6c8d923",
+      "        config_digest: sha256:8164afa59e26be9f78959e538d6c9da8553d67e601d8ebd0d5e9cbf558c3986e",
+      "        compressed_size_bytes: 156095657",
+      "      - platform: linux/arm64/v8",
+      "        manifest_digest: sha256:3aac91d19d5b7aff4c650dddfacc1a26c436459aafd4eb51ab0bf1748e990dbb",
+      "        config_digest: sha256:6878867d6da44d8c000a91f9ce8d31a613bdc3e26b4ae4dde11bc2e22d270458",
+      "        compressed_size_bytes: 154122115",
       "",
     ].join("\n");
     await writeText(root, "security/artifact-inventory.yml", inventoryYaml);
