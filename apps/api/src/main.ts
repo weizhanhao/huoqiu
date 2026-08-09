@@ -10,6 +10,7 @@ import {
 
 import { AppModule } from "./app.module.js";
 import { HttpErrorFilter } from "./common/http-error.filter.js";
+import { assertZeroTrustConfiguration } from "./identity/alpha-access.guard.js";
 import { isDirectRun } from "./runtime/direct-run.js";
 import { reportProcessReady } from "./runtime/process-ready.js";
 import { runHttpProcess } from "./runtime/run-http-process.js";
@@ -59,6 +60,7 @@ const resolveEnvironmentPort = (): number => {
 export const createHttpApp = async (
   options: CreateHttpAppOptions = {},
 ): Promise<NestFastifyApplication> => {
+  assertZeroTrustConfiguration(process.env);
   const adapter = new FastifyAdapter({
     bodyLimit: options.bodyLimit ?? BODY_LIMIT_BYTES,
     requestIdHeader: "x-request-id",
