@@ -189,12 +189,14 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
   temporaryRoots.push(launcherRoot);
   const launcherPath = resolve(launcherRoot, "launcher.mjs");
   const protectedNode = await realpath(process.execPath);
-  const protectedPnpm = await realpath(
-    resolve(
-      dirname(protectedNode),
-      process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-    ),
+  const pnpmLookup = await execFile(
+    process.platform === "win32" ? "where.exe" : "/usr/bin/which",
+    ["pnpm"],
   );
+  const pnpmPath = pnpmLookup.stdout.split(/\r?\n/, 1)[0];
+  if (pnpmPath === undefined || pnpmPath.length === 0)
+    throw new Error("missing protected pnpm fixture");
+  const protectedPnpm = await realpath(pnpmPath);
   await writeFile(
     launcherPath,
     [
@@ -228,7 +230,7 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
       "if (!allowedCommand(request.command)) process.exit(95);",
       "const systemPath = process.platform === 'win32' ? 'C:\\\\Windows\\\\System32;C:\\\\Windows' : '/usr/bin:/bin';",
       "const environment = { PATH: [dirname(protectedNode), systemPath].join(delimiter), LANG: 'C', LC_ALL: 'C', TZ: 'UTC', HUOQIU_PROCESS_TREE_TOKEN: process.env.HUOQIU_PROCESS_TREE_TOKEN };",
-      "const physical = (logical) => platformName(logical.executable) === 'pnpm' && logical.args[0] === 'exec' && platformName(logical.args[1] ?? '') === 'tsx' && /\\.mjs$/.test(logical.args[2] ?? '') ? { executable: protectedNode, args: logical.args.slice(2) } : platformName(logical.executable) === 'pnpm' ? { executable: protectedNode, args: [protectedPnpm, ...logical.args] } : logical.executable === protectedNode ? logical : null;",
+      "const physical = (logical) => platformName(logical.executable) === 'pnpm' && logical.args[0] === 'exec' && platformName(logical.args[1] ?? '') === 'tsx' && /\\.m(?:j|t)s$/.test(logical.args[2] ?? '') ? { executable: protectedNode, args: logical.args.slice(2) } : platformName(logical.executable) === 'pnpm' ? { executable: protectedNode, args: [protectedPnpm, ...logical.args] } : logical.executable === protectedNode ? logical : null;",
       "const run = (command) => new Promise((resolve, reject) => {",
       "  const mapped = physical(command); if (mapped === null) { reject(new Error('unmapped command')); return; }",
       "  const child = spawn(mapped.executable, mapped.args, { cwd: request.workspace, detached: process.platform !== 'win32', env: environment, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });",
@@ -583,41 +585,30 @@ const successCommand = (
   };
 };
 
+const canonicalD0Command = (
+  capId: string,
+): { executable: string; args: string[] } => ({
+  executable: "pnpm",
+  args: [
+    "exec",
+    "tsx",
+    "scripts/quality/d0-capability-gate.mts",
+    "--cap",
+    capId,
+  ],
+});
+
 const capabilityProgram = (summary: Record<string, unknown>): string =>
   `console.log(${JSON.stringify(`HUOQIU_CAPABILITY_RESULT ${JSON.stringify(summary)}`)});\n`;
-
-const writeCapabilityProgram = async (
-  root: string,
-  name: string,
-  source: string,
-): Promise<{ executable: string; args: string[] }> => {
-  const relativePath = `scripts/quality/${name}.mjs`;
-  const absolutePath = resolve(root, relativePath);
-  await mkdir(dirname(absolutePath), { recursive: true });
-  await writeFile(absolutePath, source, "utf8");
-  return { executable: process.execPath, args: [relativePath] };
-};
 
 const replaceFirstCapabilityProgram = async (
   root: string,
   name: string,
   source: string,
 ): Promise<void> => {
-  const manifestPath = resolve(root, "quality/manifests/d0-required.json");
-  const manifest = await json(manifestPath);
-  const first = (manifest.required_caps as Record<string, unknown>[])[0];
-  if (first === undefined) throw new Error("missing test capability");
-  first.command = await writeCapabilityProgram(root, name, source);
-  await writeJson(manifestPath, manifest);
-  await execFile(
-    "git",
-    [
-      "add",
-      "quality/manifests/d0-required.json",
-      `scripts/quality/${name}.mjs`,
-    ],
-    { cwd: root },
-  );
+  const runnerPath = "scripts/quality/d0-capability-gate.mts";
+  await writeFile(resolve(root, runnerPath), source, "utf8");
+  await execFile("git", ["add", runnerPath], { cwd: root });
   await execFile("git", ["commit", "-q", "-m", `exercise ${name}`], {
     cwd: root,
   });
@@ -679,6 +670,21 @@ const setupRepository = async (
     ].join("\n"),
     "utf8",
   );
+  if (milestone === "d0") {
+    await writeFile(
+      resolve(root, "scripts/quality/d0-capability-gate.mts"),
+      [
+        "const capIndex = process.argv.indexOf('--cap');",
+        "const capId = capIndex >= 0 ? process.argv[capIndex + 1] : undefined;",
+        `const allowedCaps = new Set(${JSON.stringify(D0_REQUIRED_CAP_IDS)});`,
+        "if (capId === undefined || !allowedCaps.has(capId)) throw new Error('invalid test capability');",
+        "const summary = { fixture_version: 'd0.v1', passed: 7, failed: 0, skipped: 0, invalid_test_markers: [], p0: 0, p1: 0 };",
+        "console.log(`HUOQIU_CAPABILITY_RESULT ${JSON.stringify(summary)}`);",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+  }
   const capIds = milestone === "d0" ? D0_REQUIRED_CAP_IDS : M1_REQUIRED_CAP_IDS;
   await writeJson(
     resolve(root, `quality/manifests/${milestone}-required.json`),
@@ -688,7 +694,10 @@ const setupRepository = async (
       fixture_version: `${milestone}.v1`,
       required_caps: capIds.map((capId) => ({
         cap_id: capId,
-        command: successCommand(`${milestone}.v1`),
+        command:
+          milestone === "d0"
+            ? canonicalD0Command(capId)
+            : successCommand(`${milestone}.v1`),
         implementer_ids: ["github:100"],
       })),
       stretch_cap_ids: [],
@@ -917,6 +926,63 @@ describe("independent required scope", () => {
     ).toThrow("MANIFEST_SCHEMA_INVALID");
   });
 
+  it("rejects replacing only the pending implementer identity and command with an attacker success command", () => {
+    expect(() =>
+      validateManifest(
+        {
+          schema_version: 1,
+          milestone: "d0",
+          fixture_version: "d0.v1",
+          required_caps: D0_REQUIRED_CAP_IDS.map((capId) => ({
+            cap_id: capId,
+            command: successCommand("d0.v1"),
+            implementer_ids: ["github:100"],
+          })),
+          stretch_cap_ids: [],
+        },
+        "d0",
+      ),
+    ).toThrow("MANIFEST_SCHEMA_INVALID");
+  });
+
+  it("accepts the exact canonical D0 capability command", () => {
+    expect(() =>
+      validateManifest(
+        {
+          schema_version: 1,
+          milestone: "d0",
+          fixture_version: "d0.v1",
+          required_caps: D0_REQUIRED_CAP_IDS.map((capId) => ({
+            cap_id: capId,
+            command: canonicalD0Command(capId),
+            implementer_ids: ["github:100"],
+          })),
+          stretch_cap_ids: [],
+        },
+        "d0",
+      ),
+    ).not.toThrow();
+  });
+
+  it("keeps the existing M1 implemented-command policy unchanged", () => {
+    expect(() =>
+      validateManifest(
+        {
+          schema_version: 1,
+          milestone: "m1",
+          fixture_version: "m1.v1",
+          required_caps: M1_REQUIRED_CAP_IDS.map((capId) => ({
+            cap_id: capId,
+            command: successCommand("m1.v1"),
+            implementer_ids: ["github:100"],
+          })),
+          stretch_cap_ids: [],
+        },
+        "m1",
+      ),
+    ).not.toThrow();
+  });
+
   it("allows the pending sentinel only with the exact fail-closed command", () => {
     const manifest = {
       schema_version: 1,
@@ -1012,9 +1078,6 @@ describe("required test validity", () => {
 
   it("rejects a capability whose normalized result has skipped tests", async () => {
     const root = await setupRepository();
-    const manifestPath = resolve(root, "quality/manifests/d0-required.json");
-    const manifest = await json(manifestPath);
-    const requiredCaps = manifest.required_caps as Record<string, unknown>[];
     const skippedSummary = {
       fixture_version: "d0.v1",
       passed: 1,
@@ -1024,26 +1087,11 @@ describe("required test validity", () => {
       p0: 0,
       p1: 0,
     };
-    const firstCap = requiredCaps[0];
-    if (firstCap === undefined) throw new Error("missing test capability");
-    firstCap.command = await writeCapabilityProgram(
+    await replaceFirstCapabilityProgram(
       root,
       "skipped-capability",
       capabilityProgram(skippedSummary),
     );
-    await writeJson(manifestPath, manifest);
-    await execFile(
-      "git",
-      [
-        "add",
-        "quality/manifests/d0-required.json",
-        "scripts/quality/skipped-capability.mjs",
-      ],
-      { cwd: root },
-    );
-    await execFile("git", ["commit", "-q", "-m", "exercise skipped result"], {
-      cwd: root,
-    });
     await expect(
       runTrustedCapability(root, "d0", "CAP-ID-001"),
     ).rejects.toThrow("REQUIRED_TEST_INVALID");
@@ -1790,21 +1838,6 @@ describe("current evidence and independent review binding", () => {
     "never resolves a Node runtime through caller PATH",
     async () => {
       const root = await setupRepository();
-      const manifestPath = resolve(root, "quality/manifests/d0-required.json");
-      const manifest = await json(manifestPath);
-      const first = (manifest.required_caps as Record<string, unknown>[])[0];
-      if (first === undefined) throw new Error("missing test capability");
-      first.command = {
-        executable: "pnpm",
-        args: ["exec", "tsx", "scripts/quality/test-capability.mjs", "d0.v1"],
-      };
-      await writeJson(manifestPath, manifest);
-      await execFile("git", ["add", "quality/manifests/d0-required.json"], {
-        cwd: root,
-      });
-      await execFile("git", ["commit", "-q", "-m", "node runner probe"], {
-        cwd: root,
-      });
       const hostileBin = await mkdtemp(
         resolve(tmpdir(), "huoqiu-hostile-node-"),
       );
@@ -1840,22 +1873,6 @@ describe("current evidence and independent review binding", () => {
     "never resolves a pnpm capability runner through caller PATH",
     async () => {
       const root = await setupRepository();
-      const manifestPath = resolve(root, "quality/manifests/d0-required.json");
-      const manifest = await json(manifestPath);
-      const first = (manifest.required_caps as Record<string, unknown>[])[0];
-      if (first === undefined) throw new Error("missing test capability");
-      first.command = {
-        executable: "pnpm",
-        args: ["exec", "tsx", "scripts/quality/test-capability.mjs", "d0.v1"],
-      };
-      await writeJson(manifestPath, manifest);
-      await execFile("git", ["add", "quality/manifests/d0-required.json"], {
-        cwd: root,
-      });
-      await execFile("git", ["commit", "-q", "-m", "pnpm runner probe"], {
-        cwd: root,
-      });
-
       const hostileBin = await mkdtemp(
         resolve(tmpdir(), "huoqiu-hostile-pnpm-"),
       );
@@ -2079,10 +2096,6 @@ describe("current evidence and independent review binding", () => {
       const address = server.address();
       if (address === null || typeof address === "string")
         throw new Error("missing local test server address");
-      const manifestPath = resolve(root, "quality/manifests/d0-required.json");
-      const manifest = await json(manifestPath);
-      const first = (manifest.required_caps as Record<string, unknown>[])[0];
-      if (first === undefined) throw new Error("missing test capability");
       const summary = `HUOQIU_CAPABILITY_RESULT ${JSON.stringify({
         fixture_version: "d0.v1",
         passed: 1,
@@ -2092,7 +2105,7 @@ describe("current evidence and independent review binding", () => {
         p0: 0,
         p1: 0,
       })}`;
-      first.command = await writeCapabilityProgram(
+      await replaceFirstCapabilityProgram(
         root,
         "network-escape",
         [
@@ -2103,13 +2116,6 @@ describe("current evidence and independent review binding", () => {
           "",
         ].join(""),
       );
-      await writeJson(manifestPath, manifest);
-      await execFile("git", ["add", "quality/manifests/d0-required.json"], {
-        cwd: root,
-      });
-      await execFile("git", ["commit", "-q", "-m", "sandbox escape attack"], {
-        cwd: root,
-      });
       await expect(runCapability(root, "d0", "CAP-ID-001")).rejects.toThrow(
         "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
       );
@@ -2366,11 +2372,6 @@ describe("current evidence and independent review binding", () => {
 
   it("rechecks repository context after a capability command before writing evidence", async () => {
     const root = await setupRepository();
-    const manifestPath = resolve(root, "quality/manifests/d0-required.json");
-    const manifest = await json(manifestPath);
-    const requiredCaps = manifest.required_caps as Record<string, unknown>[];
-    const firstCap = requiredCaps[0];
-    if (firstCap === undefined) throw new Error("missing test capability");
     const summary = `HUOQIU_CAPABILITY_RESULT ${JSON.stringify({
       fixture_version: "d0.v1",
       passed: 1,
@@ -2380,7 +2381,7 @@ describe("current evidence and independent review binding", () => {
       p0: 0,
       p1: 0,
     })}`;
-    firstCap.command = await writeCapabilityProgram(
+    await replaceFirstCapabilityProgram(
       root,
       "mutating-capability",
       [
@@ -2390,19 +2391,6 @@ describe("current evidence and independent review binding", () => {
         "",
       ].join("\n"),
     );
-    await writeJson(manifestPath, manifest);
-    await execFile(
-      "git",
-      [
-        "add",
-        "quality/manifests/d0-required.json",
-        "scripts/quality/mutating-capability.mjs",
-      ],
-      { cwd: root },
-    );
-    await execFile("git", ["commit", "-q", "-m", "mutating capability"], {
-      cwd: root,
-    });
     await expect(
       runTrustedCapability(root, "d0", "CAP-ID-001"),
     ).rejects.toThrow("CONTEXT_CHANGED_DURING_EXECUTION");
@@ -2410,11 +2398,6 @@ describe("current evidence and independent review binding", () => {
 
   it("detects a tracked write even when the command restores the original bytes", async () => {
     const root = await setupRepository();
-    const manifestPath = resolve(root, "quality/manifests/d0-required.json");
-    const manifest = await json(manifestPath);
-    const requiredCaps = manifest.required_caps as Record<string, unknown>[];
-    const firstCap = requiredCaps[0];
-    if (firstCap === undefined) throw new Error("missing test capability");
     const summary = `HUOQIU_CAPABILITY_RESULT ${JSON.stringify({
       fixture_version: "d0.v1",
       passed: 1,
@@ -2424,7 +2407,7 @@ describe("current evidence and independent review binding", () => {
       p0: 0,
       p1: 0,
     })}`;
-    firstCap.command = await writeCapabilityProgram(
+    await replaceFirstCapabilityProgram(
       root,
       "restoring-capability",
       [
@@ -2437,19 +2420,6 @@ describe("current evidence and independent review binding", () => {
         "",
       ].join("\n"),
     );
-    await writeJson(manifestPath, manifest);
-    await execFile(
-      "git",
-      [
-        "add",
-        "quality/manifests/d0-required.json",
-        "scripts/quality/restoring-capability.mjs",
-      ],
-      { cwd: root },
-    );
-    await execFile("git", ["commit", "-q", "-m", "restore mutation attack"], {
-      cwd: root,
-    });
     await expect(
       runTrustedCapability(root, "d0", "CAP-ID-001"),
     ).rejects.toThrow("CONTEXT_CHANGED_DURING_EXECUTION");

@@ -504,6 +504,17 @@ const pendingCapabilityCommand = (capId: string): RunCommand => ({
   ],
 });
 
+const d0CapabilityCommand = (capId: string): RunCommand => ({
+  executable: "pnpm",
+  args: [
+    "exec",
+    "tsx",
+    "scripts/quality/d0-capability-gate.mts",
+    "--cap",
+    capId,
+  ],
+});
+
 const isCanonicalIdentity = (value: string): boolean =>
   /^github:[1-9][0-9]*$/.test(value);
 
@@ -585,6 +596,16 @@ export const validateManifest = (
         !EXPECTED_PENDING_CAP_IDS[milestone].includes(capId)
       ) {
         fail(code, `${capId} is not approved for pending status`);
+      }
+      if (
+        milestone === "d0" &&
+        !hasPendingIdentity &&
+        canonicalJson(command) !== canonicalJson(d0CapabilityCommand(capId))
+      ) {
+        fail(
+          code,
+          `required_caps[${index}].command must be the canonical D0 capability command`,
+        );
       }
       return candidate;
     },
