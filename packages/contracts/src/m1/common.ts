@@ -117,56 +117,158 @@ export const resourceIdSchema = z
     "Expected a safe opaque resource identifier",
   );
 
-const containsUnsafeDecodedPath = (value: string): boolean => {
-  let decoded = value;
-  for (let pass = 0; pass <= value.length; pass += 1) {
-    let nextValue: string;
-    try {
-      nextValue = decodeURIComponent(decoded);
-    } catch {
-      return true;
-    }
-    if (nextValue === decoded) {
-      break;
-    }
-    decoded = nextValue;
+const residualPercentEncodingPattern = /%[0-9A-Fa-f]{2}/u;
+const unsafeRawDeepLinkPattern = /[\\\p{C}\p{White_Space}]/u;
+const unsafeSearchValuePattern = /[+/\\?#&=\p{C}\p{White_Space}]/u;
+
+const decodeOnce = (value: string): string | undefined => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return undefined;
   }
-  if (decoded.startsWith("//") || /[\\\p{Cc}]/u.test(decoded)) {
+};
+
+const isApprovedResourceId = (encodedId: string): boolean => {
+  const decodedId = decodeOnce(encodedId);
+  return (
+    decodedId !== undefined &&
+    !residualPercentEncodingPattern.test(decodedId) &&
+    resourceIdSchema.safeParse(decodedId).success
+  );
+};
+
+const isApprovedSearchQuery = (encodedQuery: string | undefined): boolean => {
+  if (encodedQuery === undefined) {
     return true;
   }
-  const [path] = decoded.split(/[?#]/u, 1);
+  if (encodedQuery.length === 0) {
+    return false;
+  }
+
+  const pairs = encodedQuery.split("&");
+  if (pairs.length !== 1) {
+    return false;
+  }
+  const parts = pairs[0]?.split("=") ?? [];
+  if (parts.length !== 2 || parts[0] !== "q") {
+    return false;
+  }
+
+  const value = decodeOnce(parts[1] ?? "");
   return (
-    path?.split("/").some((segment) => segment === "." || segment === "..") ??
-    true
+    value !== undefined &&
+    value.length <= 120 &&
+    !residualPercentEncodingPattern.test(value) &&
+    !unsafeSearchValuePattern.test(value)
+  );
+};
+
+const splitDeepLinkQuery = (
+  value: string,
+): Readonly<{ target: string; query: string | undefined }> => {
+  const queryIndex = value.indexOf("?");
+  return queryIndex === -1
+    ? { target: value, query: undefined }
+    : {
+        target: value.slice(0, queryIndex),
+        query: value.slice(queryIndex + 1),
+      };
+};
+
+const approvedStaticWebPaths = new Set([
+  "/",
+  "/login",
+  "/watchlist",
+  "/compose",
+  "/notifications",
+  "/portfolios",
+]);
+const approvedWebResourcePrefixes = [
+  "/instruments/",
+  "/posts/",
+  "/portfolios/",
+] as const;
+
+const isApprovedWebDeepLink = (value: string): boolean => {
+  const { target, query } = splitDeepLinkQuery(value);
+  if (!target.startsWith("/") || target.startsWith("//")) {
+    return false;
+  }
+  if (target === "/search") {
+    return isApprovedSearchQuery(query);
+  }
+  if (query !== undefined) {
+    return false;
+  }
+  if (approvedStaticWebPaths.has(target)) {
+    return true;
+  }
+
+  const prefix = approvedWebResourcePrefixes.find((candidate) =>
+    target.startsWith(candidate),
+  );
+  return (
+    prefix !== undefined && isApprovedResourceId(target.slice(prefix.length))
+  );
+};
+
+const approvedStaticAppTargets = new Set([
+  "home",
+  "login",
+  "search",
+  "watchlist",
+  "compose",
+  "notifications",
+  "portfolios",
+]);
+const approvedAppResourceTargets = new Set(["instrument", "post", "portfolio"]);
+
+const isApprovedAppDeepLink = (value: string): boolean => {
+  if (!value.startsWith("huoqiu://")) {
+    return false;
+  }
+
+  const { target, query } = splitDeepLinkQuery(value.slice("huoqiu://".length));
+  const pathIndex = target.indexOf("/");
+  const authority = pathIndex === -1 ? target : target.slice(0, pathIndex);
+  const path = pathIndex === -1 ? "" : target.slice(pathIndex);
+
+  if (
+    authority.length === 0 ||
+    authority.includes("@") ||
+    authority.includes(":") ||
+    authority.includes("%")
+  ) {
+    return false;
+  }
+  if (approvedStaticAppTargets.has(authority)) {
+    return (
+      path.length === 0 &&
+      (authority === "search"
+        ? isApprovedSearchQuery(query)
+        : query === undefined)
+    );
+  }
+  return (
+    approvedAppResourceTargets.has(authority) &&
+    query === undefined &&
+    path.startsWith("/") &&
+    isApprovedResourceId(path.slice(1))
   );
 };
 
 const isSafeDeepLink = (value: string): boolean => {
   if (
-    value !== value.trim() ||
-    /[\\\p{Cc}]/u.test(value) ||
-    containsUnsafeDecodedPath(value)
+    unsafeRawDeepLinkPattern.test(value) ||
+    value.includes("#") ||
+    value !== value.trim()
   ) {
     return false;
   }
-  if (value.startsWith("/")) {
-    return !value.startsWith("//");
-  }
-  if (!/^https:\/\//iu.test(value)) {
-    return false;
-  }
-
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      url.hostname.length > 0 &&
-      url.username.length === 0 &&
-      url.password.length === 0
-    );
-  } catch {
-    return false;
-  }
+  return value.startsWith("/")
+    ? isApprovedWebDeepLink(value)
+    : isApprovedAppDeepLink(value);
 };
 
 export const safeDeepLinkSchema = z
@@ -175,7 +277,7 @@ export const safeDeepLinkSchema = z
   .max(512)
   .refine(
     isSafeDeepLink,
-    "Expected an internal path or credential-free HTTPS URL",
+    "Expected an approved Web or huoqiu App registry deep link",
   );
 export const cursorSchema = z
   .string()
