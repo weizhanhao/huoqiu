@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "lint": "eslint --config ../../packages/config/eslint/base.mjs better-auth keycloak test",
     "test": "vitest run test --no-file-parallelism",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
