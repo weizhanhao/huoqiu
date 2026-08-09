@@ -51,6 +51,42 @@ const headKey = `${sessionKey}.head`;
 const slotKey = (slot: SessionSlot): string => `${sessionKey}.slot.${slot}`;
 const tombstoneKey = `${sessionKey}.tombstone`;
 
+interface StorageCoordination {
+  cleanupRequired: boolean;
+  failClosedInMemory: boolean;
+  invalidationGeneration: number;
+  operationTail: Promise<void>;
+}
+
+/*
+ * The in-memory gate is shared by every store using the same adapter. A durable
+ * tombstone carries logout across process restarts when SecureStore accepts its
+ * write. If both that write and token deletion fail, only this process can stay
+ * fail-closed; callers must also revoke the server session before trusting a
+ * later process, because client-only storage cannot prove logout after restart.
+ */
+const coordinationByStorage = new WeakMap<
+  SecureStoreAdapter,
+  StorageCoordination
+>();
+
+const getStorageCoordination = (
+  storage: SecureStoreAdapter,
+): StorageCoordination => {
+  const existing = coordinationByStorage.get(storage);
+  if (existing !== undefined) {
+    return existing;
+  }
+  const coordination: StorageCoordination = {
+    cleanupRequired: false,
+    failClosedInMemory: false,
+    invalidationGeneration: 0,
+    operationTail: Promise.resolve(),
+  };
+  coordinationByStorage.set(storage, coordination);
+  return coordination;
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -124,15 +160,29 @@ export const createSecureSessionStore = (
   storage: SecureStoreAdapter,
   options: SecureSessionStoreOptions,
 ): SecureSessionStore => {
-  let failClosedInMemory = false;
+  const coordination = getStorageCoordination(storage);
 
-  const clearStoredSession = async (): Promise<void> => {
-    failClosedInMemory = true;
+  const markInvalidated = (): number => {
+    coordination.failClosedInMemory = true;
+    coordination.cleanupRequired = true;
+    if (coordination.invalidationGeneration === Number.MAX_SAFE_INTEGER) {
+      return coordination.invalidationGeneration;
+    }
+    coordination.invalidationGeneration += 1;
+    return coordination.invalidationGeneration;
+  };
+
+  const clearStoredSession = async (
+    invalidationGeneration: number,
+  ): Promise<void> => {
+    coordination.failClosedInMemory = true;
+    coordination.cleanupRequired = true;
     let failed = false;
     try {
       await storage.setItemAsync(
         tombstoneKey,
         JSON.stringify({
+          invalidationGeneration,
           schemaVersion: secureSessionSchemaVersion,
           status: "cleared",
         }),
@@ -151,10 +201,14 @@ export const createSecureSessionStore = (
     ) {
       throw new SecureSessionStorageError();
     }
+    if (coordination.invalidationGeneration === invalidationGeneration) {
+      coordination.cleanupRequired = false;
+    }
   };
 
   const persistStoredSession = async (
     session: SecureSession,
+    expectedInvalidationGeneration: number,
   ): Promise<void> => {
     let candidateKey: string | null = null;
     let candidateMayContainSession = false;
@@ -163,6 +217,10 @@ export const createSecureSessionStore = (
       if (!isSecureSession(session)) {
         throw new Error("Invalid secure session");
       }
+      if (coordination.cleanupRequired) {
+        await clearStoredSession(coordination.invalidationGeneration);
+      }
+      const initialTombstone = await storage.getItemAsync(tombstoneKey);
       const storedHead = await storage.getItemAsync(headKey);
       const currentHead = storedHead === null ? null : parseHead(storedHead);
       const nextSlot: SessionSlot = currentHead?.slot === "a" ? "b" : "a";
@@ -189,28 +247,57 @@ export const createSecureSessionStore = (
       if (readBackEnvelope !== serializedEnvelope) {
         throw new Error("Secure session candidate verification failed");
       }
+      if (
+        coordination.invalidationGeneration !==
+          expectedInvalidationGeneration ||
+        (await storage.getItemAsync(tombstoneKey)) !== initialTombstone
+      ) {
+        throw new Error("Secure session invalidated before commit");
+      }
       await storage.setItemAsync(headKey, JSON.stringify(head));
       committed = true;
+      if (
+        coordination.invalidationGeneration !== expectedInvalidationGeneration
+      ) {
+        throw new Error("Secure session invalidated during commit");
+      }
       await storage.deleteItemAsync(tombstoneKey);
+      if (
+        coordination.invalidationGeneration !== expectedInvalidationGeneration
+      ) {
+        throw new Error("Secure session invalidated during commit");
+      }
       if (currentHead !== null) {
         await storage.deleteItemAsync(slotKey(currentHead.slot));
       }
-      failClosedInMemory = false;
+      if (
+        coordination.invalidationGeneration !==
+          expectedInvalidationGeneration ||
+        (await storage.getItemAsync(tombstoneKey)) !== null
+      ) {
+        throw new Error("Secure session invalidated during commit");
+      }
+      coordination.cleanupRequired = false;
+      coordination.failClosedInMemory = false;
     } catch {
       if (committed) {
+        const invalidationGeneration = coordination.failClosedInMemory
+          ? coordination.invalidationGeneration
+          : markInvalidated();
         try {
-          await clearStoredSession();
+          await clearStoredSession(invalidationGeneration);
         } catch {
-          // The in-memory gate remains closed when durable cleanup is partial.
+          // The shared in-memory gate remains closed for a later cleanup retry.
         }
       } else if (candidateMayContainSession && candidateKey !== null) {
         try {
           await storage.deleteItemAsync(candidateKey);
         } catch {
+          const invalidationGeneration = markInvalidated();
           try {
-            await clearStoredSession();
+            await clearStoredSession(invalidationGeneration);
           } catch {
-            // The in-memory gate remains closed when durable cleanup is partial.
+            // The shared in-memory gate remains closed for a later cleanup retry.
           }
         }
       }
@@ -219,13 +306,40 @@ export const createSecureSessionStore = (
   };
 
   const restoreStoredSession = async (): Promise<SecureSession | null> => {
+    if (coordination.failClosedInMemory) {
+      if (coordination.cleanupRequired) {
+        try {
+          await clearStoredSession(coordination.invalidationGeneration);
+        } catch {
+          throw new SecureSessionStorageError();
+        }
+      }
+      return null;
+    }
+
+    let storedTombstone: string | null;
     try {
-      if (failClosedInMemory) {
-        return null;
+      storedTombstone = await storage.getItemAsync(tombstoneKey);
+    } catch {
+      const invalidationGeneration = markInvalidated();
+      try {
+        await clearStoredSession(invalidationGeneration);
+      } catch {
+        // The shared in-memory gate remains closed for a later cleanup retry.
       }
-      if ((await storage.getItemAsync(tombstoneKey)) !== null) {
+      throw new SecureSessionStorageError();
+    }
+    if (storedTombstone !== null) {
+      const invalidationGeneration = markInvalidated();
+      try {
+        await clearStoredSession(invalidationGeneration);
         return null;
+      } catch {
+        throw new SecureSessionStorageError();
       }
+    }
+
+    try {
       const storedHead = await storage.getItemAsync(headKey);
       if (storedHead === null) {
         return null;
@@ -240,26 +354,26 @@ export const createSecureSessionStore = (
         head.generation,
       ).session;
       if (restoredSession.expiresAtEpochMs <= options.now()) {
-        await clearStoredSession();
+        await clearStoredSession(markInvalidated());
         return null;
       }
       return restoredSession;
     } catch {
+      const invalidationGeneration = markInvalidated();
       try {
-        await clearStoredSession();
+        await clearStoredSession(invalidationGeneration);
       } catch {
-        // A tombstone or deletion was attempted; never expose storage details.
+        // The shared in-memory gate remains closed for a later cleanup retry.
       }
       throw new SecureSessionStorageError();
     }
   };
 
-  let operationTail: Promise<void> = Promise.resolve();
   const serialize = <Result>(
     operation: () => Promise<Result>,
   ): Promise<Result> => {
-    const result = operationTail.then(operation);
-    operationTail = result.then(
+    const result = coordination.operationTail.then(operation);
+    coordination.operationTail = result.then(
       () => undefined,
       () => undefined,
     );
@@ -267,8 +381,22 @@ export const createSecureSessionStore = (
   };
 
   return {
-    clear: () => serialize(clearStoredSession),
-    persist: (session) => serialize(() => persistStoredSession(session)),
+    clear: () => {
+      const invalidationGeneration = markInvalidated();
+      const priorTail = coordination.operationTail;
+      const result = clearStoredSession(invalidationGeneration);
+      coordination.operationTail = Promise.allSettled([priorTail, result]).then(
+        () => undefined,
+      );
+      return result;
+    },
+    persist: (session) => {
+      const expectedInvalidationGeneration =
+        coordination.invalidationGeneration;
+      return serialize(() =>
+        persistStoredSession(session, expectedInvalidationGeneration),
+      );
+    },
     restore: () => serialize(restoreStoredSession),
   };
 };

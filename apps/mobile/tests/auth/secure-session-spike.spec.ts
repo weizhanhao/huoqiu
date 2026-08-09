@@ -3,6 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 const expoSecureStoreMock = vi.hoisted(() => {
   const values = new Map<string, string>();
   const observedOptions: unknown[] = [];
+  let tokenWritePause:
+    | Readonly<{
+        releasePromise: Promise<void>;
+        releaseWrite: () => void;
+        reportPaused: () => void;
+      }>
+    | undefined;
   return {
     WHEN_UNLOCKED_THIS_DEVICE_ONLY: 6,
     deleteItemAsync: async (key: string, options?: unknown) => {
@@ -14,14 +21,34 @@ const expoSecureStoreMock = vi.hoisted(() => {
       return values.get(key) ?? null;
     },
     observedOptions,
+    pauseNextTokenWrite: () => {
+      let releaseWrite: () => void = () => undefined;
+      let reportPaused: () => void = () => undefined;
+      const releasePromise = new Promise<void>((resolve) => {
+        releaseWrite = resolve;
+      });
+      const waitUntilPaused = new Promise<void>((resolve) => {
+        reportPaused = resolve;
+      });
+      tokenWritePause = { releasePromise, releaseWrite, reportPaused };
+      return { release: releaseWrite, waitUntilPaused };
+    },
     reset: () => {
       observedOptions.length = 0;
+      tokenWritePause = undefined;
       values.clear();
     },
     setItemAsync: async (key: string, value: string, options?: unknown) => {
       observedOptions.push(options);
+      if (tokenWritePause !== undefined && value.includes('"accessToken"')) {
+        const pause = tokenWritePause;
+        tokenWritePause = undefined;
+        pause.reportPaused();
+        await pause.releasePromise;
+      }
       values.set(key, value);
     },
+    storedValues: () => [...values.values()],
   };
 });
 
@@ -48,6 +75,7 @@ type MemorySecureStore = Readonly<{
   corruptSetOnCall: (call: number) => void;
   deleteCallCount: () => number;
   failDeleteOnCall: (call: number) => void;
+  failDeleteOnCalls: (calls: readonly number[]) => void;
   failSetOnCall: (call: number) => void;
   pauseNextTokenWrite: () => Readonly<{
     release: () => void;
@@ -62,7 +90,7 @@ const createMemorySecureStore = (): MemorySecureStore => {
   const values = new Map<string, string>();
   let corruptOnSetCall: number | null = null;
   let deleteCalls = 0;
-  let failOnDeleteCall: number | null = null;
+  const failOnDeleteCalls = new Set<number>();
   let failOnSetCall: number | null = null;
   let tokenWritePause:
     | Readonly<{
@@ -76,7 +104,7 @@ const createMemorySecureStore = (): MemorySecureStore => {
     adapter: {
       deleteItemAsync: async (key) => {
         deleteCalls += 1;
-        if (deleteCalls === failOnDeleteCall) {
+        if (failOnDeleteCalls.has(deleteCalls)) {
           throw new Error(`injected ${session.accessToken} delete failure`);
         }
         values.delete(key);
@@ -108,7 +136,10 @@ const createMemorySecureStore = (): MemorySecureStore => {
     },
     deleteCallCount: () => deleteCalls,
     failDeleteOnCall: (call) => {
-      failOnDeleteCall = call;
+      failOnDeleteCalls.add(call);
+    },
+    failDeleteOnCalls: (calls) => {
+      calls.forEach((call) => failOnDeleteCalls.add(call));
     },
     failSetOnCall: (call) => {
       failOnSetCall = call;
@@ -380,7 +411,7 @@ describe("Expo SecureStore session spike", () => {
     },
   );
 
-  it("serializes persist then clear so the later logout wins", async () => {
+  it("cancels an in-flight persist so the later logout wins", async () => {
     const memory = createMemorySecureStore();
     const store = createSecureSessionStore(memory.adapter, {
       now: () => 1_900_000_000_000,
@@ -391,10 +422,88 @@ describe("Expo SecureStore session spike", () => {
     const clearPromise = store.clear();
     await pause.waitUntilPaused;
     pause.release();
-    await Promise.all([persistPromise, clearPromise]);
+    await Promise.allSettled([persistPromise, clearPromise]);
 
+    await expect(persistPromise).rejects.toBeInstanceOf(
+      SecureSessionStorageError,
+    );
+    await expect(clearPromise).resolves.toBeUndefined();
     await expect(store.restore()).resolves.toBeNull();
     expect(memory.storedValues().join("|")).not.toContain(session.accessToken);
+  });
+
+  it("coordinates separate stores so a later logout cannot be overwritten", async () => {
+    const memory = createMemorySecureStore();
+    const persistingStore = createSecureSessionStore(memory.adapter, {
+      now: () => 1_900_000_000_000,
+    });
+    const clearingStore = createSecureSessionStore(memory.adapter, {
+      now: () => 1_900_000_000_000,
+    });
+    const pause = memory.pauseNextTokenWrite();
+
+    const persistPromise = persistingStore.persist(session);
+    await pause.waitUntilPaused;
+    const clearPromise = clearingStore.clear();
+    await expect(clearPromise).resolves.toBeUndefined();
+    pause.release();
+    await persistPromise.catch(() => undefined);
+
+    const restoringStore = createSecureSessionStore(memory.adapter, {
+      now: () => 1_900_000_000_000,
+    });
+    await expect(persistPromise).rejects.toBeInstanceOf(
+      SecureSessionStorageError,
+    );
+    await expect(restoringStore.restore()).resolves.toBeNull();
+    expect(memory.storedValues().join("|")).not.toContain(session.accessToken);
+    expect(memory.storedValues().join("|")).not.toContain(session.refreshToken);
+  });
+
+  it("shares fail-closed state and retries cleanup after a partial logout", async () => {
+    const memory = createMemorySecureStore();
+    const clearingStore = createSecureSessionStore(memory.adapter, {
+      now: () => 1_900_000_000_000,
+    });
+    await clearingStore.persist(session);
+    memory.failSetOnCall(memory.setCallCount() + 1);
+    memory.failDeleteOnCalls([
+      memory.deleteCallCount() + 1,
+      memory.deleteCallCount() + 2,
+    ]);
+
+    await expect(clearingStore.clear()).rejects.toBeInstanceOf(
+      SecureSessionStorageError,
+    );
+    expect(memory.storedValues().join("|")).toContain(session.accessToken);
+
+    const restoringStore = createSecureSessionStore(memory.adapter, {
+      now: () => 1_900_000_000_000,
+    });
+    await expect(restoringStore.restore()).resolves.toBeNull();
+    expect(memory.storedValues().join("|")).not.toContain(session.accessToken);
+    expect(memory.storedValues().join("|")).not.toContain(session.refreshToken);
+  });
+
+  it("retries physical cleanup when a durable tombstone outlives a failed slot deletion", async () => {
+    const memory = createMemorySecureStore();
+    const clearingStore = createSecureSessionStore(memory.adapter, {
+      now: () => 1_900_000_000_000,
+    });
+    await clearingStore.persist(session);
+    memory.failDeleteOnCall(memory.deleteCallCount() + 2);
+
+    await expect(clearingStore.clear()).rejects.toBeInstanceOf(
+      SecureSessionStorageError,
+    );
+    expect(memory.storedValues().join("|")).toContain(session.accessToken);
+
+    const restoringStore = createSecureSessionStore(memory.adapter, {
+      now: () => 1_900_000_000_000,
+    });
+    await expect(restoringStore.restore()).resolves.toBeNull();
+    expect(memory.storedValues().join("|")).not.toContain(session.accessToken);
+    expect(memory.storedValues().join("|")).not.toContain(session.refreshToken);
   });
 
   it("continues serialized cleanup after a failed operation", async () => {
@@ -437,6 +546,41 @@ describe("Expo SecureStore session spike", () => {
           keychainService: "huoqiu.auth.session",
         }),
       ]),
+    );
+  });
+
+  it("coordinates concurrent stores created by the production factory", async () => {
+    expoSecureStoreMock.reset();
+    const secureSessionModule =
+      (await import("../../src/auth/secure-session-spike")) as Readonly<{
+        createExpoSecureSessionStore: (options: {
+          now: () => number;
+        }) => SecureSessionStore;
+      }>;
+    const persistingStore = secureSessionModule.createExpoSecureSessionStore({
+      now: () => 1_900_000_000_000,
+    });
+    const clearingStore = secureSessionModule.createExpoSecureSessionStore({
+      now: () => 1_900_000_000_000,
+    });
+    const pause = expoSecureStoreMock.pauseNextTokenWrite();
+
+    const persistPromise = persistingStore.persist(session);
+    await pause.waitUntilPaused;
+    const clearPromise = clearingStore.clear();
+    await expect(clearPromise).resolves.toBeUndefined();
+    pause.release();
+    await persistPromise.catch(() => undefined);
+
+    const restoringStore = secureSessionModule.createExpoSecureSessionStore({
+      now: () => 1_900_000_000_000,
+    });
+    await expect(persistPromise).rejects.toBeInstanceOf(
+      SecureSessionStorageError,
+    );
+    await expect(restoringStore.restore()).resolves.toBeNull();
+    expect(expoSecureStoreMock.storedValues().join("|")).not.toContain(
+      session.accessToken,
     );
   });
 });
