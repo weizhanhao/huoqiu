@@ -40,7 +40,10 @@ boundary described below.
    with an `authorship`-role key. The signature binds
    repository ID, trusted base, exact HEAD and tree, canonical binary diff,
    tracked-source digest, registry digest, derivation policy, archived input
-   digest, implementer set, time, and full issuer provenance. Manifest
+   digest, implementer set, time, and full issuer provenance. Recording and
+   verification both require the issuer's workflow commit to equal the
+   candidate commit and the workflow bytes to match the digest in the
+   root-signed key policy. Manifest
    `implementer_ids` are checked against this statement; they are never their
    own authority.
 4. A different protected principal and different key perform review. Review v3
@@ -127,7 +130,9 @@ requires a verifier/oracle release; a manifest alone cannot downgrade a gate.
 
 The protected system supplies all root, registry, repository, actual-verifier,
 execution-launcher, authorship-archive, workflow-provenance, and signing-key
-variables. For epoch N greater than 1,
+variables. The authorship and review roles use different protected principals,
+different keys, and separately authorized policies even when the same immutable
+workflow file orchestrates both jobs. For epoch N greater than 1,
 `HUOQIU_TRUST_REGISTRY_HISTORY_B64` is canonical base64 of a JSON array whose
 items are canonical base64 for the exact raw registry bytes from epochs 1
 through N-1. For authorship, `HUOQIU_AUTHORSHIP_ARCHIVE_B64` is the exact
@@ -142,12 +147,14 @@ plain pinned JavaScript under Node 24.15; development transforms therefore
 produce a different verifier digest by design.
 
 ```text
-quality:record-authorship --milestone <d0|m1> --commit-sha <HEAD>
-quality:record-review --milestone <d0|m1> --commit-sha <HEAD> [--dimension release]
-gate:d0 | gate:m1
+protected-verifier record-authorship --repository-root <root> --milestone <d0|m1> --commit-sha <HEAD>
+protected-verifier record-review --repository-root <root> --milestone <d0|m1> --commit-sha <HEAD> [--dimension release]
+protected-verifier gate --repository-root <root> --milestone <d0|m1>
 ```
 
-The repository-local TypeScript entrypoints are diagnostic tools. Because a
+The protected verifier CLI above is a pinned external distribution installed
+on the dedicated quality runner. The similarly named repository-local
+TypeScript entrypoints are diagnostic tools. Because a
 certifying verifier and execution launcher must both be protected artifacts
 outside the candidate checkout, an ordinary local invocation intentionally
 cannot self-certify and fails closed without those prerequisites.

@@ -3940,6 +3940,12 @@ export const recordAuthorship = async (
       "AUTHORSHIP_ATTESTATION_INVALID",
       "authorship provenance is unauthorized",
     );
+  await assertTrustedWorkflow(
+    root,
+    policy,
+    identity.source.workflow_sha,
+    context,
+  );
   const trustedBaseSha = requireSha(
     environment.HUOQIU_TRUSTED_BASE_SHA,
     "AUTHORSHIP_IDENTITY_NOT_CONFIGURED",
@@ -4095,6 +4101,12 @@ const verifyAuthorship = async (
   ) {
     fail("AUTHORSHIP_ATTESTATION_INVALID", "authorship signature invalid");
   }
+  await assertTrustedWorkflow(
+    root,
+    policy,
+    identity.source.workflow_sha,
+    context,
+  );
   return { attestation, sha256: sha256(contents) };
 };
 
@@ -4116,7 +4128,7 @@ const assertTrustedWorkflow = async (
   if (workflowSha !== context.commit_sha)
     fail(
       "REVIEW_TRUST_POLICY_MISMATCH",
-      "review workflow commit does not equal the certified commit",
+      "trusted workflow commit does not equal the certified commit",
     );
   const path = trustedWorkflowPath(policy);
   const contents = await readFile(
@@ -4125,7 +4137,7 @@ const assertTrustedWorkflow = async (
   if (sha256(contents) !== policy.workflow_file_sha256)
     fail(
       "REVIEW_TRUST_POLICY_MISMATCH",
-      "review workflow bytes are not registered",
+      "trusted workflow bytes are not registered",
     );
 };
 

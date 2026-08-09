@@ -1,4 +1,4 @@
-name: D0 protected quality review
+name: D0 protected quality certification
 
 on:
   workflow_dispatch:
@@ -7,74 +7,186 @@ on:
         description: Exact candidate commit to certify
         required: true
         type: string
+      trusted_base_sha:
+        description: Exact protected base used for authorship derivation
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: d0-certification-${{ inputs.commit_sha }}
+  cancel-in-progress: false
+
 jobs:
   capability-evidence:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, huoqiu-quality]
+    timeout-minutes: 45
+    environment: quality-capability
+    env:
+      HUOQIU_PROTECTED_VERIFIER_CLI: ${{ vars.HUOQIU_PROTECTED_VERIFIER_CLI }}
+      HUOQIU_VERIFIER_ROOT_PUBLIC_KEY_SPKI_B64: ${{ vars.HUOQIU_VERIFIER_ROOT_PUBLIC_KEY_SPKI_B64 }}
+      HUOQIU_VERIFIER_ROOT_KEY_ID: ${{ vars.HUOQIU_VERIFIER_ROOT_KEY_ID }}
+      HUOQIU_VERIFIER_SHA256: ${{ vars.HUOQIU_VERIFIER_SHA256 }}
+      HUOQIU_VERIFIER_ENTRYPOINT_PATH: ${{ vars.HUOQIU_VERIFIER_ENTRYPOINT_PATH }}
+      HUOQIU_EXECUTION_LAUNCHER_PATH: ${{ vars.HUOQIU_EXECUTION_LAUNCHER_PATH }}
+      HUOQIU_EXECUTION_LAUNCHER_SHA256: ${{ vars.HUOQIU_EXECUTION_LAUNCHER_SHA256 }}
+      HUOQIU_EXECUTION_ISOLATION_PROFILE: container-v1:no-network,read-only-source,owned-process-tree
+      HUOQIU_REPOSITORY_ID: ${{ vars.HUOQIU_REPOSITORY_ID }}
+      HUOQIU_TRUST_REGISTRY_EPOCH: ${{ vars.HUOQIU_TRUST_REGISTRY_EPOCH }}
+      HUOQIU_TRUST_REGISTRY_SHA256: ${{ vars.HUOQIU_TRUST_REGISTRY_SHA256 }}
     steps:
-      - uses: actions/checkout@v5
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
           ref: ${{ inputs.commit_sha }}
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24.15.0
-      - run: corepack enable
-      - run: corepack prepare pnpm@11.4.0 --activate
-      - run: pnpm install --frozen-lockfile
-      - name: Verify exact clean candidate
+      - name: Verify exact clean candidate and workflow provenance
+        shell: bash
         run: |
+          set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ inputs.commit_sha }}"
+          test "${{ github.workflow_sha }}" = "${{ inputs.commit_sha }}"
           test -z "$(git status --porcelain)"
+          test -x "$HUOQIU_PROTECTED_VERIFIER_CLI"
       - name: Generate current-commit capability evidence
+        shell: bash
         run: |
+          set -euo pipefail
           for cap in CAP-ID-001 CAP-INST-001 CAP-MD-001 CAP-FEED-001 CAP-WATCH-001; do
-            pnpm qa:cap -- --milestone d0 --cap "$cap"
+            "$HUOQIU_PROTECTED_VERIFIER_CLI" run-capability \
+              --repository-root "$GITHUB_WORKSPACE" \
+              --milestone d0 \
+              --commit-sha "${{ inputs.commit_sha }}" \
+              --cap "$cap"
           done
-      - uses: actions/upload-artifact@v4
+      - name: Upload capability evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: d0-capability-evidence-${{ inputs.commit_sha }}
           path: artifacts/evidence/${{ inputs.commit_sha }}
           if-no-files-found: error
+          retention-days: 7
 
-  independent-review:
+  authorship-attestation:
     needs: capability-evidence
-    runs-on: ubuntu-latest
-    environment: quality-review
+    runs-on: [self-hosted, linux, x64, huoqiu-quality]
+    timeout-minutes: 15
+    environment: quality-authorship
     env:
-      HUOQIU_REVIEW_ENVIRONMENT: quality-review
-      HUOQIU_REVIEW_KEY_ID: ${{ secrets.HUOQIU_REVIEW_KEY_ID }}
-      HUOQIU_REVIEW_PRIVATE_KEY_B64: ${{ secrets.HUOQIU_REVIEW_PRIVATE_KEY_B64 }}
-      HUOQIU_REVIEW_CHECKLIST_B64: ${{ secrets.HUOQIU_REVIEW_CHECKLIST_B64 }}
+      HUOQIU_PROTECTED_VERIFIER_CLI: ${{ vars.HUOQIU_PROTECTED_VERIFIER_CLI }}
+      HUOQIU_REVIEW_ENVIRONMENT: quality-authorship
+      HUOQIU_AUTHORSHIP_POLICY_VERSION: external-attestor-v1
+      HUOQIU_TRUSTED_BASE_SHA: ${{ inputs.trusted_base_sha }}
+      HUOQIU_VERIFIER_ROOT_PUBLIC_KEY_SPKI_B64: ${{ vars.HUOQIU_VERIFIER_ROOT_PUBLIC_KEY_SPKI_B64 }}
+      HUOQIU_VERIFIER_ROOT_KEY_ID: ${{ vars.HUOQIU_VERIFIER_ROOT_KEY_ID }}
+      HUOQIU_VERIFIER_SHA256: ${{ vars.HUOQIU_VERIFIER_SHA256 }}
+      HUOQIU_VERIFIER_ENTRYPOINT_PATH: ${{ vars.HUOQIU_VERIFIER_ENTRYPOINT_PATH }}
+      HUOQIU_REPOSITORY_ID: ${{ vars.HUOQIU_REPOSITORY_ID }}
+      HUOQIU_TRUST_REGISTRY_EPOCH: ${{ vars.HUOQIU_TRUST_REGISTRY_EPOCH }}
+      HUOQIU_TRUST_REGISTRY_SHA256: ${{ vars.HUOQIU_TRUST_REGISTRY_SHA256 }}
     steps:
-      - uses: actions/checkout@v5
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
           ref: ${{ inputs.commit_sha }}
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24.15.0
-      - run: corepack enable
-      - run: corepack prepare pnpm@11.4.0 --activate
-      - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v4
+      - name: Download capability evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: d0-capability-evidence-${{ inputs.commit_sha }}
           path: artifacts/evidence/${{ inputs.commit_sha }}
-      - name: Materialize independently supplied checklist
+      - name: Record protected authorship statement
+        shell: bash
+        env:
+          HUOQIU_AUTHORSHIP_KEY_ID: ${{ secrets.HUOQIU_AUTHORSHIP_KEY_ID }}
+          HUOQIU_AUTHORSHIP_PRIVATE_KEY_B64: ${{ secrets.HUOQIU_AUTHORSHIP_PRIVATE_KEY_B64 }}
+          HUOQIU_AUTHORSHIP_ARCHIVE_B64: ${{ secrets.HUOQIU_AUTHORSHIP_ARCHIVE_B64 }}
+          HUOQIU_AUTHORSHIP_INPUT_SHA256: ${{ secrets.HUOQIU_AUTHORSHIP_INPUT_SHA256 }}
         run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.commit_sha }}"
+          test "${{ github.workflow_sha }}" = "${{ inputs.commit_sha }}"
+          test -z "$(git status --porcelain)"
+          test -x "$HUOQIU_PROTECTED_VERIFIER_CLI"
+          "$HUOQIU_PROTECTED_VERIFIER_CLI" record-authorship \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --milestone d0 \
+            --commit-sha "${{ inputs.commit_sha }}"
+      - name: Upload evidence with authorship
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: d0-authored-evidence-${{ inputs.commit_sha }}
+          path: artifacts/evidence/${{ inputs.commit_sha }}
+          if-no-files-found: error
+          retention-days: 7
+
+  independent-review:
+    needs: authorship-attestation
+    runs-on: [self-hosted, linux, x64, huoqiu-quality]
+    timeout-minutes: 15
+    environment: quality-review
+    env:
+      HUOQIU_PROTECTED_VERIFIER_CLI: ${{ vars.HUOQIU_PROTECTED_VERIFIER_CLI }}
+      HUOQIU_REVIEW_ENVIRONMENT: quality-review
+      HUOQIU_AUTHORSHIP_POLICY_VERSION: external-attestor-v1
+      HUOQIU_TRUSTED_BASE_SHA: ${{ inputs.trusted_base_sha }}
+      HUOQIU_VERIFIER_ROOT_PUBLIC_KEY_SPKI_B64: ${{ vars.HUOQIU_VERIFIER_ROOT_PUBLIC_KEY_SPKI_B64 }}
+      HUOQIU_VERIFIER_ROOT_KEY_ID: ${{ vars.HUOQIU_VERIFIER_ROOT_KEY_ID }}
+      HUOQIU_VERIFIER_SHA256: ${{ vars.HUOQIU_VERIFIER_SHA256 }}
+      HUOQIU_VERIFIER_ENTRYPOINT_PATH: ${{ vars.HUOQIU_VERIFIER_ENTRYPOINT_PATH }}
+      HUOQIU_REPOSITORY_ID: ${{ vars.HUOQIU_REPOSITORY_ID }}
+      HUOQIU_TRUST_REGISTRY_EPOCH: ${{ vars.HUOQIU_TRUST_REGISTRY_EPOCH }}
+      HUOQIU_TRUST_REGISTRY_SHA256: ${{ vars.HUOQIU_TRUST_REGISTRY_SHA256 }}
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ inputs.commit_sha }}
+      - name: Download authored evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: d0-authored-evidence-${{ inputs.commit_sha }}
+          path: artifacts/evidence/${{ inputs.commit_sha }}
+      - name: Materialize independently supplied checklist
+        shell: bash
+        env:
+          HUOQIU_REVIEW_CHECKLIST_B64: ${{ secrets.HUOQIU_REVIEW_CHECKLIST_B64 }}
+        run: |
+          set -euo pipefail
           test -n "$HUOQIU_REVIEW_CHECKLIST_B64"
           mkdir -p "artifacts/evidence/${{ inputs.commit_sha }}/reviews"
-          printf '%s' "$HUOQIU_REVIEW_CHECKLIST_B64" | base64 --decode > "artifacts/evidence/${{ inputs.commit_sha }}/reviews/d0-checklist.json"
-      - name: Sign review and run final gate
+          printf '%s' "$HUOQIU_REVIEW_CHECKLIST_B64" | base64 --decode > \
+            "artifacts/evidence/${{ inputs.commit_sha }}/reviews/d0-checklist.json"
+      - name: Sign independent review and run final gate
+        shell: bash
+        env:
+          HUOQIU_REVIEW_KEY_ID: ${{ secrets.HUOQIU_REVIEW_KEY_ID }}
+          HUOQIU_REVIEW_PRIVATE_KEY_B64: ${{ secrets.HUOQIU_REVIEW_PRIVATE_KEY_B64 }}
+          HUOQIU_AUTHORSHIP_ARCHIVE_B64: ${{ secrets.HUOQIU_AUTHORSHIP_ARCHIVE_B64 }}
+          HUOQIU_AUTHORSHIP_INPUT_SHA256: ${{ secrets.HUOQIU_AUTHORSHIP_INPUT_SHA256 }}
         run: |
-          pnpm exec tsx scripts/quality/record-review.mts --milestone d0 --commit-sha "${{ inputs.commit_sha }}"
-          pnpm gate:d0
-      - uses: actions/upload-artifact@v4
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.commit_sha }}"
+          test "${{ github.workflow_sha }}" = "${{ inputs.commit_sha }}"
+          test -z "$(git status --porcelain)"
+          test -x "$HUOQIU_PROTECTED_VERIFIER_CLI"
+          "$HUOQIU_PROTECTED_VERIFIER_CLI" record-review \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --milestone d0 \
+            --commit-sha "${{ inputs.commit_sha }}"
+          "$HUOQIU_PROTECTED_VERIFIER_CLI" gate \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --milestone d0
+      - name: Upload certified evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: d0-certified-evidence-${{ inputs.commit_sha }}
           path: artifacts/evidence/${{ inputs.commit_sha }}
           if-no-files-found: error
+          retention-days: 30

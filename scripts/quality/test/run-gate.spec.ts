@@ -171,7 +171,6 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
   const authorshipKeyId = `ed25519:${createHash("sha256")
     .update(authorshipDer)
     .digest("hex")}`;
-  const authorshipWorkflowSha = "d".repeat(40);
   const rootDer = rootPair.publicKey.export({ format: "der", type: "spki" });
   const rootKeyId = `ed25519:${createHash("sha256").update(rootDer).digest("hex")}`;
   const verifierArgument = process.argv[1];
@@ -260,7 +259,7 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
         repository: "huoqiu/huoqiu",
         repository_id: "9001",
         workflow_ref:
-          "huoqiu/huoqiu/.github/workflows/authorship.yml@refs/heads/main",
+          "huoqiu/huoqiu/.github/workflows/d0-quality-review.yml@refs/heads/main",
         workflow_file_sha256: createHash("sha256")
           .update(workflowContents)
           .digest("hex"),
@@ -343,8 +342,8 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
     GITHUB_REPOSITORY: "huoqiu/huoqiu",
     GITHUB_REPOSITORY_ID: "9001",
     GITHUB_WORKFLOW_REF:
-      "huoqiu/huoqiu/.github/workflows/authorship.yml@refs/heads/main",
-    GITHUB_WORKFLOW_SHA: authorshipWorkflowSha,
+      "huoqiu/huoqiu/.github/workflows/d0-quality-review.yml@refs/heads/main",
+    GITHUB_WORKFLOW_SHA: "a".repeat(40),
     GITHUB_REF: "refs/heads/main",
     GITHUB_REF_PROTECTED: "true",
     GITHUB_EVENT_NAME: "workflow_dispatch",
@@ -646,6 +645,7 @@ const setupRepository = async (
     throw new Error("missing ephemeral signing environment");
   authorshipEnvironment.HUOQIU_TRUSTED_BASE_SHA = head;
   reviewEnvironment.HUOQIU_TRUSTED_BASE_SHA = head;
+  authorshipEnvironment.GITHUB_WORKFLOW_SHA = head;
   reviewEnvironment.GITHUB_WORKFLOW_SHA = head;
   reviewEnvironment.HUOQIU_AUTHORSHIP_POLICY_VERSION =
     authorshipEnvironment.HUOQIU_AUTHORSHIP_POLICY_VERSION;
@@ -2616,6 +2616,21 @@ describe("trusted reviewer identity boundary", () => {
       environment,
     });
     expect(attestation.implementer_ids).toEqual(["github:100", "github:101"]);
+  });
+
+  it("rejects authorship from a workflow commit other than the candidate commit", async () => {
+    const root = await setupRepository();
+    const head = (
+      await execFile("git", ["rev-parse", "HEAD"], { cwd: root })
+    ).stdout.trim();
+    const environment = authorshipEnvironments.get(root);
+    if (environment === undefined)
+      throw new Error("missing authorship environment");
+    environment.GITHUB_WORKFLOW_SHA = "f".repeat(40);
+
+    await expect(
+      recordAuthorship(root, head, { milestone: "d0", environment }),
+    ).rejects.toThrow("REVIEW_TRUST_POLICY_MISMATCH");
   });
 
   it("rejects protected authorship archive bytes that do not match their digest", async () => {
