@@ -27,6 +27,99 @@ export const notificationSchema = z
   })
   .strict();
 
+export const notificationSseDataSchema = requestMetaSchema.extend({
+  event: notificationSchema,
+});
+
+const addSseIssue = (
+  context: z.RefinementCtx,
+  message: string,
+  frameIndex?: number,
+): void => {
+  context.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: frameIndex === undefined ? [] : [frameIndex],
+    message,
+  });
+};
+
+export const notificationSseFrameBatchSchema = z
+  .string()
+  .min(1)
+  .superRefine((wireValue, context) => {
+    const normalized = wireValue.replaceAll("\r\n", "\n");
+    if (!normalized.endsWith("\n\n")) {
+      addSseIssue(context, "SSE wire value must end with a complete frame");
+      return;
+    }
+
+    const frames = normalized.slice(0, -2).split("\n\n");
+    for (const [frameIndex, frame] of frames.entries()) {
+      if (frame === ": heartbeat") {
+        continue;
+      }
+
+      const lines = frame.split("\n");
+      if (
+        lines.length !== 3 ||
+        !lines[0]?.startsWith("id: ") ||
+        lines[1] !== "event: notification" ||
+        !lines[2]?.startsWith("data: ")
+      ) {
+        addSseIssue(
+          context,
+          "Notification SSE frame requires id, event, and data lines",
+          frameIndex,
+        );
+        continue;
+      }
+
+      const eventId = lines[0].slice("id: ".length);
+      if (!versionStringSchema.safeParse(eventId).success) {
+        addSseIssue(
+          context,
+          "SSE event id must be an int64 string",
+          frameIndex,
+        );
+        continue;
+      }
+
+      let data: unknown;
+      try {
+        data = JSON.parse(lines[2].slice("data: ".length));
+      } catch {
+        addSseIssue(context, "SSE data must be valid JSON", frameIndex);
+        continue;
+      }
+
+      const parsedData = notificationSseDataSchema.safeParse(data);
+      if (!parsedData.success) {
+        addSseIssue(
+          context,
+          "SSE data must match the notification event schema",
+          frameIndex,
+        );
+        continue;
+      }
+      if (parsedData.data.event.sequence !== eventId) {
+        addSseIssue(
+          context,
+          "SSE event id must equal notification sequence",
+          frameIndex,
+        );
+      }
+    }
+  })
+  .describe(
+    "One or more complete notification id/event/data or ': heartbeat' SSE frames",
+  );
+
+export const notificationSseWireSchema = z
+  .string()
+  .describe(
+    "Raw UTF-8 SSE wire bytes decoded as text; chunks may end at arbitrary boundaries and complete frames are validated separately",
+  );
+
 export const moderationCaseSchema = z
   .object({
     id: resourceIdSchema,
@@ -79,18 +172,26 @@ export const notificationModerationContract = c.router({
       .object({
         "last-event-id": versionStringSchema.optional(),
       })
-      .strict(),
+      .passthrough(),
     query: z.object({ cursor: z.string().min(1).max(512).optional() }).strict(),
     responses: {
       200: c.otherResponse({
         contentType: "text/event-stream",
-        body: requestMetaSchema.extend({
-          event: notificationSchema,
-        }),
+        body: notificationSseWireSchema,
       }),
       ...commonErrorResponses,
     },
     summary: "Resume the recipient notification event stream",
+    description:
+      "Use a dedicated EventSource or raw-fetch streaming transport; do not use the default ts-rest client because it buffers text until the connection closes. Notification frames carry id/event/data and heartbeat comments are emitted every 20 seconds.",
+    metadata: {
+      transport: "dedicated-sse",
+      defaultTsRestClient: false,
+      eventId: "non-negative-int64-string",
+      dataSchema: "notificationSseDataSchema",
+      frameSchema: "notificationSseFrameBatchSchema",
+      heartbeatComment: ": heartbeat",
+    },
   },
   reportCreate: {
     method: "POST",

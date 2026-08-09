@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import { m1OperationRegistry } from "../src/m1/operation-registry.js";
 
+const forbiddenSurfacePattern =
+  /trade|private[-_ ]?fund|public[-_ ]?portfolio|push|target[-_ ]?price|ai[-_ ]?advice/iu;
 const m1SourceDirectory = resolve(import.meta.dirname, "../src/m1");
 const readM1Source = (): string =>
   readdirSync(m1SourceDirectory)
@@ -16,11 +18,24 @@ const readM1Source = (): string =>
 describe("M1 forbidden surfaces", () => {
   it("contains no disabled operation or product surface", () => {
     expect(JSON.stringify(m1OperationRegistry)).not.toMatch(
-      /trade|private_fund|public_portfolio|push|target_price|ai_advice/iu,
+      forbiddenSurfacePattern,
     );
-    expect(readM1Source()).not.toMatch(
-      /trade|private_fund|public_portfolio|push|target_price|ai_advice/iu,
-    );
+    expect(readM1Source()).not.toMatch(forbiddenSurfacePattern);
+  });
+
+  it.each([
+    "private_fund",
+    "privateFund",
+    "private-fund",
+    "public_portfolio",
+    "publicPortfolio",
+    "public-portfolio",
+    "target_price",
+    "targetPrice",
+    "ai_advice",
+    "aiAdvice",
+  ])("detects forbidden naming variant %s", (surface) => {
+    expect(surface).toMatch(forbiddenSurfacePattern);
   });
 
   it("keeps the public auth contract provider-neutral", () => {

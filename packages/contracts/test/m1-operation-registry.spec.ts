@@ -157,8 +157,16 @@ describe("M1 operation registry", () => {
           ? {
               "idempotency-key": "request-0001",
               "if-match": '"42"',
+              host: "api.internal.example",
+              "content-type": "application/json",
+              "user-agent": "huoqiu-contract-test/1.0",
             }
-          : { "idempotency-key": "request-0001" };
+          : {
+              "idempotency-key": "request-0001",
+              host: "api.internal.example",
+              "content-type": "application/json",
+              "user-agent": "huoqiu-contract-test/1.0",
+            };
       expect(
         route.headers.safeParse(validHeaders).success,
         item.operationId,
@@ -253,6 +261,10 @@ describe("M1 operation registry", () => {
     expect(versionStringSchema.safeParse("9223372036854775807").success).toBe(
       true,
     );
+    expect(versionStringSchema.safeParse("9223372036854775808").success).toBe(
+      false,
+    );
+    expect(versionStringSchema.safeParse("9".repeat(128)).success).toBe(false);
     expect(versionStringSchema.safeParse(42).success).toBe(false);
     expect(versionStringSchema.safeParse("-1").success).toBe(false);
   });

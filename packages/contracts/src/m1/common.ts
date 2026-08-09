@@ -28,6 +28,25 @@ const sensitivePublicContentPatterns = [
 const isSafePublicContent = (value: string): boolean =>
   sensitivePublicContentPatterns.every((pattern) => !pattern.test(value));
 
+const MAX_NON_NEGATIVE_INT64 = "9223372036854775807";
+const NON_NEGATIVE_INT64_PATTERN = /^(?:0|[1-9]\d{0,18})$/u;
+
+const isNonNegativeInt64String = (value: string): boolean =>
+  NON_NEGATIVE_INT64_PATTERN.test(value) &&
+  (value.length < MAX_NON_NEGATIVE_INT64.length ||
+    value <= MAX_NON_NEGATIVE_INT64);
+
+export const versionStringSchema = z
+  .string()
+  .refine(isNonNegativeInt64String, "Expected a non-negative int64 string");
+
+const strongInt64EntityTagSchema = z.string().refine((value) => {
+  if (!value.startsWith('"') || !value.endsWith('"')) {
+    return false;
+  }
+  return isNonNegativeInt64String(value.slice(1, -1));
+}, "Expected a strong entity tag containing a non-negative int64 string");
+
 const publicAliasSchema = z
   .string()
   .min(1)
@@ -50,7 +69,7 @@ export const apiErrorSchema = z
         field: publicAliasSchema.optional(),
         constraint: publicAliasSchema.optional(),
         retry_after: z.number().int().min(0).max(86_400).optional(),
-        conflict_version: z.string().regex(/^\d+$/u).optional(),
+        conflict_version: versionStringSchema.optional(),
       })
       .strict(),
     trace_id: z
@@ -72,22 +91,21 @@ export const idempotencyHeaderSchema = z
   .object({
     "idempotency-key": z.string().min(8).max(128),
   })
-  .strict();
+  .passthrough();
 
 export const ifMatchHeaderSchema = z
   .object({
-    "if-match": z.string().regex(/^(?:W\/)?"\d+"$/u),
+    "if-match": strongInt64EntityTagSchema,
   })
-  .strict();
+  .passthrough();
 
 export const idempotencyIfMatchHeaderSchema = z
   .object({
     "idempotency-key": z.string().min(8).max(128),
-    "if-match": z.string().regex(/^(?:W\/)?"\d+"$/u),
+    "if-match": strongInt64EntityTagSchema,
   })
-  .strict();
+  .passthrough();
 
-export const versionStringSchema = z.string().regex(/^\d+$/u);
 export const decimalStringSchema = z.string().regex(/^-?\d+(\.\d+)?$/u);
 export const timestampSchema = z.string().datetime({ offset: true });
 export const resourceIdSchema = z.string().min(1).max(128);
