@@ -68,6 +68,9 @@ type RequestOverrides = Readonly<{
   alphaAccess?: string | null;
   authorization?: string | null;
   body?: BodyInit;
+  contentEncoding?: string | null;
+  contentLength?: string | null;
+  contentType?: string | null;
   cookie?: string | null;
   issuedAt?: string | null;
   method?: string;
@@ -117,6 +120,21 @@ const createSignedRequest = async (
     overrides.authorization !== undefined
   ) {
     headers.set("authorization", overrides.authorization);
+  }
+  if (
+    overrides.contentEncoding !== null &&
+    overrides.contentEncoding !== undefined
+  ) {
+    headers.set("content-encoding", overrides.contentEncoding);
+  }
+  if (
+    overrides.contentLength !== null &&
+    overrides.contentLength !== undefined
+  ) {
+    headers.set("content-length", overrides.contentLength);
+  }
+  if (overrides.contentType !== null && overrides.contentType !== undefined) {
+    headers.set("content-type", overrides.contentType);
   }
 
   if (overrides.signature !== null) {
@@ -260,6 +278,36 @@ describe("admin matcher and exact public allowlist", () => {
       );
 
       expect(response.headers.get("x-middleware-next")).toBe("1");
+    },
+  );
+
+  it.each(["/admin/healthz", "/admin/_next/static/chunks/app.js"])(
+    "rejects Authorization before considering public path %s",
+    async (path) => {
+      const request = new NextRequest(`https://admin.huoqiu.test${path}`, {
+        headers: { authorization: "Bearer public-bypass" },
+        nextConfig: { basePath: "/admin" },
+      });
+
+      await expect(
+        evaluateAdminAccess(request, runtimeConfig, {
+          now: () => NOW_MILLISECONDS,
+        }),
+      ).resolves.toMatchObject({ checkpoint: "session", kind: "deny" });
+      expect((await gate(request)).status).toBe(403);
+    },
+  );
+
+  it.each(["/admin/healthz?v=1", "/admin/_next/static/chunks/app.js?v=1"])(
+    "requires a completely empty query even with valid protected credentials: %s",
+    async (pathAndSearch) => {
+      const request = await createSignedRequest({
+        url: `https://admin.huoqiu.test${pathAndSearch}`,
+      });
+
+      const response = await gate(request);
+      expect(response.status).toBe(403);
+      expect(response.headers.get("x-middleware-next")).toBeNull();
     },
   );
 
@@ -602,6 +650,73 @@ describe("cookie-only session and safe denials", () => {
     expect(Object.isFrozen(ADMIN_SESSION_COOKIE)).toBe(true);
   });
 
+  it.each([
+    "Access-Token=secret",
+    "access%255ftoken=secret",
+    "SESSION.token=secret",
+    "refresh-token=secret",
+    "refreshToken%5Bvalue%5D=secret",
+    "ID%5Btoken%5D=secret",
+    "AUTHORIZATION=secret",
+    "Be-Ar_er=secret",
+    "credential=secret",
+    "invite%5Bvalue%5D=secret",
+    "payload%5Btoken%5D=secret",
+    "token%5Bvalue%5D=secret",
+  ])(
+    "rejects recursively decoded, normalized credential query key %s",
+    async (query) => {
+      const request = await createSignedRequest({
+        url: `https://admin.huoqiu.test/admin/moderation?${query}`,
+      });
+
+      await expect(
+        evaluateAdminAccess(request, runtimeConfig, {
+          now: () => NOW_MILLISECONDS,
+        }),
+      ).resolves.toMatchObject({ checkpoint: "session", kind: "deny" });
+      expect((await gate(request)).status).toBe(403);
+    },
+  );
+
+  it.each([
+    "note=Bearer%20opaque-secret",
+    "note=Bearer%3Aopaque-secret",
+    "note=prefix%20Basic%20YWJjOmRlZg%3D%3D",
+    "note=%2542earer%2520double-encoded-secret",
+  ])("rejects Basic/Bearer credential query value %s", async (query) => {
+    const response = await gate(
+      await createSignedRequest({
+        url: `https://admin.huoqiu.test/admin/moderation?${query}`,
+      }),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it.each(["safe%2525252525key=value", "note=%E0%A4%A"])(
+    "fails closed on residual or malformed query encoding %s",
+    async (query) => {
+      const response = await gate(
+        await createSignedRequest({
+          url: `https://admin.huoqiu.test/admin/moderation?${query}`,
+        }),
+      );
+
+      expect(response.status).toBe(403);
+    },
+  );
+
+  it("allows ordinary protected query fields", async () => {
+    const response = await gate(
+      await createSignedRequest({
+        url: "https://admin.huoqiu.test/admin/moderation?queue=reviewing&filter=reported",
+      }),
+    );
+
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
   it("does not accept query, body, or Bearer credentials instead of the cookie", async () => {
     const queryRequest = await createSignedRequest({
       cookie: null,
@@ -675,4 +790,225 @@ describe("cookie-only session and safe denials", () => {
     );
     expect(errorSpy).not.toHaveBeenCalled();
   });
+});
+
+describe("state-changing Admin request body boundary", () => {
+  it.each(["POST", "DELETE"])(
+    "allows a genuinely bodyless %s without Content-Type",
+    async (method) => {
+      const request = await createSignedRequest({ method });
+
+      const response = await gate(request);
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+      expect(request.body).toBeNull();
+    },
+  );
+
+  it("allows an explicitly zero-length body only after verifying it is empty", async () => {
+    const emptyRequest = await createSignedRequest({
+      body: new Uint8Array().buffer,
+      contentLength: "0",
+      method: "POST",
+    });
+    const lyingRequest = await createSignedRequest({
+      body: "not-empty",
+      contentLength: "0",
+      method: "POST",
+    });
+
+    expect((await gate(emptyRequest)).headers.get("x-middleware-next")).toBe(
+      "1",
+    );
+    expect((await gate(lyingRequest)).status).toBe(403);
+    expect(emptyRequest.bodyUsed).toBe(false);
+    expect(lyingRequest.bodyUsed).toBe(false);
+  });
+
+  it("fails closed at the total body-read deadline without consuming the original", async () => {
+    const encodedBody = new TextEncoder().encode(
+      '{"operation":"approve","reason":"reviewed"}',
+    );
+    let releaseBody = (): void => undefined;
+    const delayedBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        releaseBody = () => {
+          controller.enqueue(encodedBody);
+          controller.close();
+        };
+      },
+    });
+    const request = await createSignedRequest({
+      body: delayedBody,
+      contentType: "application/json",
+      method: "POST",
+    });
+    const deadlineGate = createAdminAccessMiddleware(runtimeConfig, {
+      bodyReadDeadlineMilliseconds: 5,
+      now: () => NOW_MILLISECONDS,
+    });
+    const responsePromise = deadlineGate(request);
+    const outcome = await Promise.race([
+      responsePromise.then((response) => ({
+        kind: "response" as const,
+        response,
+      })),
+      new Promise<{ kind: "still-reading" }>((resolve) => {
+        setTimeout(() => resolve({ kind: "still-reading" }), 250);
+      }),
+    ]);
+
+    releaseBody();
+    const response =
+      outcome.kind === "response" ? outcome.response : await responsePromise;
+    expect(outcome.kind).toBe("response");
+    expect(response.status).toBe(403);
+    expect(request.bodyUsed).toBe(false);
+    await expect(request.text()).resolves.toBe(
+      new TextDecoder().decode(encodedBody),
+    );
+  });
+
+  it.each([
+    ["POST", "application/json", '{"Access-Token":"secret"}'],
+    [
+      "PUT",
+      "application/json; charset=utf-8",
+      '{"payload":{"session[token]":"secret"}}',
+    ],
+    ["PATCH", "application/json", '{"note":"Bearer opaque-secret"}'],
+    ["PATCH", "application/json", '{"note":"Bearer:opaque-secret"}'],
+    [
+      "DELETE",
+      "application/x-www-form-urlencoded",
+      "token%255Bvalue%255D=secret",
+    ],
+  ])(
+    "rejects credential smuggling in a correctly signed %s %s body",
+    async (method, contentType, body) => {
+      const request = await createSignedRequest({
+        body,
+        contentType,
+        method,
+      });
+
+      const response = await gate(request);
+      expect(response.status).toBe(403);
+      expect(response.headers.get("x-middleware-next")).toBeNull();
+      expect(request.bodyUsed).toBe(false);
+    },
+  );
+
+  it.each([
+    ["credential=secret", "credential key"],
+    ["payload%5Btoken%5D=secret", "structured token key"],
+    ["note=Basic%2520YWJjOmRlZg%253D%253D", "encoded Basic value"],
+    ["note=Basic%3DYWJjOmRlZg", "delimited Basic value"],
+    ["note=prefix%20Bearer%20opaque-secret", "embedded Bearer value"],
+  ])("rejects form %s (%s)", async (body) => {
+    const request = await createSignedRequest({
+      body,
+      contentType: "application/x-www-form-urlencoded; charset=UTF-8",
+      method: "POST",
+    });
+
+    expect((await gate(request)).status).toBe(403);
+    expect(request.bodyUsed).toBe(false);
+  });
+
+  it.each([
+    ["multipart/form-data; boundary=boundary", "--boundary--"],
+    ["text/plain", "ordinary text"],
+    ["application/octet-stream", new Uint8Array([1, 2, 3]).buffer],
+  ])(
+    "fails closed for unsupported content type %s",
+    async (contentType, body) => {
+      const request = await createSignedRequest({
+        body,
+        contentType,
+        method: "POST",
+      });
+
+      expect((await gate(request)).status).toBe(403);
+      expect(request.bodyUsed).toBe(false);
+    },
+  );
+
+  it("fails closed for encoded state-changing bodies", async () => {
+    const request = await createSignedRequest({
+      body: '{"message":"safe"}',
+      contentEncoding: "gzip",
+      contentType: "application/json",
+      method: "POST",
+    });
+
+    expect((await gate(request)).status).toBe(403);
+    expect(request.bodyUsed).toBe(false);
+  });
+
+  it("fails closed when a bodyless request advertises multipart content", async () => {
+    const request = await createSignedRequest({
+      contentType: "multipart/form-data; boundary=boundary",
+      method: "POST",
+    });
+
+    expect(request.body).toBeNull();
+    expect((await gate(request)).status).toBe(403);
+  });
+
+  it("fails closed when an explicit empty stream advertises multipart content", async () => {
+    const request = await createSignedRequest({
+      body: new Uint8Array().buffer,
+      contentLength: "0",
+      contentType: "multipart/form-data; boundary=boundary",
+      method: "POST",
+    });
+
+    expect((await gate(request)).status).toBe(403);
+    expect(request.bodyUsed).toBe(false);
+  });
+
+  it("fails closed without reading an overlong body", async () => {
+    const request = await createSignedRequest({
+      body: JSON.stringify({ message: "x".repeat(70_000) }),
+      contentType: "application/json",
+      method: "POST",
+    });
+
+    expect((await gate(request)).status).toBe(403);
+    expect(request.bodyUsed).toBe(false);
+  });
+
+  it.each([
+    ["application/json", '{"message":'],
+    ["application/x-www-form-urlencoded", "note=%E0%A4%A"],
+    ["application/json", new Uint8Array([0xc3, 0x28]).buffer],
+  ])("fails closed for damaged %s body encoding", async (contentType, body) => {
+    const request = await createSignedRequest({
+      body,
+      contentType,
+      method: "POST",
+    });
+
+    expect((await gate(request)).status).toBe(403);
+    expect(request.bodyUsed).toBe(false);
+  });
+
+  it.each([
+    ["application/json", '{"operation":"approve","reason":"reviewed"}'],
+    ["application/x-www-form-urlencoded", "operation=approve&reason=reviewed"],
+  ])(
+    "forwards a credential-free %s body without consuming it",
+    async (contentType, body) => {
+      const request = await createSignedRequest({
+        body,
+        contentType,
+        method: "POST",
+      });
+
+      const response = await gate(request);
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+      expect(request.bodyUsed).toBe(false);
+      await expect(request.text()).resolves.toBe(body);
+    },
+  );
 });

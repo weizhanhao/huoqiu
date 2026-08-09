@@ -6,6 +6,16 @@ const DEFAULT_MAX_SKEW_SECONDS = 300;
 const MAX_CONFIGURED_SKEW_SECONDS = 3600;
 const MINIMUM_SECRET_BYTES = 32;
 const STATIC_DECODE_LIMIT = 3;
+const CREDENTIAL_DECODE_LIMIT = 3;
+const MAX_QUERY_BYTES = 8192;
+const MAX_QUERY_PAIRS = 64;
+const MAX_BODY_BYTES = 65_536;
+const MAX_BODY_PAIRS = 256;
+const MAX_BODY_DEPTH = 16;
+const MAX_BODY_NODES = 2048;
+const MAX_STREAM_CHUNKS = 1024;
+const DEFAULT_BODY_READ_DEADLINE_MILLISECONDS = 1000;
+const MAX_BODY_READ_DEADLINE_MILLISECONDS = 10_000;
 
 const EDGE_HEADERS = Object.freeze({
   alphaAccess: "x-huoqiu-alpha-access",
@@ -15,18 +25,35 @@ const EDGE_HEADERS = Object.freeze({
   subject: "x-huoqiu-edge-subject",
 });
 
-const SENSITIVE_QUERY_KEYS = new Set([
-  "access_token",
+const CREDENTIAL_KEY_NAMES = new Set([
+  "accesstoken",
   "authorization",
   "bearer",
+  "credential",
+  "credentials",
   "invite",
-  "invite_code",
+  "invitecode",
+  "idtoken",
+  "refreshtoken",
   "session",
-  "session_token",
+  "sessiontoken",
   "token",
 ]);
 
+const STRUCTURED_CREDENTIAL_ROOTS = new Set([
+  "authorization",
+  "bearer",
+  "credential",
+  "credentials",
+  "invite",
+  "session",
+  "token",
+]);
+
+const STATE_CHANGING_METHODS = new Set(["DELETE", "PATCH", "POST", "PUT"]);
+
 const UNTRUSTED_AUTHORIZATION_HEADERS = [
+  "authorization",
   "x-huoqiu-action-authorized",
   "x-huoqiu-admin-role",
   "x-huoqiu-admin-roles",
@@ -63,6 +90,7 @@ export type AdminAccessConfig = Readonly<{
 type Environment = Readonly<Record<string, string | undefined>>;
 
 type EvaluationOptions = Readonly<{
+  bodyReadDeadlineMilliseconds?: number;
   now?: () => number;
 }>;
 
@@ -212,14 +240,117 @@ const hasSafeStaticSegments = (path: string): boolean => {
   });
 };
 
-const hasSensitiveCredentialQuery = (requestUrl: URL): boolean => {
-  for (const key of requestUrl.searchParams.keys()) {
-    if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
+const recursivelyDecodeComponent = (
+  rawValue: string,
+  plusAsSpace: boolean,
+): string | undefined => {
+  let decoded = plusAsSpace ? rawValue.replaceAll("+", "%20") : rawValue;
+
+  for (let pass = 0; pass < CREDENTIAL_DECODE_LIMIT; pass += 1) {
+    if (!decoded.includes("%")) {
+      return decoded;
+    }
+
+    try {
+      decoded = decodeURIComponent(decoded);
+    } catch {
+      return undefined;
+    }
+  }
+
+  return decoded.includes("%") ? undefined : decoded;
+};
+
+const isCredentialKey = (value: string): boolean => {
+  const normalized = value.normalize("NFKC").toLowerCase();
+  const parts = normalized.split(/[^a-z0-9]+/u).filter(Boolean);
+  const compact = parts.join("");
+
+  if (CREDENTIAL_KEY_NAMES.has(compact)) {
+    return true;
+  }
+
+  if (
+    parts.some(
+      (part) =>
+        STRUCTURED_CREDENTIAL_ROOTS.has(part) || CREDENTIAL_KEY_NAMES.has(part),
+    )
+  ) {
+    return true;
+  }
+
+  return parts.some(
+    (_part, index) =>
+      index + 1 < parts.length &&
+      CREDENTIAL_KEY_NAMES.has(parts.slice(index, index + 2).join("")),
+  );
+};
+
+const containsBasicOrBearerCredential = (value: string): boolean =>
+  /(?:^|[^a-z0-9])(?:basic|bearer)(?:\s+|[:=]\s*)\S+/iu.test(
+    value.normalize("NFKC"),
+  );
+
+const hasUnsafeEncodedCredentialPairs = (
+  rawPairs: string,
+  maximumBytes: number,
+  maximumPairs: number,
+): boolean => {
+  if (new TextEncoder().encode(rawPairs).byteLength > maximumBytes) {
+    return true;
+  }
+
+  if (rawPairs.length === 0) {
+    return false;
+  }
+
+  const pairs = rawPairs.split("&");
+  if (pairs.length > maximumPairs) {
+    return true;
+  }
+
+  for (const rawPair of pairs) {
+    if (rawPair.length === 0) {
+      return true;
+    }
+
+    const separatorIndex = rawPair.indexOf("=");
+    const rawKey =
+      separatorIndex < 0 ? rawPair : rawPair.slice(0, separatorIndex);
+    const rawValue =
+      separatorIndex < 0 ? "" : rawPair.slice(separatorIndex + 1);
+    const key = recursivelyDecodeComponent(rawKey, true);
+    const value = recursivelyDecodeComponent(rawValue, true);
+
+    if (
+      key === undefined ||
+      value === undefined ||
+      key.length === 0 ||
+      key.length > 512 ||
+      value.length > maximumBytes ||
+      containsControlCharacter(key) ||
+      containsControlCharacter(value) ||
+      isCredentialKey(key) ||
+      containsBasicOrBearerCredential(value)
+    ) {
       return true;
     }
   }
 
   return false;
+};
+
+const hasUnsafeCredentialQuery = (requestUrl: URL): boolean =>
+  requestUrl.search !== "" &&
+  hasUnsafeEncodedCredentialPairs(
+    requestUrl.search.slice(1),
+    MAX_QUERY_BYTES,
+    MAX_QUERY_PAIRS,
+  );
+
+const isPublicPathCandidate = (requestUrl: URL): boolean => {
+  const path = routePath(requestUrl);
+  return path === "/healthz" || path.startsWith("/_next/static/");
 };
 
 const isPublicAllowlistRequest = (
@@ -228,7 +359,7 @@ const isPublicAllowlistRequest = (
 ): boolean => {
   if (
     (request.method !== "GET" && request.method !== "HEAD") ||
-    hasSensitiveCredentialQuery(requestUrl)
+    requestUrl.search !== ""
   ) {
     return false;
   }
@@ -380,12 +511,322 @@ const readSessionCookieState = (request: NextRequest): SessionCookieState => {
   return "present";
 };
 
+type SupportedBodyType = "form" | "json";
+
+const readSupportedBodyType = (
+  request: NextRequest,
+): SupportedBodyType | undefined => {
+  const rawContentType = request.headers.get("content-type");
+  if (
+    rawContentType === null ||
+    rawContentType.length === 0 ||
+    rawContentType.includes(",") ||
+    containsControlCharacter(rawContentType)
+  ) {
+    return undefined;
+  }
+
+  const [rawMediaType, ...rawParameters] = rawContentType.split(";");
+  const mediaType = rawMediaType?.trim().toLowerCase();
+  const bodyType =
+    mediaType === "application/json"
+      ? "json"
+      : mediaType === "application/x-www-form-urlencoded"
+        ? "form"
+        : undefined;
+  if (bodyType === undefined) {
+    return undefined;
+  }
+
+  let hasCharset = false;
+  for (const rawParameter of rawParameters) {
+    const separatorIndex = rawParameter.indexOf("=");
+    if (separatorIndex < 0) {
+      return undefined;
+    }
+
+    const name = rawParameter.slice(0, separatorIndex).trim().toLowerCase();
+    const value = rawParameter
+      .slice(separatorIndex + 1)
+      .trim()
+      .toLowerCase();
+    if (name !== "charset" || value !== "utf-8" || hasCharset) {
+      return undefined;
+    }
+    hasCharset = true;
+  }
+
+  return bodyType;
+};
+
+type ContentLengthState =
+  | Readonly<{ kind: "absent" }>
+  | Readonly<{ kind: "invalid" }>
+  | Readonly<{ bytes: number; kind: "valid" }>;
+
+const readContentLengthState = (request: NextRequest): ContentLengthState => {
+  const rawContentLength = request.headers.get("content-length");
+  if (rawContentLength === null) {
+    return { kind: "absent" };
+  }
+
+  if (!/^(0|[1-9]\d*)$/u.test(rawContentLength)) {
+    return { kind: "invalid" };
+  }
+
+  const contentLength = Number(rawContentLength);
+  if (!Number.isSafeInteger(contentLength) || contentLength > MAX_BODY_BYTES) {
+    return { kind: "invalid" };
+  }
+
+  return { bytes: contentLength, kind: "valid" };
+};
+
+const readBoundedBodyClone = async (
+  request: NextRequest,
+  deadlineMilliseconds: number,
+): Promise<Uint8Array | undefined> => {
+  let bodyClone: Request;
+  try {
+    bodyClone = request.clone();
+  } catch {
+    return undefined;
+  }
+
+  if (bodyClone.body === null) {
+    return new Uint8Array();
+  }
+
+  const reader = bodyClone.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let chunkCount = 0;
+  let totalBytes = 0;
+  let timedOut = false;
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<Readonly<{ kind: "deadline" }>>((resolve) => {
+    deadlineTimer = setTimeout(
+      () => resolve({ kind: "deadline" }),
+      deadlineMilliseconds,
+    );
+  });
+
+  try {
+    while (true) {
+      const outcome = await Promise.race([
+        reader.read().then(
+          (result) => ({ kind: "read" as const, result }),
+          () => ({ kind: "read_error" as const }),
+        ),
+        deadline,
+      ]);
+      if (outcome.kind === "deadline") {
+        timedOut = true;
+        void reader.cancel().catch(() => undefined);
+        return undefined;
+      }
+      if (outcome.kind === "read_error") {
+        void reader.cancel().catch(() => undefined);
+        return undefined;
+      }
+      if (outcome.result.done) {
+        break;
+      }
+
+      chunkCount += 1;
+      totalBytes += outcome.result.value.byteLength;
+      if (chunkCount > MAX_STREAM_CHUNKS || totalBytes > MAX_BODY_BYTES) {
+        // A clone is one branch of a tee. Awaiting cancellation can wait for
+        // the untouched original branch, so initiate it and return immediately.
+        void reader.cancel().catch(() => undefined);
+        return undefined;
+      }
+      chunks.push(outcome.result.value);
+    }
+  } catch {
+    void reader.cancel().catch(() => undefined);
+    return undefined;
+  } finally {
+    if (deadlineTimer !== undefined) {
+      clearTimeout(deadlineTimer);
+    }
+    if (!timedOut) {
+      reader.releaseLock();
+    }
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+};
+
+const decodePotentialCredentialText = (value: string): string | undefined => {
+  let decoded = value;
+  for (let pass = 0; pass < CREDENTIAL_DECODE_LIMIT; pass += 1) {
+    if (!/%[0-9a-f]{2}/iu.test(decoded)) {
+      return decoded;
+    }
+
+    try {
+      decoded = decodeURIComponent(decoded);
+    } catch {
+      return undefined;
+    }
+  }
+
+  return /%[0-9a-f]{2}/iu.test(decoded) ? undefined : decoded;
+};
+
+interface JsonInspectionState {
+  nodes: number;
+}
+
+const isSafeJsonValue = (
+  value: unknown,
+  depth: number,
+  state: JsonInspectionState,
+): boolean => {
+  state.nodes += 1;
+  if (depth > MAX_BODY_DEPTH || state.nodes > MAX_BODY_NODES) {
+    return false;
+  }
+
+  if (typeof value === "string") {
+    const decodedValue = decodePotentialCredentialText(value);
+    return (
+      decodedValue !== undefined &&
+      !containsBasicOrBearerCredential(decodedValue)
+    );
+  }
+
+  if (value === null || typeof value !== "object") {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.every((item) => isSafeJsonValue(item, depth + 1, state));
+  }
+
+  for (const [rawKey, childValue] of Object.entries(value)) {
+    const key = decodePotentialCredentialText(rawKey);
+    if (
+      key === undefined ||
+      key.length === 0 ||
+      key.length > 512 ||
+      containsControlCharacter(key) ||
+      isCredentialKey(key) ||
+      !isSafeJsonValue(childValue, depth + 1, state)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const hasSafeStateChangingBody = async (
+  request: NextRequest,
+  deadlineMilliseconds: number,
+): Promise<boolean> => {
+  if (!STATE_CHANGING_METHODS.has(request.method.toUpperCase())) {
+    return true;
+  }
+
+  const contentEncoding = request.headers.get("content-encoding");
+  if (
+    (contentEncoding !== null &&
+      contentEncoding.toLowerCase() !== "identity") ||
+    !Number.isSafeInteger(deadlineMilliseconds) ||
+    deadlineMilliseconds < 1 ||
+    deadlineMilliseconds > MAX_BODY_READ_DEADLINE_MILLISECONDS
+  ) {
+    return false;
+  }
+
+  const contentLength = readContentLengthState(request);
+  if (contentLength.kind === "invalid") {
+    return false;
+  }
+
+  const contentTypeIsAbsentOrSupported =
+    request.headers.get("content-type") === null ||
+    readSupportedBodyType(request) !== undefined;
+
+  if (request.body === null) {
+    const lengthIsEmpty =
+      contentLength.kind === "absent" || contentLength.bytes === 0;
+    return lengthIsEmpty && contentTypeIsAbsentOrSupported;
+  }
+
+  if (contentLength.kind === "valid" && contentLength.bytes === 0) {
+    if (!contentTypeIsAbsentOrSupported) {
+      return false;
+    }
+    const explicitlyEmptyBody = await readBoundedBodyClone(
+      request,
+      deadlineMilliseconds,
+    );
+    return explicitlyEmptyBody?.byteLength === 0;
+  }
+
+  const bodyType = readSupportedBodyType(request);
+  if (bodyType === undefined) {
+    return false;
+  }
+
+  const bodyBytes = await readBoundedBodyClone(request, deadlineMilliseconds);
+  if (bodyBytes === undefined) {
+    return false;
+  }
+
+  let bodyText: string;
+  try {
+    bodyText = new TextDecoder("utf-8", { fatal: true }).decode(bodyBytes);
+  } catch {
+    return false;
+  }
+
+  if (bodyType === "form") {
+    return !hasUnsafeEncodedCredentialPairs(
+      bodyText,
+      MAX_BODY_BYTES,
+      MAX_BODY_PAIRS,
+    );
+  }
+
+  let parsedBody: unknown;
+  try {
+    parsedBody = JSON.parse(bodyText) as unknown;
+  } catch {
+    return false;
+  }
+
+  return isSafeJsonValue(parsedBody, 0, { nodes: 0 });
+};
+
 export const evaluateAdminAccess = async (
   request: NextRequest,
   accessConfig: AdminAccessConfig,
   options: EvaluationOptions = {},
 ): Promise<AdminAccessDecision> => {
   const requestUrl = new URL(request.url);
+
+  if (request.headers.has("authorization")) {
+    return {
+      checkpoint: "session",
+      kind: "deny",
+    };
+  }
+
+  if (isPublicPathCandidate(requestUrl) && requestUrl.search !== "") {
+    return {
+      checkpoint: "session",
+      kind: "deny",
+    };
+  }
 
   if (isPublicAllowlistRequest(request, requestUrl)) {
     return { kind: "allow", nextAuthorization: "none", scope: "allowlist" };
@@ -411,14 +852,7 @@ export const evaluateAdminAccess = async (
     };
   }
 
-  if (hasSensitiveCredentialQuery(requestUrl)) {
-    return {
-      checkpoint: "session",
-      kind: "deny",
-    };
-  }
-
-  if (request.headers.has("authorization")) {
+  if (hasUnsafeCredentialQuery(requestUrl)) {
     return {
       checkpoint: "session",
       kind: "deny",
@@ -427,6 +861,19 @@ export const evaluateAdminAccess = async (
 
   const sessionCookieState = readSessionCookieState(request);
   if (sessionCookieState !== "present") {
+    return {
+      checkpoint: "session",
+      kind: "deny",
+    };
+  }
+
+  if (
+    !(await hasSafeStateChangingBody(
+      request,
+      options.bodyReadDeadlineMilliseconds ??
+        DEFAULT_BODY_READ_DEADLINE_MILLISECONDS,
+    ))
+  ) {
     return {
       checkpoint: "session",
       kind: "deny",
