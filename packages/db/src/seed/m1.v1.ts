@@ -18,6 +18,14 @@ export interface SeedM1Options {
 
 type SeedTransaction = postgres.TransactionSql;
 type Comparable = boolean | null | number | string | readonly string[];
+type FixtureListingStatus = M1Fixture["market"]["listing"]["status"];
+
+const toCanonicalListingStatus = (status: FixtureListingStatus): "active" => {
+  if (status !== "open") {
+    throw new Error(`SEED_UNSUPPORTED_LISTING_STATUS:${status}`);
+  }
+  return "active";
+};
 
 const sameValue = (actual: unknown, expected: Comparable): boolean =>
   JSON.stringify(actual) === JSON.stringify(expected);
@@ -129,13 +137,14 @@ const seedInstrumentRegistry = async (
   });
 
   const symbolAliases = [...listing.symbol_aliases];
+  const listingStatus = toCanonicalListingStatus(listing.status);
   await transaction`
     insert into listings
       (id, instrument_id, exchange_id, market, symbol, symbol_aliases, currency, status)
     values (
       ${listing.listing_id}, ${listing.instrument_id}, ${listing.exchange_id},
       'SYNTHETIC', ${listing.symbol}, ${transaction.json(symbolAliases)},
-      ${listing.currency}, ${listing.status}
+      ${listing.currency}, ${listingStatus}
     )
     on conflict (id) do nothing
   `;
@@ -145,7 +154,7 @@ const seedInstrumentRegistry = async (
     id: listing.listing_id,
     instrument_id: listing.instrument_id,
     market: "SYNTHETIC",
-    status: listing.status,
+    status: listingStatus,
     symbol: listing.symbol,
     symbol_aliases: symbolAliases,
   });

@@ -21,6 +21,7 @@ export const portfolios = pgTable("portfolios", {
   ownerId: text("owner_id").notNull(),
   name: text("name").notNull(),
   baseCurrency: text("base_currency").notNull(),
+  cashBalance: decimal("cash_balance").default("0"),
   status: text("status").default("active").notNull(),
   version: aggregateVersion(),
   createdAt: createdAt(),

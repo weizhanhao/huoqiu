@@ -1,6 +1,6 @@
 {
-  "id": "aa5f4b2d-413e-4845-8311-2eff7cd63cf2",
-  "prevId": "b763756d-542a-49a9-afad-3c721d0dba55",
+  "id": "008a90bb-4124-4f17-bf52-a6053675ce41",
+  "prevId": "905e580f-80ea-4aae-92fa-738cd80a0a1d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2603,9 +2603,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "watermark_at": {
-          "name": "watermark_at",
-          "type": "timestamp with time zone",
+        "watermark_sequence": {
+          "name": "watermark_sequence",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": true
         },
@@ -3460,6 +3460,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "cash_balance": {
+          "name": "cash_balance",
+          "type": "numeric(38, 18)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
         },
         "status": {
           "name": "status",

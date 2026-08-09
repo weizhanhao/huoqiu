@@ -51,6 +51,15 @@ describe.sequential("M1 fixture seed writer", () => {
         instruments: 1,
         listings: 1,
       });
+
+      const seededListings = await sql<
+        { readonly id: string; readonly status: string }[]
+      >`
+        select id, status from listings
+      `;
+      expect(seededListings).toEqual([
+        { id: "listing_syn_0001", status: "active" },
+      ]);
     } finally {
       await sql.end({ timeout: 5 });
     }

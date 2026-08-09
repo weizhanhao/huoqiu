@@ -6,6 +6,10 @@ ALTER TABLE "instruments"
 	ADD CONSTRAINT "instruments_status_check"
 	CHECK ("status" IN ('active', 'inactive'));
 --> statement-breakpoint
+ALTER TABLE "listings"
+	ADD CONSTRAINT "listings_status_check"
+	CHECK ("status" IN ('active', 'halted', 'closed'));
+--> statement-breakpoint
 ALTER TABLE "market_observations"
 	ADD CONSTRAINT "market_observations_sequence_check" CHECK ("sequence" > 0),
 	ADD CONSTRAINT "market_observations_revision_check" CHECK ("revision" >= 0),
@@ -48,10 +52,25 @@ ALTER TABLE "market_bars"
 		AND "high_price" >= "close_price"
 	);
 --> statement-breakpoint
+ALTER TABLE "portfolios"
+	ADD CONSTRAINT "portfolios_cash_balance_check" CHECK ("cash_balance" >= 0);
+--> statement-breakpoint
 ALTER TABLE "portfolio_ledger_entries"
+	ADD CONSTRAINT "portfolio_ledger_entry_type_check"
+		CHECK ("entry_type" IN ('buy', 'sell', 'fee', 'reversal')),
 	ADD CONSTRAINT "portfolio_ledger_fees_check" CHECK ("fees" >= 0),
 	ADD CONSTRAINT "portfolio_ledger_price_check" CHECK ("price" IS NULL OR "price" >= 0),
-	ADD CONSTRAINT "portfolio_ledger_reversal_check" CHECK ("reversal_of_id" IS NULL OR "reversal_of_id" <> "id");
+	ADD CONSTRAINT "portfolio_ledger_reversal_check" CHECK (
+		(
+			("entry_type" = 'reversal' AND "reversal_of_id" IS NOT NULL)
+			OR ("entry_type" <> 'reversal' AND "reversal_of_id" IS NULL)
+		)
+		AND ("reversal_of_id" IS NULL OR "reversal_of_id" <> "id")
+	);
+--> statement-breakpoint
+ALTER TABLE "notification_read_state"
+	ADD CONSTRAINT "notification_read_state_watermark_check"
+	CHECK ("watermark_sequence" >= 0);
 --> statement-breakpoint
 ALTER TABLE "outbox_events"
 	ADD CONSTRAINT "outbox_events_version_check" CHECK ("aggregate_version" > 0),
@@ -75,7 +94,9 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-	RAISE EXCEPTION 'M1_APPEND_ONLY: %.% rejects %', TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP;
+	RAISE EXCEPTION USING
+		ERRCODE = '55000',
+		MESSAGE = format('M1_APPEND_ONLY: %I.%I rejects %s', TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP);
 END;
 $$;
 --> statement-breakpoint
@@ -131,13 +152,33 @@ CREATE TRIGGER "idempotency_records_append_only"
 	BEFORE UPDATE OR DELETE ON "idempotency_records"
 	FOR EACH ROW EXECUTE FUNCTION "m1_reject_append_only_mutation"();
 --> statement-breakpoint
+CREATE FUNCTION "m1_guard_notification_watermark"() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+	IF NEW."watermark_sequence" < OLD."watermark_sequence" THEN
+		RAISE EXCEPTION USING
+			ERRCODE = '23514',
+			MESSAGE = 'M1_NOTIFICATION_WATERMARK_MONOTONIC: regression rejected';
+	END IF;
+	RETURN NEW;
+END;
+$$;
+--> statement-breakpoint
+CREATE TRIGGER "notification_read_state_monotonic"
+	BEFORE UPDATE OF "watermark_sequence" ON "notification_read_state"
+	FOR EACH ROW EXECUTE FUNCTION "m1_guard_notification_watermark"();
+--> statement-breakpoint
 CREATE FUNCTION "m1_guard_outbox_transition"() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
 	IF TG_OP = 'DELETE' THEN
-		RAISE EXCEPTION 'M1_OUTBOX_MONOTONIC: delete rejected';
+		RAISE EXCEPTION USING
+			ERRCODE = '55000',
+			MESSAGE = 'M1_OUTBOX_MONOTONIC: delete rejected';
 	END IF;
 	IF NEW."event_id" IS DISTINCT FROM OLD."event_id"
 		OR NEW."event_type" IS DISTINCT FROM OLD."event_type"
@@ -146,10 +187,16 @@ BEGIN
 		OR NEW."aggregate_version" IS DISTINCT FROM OLD."aggregate_version"
 		OR NEW."payload" IS DISTINCT FROM OLD."payload"
 		OR NEW."occurred_at" IS DISTINCT FROM OLD."occurred_at"
-		OR NEW."created_at" IS DISTINCT FROM OLD."created_at"
-		OR NEW."attempts" < OLD."attempts"
+		OR NEW."created_at" IS DISTINCT FROM OLD."created_at" THEN
+		RAISE EXCEPTION USING
+			ERRCODE = '55000',
+			MESSAGE = 'M1_OUTBOX_MONOTONIC: immutable envelope rejected';
+	END IF;
+	IF NEW."attempts" < OLD."attempts"
 		OR (OLD."published_at" IS NOT NULL AND NEW."published_at" IS DISTINCT FROM OLD."published_at") THEN
-		RAISE EXCEPTION 'M1_OUTBOX_MONOTONIC: immutable data or state regression';
+		RAISE EXCEPTION USING
+			ERRCODE = '23514',
+			MESSAGE = 'M1_OUTBOX_MONOTONIC: state regression rejected';
 	END IF;
 	RETURN NEW;
 END;
@@ -165,16 +212,24 @@ SET search_path = pg_catalog, public
 AS $$
 BEGIN
 	IF TG_OP = 'DELETE' THEN
-		RAISE EXCEPTION 'M1_INBOX_MONOTONIC: delete rejected';
+		RAISE EXCEPTION USING
+			ERRCODE = '55000',
+			MESSAGE = 'M1_INBOX_MONOTONIC: delete rejected';
 	END IF;
 	IF NEW."id" IS DISTINCT FROM OLD."id"
 		OR NEW."consumer" IS DISTINCT FROM OLD."consumer"
 		OR NEW."event_id" IS DISTINCT FROM OLD."event_id"
 		OR NEW."received_at" IS DISTINCT FROM OLD."received_at"
-		OR NEW."created_at" IS DISTINCT FROM OLD."created_at"
-		OR (OLD."processed_at" IS NOT NULL AND NEW."processed_at" IS DISTINCT FROM OLD."processed_at")
+		OR NEW."created_at" IS DISTINCT FROM OLD."created_at" THEN
+		RAISE EXCEPTION USING
+			ERRCODE = '55000',
+			MESSAGE = 'M1_INBOX_MONOTONIC: immutable envelope rejected';
+	END IF;
+	IF (OLD."processed_at" IS NOT NULL AND NEW."processed_at" IS DISTINCT FROM OLD."processed_at")
 		OR (OLD."outcome" IS NOT NULL AND NEW."outcome" IS DISTINCT FROM OLD."outcome") THEN
-		RAISE EXCEPTION 'M1_INBOX_MONOTONIC: immutable data or state regression';
+		RAISE EXCEPTION USING
+			ERRCODE = '23514',
+			MESSAGE = 'M1_INBOX_MONOTONIC: state regression rejected';
 	END IF;
 	RETURN NEW;
 END;

@@ -42,10 +42,7 @@ export const notificationReadState = pgTable(
   {
     id: textId(),
     recipientId: text("recipient_id").notNull(),
-    watermarkAt: timestamp("watermark_at", {
-      mode: "date",
-      withTimezone: true,
-    }).notNull(),
+    watermarkSequence: bigintCounter("watermark_sequence"),
     version: aggregateVersion(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

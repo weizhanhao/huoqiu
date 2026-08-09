@@ -316,7 +316,7 @@ CREATE TABLE "notification_delivery_attempts" (
 CREATE TABLE "notification_read_state" (
 	"id" text PRIMARY KEY NOT NULL,
 	"recipient_id" text NOT NULL,
-	"watermark_at" timestamp with time zone NOT NULL,
+	"watermark_sequence" bigint NOT NULL,
 	"version" bigint DEFAULT 1 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -427,6 +427,7 @@ CREATE TABLE "portfolios" (
 	"owner_id" text NOT NULL,
 	"name" text NOT NULL,
 	"base_currency" text NOT NULL,
+	"cash_balance" numeric(38, 18) DEFAULT '0' NOT NULL,
 	"status" text DEFAULT 'active' NOT NULL,
 	"version" bigint DEFAULT 1 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,

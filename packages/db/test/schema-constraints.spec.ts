@@ -23,7 +23,7 @@ const allPhysicalTables = [
 ];
 
 const numericSemanticColumn =
-  /(?:^|_)(?:amount|average_cost|cash_value|fees|market_value|observed_value|price|quantity|total_value|value|volume)$/u;
+  /(?:^|_)(?:amount|average_cost|cash_balance|cash_value|fees|market_value|observed_value|price|quantity|total_value|value|volume)$/u;
 
 const collectPhysicalViolations = (tables: readonly AnyPgTable[]): string[] => {
   const violations: string[] = [];
@@ -103,6 +103,26 @@ describe("M1 PostgreSQL schema physical constraints", () => {
   it("uses text business ids, numeric(38,18), bigint counters, and timestamptz", () => {
     expect(collectPhysicalViolations(allPublicTables)).toEqual([]);
     expect(collectIdTypeViolations(allPhysicalTables)).toEqual([]);
+
+    const notificationStateColumns = Object.fromEntries(
+      getTableConfig(publicSchema.notificationReadState).columns.map(
+        (column) => [column.name, column.getSQLType()],
+      ),
+    );
+    const portfolioColumns = Object.fromEntries(
+      getTableConfig(publicSchema.portfolios).columns.map((column) => [
+        column.name,
+        column.getSQLType(),
+      ]),
+    );
+
+    expect(notificationStateColumns).toMatchObject({
+      watermark_sequence: "bigint",
+    });
+    expect(notificationStateColumns).not.toHaveProperty("watermark_at");
+    expect(portfolioColumns).toMatchObject({
+      cash_balance: "numeric(38, 18)",
+    });
   });
 
   it("contains the approved idempotency, inbox/outbox, and domain unique indexes", () => {
