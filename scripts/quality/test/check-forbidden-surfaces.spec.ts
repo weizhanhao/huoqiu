@@ -1083,6 +1083,30 @@ describe("forbidden runtime surfaces", () => {
     expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
   });
 
+  it("accepts validation issue paths outside route and registry sources", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      'export const validate = (index: number) => ({ code: "custom", path: ["rows", index, "value"] });',
+      "packages/contracts/src/d0/schema.ts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
+  it("accepts ordinary exported card schemas outside a registry module", async () => {
+    const root = await createRepository();
+    await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));
+    await writeCandidate(
+      root,
+      "const cardIdSchema = createSchema(); export const feedCardSchema = object({ card_id: cardIdSchema });",
+      "packages/contracts/src/feed/card-v1.ts",
+    );
+
+    expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+  });
+
   it("parses a clean CommonJS TypeScript .cts runtime source", async () => {
     const root = await createRepository();
     await writeCandidate(

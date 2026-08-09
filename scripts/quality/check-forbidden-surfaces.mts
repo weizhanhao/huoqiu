@@ -420,7 +420,7 @@ const isDomainRegistry = (path: string): boolean => {
     parts[0] === "packages" &&
     parts[2] === "src" &&
     (parts[1] === "domain" || parts[1] === "contracts") &&
-    hasRuntimeRegistryName(path)
+    parts.some((part) => /(?:^|[._+-])registr(?:y|ies)(?:[._+-]|$)/i.test(part))
   );
 };
 
@@ -1629,11 +1629,21 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       requireStaticRegistry(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
     }
-    if (ts.isPropertyAssignment(node) && runtimeField(node.name)) {
+    const strictRuntimeFieldContext =
+      isStaticSurfaceRegistry(file) || isRouteSource(file);
+    if (
+      strictRuntimeFieldContext &&
+      ts.isPropertyAssignment(node) &&
+      runtimeField(node.name)
+    ) {
       requireStatic(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
     }
-    if (ts.isPropertyAssignment(node) && runtimeContainerField(node.name)) {
+    if (
+      strictRuntimeFieldContext &&
+      ts.isPropertyAssignment(node) &&
+      runtimeContainerField(node.name)
+    ) {
       requireStaticRegistry(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
     }
