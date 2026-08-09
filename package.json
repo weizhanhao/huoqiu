@@ -10,7 +10,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint && eslint --config packages/config/eslint/base.mjs scripts/quality",
-    "test": "turbo run test && vitest run --config packages/config/vitest/base.ts scripts/quality/test",
+    "test": "turbo run test && vitest run --config packages/config/vitest/base.ts --no-file-parallelism scripts/quality/test",
     "typecheck": "turbo run typecheck && tsc --noEmit -p scripts/quality/tsconfig.json",
     "format:check": "prettier --check .",
     "qa:cap": "tsx scripts/quality/run-capability.mts",
