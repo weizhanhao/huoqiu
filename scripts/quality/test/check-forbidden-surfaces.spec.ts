@@ -1310,6 +1310,24 @@ describe("forbidden runtime surfaces", () => {
     expect(result.stderr).toContain(relativePath);
   });
 
+  it.each([
+    'import { z } from "zod"; function build(z: any) { return z.object({ deep_link: resolveRuntimeDeepLink() }); } void build;',
+    'import { z } from "zod"; function build() { const z = runtimeSchemaFactory; return z.object({ deep_link: resolveRuntimeDeepLink() }); } void build;',
+  ])(
+    "rejects a dynamic deep_link when a Zod import name is lexically shadowed %s",
+    async (source) => {
+      const root = await createRepository();
+      const relativePath = "apps/web/src/shadowed-schema.ts";
+      await writeCandidate(root, source, relativePath);
+
+      const result = await runScanner(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("RUNTIME_CANDIDATE_UNRESOLVED");
+      expect(result.stderr).toContain(relativePath);
+    },
+  );
+
   it("accepts an ordinary exported feed card schema", async () => {
     const root = await createRepository();
     await writeCandidate(root, JSON.stringify({ routes: ["/watchlist"] }));

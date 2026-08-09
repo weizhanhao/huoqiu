@@ -687,6 +687,60 @@ describe("workspace and supply-chain boundaries", () => {
     expect(result.stderr).toContain("DIRECT_DEPENDENCY_NOT_EXACT");
   });
 
+  it("rejects an npm alias targeting an existing workspace project", async () => {
+    const root = await createRepository();
+    const path = "packages/config/package.json";
+    const manifest = await readManifest(root, path);
+    (manifest.dependencies as Record<string, string>).webAlias =
+      "npm:@huoqiu/web@0.0.0";
+    await writeJson(root, path, manifest);
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("WORKSPACE_ALIAS_FORBIDDEN");
+  });
+
+  it("rejects an npm alias targeting an unknown reserved workspace name", async () => {
+    const root = await createRepository();
+    const path = "packages/config/package.json";
+    const manifest = await readManifest(root, path);
+    (manifest.dependencies as Record<string, string>).ghostAlias =
+      "npm:@huoqiu/ghost@1.0.0";
+    await writeJson(root, path, manifest);
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("UNKNOWN_WORKSPACE_DEPENDENCY");
+  });
+
+  it.each([
+    ["spikes", "auth/package.json"],
+    ["spikes/auth", "package.json"],
+  ])(
+    "rejects the required auth workspace through symlinked component %s",
+    async (workspacePath, outsideManifestPath) => {
+      const root = await createRepository();
+      const outsideRoot = await mkdtemp(
+        resolve(tmpdir(), "huoqiu-auth-spike-"),
+      );
+      temporaryRoots.push(outsideRoot);
+      await writeJson(
+        outsideRoot,
+        outsideManifestPath,
+        workspacePackage("@huoqiu/auth-spike", { typescript: "6.0.3" }),
+      );
+      await rm(resolve(root, workspacePath), { recursive: true });
+      await symlink(outsideRoot, resolve(root, workspacePath), "dir");
+
+      const result = await runChecker(root);
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("WORKSPACE_SYMLINK_FORBIDDEN");
+    },
+  );
+
   it.each([
     "git+ssh://git@example.invalid/repo.git#deadbeef",
     "git+https://example.invalid/repo.git#deadbeef",

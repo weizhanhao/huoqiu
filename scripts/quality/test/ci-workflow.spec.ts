@@ -78,7 +78,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lane: [format, lint, typecheck, test, build, boundaries]
+        lane: [format, lint, typecheck, test, build, boundaries, dependency-audit]
     steps:
       - name: Check out repository
         uses: actions/checkout@${CHECKOUT_SHA} # v7.0.1
@@ -108,6 +108,7 @@ jobs:
               ;;
             build) pnpm build ;;
             boundaries) pnpm qa:boundaries ;;
+            dependency-audit) pnpm qa:dependency-patch ;;
             *) exit 64 ;;
           esac
       - name: Upload unit-test log
@@ -228,7 +229,7 @@ afterEach(async () => {
 });
 
 describe("least-privilege CI workflow and artifact inventory", () => {
-  it("accepts the pinned six-lane workflow and exact inventory", async () => {
+  it("accepts the pinned seven-lane workflow and exact inventory", async () => {
     const root = await createRepository();
 
     expect(await runChecker(root)).toEqual({ code: 0, stderr: "" });
@@ -524,12 +525,40 @@ describe("least-privilege CI workflow and artifact inventory", () => {
     expect(result.stderr).toContain("CI_PREFLIGHT_INVALID");
   });
 
-  it("requires exactly six fixed lanes", async () => {
+  it("requires exactly seven fixed lanes", async () => {
     const root = await createRepository();
     await replaceWorkflow(
       root,
+      "lane: [format, lint, typecheck, test, build, boundaries, dependency-audit]",
+      "lane: [format, lint, typecheck, test, build, boundaries, dependency-audit, e2e]",
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("CI_MATRIX_INVALID");
+  });
+
+  it("requires the dependency audit lane", async () => {
+    const root = await createRepository();
+    await replaceWorkflow(
+      root,
+      "lane: [format, lint, typecheck, test, build, boundaries, dependency-audit]",
       "lane: [format, lint, typecheck, test, build, boundaries]",
-      "lane: [format, lint, typecheck, test, build, boundaries, e2e]",
+    );
+
+    const result = await runChecker(root);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("CI_MATRIX_INVALID");
+  });
+
+  it("requires the fixed dependency audit command", async () => {
+    const root = await createRepository();
+    await replaceWorkflow(
+      root,
+      "            dependency-audit) pnpm qa:dependency-patch ;;\n",
+      "            dependency-audit) pnpm qa:boundaries ;;\n",
     );
 
     const result = await runChecker(root);

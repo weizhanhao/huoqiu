@@ -74,18 +74,24 @@ const EXACT_ALIAS_PACKAGE_NAME =
 const FORBIDDEN_SOURCE =
   /^(?:bitbucket:|file:|git(?:\+[^:]+)?:|github:|gitlab:|https?:|link:)/i;
 
-const isExactExternalDependency = (version: string): boolean => {
-  if (EXACT_VERSION.test(version)) return true;
-  if (!version.startsWith("npm:")) return false;
+interface ExactExternalDependency {
+  aliasTarget?: string;
+}
+
+const parseExactExternalDependency = (
+  version: string,
+): ExactExternalDependency | undefined => {
+  if (EXACT_VERSION.test(version)) return {};
+  if (!version.startsWith("npm:")) return undefined;
   const aliasedTarget = version.slice("npm:".length);
   const versionSeparator = aliasedTarget.lastIndexOf("@");
-  if (versionSeparator <= 0) return false;
+  if (versionSeparator <= 0) return undefined;
   const packageName = aliasedTarget.slice(0, versionSeparator);
   const targetVersion = aliasedTarget.slice(versionSeparator + 1);
-  return (
-    EXACT_ALIAS_PACKAGE_NAME.test(packageName) &&
+  return EXACT_ALIAS_PACKAGE_NAME.test(packageName) &&
     EXACT_VERSION.test(targetVersion)
-  );
+    ? { aliasTarget: packageName }
+    : undefined;
 };
 
 interface InventoryAction {
@@ -343,16 +349,39 @@ const discoverWorkspaceProjects = async (
   }
   const authSpikeManifestPath = resolve(root, "spikes/auth/package.json");
   try {
-    const status = await lstat(authSpikeManifestPath);
-    if (status.isSymbolicLink())
+    for (const directoryPath of [
+      resolve(root, "spikes"),
+      resolve(root, "spikes/auth"),
+    ]) {
+      const status = await lstat(directoryPath);
+      if (status.isSymbolicLink())
+        fail(
+          "WORKSPACE_SYMLINK_FORBIDDEN",
+          repositoryPath(root, directoryPath),
+        );
+      if (!status.isDirectory())
+        fail(
+          "WORKSPACE_MANIFEST_UNREADABLE",
+          `${repositoryPath(root, directoryPath)} must be a directory`,
+        );
+    }
+    const manifestStatus = await lstat(authSpikeManifestPath);
+    if (manifestStatus.isSymbolicLink())
       fail(
         "WORKSPACE_SYMLINK_FORBIDDEN",
         repositoryPath(root, authSpikeManifestPath),
       );
-    if (!status.isFile())
+    if (!manifestStatus.isFile())
       fail(
         "WORKSPACE_MANIFEST_UNREADABLE",
         "spikes/auth/package.json must be a file",
+      );
+    const canonicalManifestPath = await realpath(authSpikeManifestPath);
+    repositoryPath(root, canonicalManifestPath);
+    if (canonicalManifestPath !== authSpikeManifestPath)
+      fail(
+        "WORKSPACE_SYMLINK_FORBIDDEN",
+        repositoryPath(root, authSpikeManifestPath),
       );
     projects.push(await parseManifest(root, authSpikeManifestPath, "package"));
   } catch (error) {
@@ -428,11 +457,25 @@ const validateDependencyGraph = (
         }
         continue;
       }
-      if (!isExactExternalDependency(version)) {
+      const exactDependency =
+        parseExactExternalDependency(version) ??
         fail(
           "DIRECT_DEPENDENCY_NOT_EXACT",
           `${project.manifestPath}: ${name}@${version}`,
         );
+      const aliasTarget = exactDependency.aliasTarget;
+      if (aliasTarget !== undefined) {
+        const aliasedWorkspace = byName.get(aliasTarget);
+        if (aliasedWorkspace !== undefined)
+          fail(
+            "WORKSPACE_ALIAS_FORBIDDEN",
+            `${project.manifestPath}: ${name} must not alias workspace project ${aliasedWorkspace.name}`,
+          );
+        if (aliasTarget.startsWith("@huoqiu/"))
+          fail(
+            "UNKNOWN_WORKSPACE_DEPENDENCY",
+            `${project.manifestPath}: alias target ${aliasTarget} is not a workspace project`,
+          );
       }
     }
   }

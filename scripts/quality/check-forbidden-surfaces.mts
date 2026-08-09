@@ -894,7 +894,9 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     );
   };
 
-  const isZodObjectShapeProperty = (node: ts.PropertyAssignment): boolean => {
+  const isTopLevelZodObjectShapeProperty = (
+    node: ts.PropertyAssignment,
+  ): boolean => {
     const shape = node.parent;
     if (!ts.isObjectLiteralExpression(shape)) return false;
     const call = shape.parent;
@@ -906,9 +908,20 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     )
       return false;
     const factory = unwrapExpression(call.expression.expression);
-    return (
-      ts.isIdentifier(factory) && zodObjectFactoryAliases.has(factory.text)
-    );
+    if (!ts.isIdentifier(factory) || !zodObjectFactoryAliases.has(factory.text))
+      return false;
+    let ancestor: ts.Node | undefined = call.parent;
+    while (ancestor !== undefined && !ts.isSourceFile(ancestor)) {
+      if (
+        ts.isBlock(ancestor) ||
+        ts.isModuleBlock(ancestor) ||
+        ts.isClassStaticBlockDeclaration(ancestor) ||
+        ts.isFunctionLike(ancestor)
+      )
+        return false;
+      ancestor = ancestor.parent;
+    }
+    return ancestor !== undefined;
   };
 
   const runtimeSemanticName = (value: string): boolean =>
@@ -1804,7 +1817,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       ts.isPropertyAssignment(node) &&
       runtimeField(node.name) &&
       staticPropertyName(node.name) !== "path" &&
-      !isZodObjectShapeProperty(node)
+      !isTopLevelZodObjectShapeProperty(node)
     ) {
       requireStatic(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
@@ -1812,7 +1825,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     if (
       ts.isPropertyAssignment(node) &&
       runtimeContainerField(node.name) &&
-      !isZodObjectShapeProperty(node)
+      !isTopLevelZodObjectShapeProperty(node)
     ) {
       requireStaticRegistry(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
