@@ -19,7 +19,12 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { watch as watchFiles, type FSWatcher, type Stats } from "node:fs";
+import {
+  realpathSync,
+  watch as watchFiles,
+  type FSWatcher,
+  type Stats,
+} from "node:fs";
 import { constants as fsConstants } from "node:fs";
 import { Session } from "node:inspector";
 import { arch, platform, tmpdir } from "node:os";
@@ -330,7 +335,15 @@ const isBareExecutable = (executable: string): boolean =>
   !executable.includes("/") && !executable.includes("\\");
 
 const normalizedExecutablePath = (executable: string): string =>
-  executable.replaceAll("\\", "/").toLowerCase();
+  executable.replaceAll("\\", "/");
+
+const PROTECTED_NODE_EXECUTABLE = realpathSync(process.execPath);
+
+const samePlatformPath = (left: string, right: string): boolean =>
+  process.platform === "win32"
+    ? normalizedExecutablePath(left).toLowerCase() ===
+      normalizedExecutablePath(right).toLowerCase()
+    : left === right;
 
 const isNodeEvalArgument = (argument: string): boolean =>
   argument === "-e" ||
@@ -349,11 +362,11 @@ const assertAllowedRunner = (
   const basename = executableBasename(executable);
   if (basename !== undefined && NODE_EXECUTABLES.has(basename)) {
     if (
-      !isBareExecutable(executable) &&
-      normalizedExecutablePath(executable) !==
-        normalizedExecutablePath(process.execPath)
+      isBareExecutable(executable) ||
+      !isAbsolute(executable) ||
+      !samePlatformPath(executable, PROTECTED_NODE_EXECUTABLE)
     ) {
-      fail(code, "path-qualified Node must equal the protected runtime");
+      fail(code, "Node must be the protected absolute runtime path");
     }
     if (args.some(isNodeEvalArgument))
       fail(code, "Node eval/print commands are forbidden");
@@ -390,6 +403,29 @@ const assertAllowedRunner = (
   )
     fail(code, "pnpm exec target is not in the protected runner allowlist");
   const targetArgs = args.slice(targetIndex + 1);
+  if (
+    targetArgs.some((argument) => {
+      const option = argument.split("=", 1)[0]?.toLowerCase();
+      return (
+        option === "codegen" ||
+        option === "-w" ||
+        option === "--watch" ||
+        option === "--watchall" ||
+        option === "--watch-all" ||
+        option === "--ui" ||
+        option === "--ui-host" ||
+        option === "--ui-port" ||
+        option === "--debug" ||
+        option === "--inspect" ||
+        option === "--inspect-brk" ||
+        option === "--inspect-wait" ||
+        option === "--headed" ||
+        option === "--show-report"
+      );
+    })
+  ) {
+    fail(code, "interactive or persistent runner modes are forbidden");
+  }
   if (targetBasename === "tsx") {
     const script = targetArgs[0];
     if (
@@ -1585,7 +1621,7 @@ const executeSpawn = async (
   });
 };
 
-export const executeCommand = async (
+export const executeCommandForTesting = async (
   root: string,
   command: RunCommand,
   options: ExecuteCommandOptions = {},
@@ -1597,6 +1633,20 @@ export const executeCommand = async (
     safeCommand.executable,
     safeCommand.args,
     options,
+  );
+};
+
+export const executeCommand = async (
+  root: string,
+  command: RunCommand,
+  options?: ExecuteCommandOptions,
+): Promise<SpawnResult> => {
+  void root;
+  void command;
+  void options;
+  return fail(
+    "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
+    "direct host execution cannot establish process ownership; use the protected capability launcher",
   );
 };
 
@@ -2326,6 +2376,12 @@ interface ProtectedExecutionLauncher {
   identity: ProtectedFileIdentity;
 }
 
+interface ProtectedPnpmRunner {
+  path: string;
+  sha256: string;
+  identity: ProtectedFileIdentity;
+}
+
 const PROTECTED_ISOLATION_PROFILE =
   "container-v1:no-network,read-only-source,owned-process-tree";
 
@@ -2377,6 +2433,52 @@ const protectedExecutionLauncher = async (
   };
 };
 
+const protectedPnpmRunner = async (
+  root: string,
+): Promise<ProtectedPnpmRunner> => {
+  const code = "PROTECTED_EXECUTION_LAUNCHER_REQUIRED";
+  const adjacentPnpm = resolve(
+    dirname(PROTECTED_NODE_EXECUTABLE),
+    process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+  );
+  const resolvedPnpm = await realpath(adjacentPnpm).catch(() =>
+    fail(code, "pnpm is not installed beside the protected Node runtime"),
+  );
+  const snapshot = await readProtectedFile(
+    resolvedPnpm,
+    root,
+    code,
+    "protected pnpm runner",
+    true,
+  );
+  return {
+    path: snapshot.path,
+    sha256: sha256(snapshot.bytes),
+    identity: snapshot.identity,
+  };
+};
+
+const protectedPnpmCommand = (
+  runner: ProtectedPnpmRunner,
+  args: readonly string[],
+): RunCommand => {
+  if (/\.(?:cjs|js|mjs)$/iu.test(runner.path)) {
+    return {
+      executable: PROTECTED_NODE_EXECUTABLE,
+      args: [runner.path, ...args],
+    };
+  }
+  return { executable: runner.path, args: [...args] };
+};
+
+const protectedExecutionCommand = (
+  command: RunCommand,
+  pnpm: ProtectedPnpmRunner,
+): RunCommand =>
+  PNPM_EXECUTABLES.has(executableBasename(command.executable) ?? "")
+    ? protectedPnpmCommand(pnpm, command.args)
+    : command;
+
 const executeWithProtectedLauncher = async (
   root: string,
   launcher: ProtectedExecutionLauncher,
@@ -2385,11 +2487,22 @@ const executeWithProtectedLauncher = async (
   options: ExecuteCommandOptions,
 ): Promise<SpawnResult> => {
   const safeCommand = validateCommand(command);
+  const pnpm = await protectedPnpmRunner(root);
+  const executionCommand = protectedExecutionCommand(safeCommand, pnpm);
+  const installCommand = install
+    ? protectedPnpmCommand(pnpm, [
+        "install",
+        "--offline",
+        "--frozen-lockfile",
+        "--strict-peer-dependencies",
+      ])
+    : null;
   const request = Buffer.from(
     canonicalJson({
-      schema_version: 1,
+      schema_version: 2,
       workspace: root,
-      install,
+      install_command: installCommand,
+      execution_command: executionCommand,
       command: safeCommand,
       isolation_profile: PROTECTED_ISOLATION_PROFILE,
     }),
@@ -2397,12 +2510,12 @@ const executeWithProtectedLauncher = async (
   ).toString("base64");
   const launcherCommand = {
     executable: launcher.path,
-    args: ["--huoqiu-request-v1", request],
+    args: ["--huoqiu-request-v2", request],
   };
   const launcherResult = await executeSpawn(
     root,
     launcherCommand,
-    process.execPath,
+    PROTECTED_NODE_EXECUTABLE,
     [
       "--input-type=module",
       "--eval",
@@ -2473,6 +2586,22 @@ const executeWithProtectedLauncher = async (
       "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
       "launcher filesystem identity changed during execution",
     );
+  const postPnpm = await readProtectedFile(
+    pnpm.path,
+    root,
+    "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
+    "protected pnpm runner",
+    true,
+  );
+  if (
+    !sameProtectedFileIdentity(pnpm.identity, postPnpm.identity) ||
+    sha256(postPnpm.bytes) !== pnpm.sha256
+  ) {
+    fail(
+      "PROTECTED_EXECUTION_LAUNCHER_REQUIRED",
+      "protected pnpm runner changed during execution",
+    );
+  }
   return result;
 };
 

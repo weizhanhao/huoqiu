@@ -36,6 +36,7 @@ import {
   computeCurrentContext,
   evidencePath,
   executeCommand,
+  executeCommandForTesting,
   hashRepositoryInputs,
   loadInputsForTesting,
   parseCapabilitySummary,
@@ -193,7 +194,7 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
       "import { spawn } from 'node:child_process';",
       "const marker = process.argv[1];",
       "const encoded = process.argv[2];",
-      "if (marker !== '--huoqiu-request-v1' || encoded === undefined) process.exit(90);",
+      "if (marker !== '--huoqiu-request-v2' || encoded === undefined) process.exit(90);",
       "const request = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));",
       "const environment = { PATH: process.env.PATH, LANG: 'C', LC_ALL: 'C', TZ: 'UTC', HUOQIU_PROCESS_TREE_TOKEN: process.env.HUOQIU_PROCESS_TREE_TOKEN };",
       "const run = (command) => new Promise((resolve, reject) => {",
@@ -205,12 +206,12 @@ const installEphemeralReviewTrust = async (root: string): Promise<void> => {
       "  child.once('error', reject);",
       "  child.once('close', (code, signal) => resolve({ code: code ?? -1, signal, stdout, stderr }));",
       "});",
-      "if (request.install === true) {",
-      "  const install = await run({ executable: 'pnpm', args: ['install', '--offline', '--frozen-lockfile', '--strict-peer-dependencies'] });",
+      "if (request.install_command !== null) {",
+      "  const install = await run(request.install_command);",
       "  if (install.code !== 0 || install.signal !== null) { process.stderr.write(install.stderr); process.exit(91); }",
       "}",
       "const startedAt = new Date().toISOString();",
-      "const result = await run(request.command);",
+      "const result = await run(request.execution_command);",
       "const finishedAt = new Date().toISOString();",
       "const report = { schema_version: 1, command: request.command, started_at: startedAt, finished_at: finishedAt, exit_code: result.code, signal: result.signal, stdout: result.stdout, stderr: result.stderr };",
       "process.stdout.write(`HUOQIU_PROTECTED_EXECUTION_RESULT ${Buffer.from(JSON.stringify(report), 'utf8').toString('base64')}\\n`);",
@@ -1221,6 +1222,28 @@ describe("deterministic context hashing", () => {
 });
 
 describe("argv-only capability execution", () => {
+  it("rejects a bare Node name instead of resolving it through caller PATH", () => {
+    expect(() =>
+      validateCommand({
+        executable: "node",
+        args: ["scripts/quality/check.mjs"],
+      }),
+    ).toThrow("COMMAND_INVALID");
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "compares path-qualified Node with Unix case sensitivity",
+    () => {
+      const impostor = `${process.execPath.slice(0, -1)}${process.execPath.at(-1) === "E" ? "e" : "E"}`;
+      expect(() =>
+        validateCommand({
+          executable: impostor,
+          args: ["scripts/quality/check.mjs"],
+        }),
+      ).toThrow("COMMAND_INVALID");
+    },
+  );
+
   it.each([
     ["/bin/sh", ["dash", "ksh"]],
     ["/usr/bin/bash", ["csh", "tcsh"]],
@@ -1272,6 +1295,22 @@ describe("argv-only capability execution", () => {
     expect(() => validateCommand(command)).toThrow("COMMAND_INVALID");
   });
 
+  it.each([
+    ["vitest", ["run", "quality.spec.ts", "--watch"]],
+    ["vitest", ["run", "--ui=true", "quality.spec.ts"]],
+    ["vitest", ["run", "quality.spec.ts", "--", "--inspect-brk"]],
+    ["playwright", ["test", "quality.spec.ts", "--ui"]],
+    ["playwright", ["test", "--debug", "quality.spec.ts"]],
+    ["playwright", ["test", "quality.spec.ts", "codegen"]],
+  ])("rejects interactive %s arguments at every depth", (target, args) => {
+    expect(() =>
+      validateCommand({
+        executable: "pnpm",
+        args: ["exec", target, ...args],
+      }),
+    ).toThrow("COMMAND_INVALID");
+  });
+
   it("passes metacharacters as a literal argv value and never invokes a shell", async () => {
     expect(
       validateCommand({
@@ -1297,7 +1336,7 @@ describe("argv-only capability execution", () => {
     const injected = `;require('node:fs').writeFileSync(${JSON.stringify(marker)},'bad')`;
     const program = resolve(root, "print-argument.mjs");
     await writeFile(program, "console.log(process.argv[2]);\n", "utf8");
-    const result = await executeCommand(root, {
+    const result = await executeCommandForTesting(root, {
       executable: process.execPath,
       args: [program, injected],
     });
@@ -1314,7 +1353,7 @@ describe("argv-only capability execution", () => {
       "console.log(process.env.HUOQIU_SECRET_SENTINEL);\n",
       "utf8",
     );
-    const result = await executeCommand(
+    const result = await executeCommandForTesting(
       root,
       {
         executable: process.execPath,
@@ -1351,7 +1390,7 @@ describe("argv-only capability execution", () => {
       ].join("\n"),
       "utf8",
     );
-    const result = await executeCommand(root, {
+    const result = await executeCommandForTesting(root, {
       executable: process.execPath,
       args: [parentPath],
     });
@@ -1392,7 +1431,7 @@ describe("argv-only capability execution", () => {
       ].join("\n"),
       "utf8",
     );
-    const result = await executeCommand(root, {
+    const result = await executeCommandForTesting(root, {
       executable: process.execPath,
       args: [parentPath],
     });
@@ -1403,46 +1442,55 @@ describe("argv-only capability execution", () => {
     await expect(readFile(marker)).rejects.toThrow();
   });
 
-  it("kills a detached double-fork even after the command deletes its ownership token", async () => {
+  it("fails closed before a tokenless detached process can leave the workspace", async () => {
     const root = await mkdtemp(resolve(tmpdir(), "huoqiu-tokenless-fork-"));
-    temporaryRoots.push(root);
-    const marker = resolve(root, "tokenless-double-fork-marker");
-    const grandchildPath = resolve(root, "tokenless-grandchild.cjs");
-    const middlePath = resolve(root, "tokenless-middle.cjs");
+    const escapeRoot = await mkdtemp(
+      resolve(tmpdir(), "huoqiu-escape-target-"),
+    );
+    temporaryRoots.push(root, escapeRoot);
+    const marker = resolve(escapeRoot, "tokenless-double-fork-marker");
+    const pidPath = resolve(escapeRoot, "tokenless-double-fork-pid");
     const parentPath = resolve(root, "tokenless-parent.cjs");
-    await writeFile(
-      grandchildPath,
-      `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'escaped'), 500);\n`,
-      "utf8",
-    );
-    await writeFile(
-      middlePath,
-      [
-        "const { spawn } = require('node:child_process');",
-        `spawn(process.execPath, [${JSON.stringify(grandchildPath)}], { detached: true, stdio: 'ignore' }).unref();`,
-        "",
-      ].join("\n"),
-      "utf8",
-    );
+    const escapedSource = [
+      "const { writeFileSync } = require('node:fs');",
+      `writeFileSync(${JSON.stringify(pidPath)}, String(process.pid));`,
+      `setTimeout(() => writeFileSync(${JSON.stringify(marker)}, 'escaped'), 600);`,
+      "setInterval(() => {}, 1000);",
+      "",
+    ].join("\n");
     await writeFile(
       parentPath,
       [
         "const { spawn } = require('node:child_process');",
         "delete process.env.HUOQIU_PROCESS_TREE_TOKEN;",
-        `spawn(process.execPath, [${JSON.stringify(middlePath)}], { detached: true, stdio: 'ignore' }).unref();`,
+        `spawn(process.execPath, ['-e', ${JSON.stringify(escapedSource)}], { cwd: ${JSON.stringify(tmpdir())}, detached: true, stdio: 'ignore', env: { PATH: process.env.PATH } }).unref();`,
         "",
       ].join("\n"),
       "utf8",
     );
-    const result = await executeCommand(root, {
-      executable: process.execPath,
-      args: [parentPath],
-    });
-    expect(result.exit_code).toBe(0);
-    await new Promise<void>((resolvePromise) =>
-      setTimeout(resolvePromise, 800),
-    );
-    await expect(readFile(marker)).rejects.toThrow();
+    let escapedPid: number | undefined;
+    try {
+      await expect(
+        executeCommand(root, {
+          executable: process.execPath,
+          args: [parentPath],
+        }),
+      ).rejects.toThrow("PROTECTED_EXECUTION_LAUNCHER_REQUIRED");
+      await new Promise<void>((resolvePromise) =>
+        setTimeout(resolvePromise, 800),
+      );
+      await expect(readFile(pidPath)).rejects.toThrow();
+      await expect(readFile(marker)).rejects.toThrow();
+    } finally {
+      escapedPid = Number(await readFile(pidPath, "utf8").catch(() => ""));
+      if (Number.isSafeInteger(escapedPid) && escapedPid > 0) {
+        try {
+          process.kill(escapedPid, "SIGKILL");
+        } catch {
+          // The escaped process may already have exited.
+        }
+      }
+    }
   });
 
   it("terminates a hung process at the configured timeout", async () => {
@@ -1451,7 +1499,7 @@ describe("argv-only capability execution", () => {
     const program = resolve(root, "hang.mjs");
     await writeFile(program, "setInterval(() => {}, 1000);\n", "utf8");
     await expect(
-      executeCommand(
+      executeCommandForTesting(
         root,
         {
           executable: process.execPath,
@@ -1468,7 +1516,7 @@ describe("argv-only capability execution", () => {
     const program = resolve(root, "large-output.mjs");
     await writeFile(program, "console.log('x'.repeat(10000));\n", "utf8");
     await expect(
-      executeCommand(
+      executeCommandForTesting(
         root,
         {
           executable: process.execPath,
@@ -1650,6 +1698,66 @@ describe("strict CLI normalization", () => {
 });
 
 describe("current evidence and independent review binding", () => {
+  it.skipIf(process.platform === "win32")(
+    "never resolves a pnpm capability runner through caller PATH",
+    async () => {
+      const root = await setupRepository();
+      const manifestPath = resolve(root, "quality/manifests/d0-required.json");
+      const manifest = await json(manifestPath);
+      const first = (manifest.required_caps as Record<string, unknown>[])[0];
+      if (first === undefined) throw new Error("missing test capability");
+      first.command = {
+        executable: "pnpm",
+        args: ["exec", "tsx", "scripts/quality/test-capability.mjs", "d0.v1"],
+      };
+      await writeJson(manifestPath, manifest);
+      await execFile("git", ["add", "quality/manifests/d0-required.json"], {
+        cwd: root,
+      });
+      await execFile("git", ["commit", "-q", "-m", "pnpm runner probe"], {
+        cwd: root,
+      });
+
+      const hostileBin = await mkdtemp(
+        resolve(tmpdir(), "huoqiu-hostile-pnpm-"),
+      );
+      temporaryRoots.push(hostileBin);
+      const marker = resolve(hostileBin, "fake-pnpm-executed");
+      const fakePnpm = resolve(hostileBin, "pnpm");
+      const summary = `HUOQIU_CAPABILITY_RESULT ${JSON.stringify({
+        fixture_version: "d0.v1",
+        passed: 7,
+        failed: 0,
+        skipped: 0,
+        invalid_test_markers: [],
+        p0: 0,
+        p1: 0,
+      })}`;
+      await writeFile(
+        fakePnpm,
+        [
+          "#!/bin/sh",
+          `printf escaped > ${JSON.stringify(marker)}`,
+          `printf '%s\\n' ${JSON.stringify(summary)}`,
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+      await chmod(fakePnpm, 0o700);
+      const originalPath = process.env.PATH;
+      process.env.PATH = `${hostileBin}:${originalPath ?? ""}`;
+      try {
+        await expect(
+          runTrustedCapability(root, "d0", "CAP-ID-001"),
+        ).rejects.toThrow("CAPABILITY_COMMAND_FAILED");
+        await expect(readFile(marker)).rejects.toThrow();
+      } finally {
+        if (originalPath === undefined) delete process.env.PATH;
+        else process.env.PATH = originalPath;
+      }
+    },
+  );
+
   it.skipIf(process.platform === "win32")(
     "verifies protected trust before any PATH-resolved Git can execute",
     async () => {
@@ -2914,7 +3022,7 @@ describe("milestone results and explicit not-ready behavior", () => {
   });
 
   it("registered future qa modules fail explicitly instead of module resolution errors", async () => {
-    const result = await executeCommand(sourceRoot, {
+    const result = await executeCommandForTesting(sourceRoot, {
       executable: "pnpm",
       args: ["exec", "tsx", "scripts/quality/auth-spike-gate.mts"],
     });
