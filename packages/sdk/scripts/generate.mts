@@ -289,17 +289,20 @@ const parseCommand = (args: readonly string[]): GenerateCommand => {
 };
 
 const main = async (): Promise<void> => {
-  const command = parseCommand(process.argv.slice(2));
-  if (command.kind === "output") {
-    await writeArtifacts(command.outputDirectory, await createArtifacts());
+  const generationMode = parseCommand(process.argv.slice(2));
+  if (generationMode.kind === "output") {
+    await writeArtifacts(
+      generationMode.outputDirectory,
+      await createArtifacts(),
+    );
     process.stdout.write("SDK_GENERATION_OUTPUT PASS\n");
     return;
   }
 
-  if (command.kind === "install") {
+  if (generationMode.kind === "install") {
     const expected = await createArtifacts();
     assertArtifactsMatch(
-      await readArtifacts(command.sourceDirectory),
+      await readArtifacts(generationMode.sourceDirectory),
       expected,
       "SDK candidate",
     );
