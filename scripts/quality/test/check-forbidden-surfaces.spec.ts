@@ -1294,6 +1294,19 @@ describe("forbidden runtime surfaces", () => {
     },
   );
 
+  it.each([
+    'import { z } from "zod"; const safeDeepLinkSchema = z.string(); const cardSchema = <CardType extends string>(cardType: CardType) => z.object({ card_type: z.literal(cardType), deep_link: safeDeepLinkSchema }).strict(); void cardSchema;',
+    'import { z as schema } from "zod"; const safeDeepLinkSchema = schema.string(); function outer() { function build() { return schema.strictObject({ deep_link: safeDeepLinkSchema }); } return build; } void outer;',
+  ])(
+    "accepts a Zod object field inside an unshadowed nested factory %s",
+    async (source) => {
+      const root = await createRepository();
+      await writeCandidate(root, source, "packages/contracts/src/nested.ts");
+
+      expect(await runScanner(root)).toMatchObject({ code: 0, stderr: "" });
+    },
+  );
+
   it("still rejects a dynamic deep_link on an ordinary runtime object", async () => {
     const root = await createRepository();
     const relativePath = "apps/web/src/notification.ts";
@@ -1313,6 +1326,7 @@ describe("forbidden runtime surfaces", () => {
   it.each([
     'import { z } from "zod"; function build(z: any) { return z.object({ deep_link: resolveRuntimeDeepLink() }); } void build;',
     'import { z } from "zod"; function build() { const z = runtimeSchemaFactory; return z.object({ deep_link: resolveRuntimeDeepLink() }); } void build;',
+    'import { z } from "zod"; const z = runtimeSchemaFactory; z.object({ deep_link: resolveRuntimeDeepLink() });',
   ])(
     "rejects a dynamic deep_link when a Zod import name is lexically shadowed %s",
     async (source) => {

@@ -593,7 +593,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
   const topLevelFunctions = new Map<string, ts.FunctionDeclaration>();
   const nestRouteDecoratorAliases = new Set<string>();
   const nestNamespaces = new Set<string>();
-  const zodObjectFactoryAliases = new Set<string>();
+  const zodObjectFactoryImports = new Map<string, ts.Identifier>();
   const surfaces = new Set<string>();
   const evaluating = new Set<string>();
 
@@ -702,15 +702,15 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     ) {
       const importClause = statement.importClause;
       if (importClause?.name !== undefined)
-        zodObjectFactoryAliases.add(importClause.name.text);
+        zodObjectFactoryImports.set(importClause.name.text, importClause.name);
       const bindings = importClause?.namedBindings;
       if (bindings !== undefined && ts.isNamespaceImport(bindings))
-        zodObjectFactoryAliases.add(bindings.name.text);
+        zodObjectFactoryImports.set(bindings.name.text, bindings.name);
       else if (bindings !== undefined)
         for (const element of bindings.elements) {
           if (element.isTypeOnly) continue;
           if ((element.propertyName ?? element.name).text === "z")
-            zodObjectFactoryAliases.add(element.name.text);
+            zodObjectFactoryImports.set(element.name.text, element.name);
         }
     }
     if (
@@ -894,9 +894,35 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     );
   };
 
-  const isTopLevelZodObjectShapeProperty = (
-    node: ts.PropertyAssignment,
-  ): boolean => {
+  let lexicalBindingChecker: ts.TypeChecker | undefined;
+  const getLexicalBindingChecker = (): ts.TypeChecker => {
+    if (lexicalBindingChecker !== undefined) return lexicalBindingChecker;
+    const options: ts.CompilerOptions = {
+      module: ts.ModuleKind.ESNext,
+      noLib: true,
+      noResolve: true,
+      target: ts.ScriptTarget.ES2023,
+    };
+    const host: ts.CompilerHost = {
+      fileExists: (candidate) => candidate === sourceFile.fileName,
+      getCanonicalFileName: (candidate) => candidate,
+      getCurrentDirectory: () => "",
+      getDefaultLibFileName: () => "lib.d.ts",
+      getNewLine: () => "\n",
+      getSourceFile: (candidate) =>
+        candidate === sourceFile.fileName ? sourceFile : undefined,
+      readFile: (candidate) =>
+        candidate === sourceFile.fileName ? content : undefined,
+      useCaseSensitiveFileNames: () => true,
+      writeFile: () => undefined,
+    };
+    lexicalBindingChecker = ts
+      .createProgram([sourceFile.fileName], options, host)
+      .getTypeChecker();
+    return lexicalBindingChecker;
+  };
+
+  const isZodObjectShapeProperty = (node: ts.PropertyAssignment): boolean => {
     const shape = node.parent;
     if (!ts.isObjectLiteralExpression(shape)) return false;
     const call = shape.parent;
@@ -908,20 +934,17 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     )
       return false;
     const factory = unwrapExpression(call.expression.expression);
-    if (!ts.isIdentifier(factory) || !zodObjectFactoryAliases.has(factory.text))
-      return false;
-    let ancestor: ts.Node | undefined = call.parent;
-    while (ancestor !== undefined && !ts.isSourceFile(ancestor)) {
-      if (
-        ts.isBlock(ancestor) ||
-        ts.isModuleBlock(ancestor) ||
-        ts.isClassStaticBlockDeclaration(ancestor) ||
-        ts.isFunctionLike(ancestor)
-      )
-        return false;
-      ancestor = ancestor.parent;
-    }
-    return ancestor !== undefined;
+    if (!ts.isIdentifier(factory)) return false;
+    const importedFactory = zodObjectFactoryImports.get(factory.text);
+    if (importedFactory === undefined) return false;
+    const checker = getLexicalBindingChecker();
+    const importedSymbol = checker.getSymbolAtLocation(importedFactory);
+    return (
+      importedSymbol !== undefined &&
+      importedSymbol.declarations?.length === 1 &&
+      importedSymbol.declarations[0] === importedFactory.parent &&
+      checker.getSymbolAtLocation(factory) === importedSymbol
+    );
   };
 
   const runtimeSemanticName = (value: string): boolean =>
@@ -1817,7 +1840,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
       ts.isPropertyAssignment(node) &&
       runtimeField(node.name) &&
       staticPropertyName(node.name) !== "path" &&
-      !isTopLevelZodObjectShapeProperty(node)
+      !isZodObjectShapeProperty(node)
     ) {
       requireStatic(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
@@ -1825,7 +1848,7 @@ const sourceSurfaces = (file: string, content: string): string[] => {
     if (
       ts.isPropertyAssignment(node) &&
       runtimeContainerField(node.name) &&
-      !isTopLevelZodObjectShapeProperty(node)
+      !isZodObjectShapeProperty(node)
     ) {
       requireStaticRegistry(node.initializer, node.name.getText(sourceFile));
       collectExpressionSurfaces(node.initializer);
