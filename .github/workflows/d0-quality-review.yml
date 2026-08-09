@@ -21,8 +21,11 @@ concurrency:
 
 jobs:
   capability-evidence:
-    runs-on: [self-hosted, linux, x64, huoqiu-quality]
-    timeout-minutes: 45
+    # One protected macOS host runs the Web golden path, iOS Simulator, and an
+    # Android emulator so CAP-WATCH-001 cannot be assembled from unit-only or
+    # single-platform evidence.
+    runs-on: [self-hosted, macOS, ARM64, huoqiu-quality-macos]
+    timeout-minutes: 90
     environment: quality-capability
     env:
       HUOQIU_PROTECTED_VERIFIER_CLI: ${{ vars.HUOQIU_PROTECTED_VERIFIER_CLI }}

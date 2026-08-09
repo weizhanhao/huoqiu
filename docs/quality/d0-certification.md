@@ -13,11 +13,15 @@ candidate checkout before `.github/workflows/d0-quality-review.yml` can pass:
    verified implementer's canonical `github:<numeric-id>`. Do not infer an ID
    from a login, display name, commit email, or local Git configuration.
 2. Install the pinned verifier distribution and execution launcher on a
-   dedicated self-hosted runner labelled `huoqiu-quality`. Register their exact
+   dedicated Apple Silicon self-hosted runner labelled
+   `huoqiu-quality-macos`. Register their exact
    digests, paths, repository ID, root public key, registry epoch, and isolation
    profile as protected environment variables. The runner must provide the
    no-network, read-only-source, complete-process-tree boundary described in
    `docs/engineering/quality-trust-model.md`; there is no local fallback.
+   It must also provide the root-owned mobile toolchain registry documented by
+   `scripts/quality/mobile-d0-evidence.mts`, a bootable iOS Simulator, a
+   connected Android emulator, and the pinned browser required by Playwright.
 3. Create two different Ed25519 key pairs outside the repository: one for the
    authorship attestor and one for the independent reviewer. Register only the
    public keys and exact GitHub Actions provenance in the root-signed
@@ -46,6 +50,10 @@ only when the candidate SHA is also the SHA containing the workflow bytes that
 GitHub executed. It then performs three separate jobs:
 
 1. the protected verifier generates all five D0 capability evidence records;
+   each UI capability covers both Web and App component suites, while
+   `CAP-WATCH-001` additionally runs
+   `tests/e2e/playwright/d0/golden.spec.ts` and the real native commands
+   `e2e:mobile:d0:ios` plus `e2e:mobile:d0:android`;
 2. the protected authorship principal signs the exact external identity archive
    and candidate context;
 3. the independent reviewer materializes its checklist, signs the complete
@@ -54,6 +62,10 @@ GitHub executed. It then performs three separate jobs:
 Signing secrets are scoped only to their signing steps. Candidate commands are
 run by the external verifier and launcher, not by repository-local TypeScript
 under a private signing key. Every Action is pinned to an immutable commit.
+The verifier must reject any activated D0 manifest whose command is not the
+canonical `scripts/quality/d0-capability-gate.mts --cap <CAP-ID>` command; merely
+replacing an implementer placeholder can never remove the cross-platform
+release evidence.
 
 The committed v2 registry is intentionally unsigned with no authorized keys,
 and the D0 manifests still contain explicit pending sentinels. Therefore the

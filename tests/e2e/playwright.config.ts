@@ -5,6 +5,8 @@ const evidenceDirectory = resolve(
   process.cwd(),
   "artifacts/evidence/playwright/d0",
 );
+const usesExternallyManagedServer =
+  process.env.HUOQIU_D0_WEB_SERVER_EXTERNAL === "1";
 
 export default defineConfig({
   testDir: "./playwright",
@@ -28,7 +30,9 @@ export default defineConfig({
     navigationTimeout: 10_000,
     screenshot: "on",
     trace: "on",
-    video: "on",
+    // The protected D0 runner is deliberately independent of Playwright's
+    // user-cache ffmpeg download. Screenshots and traces remain mandatory.
+    video: usesExternallyManagedServer ? "off" : "on",
   },
   projects: [
     {
@@ -39,11 +43,13 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command:
-      "pnpm --filter @huoqiu/web build && pnpm --filter @huoqiu/web start --hostname 127.0.0.1 --port 3310",
-    url: "http://127.0.0.1:3310",
-    reuseExistingServer: process.env.CI !== "true",
-    timeout: 120_000,
-  },
+  webServer: usesExternallyManagedServer
+    ? undefined
+    : {
+        command:
+          "pnpm --filter @huoqiu/web build && pnpm --filter @huoqiu/web start --hostname 127.0.0.1 --port 3310",
+        url: "http://127.0.0.1:3310",
+        reuseExistingServer: process.env.CI !== "true",
+        timeout: 120_000,
+      },
 });

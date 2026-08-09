@@ -3,7 +3,10 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { executeCommand, parseCapabilitySummary } from "../gate-core.mts";
+import {
+  executeCommandForTesting,
+  parseCapabilitySummary,
+} from "../gate-core.mts";
 
 const sourceRoot = resolve(import.meta.dirname, "..", "..", "..");
 
@@ -46,24 +49,28 @@ describe("D0 capability certification commands", () => {
     );
 
     expect(workflow).toContain("environment: quality-review");
+    expect(workflow).toContain("huoqiu-quality-macos");
     expect(workflow).toContain("secrets.HUOQIU_REVIEW_PRIVATE_KEY_B64");
     expect(workflow).toContain("secrets.HUOQIU_REVIEW_CHECKLIST_B64");
-    expect(workflow).toContain("pnpm gate:d0");
+    expect(workflow).toContain('"$HUOQIU_PROTECTED_VERIFIER_CLI" gate');
     expect(workflow).not.toMatch(/BEGIN (?:OPENSSH|PRIVATE) KEY/u);
     expect(guide).toContain("github:<numeric-id>");
     expect(guide).toContain("Ed25519");
     expect(guide).toContain("fail closed");
+    expect(guide).toContain("tests/e2e/playwright/d0/golden.spec.ts");
+    expect(guide).toContain("e2e:mobile:d0:ios");
+    expect(guide).toContain("e2e:mobile:d0:android");
   });
 
-  it("runs a real watchlist capability and emits one normalized passing result", async () => {
-    const execution = await executeCommand(sourceRoot, {
+  it("runs one real Web and App feed capability and emits one normalized passing result", async () => {
+    const execution = await executeCommandForTesting(sourceRoot, {
       executable: "pnpm",
       args: [
         "exec",
         "tsx",
         "scripts/quality/d0-capability-gate.mts",
         "--cap",
-        "CAP-WATCH-001",
+        "CAP-FEED-001",
       ],
     });
 
@@ -74,7 +81,7 @@ describe("D0 capability certification commands", () => {
       invalid_test_markers: [],
       p0: 0,
       p1: 0,
-      passed: 3,
+      passed: 5,
       skipped: 0,
     });
   });
