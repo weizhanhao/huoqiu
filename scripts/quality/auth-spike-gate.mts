@@ -49,8 +49,107 @@ interface AuditProcessFailure {
   stdout?: string | undefined;
 }
 
+interface VitestJsonReport {
+  numFailedTests: number;
+  numPassedTests: number;
+  numPendingTests: number;
+  numTodoTests: number;
+  numTotalTests: number;
+  success: boolean;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isNonNegativeSafeInteger = (value: unknown): value is number =>
+  Number.isSafeInteger(value) && (value as number) >= 0;
+
+export const assertNodeRuntime = (
+  runtime: string,
+  declaredEngine: unknown,
+  declaredNvmVersion: string,
+): void => {
+  if (
+    declaredEngine !== ">=24.15.0 <25" ||
+    declaredNvmVersion.trim() !== "24.15.0"
+  ) {
+    throw new QualityGateError(
+      "AUTH_NODE_DECLARATION_MISMATCH",
+      "package.json engines.node and .nvmrc must declare >=24.15.0 <25 and 24.15.0",
+    );
+  }
+  const match = /^v?(\d+)\.(\d+)\.(\d+)$/u.exec(runtime);
+  if (match === null) {
+    throw new QualityGateError(
+      "AUTH_NODE_RUNTIME_UNSUPPORTED",
+      `${runtime}; required >=24.15.0 <25`,
+    );
+  }
+  const [, rawMajor, rawMinor] = match;
+  const major = Number(rawMajor);
+  const minor = Number(rawMinor);
+  if (major !== 24 || minor < 15) {
+    throw new QualityGateError(
+      "AUTH_NODE_RUNTIME_UNSUPPORTED",
+      `${runtime}; required >=24.15.0 <25`,
+    );
+  }
+};
+
+export const assertPassingVitestReport = (
+  stdout: string,
+  scope: "root" | "mobile",
+): void => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    throw new QualityGateError(
+      "AUTH_VITEST_REPORT_INVALID",
+      `${scope} Vitest did not emit one JSON report`,
+    );
+  }
+  if (!isRecord(parsed)) {
+    throw new QualityGateError(
+      "AUTH_VITEST_REPORT_INVALID",
+      `${scope} Vitest report must be an object`,
+    );
+  }
+  for (const field of [
+    "numFailedTests",
+    "numPassedTests",
+    "numPendingTests",
+    "numTodoTests",
+    "numTotalTests",
+  ] as const) {
+    if (!isNonNegativeSafeInteger(parsed[field])) {
+      throw new QualityGateError(
+        "AUTH_VITEST_REPORT_INVALID",
+        `${scope} Vitest ${field} must be a non-negative safe integer`,
+      );
+    }
+  }
+  if (typeof parsed.success !== "boolean") {
+    throw new QualityGateError(
+      "AUTH_VITEST_REPORT_INVALID",
+      `${scope} Vitest success must be boolean`,
+    );
+  }
+  const report = parsed as unknown as VitestJsonReport;
+  if (
+    !report.success ||
+    report.numTotalTests === 0 ||
+    report.numPassedTests !== report.numTotalTests ||
+    report.numFailedTests !== 0 ||
+    report.numPendingTests !== 0 ||
+    report.numTodoTests !== 0
+  ) {
+    throw new QualityGateError(
+      "AUTH_TESTS_NOT_ALL_PASSED",
+      `${scope} total=${report.numTotalTests} passed=${report.numPassedTests} failed=${report.numFailedTests} pending=${report.numPendingTests} todo=${report.numTodoTests}`,
+    );
+  }
+};
 
 export const assertSelectedProvider = (provider: string): void => {
   if (provider !== selectedProvider) {
@@ -100,17 +199,33 @@ export const rootHighOrCriticalAdvisories = (report: unknown): string[] => {
     if (advisory.severity !== "high" && advisory.severity !== "critical") {
       continue;
     }
-    if (!Array.isArray(advisory.findings)) continue;
-    const reachesRoot = advisory.findings.some((findingValue) => {
-      if (!isRecord(findingValue)) return false;
-      const finding = findingValue as AuditFinding;
-      return (
-        Array.isArray(finding.paths) &&
-        finding.paths.some(
-          (path) => typeof path === "string" && path.startsWith(".>"),
-        )
+    if (!Array.isArray(advisory.findings) || advisory.findings.length === 0) {
+      throw new QualityGateError(
+        "AUTH_AUDIT_INVALID",
+        "High/Critical advisory findings must be a non-empty array",
       );
-    });
+    }
+    let reachesRoot = false;
+    for (const findingValue of advisory.findings) {
+      if (!isRecord(findingValue)) {
+        throw new QualityGateError(
+          "AUTH_AUDIT_INVALID",
+          "High/Critical advisory finding must be an object",
+        );
+      }
+      const finding = findingValue as AuditFinding;
+      if (
+        !Array.isArray(finding.paths) ||
+        finding.paths.length === 0 ||
+        finding.paths.some((path) => typeof path !== "string")
+      ) {
+        throw new QualityGateError(
+          "AUTH_AUDIT_INVALID",
+          "High/Critical advisory paths must be a non-empty string array",
+        );
+      }
+      reachesRoot ||= finding.paths.some((path) => path.startsWith(".>"));
+    }
     if (!reachesRoot) continue;
     const id =
       typeof advisory.github_advisory_id === "string"
@@ -167,6 +282,17 @@ const assertDeclaredVersions = async (): Promise<void> => {
       );
     }
   }
+};
+
+const assertConfiguredNodeRuntime = async (): Promise<void> => {
+  const rootPackage = await readJson(resolve(repositoryRoot, "package.json"));
+  const engines = rootPackage.engines;
+  const nvmVersion = await readFile(resolve(repositoryRoot, ".nvmrc"), "utf8");
+  assertNodeRuntime(
+    process.version,
+    isRecord(engines) ? engines.node : undefined,
+    nvmVersion,
+  );
 };
 
 const installedPackageMetadata = async (
@@ -290,16 +416,18 @@ const verifyRootConformance = async (): Promise<void> => {
     "AUTH_ROOT_TYPECHECK_FAILED",
   );
   const vitestCli = resolve(repositoryRoot, "node_modules/vitest/vitest.mjs");
-  await runCommand(
+  const report = await runCommand(
     process.execPath,
     [
       vitestCli,
       "run",
       "spikes/auth/test/auth-provider.conformance.spec.ts",
       "--no-file-parallelism",
+      "--reporter=json",
     ],
     "AUTH_ROOT_CONFORMANCE_FAILED",
   );
+  assertPassingVitestReport(report, "root");
 };
 
 const verifyMobileEvidence = async (): Promise<void> => {
@@ -316,7 +444,7 @@ const verifyMobileEvidence = async (): Promise<void> => {
     );
   }
   const pnpm = pnpmCommand();
-  await runCommand(
+  const report = await runCommand(
     pnpm.command,
     [
       ...pnpm.prefix,
@@ -327,12 +455,15 @@ const verifyMobileEvidence = async (): Promise<void> => {
       "run",
       "tests/auth/secure-session-spike.spec.ts",
       "--no-file-parallelism",
+      "--reporter=json",
     ],
     "AUTH_MOBILE_CONFORMANCE_FAILED",
   );
+  assertPassingVitestReport(report, "mobile");
 };
 
 export const main = async (args = process.argv.slice(2)): Promise<void> => {
+  await assertConfiguredNodeRuntime();
   const flags = parseStrictFlags(args, new Set(["--provider"]));
   const provider = requiredFlag(flags, "--provider");
   assertSelectedProvider(provider);

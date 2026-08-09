@@ -112,16 +112,19 @@ describe("Better Auth M1 conformance", () => {
     await register(probe);
 
     const signedIn = await login(probe);
-    const cookie = setCookieValues(signedIn).find((value) =>
+    const sessionCookies = setCookieValues(signedIn).filter((value) =>
       value.includes("huoqiu.session_token="),
     );
 
-    expect(cookie).toBeDefined();
-    expect(cookie).toMatch(/^__Secure-huoqiu\.session_token=/);
-    expect(cookie).toMatch(/; HttpOnly(?:;|$)/i);
-    expect(cookie).toMatch(/; Secure(?:;|$)/i);
-    expect(cookie).toMatch(/; SameSite=Lax(?:;|$)/i);
-    expect(cookie).not.toMatch(/Domain=/i);
+    expect(sessionCookies.length).toBeGreaterThan(0);
+    for (const cookie of sessionCookies) {
+      expect(cookie).toMatch(/^__Secure-huoqiu\.session_token=/);
+      expect(cookie).toMatch(/; Path=\/(?:;|$)/i);
+      expect(cookie).toMatch(/; HttpOnly(?:;|$)/i);
+      expect(cookie).toMatch(/; Secure(?:;|$)/i);
+      expect(cookie).toMatch(/; SameSite=Lax(?:;|$)/i);
+      expect(cookie).not.toMatch(/Domain=/i);
+    }
   });
 
   it("accepts the issued signed session token as a Bearer credential", async () => {
@@ -140,12 +143,37 @@ describe("Better Auth M1 conformance", () => {
     expect(session.json()).toMatchObject({ user: { email } });
   });
 
+  it("rejects tampered signed and unsigned Bearer credentials", async () => {
+    const probe = await createProbe();
+    await register(probe);
+
+    const signedIn = await login(probe);
+    const token = bearerToken(signedIn);
+    const separator = token.lastIndexOf(".");
+    expect(separator).toBeGreaterThan(0);
+    const signatureStart = separator + 1;
+    const replacement = token[signatureStart] === "a" ? "b" : "a";
+    const tampered = `${token.slice(0, signatureStart)}${replacement}${token.slice(signatureStart + 1)}`;
+    const unsigned = token.slice(0, separator);
+
+    for (const credential of [tampered, unsigned]) {
+      const session = await probe.inject({
+        method: "GET",
+        path: "/api/auth/get-session",
+        headers: { ...baseHeaders, authorization: `Bearer ${credential}` },
+      });
+      expect(session.statusCode).toBe(200);
+      expect(session.json()).toBeNull();
+    }
+  });
+
   it("revokes an active Bearer session and rejects replay", async () => {
     const probe = await createProbe();
     await register(probe);
 
     const signedIn = await login(probe);
     const token = bearerToken(signedIn);
+    const cookie = sessionCookie(signedIn);
     const authorization = `Bearer ${token}`;
 
     const revoked = await probe.inject({
@@ -160,6 +188,38 @@ describe("Better Auth M1 conformance", () => {
       method: "GET",
       path: "/api/auth/get-session",
       headers: { ...baseHeaders, authorization },
+    });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toBeNull();
+
+    const cookieReplay = await probe.inject({
+      method: "GET",
+      path: "/api/auth/get-session",
+      headers: { ...baseHeaders, cookie },
+    });
+    expect(cookieReplay.statusCode).toBe(200);
+    expect(cookieReplay.json()).toBeNull();
+  });
+
+  it("rejects Bearer replay after logout through the session cookie", async () => {
+    const probe = await createProbe();
+    await register(probe);
+
+    const signedIn = await login(probe);
+    const token = bearerToken(signedIn);
+    const cookie = sessionCookie(signedIn);
+    const logout = await probe.inject({
+      method: "POST",
+      path: "/api/auth/sign-out",
+      headers: { ...baseHeaders, cookie },
+    });
+    expect(logout.statusCode).toBe(200);
+    expect(logout.json()).toEqual({ success: true });
+
+    const replay = await probe.inject({
+      method: "GET",
+      path: "/api/auth/get-session",
+      headers: { ...baseHeaders, authorization: `Bearer ${token}` },
     });
     expect(replay.statusCode).toBe(200);
     expect(replay.json()).toBeNull();
