@@ -8,5 +8,8 @@ minimumReleaseAgeIgnoreMissingTime: false
 trustLockfile: false
 blockExoticSubdeps: true
 
+overrides:
+  "@nestjs/platform-fastify>find-my-way": 9.7.0
+
 allowBuilds:
   esbuild: true

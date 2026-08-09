@@ -3252,13 +3252,14 @@ describe("milestone results and explicit not-ready behavior", () => {
     ).rejects.toThrow("NOT_IMPLEMENTED");
   });
 
-  it("registered future qa modules fail explicitly instead of module resolution errors", async () => {
+  it("requires an explicit provider for the implemented auth spike gate", async () => {
     const result = await executeCommandForTesting(sourceRoot, {
       executable: "pnpm",
       args: ["exec", "tsx", "scripts/quality/auth-spike-gate.mts"],
     });
     expect(result.exit_code).not.toBe(0);
-    expect(result.stderr).toContain("NOT_IMPLEMENTED");
+    expect(result.stderr).toContain("CLI_ARGUMENT_INVALID");
+    expect(result.stderr).toContain("--provider is required");
     expect(result.stderr).not.toContain("ERR_MODULE_NOT_FOUND");
   });
 
