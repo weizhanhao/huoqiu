@@ -8,9 +8,12 @@
     ".": "./src/schema/index.ts"
   },
   "scripts": {
-    "lint": "eslint --config ../config/eslint/base.mjs src test drizzle.config.ts",
-    "test": "vitest run --config ../config/vitest/base.ts test",
-    "typecheck": "tsc --noEmit --skipLibCheck --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals drizzle.config.ts src/schema/*.ts test/*.spec.ts"
+    "lint": "eslint --config ../config/eslint/base.mjs src test scripts drizzle.config.ts",
+    "migrate": "tsx scripts/migrate.mts",
+    "seed:m1": "tsx scripts/seed.mts",
+    "test": "vitest run --config ../config/vitest/base.ts --maxWorkers=1 test",
+    "test:migrations": "vitest run --config ../config/vitest/base.ts --maxWorkers=1 test/migrations",
+    "typecheck": "tsc --noEmit --skipLibCheck --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --resolveJsonModule --allowSyntheticDefaultImports --types node,vitest/globals drizzle.config.ts scripts/*.mts src/schema/*.ts src/seed/*.ts test/*.spec.ts test/migrations/*.ts"
   },
   "dependencies": {
     "@huoqiu/contracts": "workspace:*",
