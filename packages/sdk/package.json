@@ -1,0 +1,32 @@
+{
+  "name": "@huoqiu/sdk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./types": "./src/types.ts",
+    "./manifest": "./generated-manifest.json"
+  },
+  "scripts": {
+    "generate": "tsx scripts/generate.mts",
+    "lint": "eslint --config ../config/eslint/base.mjs scripts src test",
+    "test": "vitest run --config ../config/vitest/base.ts test",
+    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals scripts/generate.mts src/*.ts test/*.spec.ts"
+  },
+  "dependencies": {
+    "@huoqiu/contracts": "workspace:*",
+    "@ts-rest/core": "3.52.1"
+  },
+  "devDependencies": {
+    "@huoqiu/config": "workspace:*",
+    "tsx": "4.23.9"
+  },
+  "peerDependencies": {
+    "eslint": "10.8.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
