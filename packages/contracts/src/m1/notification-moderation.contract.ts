@@ -9,6 +9,7 @@ import {
   idempotencyIfMatchHeaderSchema,
   requestMetaSchema,
   resourceIdSchema,
+  safeDeepLinkSchema,
   timestampSchema,
   versionStringSchema,
 } from "./common.js";
@@ -23,7 +24,7 @@ export const notificationSchema = z
     title: z.string().min(1).max(160),
     body: z.string().min(1).max(500),
     created_at: timestampSchema,
-    deep_link: z.string().min(1).max(512).nullable(),
+    deep_link: safeDeepLinkSchema.nullable(),
   })
   .strict();
 

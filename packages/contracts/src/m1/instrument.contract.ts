@@ -16,6 +16,24 @@ const c = initContract();
 
 const listingPathSchema = z.object({ id: resourceIdSchema }).strict();
 
+const exchangeTimezoneSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(
+    /^(?:UTC|GMT|[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+)+)$/u,
+    "Expected an IANA exchange timezone",
+  );
+
+const syntheticProviderProvenanceShape = {
+  source: z.literal("huoqiu-synthetic"),
+  as_of: timestampSchema,
+  exchange_timezone: exchangeTimezoneSchema,
+  sequence: versionStringSchema,
+  revision: versionStringSchema,
+  entitlement: z.literal("synthetic"),
+} as const;
+
 export const listingSchema = z
   .object({
     id: resourceIdSchema,
@@ -34,11 +52,8 @@ export const quoteSchema = z
     price: decimalStringSchema,
     change: decimalStringSchema,
     change_percent: decimalStringSchema,
-    as_of: timestampSchema,
     stale: z.boolean(),
-    source: z.literal("synthetic"),
-    entitlement: z.enum(["allowed", "delayed", "denied"]),
-    sequence: versionStringSchema,
+    ...syntheticProviderProvenanceShape,
   })
   .strict();
 
@@ -50,7 +65,7 @@ export const barSchema = z
     low: decimalStringSchema,
     close: decimalStringSchema,
     volume: decimalStringSchema,
-    sequence: versionStringSchema,
+    ...syntheticProviderProvenanceShape,
   })
   .strict();
 
@@ -90,7 +105,7 @@ export const instrumentContract = c.router({
     path: "/v1/listings/:id/bars",
     pathParams: listingPathSchema,
     query: cursorQuerySchema.extend({
-      interval: z.enum(["1m", "5m", "15m", "1h", "1d"]),
+      interval: z.literal("1d"),
       adjustment: z.enum(["none", "forward", "backward"]).default("none"),
     }),
     responses: {

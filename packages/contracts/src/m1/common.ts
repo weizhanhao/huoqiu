@@ -108,7 +108,75 @@ export const idempotencyIfMatchHeaderSchema = z
 
 export const decimalStringSchema = z.string().regex(/^-?\d+(\.\d+)?$/u);
 export const timestampSchema = z.string().datetime({ offset: true });
-export const resourceIdSchema = z.string().min(1).max(128);
+export const resourceIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(
+    /^[A-Za-z0-9][A-Za-z0-9._:-]*$/u,
+    "Expected a safe opaque resource identifier",
+  );
+
+const containsUnsafeDecodedPath = (value: string): boolean => {
+  let decoded = value;
+  for (let pass = 0; pass <= value.length; pass += 1) {
+    let nextValue: string;
+    try {
+      nextValue = decodeURIComponent(decoded);
+    } catch {
+      return true;
+    }
+    if (nextValue === decoded) {
+      break;
+    }
+    decoded = nextValue;
+  }
+  if (decoded.startsWith("//") || /[\\\p{Cc}]/u.test(decoded)) {
+    return true;
+  }
+  const [path] = decoded.split(/[?#]/u, 1);
+  return (
+    path?.split("/").some((segment) => segment === "." || segment === "..") ??
+    true
+  );
+};
+
+const isSafeDeepLink = (value: string): boolean => {
+  if (
+    value !== value.trim() ||
+    /[\\\p{Cc}]/u.test(value) ||
+    containsUnsafeDecodedPath(value)
+  ) {
+    return false;
+  }
+  if (value.startsWith("/")) {
+    return !value.startsWith("//");
+  }
+  if (!/^https:\/\//iu.test(value)) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.hostname.length > 0 &&
+      url.username.length === 0 &&
+      url.password.length === 0
+    );
+  } catch {
+    return false;
+  }
+};
+
+export const safeDeepLinkSchema = z
+  .string()
+  .min(1)
+  .max(512)
+  .refine(
+    isSafeDeepLink,
+    "Expected an internal path or credential-free HTTPS URL",
+  );
 export const cursorSchema = z
   .string()
   .min(1)
