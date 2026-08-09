@@ -14,7 +14,7 @@ import {
   BetterAuthProviderAdapter,
   createProcessLocalBetterAuthRuntime,
 } from "../../../src/identity/auth-provider.adapter.js";
-import { BoundedIdempotencyRegistry } from "../../../src/identity/idempotency-registry.js";
+import { BoundedIdempotencyStore } from "../../../src/identity/idempotency-store.js";
 import { createHttpApp } from "../../../src/main.js";
 
 const edgeSecret = "alpha-edge-test-secret-with-at-least-32-characters";
@@ -149,6 +149,116 @@ describe("API-AUTH-001..004", () => {
       m1Router.authRegister.responses[409].parse(replay.json()),
     ).not.toThrow();
     expect(replay.body).not.toContain(inviteCode);
+  });
+
+  it("rejects every auth query before credentials, idempotency, or controller state", async () => {
+    const application = await createApplication();
+    const server = application.getHttpAdapter().getInstance();
+
+    const rejectedRegisterUrl = "/v1/auth/register?token=abc";
+    const rejectedRegister = await server.inject({
+      method: "POST",
+      url: rejectedRegisterUrl,
+      headers: {
+        ...edgeHeaders("POST", rejectedRegisterUrl),
+        "idempotency-key": "query-register-key",
+      },
+      payload: registerBody,
+    });
+    const rejectedLoginUrl = "/v1/auth/login?token=%2F";
+    const rejectedLogin = await server.inject({
+      method: "POST",
+      url: rejectedLoginUrl,
+      headers: {
+        ...edgeHeaders("POST", rejectedLoginUrl),
+        "idempotency-key": "query-login-key",
+      },
+      payload: {
+        email: registerBody.email,
+        password: registerBody.password,
+        transport: "bearer",
+      },
+    });
+    const rejectedSessionUrl = "/v1/auth/session?token=a&token=b";
+    const rejectedSession = await server.inject({
+      method: "GET",
+      url: rejectedSessionUrl,
+      headers: edgeHeaders("GET", rejectedSessionUrl),
+    });
+    const rejectedLogoutUrl = "/v1/auth/logout?=x";
+    const rejectedLogout = await server.inject({
+      method: "POST",
+      url: rejectedLogoutUrl,
+      headers: {
+        ...edgeHeaders("POST", rejectedLogoutUrl),
+        "idempotency-key": "query-logout-key",
+      },
+      payload: {},
+    });
+
+    for (const response of [
+      rejectedRegister,
+      rejectedLogin,
+      rejectedSession,
+      rejectedLogout,
+    ]) {
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ code: "VALIDATION_FAILED" });
+      expect(() =>
+        m1Router.authRegister.responses[400].parse(response.json()),
+      ).not.toThrow();
+      expect(response.headers["set-auth-token"]).toBeUndefined();
+      expect(response.headers["set-cookie"]).toBeUndefined();
+    }
+
+    const registration = await server.inject({
+      method: "POST",
+      url: "/v1/auth/register",
+      headers: {
+        ...edgeHeaders("POST", "/v1/auth/register"),
+        "idempotency-key": "query-register-key",
+      },
+      payload: registerBody,
+    });
+    expect(registration.statusCode).toBe(201);
+    const cookiePair = String(registration.headers["set-cookie"]).split(
+      ";",
+      1,
+    )[0];
+
+    for (const query of [
+      "?token=abc",
+      "?token=%2F%3F%26",
+      "?token=a&token=b",
+      "?=empty-key",
+      "?token=",
+      `?token=${"a".repeat(2_100)}`,
+    ]) {
+      const url = `/v1/auth/session${query}`;
+      const response = await server.inject({
+        method: "GET",
+        url,
+        headers: {
+          ...edgeHeaders("GET", url),
+          cookie: cookiePair,
+        },
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ code: "VALIDATION_FAILED" });
+      expect(() =>
+        m1Router.authRegister.responses[400].parse(response.json()),
+      ).not.toThrow();
+    }
+
+    const sessionWithoutQuery = await server.inject({
+      method: "GET",
+      url: "/v1/auth/session",
+      headers: {
+        ...edgeHeaders("GET", "/v1/auth/session"),
+        cookie: cookiePair,
+      },
+    });
+    expect(sessionWithoutQuery.statusCode).toBe(200);
   });
 
   it("uses the frozen contracts for body, header, malformed JSON, and provider conflict errors", async () => {
@@ -457,7 +567,7 @@ describe("API-AUTH-001..004", () => {
     const service = new AuthService(
       provider,
       store,
-      new BoundedIdempotencyRegistry({ secret: authSecret }),
+      new BoundedIdempotencyStore({ secret: authSecret }),
     );
 
     try {

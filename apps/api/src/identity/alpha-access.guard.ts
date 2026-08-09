@@ -9,7 +9,7 @@ import {
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 
-import { identityHttpException } from "./identity-error.js";
+import { identityHttpException, validationFailure } from "./identity-error.js";
 
 const DEFAULT_MAX_CLOCK_SKEW_SECONDS = 300;
 const MAX_CLOCK_SKEW_SECONDS = 3_600;
@@ -20,6 +20,16 @@ const ALPHA_ACCESS_VALUE = /^(?:false|true)$/u;
 const CONTROL_CHARACTER = /\p{C}/u;
 const SCALAR_SEPARATOR_OR_WHITESPACE = /[,\s]/u;
 const EDGE_SUBJECT_CONTEXT = Symbol("huoqiu:identity:verified-edge-subject");
+const MAX_AUTH_REQUEST_TARGET_LENGTH = 2_048;
+const AUTH_CONTRACT_PATHS = [
+  "/v1/auth/register",
+  "/v1/auth/login",
+  "/v1/auth/session",
+  "/v1/auth/logout",
+] as const;
+const MAX_AUTH_CONTRACT_PATH_LENGTH = Math.max(
+  ...AUTH_CONTRACT_PATHS.map((path) => path.length),
+);
 
 type RequestWithEdgeSubject = FastifyRequest & {
   [EDGE_SUBJECT_CONTEXT]?: string;
@@ -157,6 +167,31 @@ const alphaAccessFailure = () =>
     "Alpha access is required",
   );
 
+const isAuthContractPath = (value: string): boolean =>
+  AUTH_CONTRACT_PATHS.some((path) => path === value);
+
+const assertAuthRequestTargetShape = (request: FastifyRequest): void => {
+  const rawUrl = request.raw?.url;
+  const requestTarget = typeof rawUrl === "string" ? rawUrl : request.url;
+  const prefix = requestTarget.slice(0, MAX_AUTH_CONTRACT_PATH_LENGTH + 1);
+  const queryMarker = prefix.indexOf("?");
+  const inferredPath =
+    queryMarker === -1 ? prefix : prefix.slice(0, queryMarker);
+  const routePath = request.routeOptions?.url;
+  const isAuthContract =
+    (typeof routePath === "string" && isAuthContractPath(routePath)) ||
+    isAuthContractPath(inferredPath);
+  if (!isAuthContract) return;
+  if (
+    requestTarget.length === 0 ||
+    requestTarget.length > MAX_AUTH_REQUEST_TARGET_LENGTH ||
+    CONTROL_CHARACTER.test(requestTarget) ||
+    queryMarker !== -1
+  ) {
+    throw validationFailure();
+  }
+};
+
 @Injectable()
 export class AlphaAccessGuard implements CanActivate {
   constructor(
@@ -167,6 +202,7 @@ export class AlphaAccessGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<FastifyRequest>();
+    assertAuthRequestTargetShape(request);
     if (
       request.url === "/healthz" &&
       (request.method === "GET" || request.method === "HEAD")

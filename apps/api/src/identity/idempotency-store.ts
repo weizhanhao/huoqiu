@@ -5,9 +5,7 @@ import {
   idempotencyConflict,
 } from "./identity-error.js";
 
-export const IDEMPOTENCY_REGISTRY = Symbol("IDEMPOTENCY_REGISTRY");
-
-export type IdempotencyRegistryOptions = Readonly<{
+export type IdempotencyStoreOptions = Readonly<{
   capacity?: number;
   now?: () => number;
   secret: string | Uint8Array;
@@ -15,7 +13,7 @@ export type IdempotencyRegistryOptions = Readonly<{
 }>;
 
 interface Entry {
-  expiresAt: number;
+  expiresAt: number | undefined;
   requestFingerprint: string;
   result: Promise<unknown>;
   settled: boolean;
@@ -41,14 +39,14 @@ const canonicalJson = (value: unknown): string => {
   throw new TypeError("IDEMPOTENCY_CANONICAL_VALUE_INVALID");
 };
 
-export class BoundedIdempotencyRegistry {
+export class BoundedIdempotencyStore {
   private readonly capacity: number;
   private readonly entries = new Map<string, Entry>();
   private readonly now: () => number;
   private readonly secret: string | Uint8Array;
   private readonly ttlMilliseconds: number;
 
-  constructor(options: IdempotencyRegistryOptions) {
+  constructor(options: IdempotencyStoreOptions) {
     this.capacity = options.capacity ?? 1024;
     this.now = options.now ?? Date.now;
     this.secret = options.secret;
@@ -73,7 +71,7 @@ export class BoundedIdempotencyRegistry {
     }>,
     work: () => Promise<T>,
   ): Promise<T> {
-    this.cleanup();
+    this.cleanupExpiredSettledEntries();
     const index = this.digest("index", [
       input.operation,
       input.callerId,
@@ -91,28 +89,21 @@ export class BoundedIdempotencyRegistry {
       return (await existing.result) as T;
     }
 
-    while (this.entries.size >= this.capacity) {
-      const oldestSettled = [...this.entries].find(
-        ([, entry]) => entry.settled,
-      )?.[0];
-      if (oldestSettled === undefined) throw idempotencyCapacityExceeded();
-      this.entries.delete(oldestSettled);
+    if (this.entries.size >= this.capacity) {
+      throw idempotencyCapacityExceeded();
     }
+
     const result = Promise.resolve().then(work);
     const entry: Entry = {
-      expiresAt: this.now() + this.ttlMilliseconds,
+      expiresAt: undefined,
       requestFingerprint,
       result,
       settled: false,
     };
     this.entries.set(index, entry);
     void result.then(
-      () => {
-        entry.settled = true;
-      },
-      () => {
-        entry.settled = true;
-      },
+      () => this.markSettled(entry),
+      () => this.markSettled(entry),
     );
     return await result;
   }
@@ -125,7 +116,7 @@ export class BoundedIdempotencyRegistry {
       request: unknown;
     }>,
   ): Promise<T | undefined> {
-    this.cleanup();
+    this.cleanupExpiredSettledEntries();
     const index = this.digest("index", [
       input.operation,
       input.callerId,
@@ -144,15 +135,26 @@ export class BoundedIdempotencyRegistry {
   }
 
   size(): number {
-    this.cleanup();
+    this.cleanupExpiredSettledEntries();
     return this.entries.size;
   }
 
-  private cleanup(): void {
+  private cleanupExpiredSettledEntries(): void {
     const now = this.now();
     for (const [index, entry] of this.entries) {
-      if (entry.expiresAt <= now) this.entries.delete(index);
+      if (
+        entry.settled &&
+        entry.expiresAt !== undefined &&
+        entry.expiresAt <= now
+      ) {
+        this.entries.delete(index);
+      }
     }
+  }
+
+  private markSettled(entry: Entry): void {
+    entry.expiresAt = this.now() + this.ttlMilliseconds;
+    entry.settled = true;
   }
 
   private digest(namespace: string, parts: readonly string[]): string {

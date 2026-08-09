@@ -15,8 +15,7 @@ import {
   type AuthSubjectSession,
   type AuthTransport,
 } from "./auth-provider.port.js";
-import { IDEMPOTENCY_REGISTRY } from "./idempotency-registry.js";
-import type { BoundedIdempotencyRegistry } from "./idempotency-registry.js";
+import { BoundedIdempotencyStore } from "./idempotency-store.js";
 import {
   identityHttpException,
   SuspendedActorError,
@@ -221,8 +220,8 @@ export class AuthService {
     private readonly identityBackend: AuthProviderPort,
     @Inject(IDENTITY_STORE_PORT)
     private readonly identityStore: IdentityStorePort,
-    @Inject(IDEMPOTENCY_REGISTRY)
-    private readonly idempotency: BoundedIdempotencyRegistry,
+    @Inject(BoundedIdempotencyStore)
+    private readonly idempotency: BoundedIdempotencyStore,
   ) {}
 
   async register(input: RegisterInput): Promise<IdentitySession> {
@@ -272,7 +271,7 @@ export class AuthService {
 
   async login(input: LoginInput): Promise<IdentitySession> {
     const email = input.body.email.toLowerCase();
-    return await this.idempotency.execute(
+    const session = await this.idempotency.execute(
       {
         callerId: input.callerId,
         key: input.idempotencyKey,
@@ -319,6 +318,7 @@ export class AuthService {
         return this.toIdentitySession(actor, subjectSession);
       },
     );
+    return await this.requireActiveSessionActor(session);
   }
 
   async resolveSession(
@@ -336,6 +336,29 @@ export class AuthService {
       throw new SuspendedActorError();
     }
     return this.toIdentitySession(actor, subjectSession);
+  }
+
+  private async requireActiveSessionActor(
+    session: IdentitySession,
+  ): Promise<IdentitySession> {
+    const actor = await this.identityStore.findActorById(session.actor.actorId);
+    if (actor === null) {
+      await this.identityBackend.logout(session.credential);
+      throw identityHttpException(
+        HttpStatus.UNAUTHORIZED,
+        "AUTH_REQUIRED",
+        "Authentication failed",
+      );
+    }
+    if (actor.status === "suspended") {
+      await this.identityBackend.revokeSubjectSessions(actor.identitySubjectId);
+      throw identityHttpException(
+        HttpStatus.FORBIDDEN,
+        "FORBIDDEN",
+        "Actor is suspended",
+      );
+    }
+    return { ...session, actor };
   }
 
   async logout(input: LogoutInput, session: IdentitySession): Promise<void> {

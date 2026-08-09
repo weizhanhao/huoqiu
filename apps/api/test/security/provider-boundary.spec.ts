@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { HttpException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 
-import { BoundedIdempotencyRegistry } from "../../src/identity/idempotency-registry.js";
+import { BoundedIdempotencyStore } from "../../src/identity/idempotency-store.js";
 
 const source = async (name: string): Promise<string> =>
   await readFile(
@@ -22,9 +22,9 @@ describe("identity private boundaries", () => {
     },
   );
 
-  it("coalesces concurrent work, detects conflicts, and cleans bounded entries", async () => {
+  it("coalesces concurrent work, detects conflicts, and cleans expired settled entries", async () => {
     let now = 1_000;
-    const registry = new BoundedIdempotencyRegistry({
+    const registry = new BoundedIdempotencyStore({
       capacity: 2,
       now: () => now,
       secret: "idempotency-test-secret-with-at-least-32-characters",
@@ -64,17 +64,100 @@ describe("identity private boundaries", () => {
       { ...input, key: "second-key-value" },
       async () => "second",
     );
-    await registry.execute(
-      { ...input, key: "third-key-value" },
-      async () => "third",
-    );
+    let capacityStatus: number | undefined;
+    try {
+      await registry.execute(
+        { ...input, key: "third-key-value" },
+        async () => "third",
+      );
+    } catch (error) {
+      capacityStatus =
+        error instanceof HttpException ? error.getStatus() : undefined;
+    }
+    expect(capacityStatus).toBe(429);
     expect(registry.size()).toBe(2);
     now += 11;
     expect(registry.size()).toBe(0);
   });
 
+  it("retains in-flight work past the TTL and starts TTL at settlement", async () => {
+    let now = 1_000;
+    const registry = new BoundedIdempotencyStore({
+      capacity: 1,
+      now: () => now,
+      secret: "idempotency-test-secret-with-at-least-32-characters",
+      ttlMilliseconds: 10,
+    });
+    let release = (): void => undefined;
+    const input = {
+      callerId: "edge-caller",
+      key: "long-running-key",
+      operation: "auth.login",
+      request: { email: "pending@huoqiu.test" },
+    };
+    const pending = registry.execute(
+      input,
+      async () =>
+        await new Promise<string>((resolve) => {
+          release = () => resolve("first-result");
+        }),
+    );
+    await Promise.resolve();
+
+    now = 2_000;
+    const duplicateWork = vi.fn(async () => "duplicate-result");
+    const replay = registry.execute(input, duplicateWork);
+    await Promise.resolve();
+    expect(duplicateWork).not.toHaveBeenCalled();
+
+    release();
+    await expect(Promise.all([pending, replay])).resolves.toEqual([
+      "first-result",
+      "first-result",
+    ]);
+
+    now = 2_009;
+    await expect(registry.replay<string>(input)).resolves.toBe("first-result");
+    now = 2_010;
+    await expect(
+      registry.execute(input, async () => "after-expiry"),
+    ).resolves.toBe("after-expiry");
+  });
+
+  it("fails closed at capacity without evicting an unexpired settled replay", async () => {
+    let now = 5_000;
+    const registry = new BoundedIdempotencyStore({
+      capacity: 1,
+      now: () => now,
+      secret: "idempotency-test-secret-with-at-least-32-characters",
+      ttlMilliseconds: 100,
+    });
+    const first = {
+      callerId: "edge-caller",
+      key: "stable-key",
+      operation: "auth.register",
+      request: { email: "stable@huoqiu.test" },
+    };
+    await expect(registry.execute(first, async () => "stable")).resolves.toBe(
+      "stable",
+    );
+    await expect(registry.replay<string>(first)).resolves.toBe("stable");
+
+    const displacedWork = vi.fn(async () => "displaced");
+    await expect(
+      registry.execute({ ...first, key: "different-key" }, displacedWork),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(displacedWork).not.toHaveBeenCalled();
+    await expect(registry.replay<string>(first)).resolves.toBe("stable");
+
+    now = 5_101;
+    await expect(
+      registry.execute({ ...first, key: "different-key" }, displacedWork),
+    ).resolves.toBe("displaced");
+  });
+
   it("never evicts in-flight idempotency work to make room", async () => {
-    const registry = new BoundedIdempotencyRegistry({
+    const registry = new BoundedIdempotencyStore({
       capacity: 1,
       secret: "idempotency-test-secret-with-at-least-32-characters",
     });

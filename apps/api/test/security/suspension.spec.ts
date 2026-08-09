@@ -13,7 +13,7 @@ import {
   InMemoryIdentityStore,
 } from "../../src/identity/auth.service.js";
 import { IdentityModule } from "../../src/identity/identity.module.js";
-import { BoundedIdempotencyRegistry } from "../../src/identity/idempotency-registry.js";
+import { BoundedIdempotencyStore } from "../../src/identity/idempotency-store.js";
 import { createHttpApp } from "../../src/main.js";
 
 const edgeSecret = "alpha-edge-test-secret-with-at-least-32-characters";
@@ -179,6 +179,25 @@ describe("strong suspension checks", () => {
     expect(controllerAction).not.toHaveBeenCalled();
     await expect(authService.isSseTokenValid(sseToken)).resolves.toBe(false);
 
+    const replayedLoginAfterSuspension = await server.inject({
+      method: "POST",
+      url: "/v1/auth/login",
+      headers: {
+        ...edgeHeaders("POST", "/v1/auth/login"),
+        "idempotency-key": "suspend-login",
+      },
+      payload: {
+        email: "suspended@huoqiu.test",
+        password: "correct-horse-battery-staple",
+        transport: "bearer",
+      },
+    });
+    expect(replayedLoginAfterSuspension.statusCode).toBe(403);
+    expect(
+      replayedLoginAfterSuspension.headers["set-auth-token"],
+    ).toBeUndefined();
+    expect(replayedLoginAfterSuspension.headers["set-cookie"]).toBeUndefined();
+
     const relogin = await server.inject({
       method: "POST",
       url: "/v1/auth/login",
@@ -247,7 +266,7 @@ describe("strong suspension checks", () => {
     const service = new AuthService(
       provider,
       store,
-      new BoundedIdempotencyRegistry({ secret: authSecret }),
+      new BoundedIdempotencyStore({ secret: authSecret }),
     );
 
     let status: number | undefined;

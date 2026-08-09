@@ -22,10 +22,7 @@ import {
   IDENTITY_STORE_PORT,
   InMemoryIdentityStore,
 } from "./auth.service.js";
-import {
-  BoundedIdempotencyRegistry,
-  IDEMPOTENCY_REGISTRY,
-} from "./idempotency-registry.js";
+import { BoundedIdempotencyStore } from "./idempotency-store.js";
 import { SessionGuard } from "./session.guard.js";
 
 const BETTER_AUTH_RUNTIME = Symbol("BETTER_AUTH_RUNTIME");
@@ -113,9 +110,9 @@ const selectedBetterAuthModule = BetterAuthNestModule.forRootAsync({
     },
     {
       inject: [BETTER_AUTH_RUNTIME],
-      provide: IDEMPOTENCY_REGISTRY,
+      provide: BoundedIdempotencyStore,
       useFactory: (runtime: BetterAuthRuntime) =>
-        new BoundedIdempotencyRegistry({
+        new BoundedIdempotencyStore({
           secret: runtime.credentialHmacKey,
         }),
     },
