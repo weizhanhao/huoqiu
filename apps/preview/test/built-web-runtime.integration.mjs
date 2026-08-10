@@ -71,9 +71,10 @@ describe("built Web preview integration", () => {
       assert.equal(healthResponse.status, 200);
       assert.equal(await healthResponse.text(), "ok\n");
 
-      const shellResponse = await globalThis.fetch(runtime.address, {
-        headers,
-      });
+      const shellResponse = await globalThis.fetch(
+        `${runtime.address}/markets`,
+        { headers },
+      );
       assert.equal(shellResponse.status, 200);
       assert.equal(
         shellResponse.headers.get("x-huoqiu-preview-data"),
@@ -85,11 +86,40 @@ describe("built Web preview integration", () => {
       );
       assert.match(await shellResponse.text(), /火球/u);
 
+      const routerState = encodeURIComponent(
+        JSON.stringify([
+          "",
+          {
+            children: [
+              "markets",
+              { children: ["__PAGE__", {}, null, null, 4608] },
+              null,
+              null,
+              4608,
+            ],
+          },
+          null,
+          null,
+          4624,
+        ]),
+      );
       const rscResponse = await globalThis.fetch(
-        `${runtime.address}/search?q=SYN001&_rsc=browser-cache-buster`,
-        { headers },
+        `${runtime.address}/watchlist?_rsc=browser-cache-buster`,
+        {
+          headers: {
+            ...headers,
+            "next-router-state-tree": routerState,
+            "next-url": "/markets",
+            rsc: "1",
+          },
+        },
       );
       assert.equal(rscResponse.status, 200);
+      assert.match(
+        rscResponse.headers.get("content-type") ?? "",
+        /^text\/x-component(?:;|$)/u,
+      );
+      assert.doesNotMatch(await rscResponse.text(), /<html/u);
     } finally {
       await runtime.close();
     }

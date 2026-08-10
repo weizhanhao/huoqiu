@@ -363,6 +363,63 @@ describe("preview-to-Web trust boundary", () => {
     );
   });
 
+  it("preserves the single-valued Next RSC navigation contract", async () => {
+    const preview = await capturingFixture();
+    const routerState = encodeURIComponent(
+      JSON.stringify(["", { children: ["markets", {}] }, null, null, true]),
+    );
+    const response = await globalThis.fetch(
+      `http://${HOST}:${preview.gatewayPort}/watchlist?_rsc=cache-buster`,
+      {
+        headers: authenticatedHeaders({
+          "next-router-prefetch": "1",
+          "next-router-segment-prefetch": "/_tree",
+          "next-router-state-tree": routerState,
+          "next-url": "/markets",
+          rsc: "1",
+        }),
+      },
+    );
+    const received = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(received.headers.rsc, "1");
+    assert.equal(received.headers["next-router-state-tree"], routerState);
+    assert.equal(received.headers["next-router-prefetch"], "1");
+    assert.equal(received.headers["next-router-segment-prefetch"], "/_tree");
+    assert.equal(received.headers["next-url"], "/markets");
+  });
+
+  it("drops malformed Next navigation metadata", async () => {
+    let receivedHeaders;
+    const preview = await customFixture((request, response) => {
+      receivedHeaders = request.headers;
+      response.statusCode = 200;
+      response.end("safe-upstream");
+    });
+    const response = await globalThis.fetch(
+      `http://${HOST}:${preview.gatewayPort}/watchlist?_rsc=cache-buster`,
+      {
+        headers: authenticatedHeaders({
+          "next-router-prefetch": "0",
+          "next-router-segment-prefetch": "https://attacker.invalid/tree",
+          "next-router-state-tree": "not-json",
+          "next-url": "https://attacker.invalid/markets",
+          rsc: "1, 1",
+        }),
+      },
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), "safe-upstream");
+    assert.notEqual(receivedHeaders, undefined);
+    assert.equal(receivedHeaders.rsc, undefined);
+    assert.equal(receivedHeaders["next-router-prefetch"], undefined);
+    assert.equal(receivedHeaders["next-router-segment-prefetch"], undefined);
+    assert.equal(receivedHeaders["next-router-state-tree"], undefined);
+    assert.equal(receivedHeaders["next-url"], undefined);
+  });
+
   it("binds each POST proof to its body, content type, and a fresh nonce", async () => {
     const preview = await capturingFixture();
     const target = "/watchlist";
@@ -519,6 +576,36 @@ describe("preview request limits", () => {
 });
 
 describe("preview response boundary", () => {
+  it("forwards only canonical same-origin redirect locations", async () => {
+    const preview = await customFixture((request, response) => {
+      response.statusCode = 307;
+      response.setHeader(
+        "location",
+        request.url === "/safe"
+          ? "/watchlist?_rsc=safe-cache-key"
+          : "https://attacker.invalid/escape",
+      );
+      response.end();
+    });
+
+    const safe = await globalThis.fetch(
+      `http://${HOST}:${preview.gatewayPort}/safe`,
+      { headers: authenticatedHeaders(), redirect: "manual" },
+    );
+    const external = await globalThis.fetch(
+      `http://${HOST}:${preview.gatewayPort}/external`,
+      { headers: authenticatedHeaders(), redirect: "manual" },
+    );
+
+    assert.equal(safe.status, 307);
+    assert.equal(
+      safe.headers.get("location"),
+      "/watchlist?_rsc=safe-cache-key",
+    );
+    assert.equal(external.status, 307);
+    assert.equal(external.headers.get("location"), null);
+  });
+
   it("drops upstream credentials and forged preview or edge metadata", async () => {
     const preview = await customFixture((_request, response) => {
       response.statusCode = 200;

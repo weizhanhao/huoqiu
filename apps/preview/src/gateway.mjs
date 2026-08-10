@@ -24,6 +24,7 @@ const ALLOW_HEADER_VALUE = "GET, HEAD, POST";
 const MAX_REQUEST_BODY_BYTES = 8 * 1024;
 const MAX_REQUEST_TARGET_LENGTH = 4 * 1024;
 const MAX_BODY_READ_MILLISECONDS = 1_000;
+const MAX_NEXT_ROUTER_STATE_LENGTH = 8 * 1024;
 const containsControlCharacter = (value) => {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
@@ -84,10 +85,10 @@ const credentialDigest = (value) =>
 export const credentialsMatch = (received, expected) =>
   timingSafeEqual(credentialDigest(received), credentialDigest(expected));
 
-const singleAuthorizationField = (request) => {
+const singleRawHeaderField = (request, expectedName) => {
   const values = [];
   for (let index = 0; index < request.rawHeaders.length; index += 2) {
-    if (request.rawHeaders[index]?.toLowerCase() === "authorization") {
+    if (request.rawHeaders[index]?.toLowerCase() === expectedName) {
       values.push(request.rawHeaders[index + 1]);
     }
   }
@@ -95,6 +96,9 @@ const singleAuthorizationField = (request) => {
     ? values[0]
     : undefined;
 };
+
+const singleAuthorizationField = (request) =>
+  singleRawHeaderField(request, "authorization");
 
 const parseBasicCredential = (authorization) => {
   const match = /^Basic ([^\s]+)$/u.exec(authorization);
@@ -123,6 +127,49 @@ const hasValidAccessCredential = (request, username, password) => {
   const usernameMatches = credentialsMatch(receivedUsername, username);
   const passwordMatches = credentialsMatch(receivedPassword, password);
   return parsed !== undefined && usernameMatches && passwordMatches;
+};
+
+const isValidEncodedRouterState = (value) => {
+  if (value.length === 0 || value.length > MAX_NEXT_ROUTER_STATE_LENGTH) {
+    return false;
+  }
+  try {
+    return Array.isArray(JSON.parse(decodeURIComponent(value)));
+  } catch {
+    return false;
+  }
+};
+
+const nextNavigationHeadersFor = (request) => {
+  if (singleRawHeaderField(request, "rsc") !== "1") return {};
+
+  const headers = { rsc: "1" };
+  const nextUrl = singleRawHeaderField(request, "next-url");
+  if (nextUrl !== undefined && safeRequestTarget(nextUrl) !== undefined) {
+    headers["next-url"] = nextUrl;
+  }
+
+  const routerState = singleRawHeaderField(request, "next-router-state-tree");
+  if (routerState !== undefined && isValidEncodedRouterState(routerState)) {
+    headers["next-router-state-tree"] = routerState;
+  }
+
+  if (singleRawHeaderField(request, "next-router-prefetch") === "1") {
+    headers["next-router-prefetch"] = "1";
+  }
+
+  const segmentPrefetch = singleRawHeaderField(
+    request,
+    "next-router-segment-prefetch",
+  );
+  if (
+    segmentPrefetch !== undefined &&
+    safeRequestTarget(segmentPrefetch) !== undefined
+  ) {
+    headers["next-router-segment-prefetch"] = segmentPrefetch;
+  }
+
+  return headers;
 };
 
 const validateOptions = (options) => {
@@ -197,6 +244,7 @@ const edgeHeadersFor = (request, options, target, body) => {
     const value = request.headers[name];
     if (typeof value === "string") headers[name] = value;
   }
+  Object.assign(headers, nextNavigationHeadersFor(request));
   if (body.byteLength > 0) {
     headers["content-length"] = String(body.byteLength);
   }
@@ -291,6 +339,13 @@ const copySafeUpstreamHeaders = (upstreamResponse, response) => {
   for (const name of FORWARDED_RESPONSE_HEADERS) {
     const value = upstreamResponse.headers[name];
     if (value !== undefined) response.setHeader(name, value);
+  }
+  const location = upstreamResponse.headers.location;
+  if (
+    typeof location === "string" &&
+    safeRequestTarget(location) !== undefined
+  ) {
+    response.setHeader("location", location);
   }
 };
 
