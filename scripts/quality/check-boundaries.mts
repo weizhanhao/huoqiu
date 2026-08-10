@@ -201,6 +201,70 @@ const APPROVED_CONTAINER_IMAGES: readonly InventoryContainerImage[] = [
     source_url:
       "https://github.com/docker-library/postgres/tree/4f9ced003ba58a854656ba150d146243d27ae3ac/17/bookworm",
   },
+  {
+    distribution_url: "https://hub.docker.com/r/valkey/valkey",
+    immutable_reference:
+      "docker.io/valkey/valkey:9.1.1@sha256:3acc0687f2a2e1091fae6450d7842dd658c941338cf0a873ddd9e14b9e4ea4dd",
+    licenses: ["BSD-3-Clause"],
+    platform_owner: "platform-engineering",
+    platforms: [
+      {
+        compressed_size_bytes: 44303326,
+        config_digest:
+          "sha256:2309a3c09231d6c1ab50e259e36d2578f45d271d19d6dc3908711b088890e0b8",
+        manifest_digest:
+          "sha256:2f4a4b0a42a72569b40567fae9016dc54aa76736250be28120b5fced8050c0f0",
+        platform: "linux/amd64",
+      },
+      {
+        compressed_size_bytes: 44697854,
+        config_digest:
+          "sha256:58058761276174a4176215cae8fe03a59329f15adaa2b899b465657c1802b578",
+        manifest_digest:
+          "sha256:7295255fcb711fd8b77e489e247be018940eeda917eb3a430cabd089355b293e",
+        platform: "linux/arm64",
+      },
+    ],
+    release: "9.1.1",
+    repo_digest:
+      "sha256:3acc0687f2a2e1091fae6450d7842dd658c941338cf0a873ddd9e14b9e4ea4dd",
+    repository: "docker.io/valkey/valkey",
+    source_commit: "d27f9ba65a04e80d9c417112a7621fc98a56f70d",
+    source_url:
+      "https://github.com/valkey-io/valkey/tree/d27f9ba65a04e80d9c417112a7621fc98a56f70d",
+  },
+  {
+    distribution_url: "https://www.jaegertracing.io/docs/2.20/getting-started/",
+    immutable_reference:
+      "cr.jaegertracing.io/jaegertracing/jaeger:2.20.0@sha256:46a886260e04002d8f45e213fc39063fa11a50446048fdaa64786fc0840cb9f8",
+    licenses: ["Apache-2.0"],
+    platform_owner: "platform-engineering",
+    platforms: [
+      {
+        compressed_size_bytes: 50161833,
+        config_digest:
+          "sha256:9ae01775e2b2d4a7a957647fe6e733fe17ca8a2cec87ec8c893f730afe49bf00",
+        manifest_digest:
+          "sha256:4a130978c31a30d9baadd9fd902eeb779ed7bf2efd53e8b17bd79069e689da1b",
+        platform: "linux/amd64",
+      },
+      {
+        compressed_size_bytes: 46903702,
+        config_digest:
+          "sha256:7f9e11694bb8d2a2f6b570e66ab8f984413ea041ef3f1ecda9a1584657154d43",
+        manifest_digest:
+          "sha256:1f94d894a3428ea91be4d79f92a743e7994a355b1919bbe7e7ecd59f19631fb0",
+        platform: "linux/arm64",
+      },
+    ],
+    release: "2.20.0",
+    repo_digest:
+      "sha256:46a886260e04002d8f45e213fc39063fa11a50446048fdaa64786fc0840cb9f8",
+    repository: "cr.jaegertracing.io/jaegertracing/jaeger",
+    source_commit: "d65f95169d71c3a8535355ececa782aa868071be",
+    source_url:
+      "https://github.com/jaegertracing/jaeger/tree/d65f95169d71c3a8535355ececa782aa868071be",
+  },
 ] as const;
 
 const CANONICAL_PREFLIGHT_STEPS: readonly Record<string, unknown>[] = [
@@ -1903,7 +1967,7 @@ const parseArtifactInventory = async (
   if (!isDeepStrictEqual(containerImages, APPROVED_CONTAINER_IMAGES)) {
     fail(
       "ARTIFACT_INVENTORY_CONTAINER_IMAGE_INVALID",
-      "inventory must contain exactly the approved PostgreSQL 17 image descriptor",
+      "inventory must contain exactly the approved local-stack image descriptors",
     );
   }
   return { actions, artifacts };

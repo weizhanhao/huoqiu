@@ -121,6 +121,71 @@ const exactContainerInventory = {
         },
       ],
     },
+    {
+      repository: "docker.io/valkey/valkey",
+      release: "9.1.1",
+      immutable_reference:
+        "docker.io/valkey/valkey:9.1.1@sha256:3acc0687f2a2e1091fae6450d7842dd658c941338cf0a873ddd9e14b9e4ea4dd",
+      repo_digest:
+        "sha256:3acc0687f2a2e1091fae6450d7842dd658c941338cf0a873ddd9e14b9e4ea4dd",
+      source_commit: "d27f9ba65a04e80d9c417112a7621fc98a56f70d",
+      source_url:
+        "https://github.com/valkey-io/valkey/tree/d27f9ba65a04e80d9c417112a7621fc98a56f70d",
+      distribution_url: "https://hub.docker.com/r/valkey/valkey",
+      licenses: ["BSD-3-Clause"],
+      platform_owner: "platform-engineering",
+      platforms: [
+        {
+          platform: "linux/amd64",
+          manifest_digest:
+            "sha256:2f4a4b0a42a72569b40567fae9016dc54aa76736250be28120b5fced8050c0f0",
+          config_digest:
+            "sha256:2309a3c09231d6c1ab50e259e36d2578f45d271d19d6dc3908711b088890e0b8",
+          compressed_size_bytes: 44303326,
+        },
+        {
+          platform: "linux/arm64",
+          manifest_digest:
+            "sha256:7295255fcb711fd8b77e489e247be018940eeda917eb3a430cabd089355b293e",
+          config_digest:
+            "sha256:58058761276174a4176215cae8fe03a59329f15adaa2b899b465657c1802b578",
+          compressed_size_bytes: 44697854,
+        },
+      ],
+    },
+    {
+      repository: "cr.jaegertracing.io/jaegertracing/jaeger",
+      release: "2.20.0",
+      immutable_reference:
+        "cr.jaegertracing.io/jaegertracing/jaeger:2.20.0@sha256:46a886260e04002d8f45e213fc39063fa11a50446048fdaa64786fc0840cb9f8",
+      repo_digest:
+        "sha256:46a886260e04002d8f45e213fc39063fa11a50446048fdaa64786fc0840cb9f8",
+      source_commit: "d65f95169d71c3a8535355ececa782aa868071be",
+      source_url:
+        "https://github.com/jaegertracing/jaeger/tree/d65f95169d71c3a8535355ececa782aa868071be",
+      distribution_url:
+        "https://www.jaegertracing.io/docs/2.20/getting-started/",
+      licenses: ["Apache-2.0"],
+      platform_owner: "platform-engineering",
+      platforms: [
+        {
+          platform: "linux/amd64",
+          manifest_digest:
+            "sha256:4a130978c31a30d9baadd9fd902eeb779ed7bf2efd53e8b17bd79069e689da1b",
+          config_digest:
+            "sha256:9ae01775e2b2d4a7a957647fe6e733fe17ca8a2cec87ec8c893f730afe49bf00",
+          compressed_size_bytes: 50161833,
+        },
+        {
+          platform: "linux/arm64",
+          manifest_digest:
+            "sha256:1f94d894a3428ea91be4d79f92a743e7994a355b1919bbe7e7ecd59f19631fb0",
+          config_digest:
+            "sha256:7f9e11694bb8d2a2f6b570e66ab8f984413ea041ef3f1ecda9a1584657154d43",
+          compressed_size_bytes: 46903702,
+        },
+      ],
+    },
   ],
 };
 
@@ -1361,10 +1426,27 @@ describe("workspace and supply-chain boundaries", () => {
 });
 
 describe("container image inventory boundaries", () => {
-  it("accepts only the exact approved PostgreSQL 17 image descriptor", async () => {
+  it("accepts only the exact approved local-stack image descriptors", async () => {
     const root = await createCiRepository(exactContainerInventory);
 
     expect(await runChecker(root, "ci")).toEqual({ code: 0, stderr: "" });
+  });
+
+  it.each([
+    ["a missing approved image", 1],
+    ["a reordered approved image", 2],
+  ])("rejects %s", async (_label, imageIndex) => {
+    const inventory = structuredClone(exactContainerInventory);
+    if (imageIndex === 1) inventory.container_images.splice(imageIndex, 1);
+    else inventory.container_images.reverse();
+    const root = await createCiRepository(inventory);
+
+    const result = await runChecker(root, "ci");
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(
+      "ARTIFACT_INVENTORY_CONTAINER_IMAGE_INVALID",
+    );
   });
 
   it.each([
