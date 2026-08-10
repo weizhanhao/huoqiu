@@ -6,23 +6,31 @@ import { DemoDataBadge } from "../system/demo-data-badge";
 import { PageState } from "../system/page-state";
 import { type ActiveChannel, ChannelNavigation } from "./channel-navigation";
 import { MobileBottomNavigation } from "./mobile-bottom-navigation";
+import { NotificationNavigationLink } from "./notification-navigation-link";
 import { UnavailableAction } from "./unavailable-action";
 
 type DesktopShellProperties = Readonly<{
   activeChannel?: ActiveChannel | undefined;
+  activeUtility?: "notifications" | undefined;
   children: ReactNode;
   fixtureResult?: D0FixtureLoadResult;
 }>;
 
 export function DesktopShell({
   activeChannel,
+  activeUtility,
   children,
   fixtureResult = loadD0Fixture(),
 }: DesktopShellProperties) {
   const fixture = fixtureResult.status === "ready" ? fixtureResult.data : null;
+  const notificationsActive = activeUtility === "notifications";
 
   return (
-    <div className="d0-app-shell">
+    <div
+      className={`d0-app-shell${
+        notificationsActive ? " d0-app-shell-notifications" : ""
+      }`}
+    >
       <header className="d0-topbar">
         <Link className="d0-brand" href="/" aria-label="火球首页">
           <span className="brand-mark" aria-hidden="true">
@@ -43,7 +51,10 @@ export function DesktopShell({
           <button type="submit">搜索</button>
         </form>
         <nav className="top-actions" aria-label="顶部功能">
-          <UnavailableAction icon="●" label="消息" />
+          <NotificationNavigationLink
+            active={notificationsActive}
+            variant="top"
+          />
           <Link className="top-action-link" href="/publish">
             <span className="unavailable-icon" aria-hidden="true">
               ＋
@@ -74,12 +85,18 @@ export function DesktopShell({
             <Link href="/watchlist">自选</Link>
             <Link href="/markets">行情</Link>
             <Link href="/portfolios">组合</Link>
+            <NotificationNavigationLink
+              active={notificationsActive}
+              variant="sidebar"
+            />
           </nav>
           <p className="session-disclosure">仅本机演示，不会跨端同步</p>
         </aside>
 
         <main className="d0-main">
-          <ChannelNavigation activeChannel={activeChannel} />
+          {notificationsActive ? null : (
+            <ChannelNavigation activeChannel={activeChannel} />
+          )}
           {fixtureResult.status === "ready" ? (
             children
           ) : (
@@ -162,7 +179,7 @@ export function DesktopShell({
           </p>
         </aside>
       </div>
-      <MobileBottomNavigation />
+      <MobileBottomNavigation notificationsActive={notificationsActive} />
     </div>
   );
 }

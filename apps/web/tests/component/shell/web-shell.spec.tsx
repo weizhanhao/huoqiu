@@ -19,6 +19,13 @@ const renderActiveShell = (activeChannel: "home" | "watchlist"): string =>
     </DesktopShell>,
   );
 
+const renderNotificationShell = (): string =>
+  renderToStaticMarkup(
+    <DesktopShell activeUtility="notifications">
+      <p>页面内容</p>
+    </DesktopShell>,
+  );
+
 describe("financial community web shell", () => {
   it("renders semantic header, centered content, and both desktop sidebars", () => {
     const markup = renderShell();
@@ -98,11 +105,29 @@ describe("financial community web shell", () => {
     expect(markup).toContain(">设置<");
     expect(markup).toContain('aria-label="移动端主导航"');
 
-    for (const item of ["首页", "自选", "行情", "组合", "我的"]) {
+    for (const item of ["首页", "自选", "行情", "组合", "消息"]) {
       expect(markup).toContain(`>${item}<`);
     }
 
     expect(markup).not.toMatch(/<button\b(?![^>]*type="submit")[^>]*>/u);
+  });
+
+  it("exposes notifications from desktop, sidebar, and mobile navigation", () => {
+    const markup = renderShell();
+
+    expect(markup.match(/href="\/notifications"/gu)).toHaveLength(3);
+    expect(markup).not.toContain('aria-label="消息，暂未开放"');
+    expect(markup).toContain("未读通知");
+  });
+
+  it("marks every notification entry as current on the notification route", () => {
+    const markup = renderNotificationShell();
+
+    expect(
+      markup.match(
+        /<a[^>]*aria-current="page"[^>]*href="\/notifications"[^>]*>/gu,
+      ),
+    ).toHaveLength(3);
   });
 
   it("routes every completed product surface instead of labelling it unavailable", () => {
