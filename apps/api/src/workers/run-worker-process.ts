@@ -13,14 +13,22 @@ export const runWorkerProcess = async (
   start: () => Promise<WorkerRuntime>,
   options: RunWorkerProcessOptions = {},
 ): Promise<void> => {
-  const worker = await start();
   const shutdown = createShutdownSignalWaiter(options.signalSource ?? process);
+  let shutdownRequested = false;
+  const shutdownSignal = shutdown.promise.then((signal) => {
+    shutdownRequested = true;
+    return signal;
+  });
+  let worker: WorkerRuntime | undefined;
 
   try {
-    await options.onReady?.(worker);
-    await shutdown.promise;
+    worker = await start();
+    if (!shutdownRequested) {
+      await options.onReady?.(worker);
+    }
+    await shutdownSignal;
   } finally {
     shutdown.dispose();
-    await worker.stop();
+    await worker?.stop();
   }
 };

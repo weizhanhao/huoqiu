@@ -8,16 +8,31 @@ import {
   processConsumerRegistry,
 } from "./consumer-registry.js";
 import { runWorkerProcess } from "./run-worker-process.js";
-import { WorkerRuntime } from "./worker-runtime.js";
+import type {
+  WorkerAdapterMode,
+  WorkerRuntime,
+} from "./worker-runtime.js";
+import {
+  createRegisteredWorker,
+  defaultWorkerAdapterMode,
+  type WorkerComponentOverrides,
+} from "./worker-registry.js";
 
 type WorkerStartOptions = Readonly<{
+  adapterMode?: WorkerAdapterMode;
+  components?: WorkerComponentOverrides;
   registry?: ConsumerRegistry;
 }>;
 
 export const createMarketWorker = (
   options: WorkerStartOptions = {},
 ): WorkerRuntime =>
-  new WorkerRuntime("market", options.registry ?? processConsumerRegistry);
+  createRegisteredWorker(
+    "market",
+    options.registry ?? processConsumerRegistry,
+    options.components,
+    options.adapterMode ?? defaultWorkerAdapterMode(),
+  );
 
 export const startMarketWorker = async (
   options: WorkerStartOptions = {},
@@ -29,13 +44,17 @@ export const startMarketWorker = async (
 
 if (isDirectRun(import.meta.url)) {
   void runWorkerProcess(startMarketWorker, {
-    onReady: () => {
-      reportProcessReady({
+    onReady: (worker) => {
+      const readiness = {
         activeConsumers: processConsumerRegistry.activeConsumers(),
+        adapterMode: worker.adapterMode,
+        components: worker.componentNames(),
         consumer: "market",
+        durable: worker.adapterMode === "injected",
         event: "worker.ready",
         tcpServerCount: activeTcpServerCount(),
-      });
+      } as const;
+      reportProcessReady(readiness);
     },
   }).catch(() => {
     process.stderr.write(
