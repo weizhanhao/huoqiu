@@ -1,4 +1,5 @@
-import { randomBytes } from "node:crypto";
+import { Buffer } from "node:buffer";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { request as createHttpRequest } from "node:http";
 import { dirname } from "node:path";
@@ -96,11 +97,30 @@ export const loadLocalPreviewConfiguration = ({ argv, environment }) => {
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-const probeWebHealth = (port) =>
+const healthProofFor = (hmacSecret, challenge) =>
+  `v1=${createHmac("sha256", hmacSecret)
+    .update(`v1\npreview-health\n${challenge}`)
+    .digest("hex")}`;
+
+const exactProofMatch = (received, expected) => {
+  if (typeof received !== "string") return false;
+  const receivedBytes = Buffer.from(received, "utf8");
+  const expectedBytes = Buffer.from(expected, "utf8");
+  return (
+    receivedBytes.byteLength === expectedBytes.byteLength &&
+    timingSafeEqual(receivedBytes, expectedBytes)
+  );
+};
+
+const probeWebHealth = (port, hmacSecret, challenge) =>
   new Promise((resolve) => {
+    const expectedProof = healthProofFor(hmacSecret, challenge);
     const request = createHttpRequest(
       {
-        headers: { connection: "close" },
+        headers: {
+          connection: "close",
+          "x-huoqiu-preview-health-challenge": challenge,
+        },
         host: LOOPBACK_HOST,
         method: "GET",
         path: "/healthz",
@@ -108,8 +128,14 @@ const probeWebHealth = (port) =>
         timeout: 250,
       },
       (response) => {
+        const receivedProof = response.headers["x-huoqiu-preview-health-proof"];
         response.resume();
-        response.once("end", () => resolve(response.statusCode === 200));
+        response.once("end", () =>
+          resolve(
+            response.statusCode === 200 &&
+              exactProofMatch(receivedProof, expectedProof),
+          ),
+        );
       },
     );
     request.once("error", () => resolve(false));
@@ -120,13 +146,25 @@ const probeWebHealth = (port) =>
     request.end();
   });
 
-const waitForWeb = async (child, port, timeoutMilliseconds) => {
+const waitForWeb = async (
+  child,
+  port,
+  timeoutMilliseconds,
+  hmacSecret,
+  challenge,
+) => {
   const deadline = Date.now() + timeoutMilliseconds;
   while (Date.now() < deadline) {
     if (child.exitCode !== null || child.signalCode !== null) {
       throw new Error("PREVIEW_START_FAILED");
     }
-    if (await probeWebHealth(port)) return;
+    if (
+      (await probeWebHealth(port, hmacSecret, challenge)) &&
+      child.exitCode === null &&
+      child.signalCode === null
+    ) {
+      return;
+    }
     await delay(50);
   }
   throw new Error("PREVIEW_START_FAILED");
@@ -200,6 +238,7 @@ export const startLocalPreview = async (
   }
 
   const hmacSecret = randomBytes(32).toString("hex");
+  const healthChallenge = randomBytes(32).toString("hex");
   const child = spawn(
     process.execPath,
     [
@@ -218,7 +257,13 @@ export const startLocalPreview = async (
 
   let gateway;
   try {
-    await waitForWeb(child, configuration.webPort, readyTimeoutMilliseconds);
+    await waitForWeb(
+      child,
+      configuration.webPort,
+      readyTimeoutMilliseconds,
+      hmacSecret,
+      healthChallenge,
+    );
     gateway = createPreviewGateway({
       buildSha: configuration.productSha,
       gatewaySha: configuration.gatewaySha,

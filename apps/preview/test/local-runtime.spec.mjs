@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { createServer as createHttpServer } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -55,6 +56,7 @@ const dummyWebScript = async () => {
     scriptPath,
     `
       import { createServer } from "node:http";
+      import { createHmac } from "node:crypto";
       const portIndex = process.argv.indexOf("--port");
       const hostIndex = process.argv.indexOf("--hostname");
       const port = Number(process.argv[portIndex + 1]);
@@ -62,6 +64,16 @@ const dummyWebScript = async () => {
       const server = createServer((request, response) => {
         if (request.url === "/exit") process.exit(7);
         if (request.url === "/healthz") {
+          const challenge = request.headers["x-huoqiu-preview-health-challenge"];
+          if (typeof challenge === "string") {
+            const proof = createHmac(
+              "sha256",
+              process.env.ZERO_TRUST_HMAC_SECRET,
+            )
+              .update("v1\\npreview-health\\n" + challenge)
+              .digest("hex");
+            response.setHeader("x-huoqiu-preview-health-proof", "v1=" + proof);
+          }
           response.statusCode = 200;
           response.end("ok");
           return;
@@ -248,5 +260,45 @@ describe("local preview process lifecycle", () => {
     await assert.rejects(
       globalThis.fetch(runtime.address, { headers: { authorization } }),
     );
+  });
+
+  it("does not trust an unrelated process that preoccupies the Web port", async () => {
+    const [port, webPort] = await Promise.all([
+      availablePort(),
+      availablePort(),
+    ]);
+    const occupant = createHttpServer((_request, response) => {
+      response.statusCode = 200;
+      response.end("not-the-preview-child");
+    });
+    await new Promise((resolve, reject) => {
+      occupant.once("error", reject);
+      occupant.listen(webPort, "127.0.0.1", () => {
+        occupant.off("error", reject);
+        resolve();
+      });
+    });
+    resources.push(
+      () =>
+        new Promise((resolve) => {
+          occupant.close(() => resolve());
+          occupant.closeAllConnections();
+        }),
+    );
+    const configuration = loadLocalPreviewConfiguration({
+      argv: ["--port", String(port), "--web-port", String(webPort)],
+      environment: validEnvironment,
+    });
+    const { scriptPath: webStartScript } = await dummyWebScript();
+
+    await assert.rejects(
+      startLocalPreview(configuration, {
+        environment: process.env,
+        readyTimeoutMilliseconds: 1_000,
+        webStartScript,
+      }),
+      new Error("PREVIEW_START_FAILED"),
+    );
+    await assert.rejects(globalThis.fetch(`http://127.0.0.1:${port}`));
   });
 });
