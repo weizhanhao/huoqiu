@@ -12,6 +12,13 @@ const renderShell = (): string =>
     </DesktopShell>,
   );
 
+const renderActiveShell = (activeChannel: "home" | "watchlist"): string =>
+  renderToStaticMarkup(
+    <DesktopShell activeChannel={activeChannel}>
+      <p>页面内容</p>
+    </DesktopShell>,
+  );
+
 describe("financial community web shell", () => {
   it("renders semantic header, centered content, and both desktop sidebars", () => {
     const markup = renderShell();
@@ -50,6 +57,24 @@ describe("financial community web shell", () => {
     expect(markup).toMatch(/<details\b[^>]*class="unavailable-action"/u);
     expect(markup).toContain("此功能暂未开放");
     expect(markup).toContain("再次点击可收起");
+  });
+
+  it("marks only the active real channel as the current page", () => {
+    const homeChannels =
+      /<nav class="channel-tabs"[^>]*>([\s\S]*?)<\/nav>/u.exec(
+        renderActiveShell("home"),
+      )?.[1];
+    const watchlistChannels =
+      /<nav class="channel-tabs"[^>]*>([\s\S]*?)<\/nav>/u.exec(
+        renderActiveShell("watchlist"),
+      )?.[1];
+
+    expect(homeChannels).toMatch(/<a aria-current="page" href="\/">首页<\/a>/u);
+    expect(homeChannels).not.toMatch(/aria-current="page" href="\/watchlist"/u);
+    expect(watchlistChannels).toMatch(
+      /<a aria-current="page" href="\/watchlist">自选<\/a>/u,
+    );
+    expect(watchlistChannels).not.toMatch(/aria-current="page" href="\/"/u);
   });
 
   it("keeps search, watchlist, and synthetic instrument entry points working", () => {
@@ -102,5 +127,6 @@ describe("financial community web shell", () => {
       )?.[1];
     expect(searchButtonBlock).toContain("white-space: nowrap");
     expect(channelItemBlock).toContain("white-space: nowrap");
+    expect(stylesheet).toContain('.channel-tabs > a[aria-current="page"]');
   });
 });

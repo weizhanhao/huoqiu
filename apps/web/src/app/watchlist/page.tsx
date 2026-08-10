@@ -16,7 +16,7 @@ export default async function WatchlistPage({
   const state = normalizeD0FixtureState((await searchParams).fixture_state);
 
   return (
-    <DesktopShell fixtureResult={fixtureResult}>
+    <DesktopShell activeChannel="watchlist" fixtureResult={fixtureResult}>
       {fixtureResult.status === "ready" ? (
         <WatchlistPanel fixture={fixtureResult.data} state={state} />
       ) : null}

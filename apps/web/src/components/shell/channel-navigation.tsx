@@ -14,14 +14,32 @@ const unavailableChannels = [
   "ETF",
 ] as const;
 
-export function ChannelNavigation() {
+export type ActiveChannel = "home" | "watchlist";
+
+type ChannelNavigationProperties = Readonly<{
+  activeChannel?: ActiveChannel | undefined;
+}>;
+
+export function ChannelNavigation({
+  activeChannel,
+}: ChannelNavigationProperties) {
   return (
     <nav className="channel-tabs" aria-label="全局频道">
-      <Link href="/">首页</Link>
+      <Link
+        aria-current={activeChannel === "home" ? "page" : undefined}
+        href="/"
+      >
+        首页
+      </Link>
       {unavailableChannels.slice(0, 3).map((channel) => (
         <UnavailableAction label={channel} key={channel} />
       ))}
-      <Link href="/watchlist">自选</Link>
+      <Link
+        aria-current={activeChannel === "watchlist" ? "page" : undefined}
+        href="/watchlist"
+      >
+        自选
+      </Link>
       {unavailableChannels.slice(3).map((channel) => (
         <UnavailableAction label={channel} key={channel} />
       ))}

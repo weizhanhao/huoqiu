@@ -14,7 +14,7 @@ export default async function HomePage({ searchParams }: HomePageProperties) {
   const state = normalizeD0FixtureState((await searchParams).fixture_state);
 
   return (
-    <DesktopShell fixtureResult={fixtureResult}>
+    <DesktopShell activeChannel="home" fixtureResult={fixtureResult}>
       {fixtureResult.status === "ready" ? (
         <>
           <section className="feed-intro" aria-labelledby="feed-heading">

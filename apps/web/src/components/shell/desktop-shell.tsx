@@ -4,16 +4,18 @@ import type { ReactNode } from "react";
 import { loadD0Fixture, type D0FixtureLoadResult } from "../../lib/d0-fixture";
 import { DemoDataBadge } from "../system/demo-data-badge";
 import { PageState } from "../system/page-state";
-import { ChannelNavigation } from "./channel-navigation";
+import { type ActiveChannel, ChannelNavigation } from "./channel-navigation";
 import { MobileBottomNavigation } from "./mobile-bottom-navigation";
 import { UnavailableAction } from "./unavailable-action";
 
 type DesktopShellProperties = Readonly<{
+  activeChannel?: ActiveChannel | undefined;
   children: ReactNode;
   fixtureResult?: D0FixtureLoadResult;
 }>;
 
 export function DesktopShell({
+  activeChannel,
   children,
   fixtureResult = loadD0Fixture(),
 }: DesktopShellProperties) {
@@ -70,7 +72,7 @@ export function DesktopShell({
         </aside>
 
         <main className="d0-main">
-          <ChannelNavigation />
+          <ChannelNavigation activeChannel={activeChannel} />
           {fixtureResult.status === "ready" ? (
             children
           ) : (
