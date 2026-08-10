@@ -351,8 +351,8 @@ const hasUnsafeCredentialQuery = (requestUrl: URL): boolean =>
   );
 
 const isPublicPathCandidate = (requestUrl: URL): boolean => {
-  const path = routePath(requestUrl);
-  return path === "/healthz" || path.startsWith("/_next/static/");
+  const requestPath = routePath(requestUrl);
+  return requestPath === "/healthz" || requestPath.startsWith("/_next/static/");
 };
 
 const isPublicAllowlistRequest = (
@@ -366,10 +366,11 @@ const isPublicAllowlistRequest = (
     return false;
   }
 
-  const path = routePath(requestUrl);
+  const requestPath = routePath(requestUrl);
   return (
-    path === "/healthz" ||
-    (path.startsWith("/_next/static/") && hasSafeStaticSegments(path))
+    requestPath === "/healthz" ||
+    (requestPath.startsWith("/_next/static/") &&
+      hasSafeStaticSegments(requestPath))
   );
 };
 
