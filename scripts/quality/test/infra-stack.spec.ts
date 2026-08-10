@@ -48,7 +48,7 @@ describe("closed-alpha local stack", () => {
       services: Record<
         string,
         {
-          healthcheck?: unknown;
+          healthcheck?: { test?: string[] };
           image?: string;
           ports?: string[];
           volumes?: string[];
@@ -73,6 +73,10 @@ describe("closed-alpha local stack", () => {
     expect(Object.keys(compose.volumes).toSorted()).toEqual([
       "huoqiu-postgres-data",
       "huoqiu-valkey-data",
+    ]);
+    expect(compose.services.jaeger?.healthcheck?.test).toEqual([
+      "CMD-SHELL",
+      "wget -qO- http://127.0.0.1:13133/status | grep -Eq '\"healthy\"[[:space:]]*:[[:space:]]*true'",
     ]);
     expect(compose.services.jaeger?.volumes).toBeUndefined();
     expect(compose.services.postgres?.volumes).toContain(

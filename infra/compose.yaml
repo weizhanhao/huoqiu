@@ -60,7 +60,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://127.0.0.1:13133/status | grep -q 'Server available'",
+          'wget -qO- http://127.0.0.1:13133/status | grep -Eq ''"healthy"[[:space:]]*:[[:space:]]*true''',
         ]
       interval: 5s
       timeout: 3s
