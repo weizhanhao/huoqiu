@@ -253,6 +253,8 @@ describe("market and portfolio controls in a real browser DOM", () => {
   });
 
   it("has no serious or critical accessibility violations in the instrument detail", async () => {
+    const scope = await requiredControl(page.getByTestId("instrument-detail"));
+    await scope.getByRole("tab", { name: "成分股" }).click();
     const results = await new AxeBuilder({ page })
       .include('[data-testid="instrument-detail"]')
       .analyze();

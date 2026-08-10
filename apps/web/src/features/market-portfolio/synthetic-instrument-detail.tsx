@@ -279,7 +279,12 @@ export function SyntheticInstrumentDetail({
           ) : null}
 
           {activeTab === "constituents" ? (
-            <div className={styles.tableScroller}>
+            <div
+              aria-label={`${listing.name}固定合成成分横向滚动表格`}
+              className={styles.tableScroller}
+              role="region"
+              tabIndex={0}
+            >
               <table className={styles.dataTable}>
                 <caption>{listing.name}固定合成成分</caption>
                 <thead>

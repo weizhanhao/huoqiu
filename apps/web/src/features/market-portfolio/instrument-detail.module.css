@@ -429,6 +429,12 @@
   overflow-x: auto;
 }
 
+.tableScroller:focus-visible {
+  border-radius: var(--hq-radius-control);
+  box-shadow: inset var(--hq-shadow-focus);
+  outline: 2px solid transparent;
+}
+
 .dataTable {
   border-collapse: collapse;
   min-width: 560px;
