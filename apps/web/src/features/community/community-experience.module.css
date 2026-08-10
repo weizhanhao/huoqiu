@@ -202,15 +202,15 @@
 
 .composer,
 .replyComposer,
-.publisherForm {
+.publisher {
   display: grid;
   gap: 10px;
 }
 
 .composer textarea,
 .replyComposer input,
-.publisherForm textarea,
-.publisherForm input[type="text"] {
+.publisher textarea,
+.publisher input[type="text"] {
   background: var(--hq-surface-base);
   border: 1px solid var(--hq-surface-divider);
   border-radius: 10px;
@@ -222,7 +222,7 @@
 }
 
 .composer textarea,
-.publisherForm textarea {
+.publisher textarea {
   min-height: 112px;
   resize: vertical;
 }

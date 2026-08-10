@@ -117,7 +117,7 @@ export function PostDetail() {
           </div>
           <button
             aria-pressed={state.isFollowing}
-            className={state.isFollowing ? styles.actionActive : styles.action}
+            className={`${styles.action} ${state.isFollowing ? styles.actionActive : ""}`}
             onClick={() => setState((current) => toggleFollow(current))}
             type="button"
           >
@@ -151,7 +151,7 @@ export function PostDetail() {
         <div className={styles.actions} aria-label="帖子互动">
           <button
             aria-pressed={state.isLiked}
-            className={state.isLiked ? styles.actionActive : styles.action}
+            className={`${styles.action} ${state.isLiked ? styles.actionActive : ""}`}
             onClick={() =>
               setState((current) => toggleReaction(current, "like"))
             }
@@ -161,7 +161,7 @@ export function PostDetail() {
           </button>
           <button
             aria-pressed={state.isBookmarked}
-            className={state.isBookmarked ? styles.actionActive : styles.action}
+            className={`${styles.action} ${state.isBookmarked ? styles.actionActive : ""}`}
             onClick={() =>
               setState((current) => toggleReaction(current, "bookmark"))
             }
@@ -263,7 +263,8 @@ export function Publisher() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [preview, setPreview] = useState<PreviewImage | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -275,7 +276,8 @@ export function Publisher() {
   const changeMode = (nextMode: PublisherMode) => {
     setMode(nextMode);
     setError(null);
-    setMessage(null);
+    setNotice(null);
+    setSuccess(null);
   };
 
   const chooseImage = (event: ChangeEvent<HTMLInputElement>) => {
@@ -295,12 +297,14 @@ export function Publisher() {
     event.preventDefault();
     const result = publishDraft({ body, mode, title });
     setError(result.error);
-    setMessage(result.success);
+    setNotice(null);
+    setSuccess(result.success);
   };
 
   const announceUnavailable = (feature: string) => {
     setError(null);
-    setMessage(`${feature}选择器暂未开放。`);
+    setNotice(`${feature}选择器暂未开放。`);
+    setSuccess(null);
   };
 
   return (
@@ -409,9 +413,14 @@ export function Publisher() {
             {error}
           </p>
         ) : null}
-        {message ? (
-          <div className={styles.success} aria-live="polite">
-            <strong>{message}</strong>
+        {notice ? (
+          <p className={styles.notice} role="status">
+            {notice}
+          </p>
+        ) : null}
+        {success ? (
+          <div className={styles.success} role="status">
+            <strong>{success}</strong>
             <span>这是本地合成会话状态，未持久化。</span>
             <Link href="/community">返回社区</Link>
           </div>
