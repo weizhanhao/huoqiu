@@ -105,6 +105,20 @@ describe("financial community web shell", () => {
     expect(markup).not.toMatch(/<button\b(?![^>]*type="submit")[^>]*>/u);
   });
 
+  it("routes every completed product surface instead of labelling it unavailable", () => {
+    const markup = renderShell();
+
+    expect(markup.match(/href="\/publish"/gu)).toHaveLength(2);
+    expect(markup.match(/href="\/markets"/gu)).toHaveLength(2);
+    expect(markup.match(/href="\/portfolios"/gu)).toHaveLength(2);
+    expect(markup).toContain('href="/community"');
+    expect(markup).not.toContain('aria-label="发布，暂未开放"');
+    expect(markup).not.toContain('aria-label="写帖子，暂未开放"');
+    expect(markup).not.toContain('aria-label="行情，暂未开放"');
+    expect(markup).not.toContain('aria-label="组合，暂未开放"');
+    expect(markup).not.toContain('aria-label="热门，暂未开放"');
+  });
+
   it("defines a fixed mobile bottom bar and protects content from overlap", () => {
     const stylesheet = readFileSync(
       new URL("../../../src/app/globals.css", import.meta.url),

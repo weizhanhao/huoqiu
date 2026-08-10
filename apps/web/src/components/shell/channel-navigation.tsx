@@ -3,8 +3,6 @@ import Link from "next/link";
 import { UnavailableAction } from "./unavailable-action";
 
 const unavailableChannels = [
-  "关注",
-  "热门",
   "7x24",
   "视频",
   "基金",
@@ -14,7 +12,7 @@ const unavailableChannels = [
   "ETF",
 ] as const;
 
-export type ActiveChannel = "home" | "watchlist";
+export type ActiveChannel = "community" | "home" | "watchlist";
 
 type ChannelNavigationProperties = Readonly<{
   activeChannel?: ActiveChannel | undefined;
@@ -31,16 +29,21 @@ export function ChannelNavigation({
       >
         首页
       </Link>
-      {unavailableChannels.slice(0, 3).map((channel) => (
-        <UnavailableAction label={channel} key={channel} />
-      ))}
+      <UnavailableAction label="关注" />
+      <Link
+        aria-current={activeChannel === "community" ? "page" : undefined}
+        href="/community"
+      >
+        热门
+      </Link>
+      <UnavailableAction label="7x24" />
       <Link
         aria-current={activeChannel === "watchlist" ? "page" : undefined}
         href="/watchlist"
       >
         自选
       </Link>
-      {unavailableChannels.slice(3).map((channel) => (
+      {unavailableChannels.slice(1).map((channel) => (
         <UnavailableAction label={channel} key={channel} />
       ))}
     </nav>

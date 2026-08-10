@@ -3,7 +3,7 @@ import { CommunityFeed } from "../../features/community/community-experience";
 
 export default function CommunityPage() {
   return (
-    <DesktopShell>
+    <DesktopShell activeChannel="community">
       <CommunityFeed />
     </DesktopShell>
   );

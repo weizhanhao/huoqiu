@@ -13,8 +13,14 @@ export function MobileBottomNavigation() {
         <span aria-hidden="true">☆</span>
         <span>自选</span>
       </Link>
-      <UnavailableAction icon="⌁" label="行情" />
-      <UnavailableAction icon="◫" label="组合" />
+      <Link href="/markets">
+        <span aria-hidden="true">⌁</span>
+        <span>行情</span>
+      </Link>
+      <Link href="/portfolios">
+        <span aria-hidden="true">◫</span>
+        <span>组合</span>
+      </Link>
       <UnavailableAction icon="○" label="我的" />
     </nav>
   );

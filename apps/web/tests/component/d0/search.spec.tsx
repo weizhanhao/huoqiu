@@ -46,6 +46,17 @@ describe("D0 instrument search", () => {
     expect(markup).toContain("108.64");
   });
 
+  it("searches the complete synthetic market universe", () => {
+    const fixture = readyFixture();
+    const markup = renderToStaticMarkup(
+      <InstrumentSearch fixture={fixture} query="SYN002" state="normal" />,
+    );
+
+    expect(markup).toContain('href="/instruments/listing_syn_0002"');
+    expect(markup).toContain("星港制造");
+    expect(markup).toContain("42.68");
+  });
+
   it("preserves a no-result query and shows an explicit empty state", () => {
     const markup = renderToStaticMarkup(
       <InstrumentSearch

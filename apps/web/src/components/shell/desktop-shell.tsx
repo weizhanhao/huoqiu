@@ -44,7 +44,12 @@ export function DesktopShell({
         </form>
         <nav className="top-actions" aria-label="顶部功能">
           <UnavailableAction icon="●" label="消息" />
-          <UnavailableAction icon="＋" label="发布" />
+          <Link className="top-action-link" href="/publish">
+            <span className="unavailable-icon" aria-hidden="true">
+              ＋
+            </span>
+            <span>发布</span>
+          </Link>
           <UnavailableAction icon="⚙" label="设置" />
         </nav>
         <DemoDataBadge />
@@ -61,12 +66,14 @@ export function DesktopShell({
               <small>固定 Fixture 身份</small>
             </div>
           </div>
-          <UnavailableAction icon="＋" label="写帖子" />
+          <Link className="sidebar-publish" href="/publish">
+            ＋ 写帖子
+          </Link>
           <nav aria-label="主导航">
             <Link href="/">首页</Link>
             <Link href="/watchlist">自选</Link>
-            <UnavailableAction icon="⌁" label="行情" />
-            <UnavailableAction icon="◫" label="组合" />
+            <Link href="/markets">行情</Link>
+            <Link href="/portfolios">组合</Link>
           </nav>
           <p className="session-disclosure">仅本机演示，不会跨端同步</p>
         </aside>

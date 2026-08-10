@@ -1,6 +1,7 @@
 import type { D0Fixture } from "@huoqiu/contracts/d0";
 import Link from "next/link";
 
+import { syntheticListings } from "../../features/market-portfolio/synthetic-data";
 import { PageState } from "../system/page-state";
 
 export type D0Instrument = D0Fixture["instruments"][number];
@@ -21,6 +22,60 @@ export const searchD0Listings = (
       instrument.pinyin,
       ...instrument.aliases,
     ].some((value) => value.toLocaleLowerCase("zh-CN").includes(normalized)),
+  );
+};
+
+type InstrumentSearchResult = Readonly<{
+  changePct: number;
+  currency: string;
+  listingId: string;
+  market: string;
+  name: string;
+  price: string;
+  symbol: string;
+}>;
+
+const searchInstrumentListings = (
+  query: string,
+  fixture: D0Fixture,
+): readonly InstrumentSearchResult[] => {
+  const normalized = query.trim().toLocaleLowerCase("zh-CN");
+  if (normalized.length === 0) return [];
+
+  const fixtureResults = searchD0Listings(query, fixture).map((instrument) => {
+    const quote = fixture.quotes.find(
+      (candidate) => candidate.listing_id === instrument.listing_id,
+    );
+    return {
+      changePct: Number(quote?.change_pct ?? 0),
+      currency: instrument.currency,
+      listingId: instrument.listing_id,
+      market: instrument.market,
+      name: instrument.name,
+      price: quote?.last ?? "--",
+      symbol: instrument.symbol,
+    };
+  });
+  const marketResults = syntheticListings
+    .filter((listing) =>
+      [listing.symbol, listing.name].some((value) =>
+        value.toLocaleLowerCase("zh-CN").includes(normalized),
+      ),
+    )
+    .map((listing) => ({
+      changePct: listing.changePct,
+      currency: listing.currency,
+      listingId: listing.listingId,
+      market: listing.marketLabel,
+      name: listing.name,
+      price: listing.price,
+      symbol: listing.symbol,
+    }));
+
+  return [...fixtureResults, ...marketResults].filter(
+    (candidate, index, entries) =>
+      entries.findIndex((entry) => entry.listingId === candidate.listingId) ===
+      index,
   );
 };
 
@@ -45,7 +100,7 @@ export function InstrumentSearch({
     );
   }
 
-  const results = searchD0Listings(query, fixture);
+  const results = searchInstrumentListings(query, fixture);
   const hasQuery = query.trim().length > 0;
 
   return (
@@ -76,12 +131,10 @@ export function InstrumentSearch({
       ) : (
         <ul className="search-results" aria-label="演示标的搜索结果">
           {results.map((instrument) => {
-            const quote = fixture.quotes.find(
-              (candidate) => candidate.listing_id === instrument.listing_id,
-            );
+            const isUp = instrument.changePct >= 0;
             return (
-              <li key={instrument.listing_id}>
-                <Link href={`/instruments/${instrument.listing_id}`}>
+              <li key={instrument.listingId}>
+                <Link href={`/instruments/${instrument.listingId}`}>
                   <span>
                     <strong>{instrument.name}</strong>
                     <small>
@@ -89,9 +142,14 @@ export function InstrumentSearch({
                       {instrument.currency}
                     </small>
                   </span>
-                  <span className="search-result-price market-up">
-                    <strong>{quote?.last ?? "--"}</strong>
-                    <small>+{quote?.change_pct ?? "--"}%</small>
+                  <span
+                    className={`search-result-price ${isUp ? "market-up" : "market-down"}`}
+                  >
+                    <strong>{instrument.price}</strong>
+                    <small>
+                      {isUp ? "+" : ""}
+                      {instrument.changePct.toFixed(2)}%
+                    </small>
                   </span>
                 </Link>
               </li>
