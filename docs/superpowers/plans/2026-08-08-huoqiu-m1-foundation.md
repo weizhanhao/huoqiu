@@ -659,6 +659,7 @@ git commit -m "feat(market): add deterministic synthetic provider"
 - Modify: `scripts/quality/check-boundaries.mts`
 - Modify: `scripts/quality/test/check-boundaries.spec.ts`
 - Modify: `scripts/quality/test/ci-workflow.spec.ts`
+- Create: `scripts/quality/test/infra-stack.spec.ts`
 - Create: `apps/api/src/config/runtime-configuration.ts`
 - Create: `apps/api/src/observability/telemetry.ts`
 - Modify: `apps/api/src/workers/events.main.ts`
