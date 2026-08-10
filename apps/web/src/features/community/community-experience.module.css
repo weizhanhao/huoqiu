@@ -1,0 +1,282 @@
+.section {
+  display: grid;
+  gap: 18px;
+  max-width: 760px;
+  min-width: 0;
+  padding: 4px 0 28px;
+}
+
+.eyebrow,
+.kind,
+.meta,
+.notice,
+.disclosure,
+.cardFooter,
+.commentTime,
+.previewMeta {
+  color: var(--hq-text-tertiary);
+  font-size: 0.82rem;
+}
+
+.intro,
+.card,
+.detail,
+.publisher,
+.comment,
+.reply,
+.risk,
+.mediaPreview {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-surface-divider);
+  border-radius: var(--hq-radius-card);
+}
+
+.intro,
+.detail,
+.publisher {
+  padding: 22px;
+}
+
+.intro {
+  display: grid;
+  gap: 10px;
+}
+
+.intro h2,
+.detail h2,
+.publisher h2 {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  letter-spacing: -0.03em;
+}
+
+.channels,
+.actions,
+.composerActions,
+.toolRow,
+.authorRow,
+.cardFooter,
+.modeTabs {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.channels {
+  border-bottom: 1px solid var(--hq-surface-divider);
+  padding-bottom: 10px;
+}
+
+.channel,
+.action,
+.modeTab,
+.toolButton,
+.submit,
+.remove {
+  border: 1px solid var(--hq-surface-divider);
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  min-height: 36px;
+  padding: 7px 12px;
+}
+
+.channel,
+.action,
+.modeTab,
+.toolButton,
+.remove {
+  background: var(--hq-surface-base);
+  color: var(--hq-text-primary);
+}
+
+.channel[aria-pressed="true"],
+.modeTab[aria-pressed="true"],
+.actionActive,
+.submit {
+  background: var(--hq-brand-primary);
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-brand-on-primary);
+}
+
+.feed {
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  display: grid;
+  gap: 11px;
+  padding: 18px;
+}
+
+.card h3,
+.comment h3 {
+  font-size: 1rem;
+}
+
+.kind {
+  background: var(--hq-surface-subtle);
+  border-radius: 999px;
+  display: inline-block;
+  padding: 3px 8px;
+  width: fit-content;
+}
+
+.card p,
+.detailBody,
+.comment p,
+.reply p,
+.disclosure,
+.risk p {
+  line-height: 1.65;
+}
+
+.cardFooter {
+  justify-content: space-between;
+}
+
+.cardFooter a,
+.backLink,
+.success a {
+  color: var(--hq-brand-primary);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.detail {
+  display: grid;
+  gap: 16px;
+}
+
+.authorRow {
+  justify-content: space-between;
+}
+
+.authorMeta {
+  display: grid;
+  gap: 3px;
+}
+
+.instrumentList,
+.commentList,
+.replyList {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.instrumentList {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.instrumentList li {
+  background: var(--hq-surface-subtle);
+  border-radius: 8px;
+  padding: 9px;
+}
+
+.risk {
+  border-left: 4px solid var(--hq-brand-primary);
+  padding: 14px;
+}
+
+.comment,
+.reply {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.replyList {
+  border-left: 2px solid var(--hq-surface-divider);
+  margin-left: 4px;
+  padding-left: 12px;
+}
+
+.reply {
+  background: var(--hq-surface-subtle);
+}
+
+.composer,
+.replyComposer,
+.publisherForm {
+  display: grid;
+  gap: 10px;
+}
+
+.composer textarea,
+.replyComposer input,
+.publisherForm textarea,
+.publisherForm input[type="text"] {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-surface-divider);
+  border-radius: 10px;
+  color: var(--hq-text-primary);
+  font: inherit;
+  min-height: 42px;
+  padding: 10px;
+  width: 100%;
+}
+
+.composer textarea,
+.publisherForm textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.publisher {
+  display: grid;
+  gap: 16px;
+}
+
+.fileInput {
+  max-width: 100%;
+}
+
+.mediaPreview {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.mediaPreview img {
+  border-radius: 8px;
+  max-height: 250px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.success {
+  background: var(--hq-surface-subtle);
+  border: 1px solid var(--hq-brand-primary);
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+}
+
+.error {
+  color: #b42318;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .intro,
+  .detail,
+  .publisher {
+    padding: 16px;
+  }
+
+  .authorRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cardFooter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
