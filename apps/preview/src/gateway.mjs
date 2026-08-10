@@ -212,6 +212,12 @@ const safeRequestTarget = (rawTarget) => {
   }
 };
 
+const nextVisibleRequestTarget = (target) => {
+  const parsed = new URL(target, "http://preview.invalid");
+  parsed.searchParams.delete("_rsc");
+  return `${parsed.pathname}${parsed.search}`;
+};
+
 const readBoundedBody = (request) =>
   new Promise((resolve) => {
     const rawContentLength = request.headers["content-length"];
@@ -353,7 +359,12 @@ export const createPreviewGateway = (options) => {
 
         const upstreamRequest = createUpstreamRequest(
           {
-            headers: edgeHeadersFor(request, options, target, bodyResult.body),
+            headers: edgeHeadersFor(
+              request,
+              options,
+              nextVisibleRequestTarget(target),
+              bodyResult.body,
+            ),
             host: LOOPBACK_HOST,
             maxHeaderSize: 16 * 1024,
             method,

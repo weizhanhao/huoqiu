@@ -308,6 +308,37 @@ describe("preview-to-Web trust boundary", () => {
       );
     }
   });
+
+  it("signs the target exactly as Next exposes it after removing its RSC cache key", async () => {
+    const preview = await capturingFixture();
+    const target = "/search?q=a%20b&_rsc=browser-cache-buster";
+
+    const response = await globalThis.fetch(
+      `http://${HOST}:${preview.gatewayPort}${target}`,
+      { headers: authenticatedHeaders() },
+    );
+    const received = await response.json();
+    const issuedAt = String(FIXED_NOW / 1000);
+    const canonical = [
+      "v1",
+      "GET",
+      "/search?q=a+b",
+      "preview-user",
+      "huoqiu-local-preview",
+      "true",
+      issuedAt,
+    ].join("\n");
+    const expectedSignature = `v1=${createHmac("sha256", HMAC_SECRET)
+      .update(canonical)
+      .digest("hex")}`;
+
+    assert.equal(response.status, 200);
+    assert.equal(received.url, target);
+    assert.equal(
+      received.headers["x-huoqiu-edge-signature"],
+      expectedSignature,
+    );
+  });
 });
 
 describe("preview request limits", () => {

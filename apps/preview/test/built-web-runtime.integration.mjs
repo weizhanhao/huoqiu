@@ -84,6 +84,12 @@ describe("built Web preview integration", () => {
         "unreviewed",
       );
       assert.match(await shellResponse.text(), /火球/u);
+
+      const rscResponse = await globalThis.fetch(
+        `${runtime.address}/search?q=SYN001&_rsc=browser-cache-buster`,
+        { headers },
+      );
+      assert.equal(rscResponse.status, 200);
     } finally {
       await runtime.close();
     }
