@@ -2,6 +2,7 @@ import { cssVariables } from "@huoqiu/web-ui";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { syntheticListings } from "../features/market-portfolio/synthetic-data";
 import { loadD0Fixture } from "../lib/d0-fixture";
 import { D0WatchlistProvider } from "../stores/d0-watchlist";
 
@@ -18,12 +19,18 @@ type RootLayoutProperties = Readonly<{
 
 export default function RootLayout({ children }: RootLayoutProperties) {
   const fixtureResult = loadD0Fixture();
-  const knownListingIds =
+  const fixtureListingIds =
     fixtureResult.status === "ready"
       ? fixtureResult.data.instruments.map(
           (instrument) => instrument.listing_id,
         )
       : [];
+  const knownListingIds = [
+    ...new Set([
+      ...fixtureListingIds,
+      ...syntheticListings.map((listing) => listing.listingId),
+    ]),
+  ];
 
   return (
     <html lang="zh-CN">

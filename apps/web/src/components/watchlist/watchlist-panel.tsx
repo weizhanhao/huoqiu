@@ -3,8 +3,9 @@
 import type { D0Fixture } from "@huoqiu/contracts/d0";
 import Link from "next/link";
 
-import { useD0Watchlist } from "../../stores/d0-watchlist";
+import { syntheticListings } from "../../features/market-portfolio/synthetic-data";
 import type { D0PageState } from "../../lib/d0-page-state";
+import { useD0Watchlist } from "../../stores/d0-watchlist";
 import { DemoDataBadge } from "../system/demo-data-badge";
 import { PageState } from "../system/page-state";
 import { WatchlistToggle } from "./watchlist-toggle";
@@ -14,21 +15,54 @@ type WatchlistPanelProperties = Readonly<{
   state?: D0PageState;
 }>;
 
+type WatchlistEntry = Readonly<{
+  listingId: string;
+  market: string;
+  name: string;
+  price: string;
+  symbol: string;
+  changePct: string;
+}>;
+
 export function WatchlistPanel({
   fixture,
   state = "normal",
 }: WatchlistPanelProperties) {
   const { listingIds } = useD0Watchlist();
-  const entries = listingIds.flatMap((listingId) => {
+  const entries = listingIds.flatMap<WatchlistEntry>((listingId) => {
     const instrument = fixture.instruments.find(
       (candidate) => candidate.listing_id === listingId,
     );
     const quote = fixture.quotes.find(
       (candidate) => candidate.listing_id === listingId,
     );
-    return instrument === undefined || quote === undefined
+    if (instrument !== undefined && quote !== undefined) {
+      return [
+        {
+          listingId: instrument.listing_id,
+          market: instrument.market,
+          name: instrument.name,
+          price: quote.last,
+          symbol: instrument.symbol,
+          changePct: quote.change_pct,
+        },
+      ];
+    }
+    const syntheticListing = syntheticListings.find(
+      (candidate) => candidate.listingId === listingId,
+    );
+    return syntheticListing === undefined
       ? []
-      : [{ instrument, quote }];
+      : [
+          {
+            listingId: syntheticListing.listingId,
+            market: syntheticListing.marketLabel,
+            name: syntheticListing.name,
+            price: syntheticListing.price,
+            symbol: syntheticListing.symbol,
+            changePct: syntheticListing.changePct.toFixed(2),
+          },
+        ];
   });
 
   return (
@@ -65,29 +99,29 @@ export function WatchlistPanel({
               </tr>
             </thead>
             <tbody>
-              {entries.map(({ instrument, quote }) => {
-                const isUp = !quote.change.startsWith("-");
+              {entries.map((entry) => {
+                const isUp = !entry.changePct.startsWith("-");
                 const prefix = isUp ? "+" : "";
                 return (
-                  <tr key={instrument.listing_id}>
+                  <tr key={entry.listingId}>
                     <th scope="row">
-                      <Link href={`/instruments/${instrument.listing_id}`}>
-                        <strong>{instrument.name}</strong>
+                      <Link href={`/instruments/${entry.listingId}`}>
+                        <strong>{entry.name}</strong>
                         <small>
-                          {instrument.symbol} · {instrument.market}
+                          {entry.symbol} · {entry.market} · synthetic
                         </small>
                       </Link>
                     </th>
                     <td className={isUp ? "market-up" : "market-down"}>
-                      {quote.last}
+                      {entry.price}
                     </td>
                     <td className={isUp ? "market-up" : "market-down"}>
                       {prefix}
-                      {quote.change_pct}%
+                      {entry.changePct}%
                     </td>
                     <td>
                       <WatchlistToggle
-                        listingId={instrument.listing_id}
+                        listingId={entry.listingId}
                         removeLabel="移出自选"
                       />
                     </td>

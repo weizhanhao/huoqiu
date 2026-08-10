@@ -3,6 +3,8 @@ import { QuoteHeader } from "../../../components/instrument/quote-header";
 import { DesktopShell } from "../../../components/shell/desktop-shell";
 import { UnavailableAction } from "../../../components/shell/unavailable-action";
 import { PageState } from "../../../components/system/page-state";
+import { SyntheticInstrumentDetail } from "../../../features/market-portfolio/synthetic-instrument-detail";
+import { syntheticListings } from "../../../features/market-portfolio/synthetic-data";
 import { loadD0Fixture } from "../../../lib/d0-fixture";
 import { normalizeD0FixtureState } from "../../../lib/d0-page-state";
 
@@ -15,11 +17,20 @@ type InstrumentPageProperties = Readonly<{
 
 export const generateStaticParams = () => {
   const result = loadD0Fixture();
-  return result.status === "ready"
-    ? result.data.instruments.map((instrument) => ({
-        listingId: instrument.listing_id,
-      }))
-    : [];
+  const fixtureParams =
+    result.status === "ready"
+      ? result.data.instruments.map((instrument) => ({
+          listingId: instrument.listing_id,
+        }))
+      : [];
+  return [
+    ...fixtureParams,
+    ...syntheticListings.map((listing) => ({ listingId: listing.listingId })),
+  ].filter(
+    (candidate, index, entries) =>
+      entries.findIndex((entry) => entry.listingId === candidate.listingId) ===
+      index,
+  );
 };
 
 export default async function InstrumentPage({
@@ -43,6 +54,9 @@ export default async function InstrumentPage({
   const series = fixtureResult.data.bars.find(
     (candidate) => candidate.listing_id === listingId,
   );
+  const syntheticListing = syntheticListings.find(
+    (candidate) => candidate.listingId === listingId,
+  );
 
   return (
     <DesktopShell fixtureResult={fixtureResult}>
@@ -53,7 +67,11 @@ export default async function InstrumentPage({
           errorMessage="演示标的详情暂时不可用"
         />
       ) : instrument === undefined || quote === undefined ? (
-        <PageState state="empty" emptyMessage="没有这个演示标的" />
+        syntheticListing === undefined ? (
+          <PageState state="empty" emptyMessage="没有这个演示标的" />
+        ) : (
+          <SyntheticInstrumentDetail listing={syntheticListing} />
+        )
       ) : (
         <div className="instrument-detail">
           <QuoteHeader instrument={instrument} quote={quote} />
