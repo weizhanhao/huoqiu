@@ -1,8 +1,14 @@
 import Link from "next/link";
 
-import { UnavailableAction } from "./unavailable-action";
+import { NotificationNavigationLink } from "./notification-navigation-link";
 
-export function MobileBottomNavigation() {
+type MobileBottomNavigationProperties = Readonly<{
+  notificationsActive?: boolean;
+}>;
+
+export function MobileBottomNavigation({
+  notificationsActive = false,
+}: MobileBottomNavigationProperties) {
   return (
     <nav className="mobile-bottom-nav" aria-label="移动端主导航">
       <Link href="/">
@@ -21,7 +27,10 @@ export function MobileBottomNavigation() {
         <span aria-hidden="true">◫</span>
         <span>组合</span>
       </Link>
-      <UnavailableAction icon="○" label="我的" />
+      <NotificationNavigationLink
+        active={notificationsActive}
+        variant="mobile"
+      />
     </nav>
   );
 }

@@ -2,6 +2,7 @@ import { cssVariables } from "@huoqiu/web-ui";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { NotificationSessionProvider } from "../features/notifications/notification-state";
 import { syntheticListings } from "../features/market-portfolio/synthetic-data";
 import { loadD0Fixture } from "../lib/d0-fixture";
 import { D0WatchlistProvider } from "../stores/d0-watchlist";
@@ -38,12 +39,14 @@ export default function RootLayout({ children }: RootLayoutProperties) {
         <style dangerouslySetInnerHTML={{ __html: cssVariables }} />
       </head>
       <body>
-        <D0WatchlistProvider knownListingIds={knownListingIds}>
-          <span className="visually-hidden">
-            自选数据仅当前会话保存，刷新后重置
-          </span>
-          {children}
-        </D0WatchlistProvider>
+        <NotificationSessionProvider>
+          <D0WatchlistProvider knownListingIds={knownListingIds}>
+            <span className="visually-hidden">
+              自选与消息状态仅当前会话保存，刷新后重置
+            </span>
+            {children}
+          </D0WatchlistProvider>
+        </NotificationSessionProvider>
       </body>
     </html>
   );
