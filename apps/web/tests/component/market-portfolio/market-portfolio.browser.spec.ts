@@ -289,6 +289,26 @@ describe("market and portfolio controls in a real browser DOM", () => {
     expect(await relatedEtfs.getAttribute("tabindex")).toBe("-1");
   });
 
+  it("gives the publish-discussion link the project touch target", async () => {
+    const scope = await requiredControl(page.getByTestId("instrument-detail"));
+    const publish = scope.getByRole("link", {
+      exact: true,
+      name: "＋ 发讨论",
+    });
+    const bounds = await publish.boundingBox();
+    const minimum = await page.evaluate(() =>
+      Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          "--hq-touch-web-minimum",
+        ),
+      ),
+    );
+
+    expect(bounds).not.toBeNull();
+    expect(bounds?.width).toBeGreaterThanOrEqual(minimum);
+    expect(bounds?.height).toBeGreaterThanOrEqual(minimum);
+  });
+
   it("keeps instrument detail panels inside a 390px mobile viewport", async () => {
     const scope = await requiredControl(page.getByTestId("instrument-detail"));
     const quotePanel = scope.locator("header").first();

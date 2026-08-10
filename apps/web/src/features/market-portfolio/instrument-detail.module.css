@@ -325,9 +325,12 @@
 }
 
 .discussionToolbar > a {
+  align-items: center;
   color: var(--hq-brand-primary);
+  display: inline-flex;
   font-size: 13px;
   font-weight: var(--hq-type-weight-semibold);
+  min-height: var(--hq-touch-web-minimum);
   text-decoration: none;
 }
 
