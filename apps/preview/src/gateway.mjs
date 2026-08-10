@@ -1,4 +1,9 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from "node:crypto";
 import { Buffer } from "node:buffer";
 import { createServer, request as createUpstreamRequest } from "node:http";
 import { clearTimeout, setTimeout } from "node:timers";
@@ -157,14 +162,22 @@ const validateOptions = (options) => {
 const edgeHeadersFor = (request, options, target, body) => {
   const issuedAt = String(Math.floor((options.now ?? Date.now)() / 1000));
   const method = request.method ?? "GET";
+  const nonce = randomBytes(16).toString("hex");
+  const contentType = request.headers["content-type"] ?? "";
+  const bodyLength = String(body.byteLength);
+  const bodySha256 = createHash("sha256").update(body).digest("hex");
   const canonical = [
-    "v1",
+    "v2",
     method,
     target,
     EDGE_SUBJECT,
     EDGE_ISSUER,
     "true",
     issuedAt,
+    nonce,
+    contentType,
+    bodyLength,
+    bodySha256,
   ].join("\n");
   const signature = createHmac("sha256", options.hmacSecret)
     .update(canonical)
@@ -172,9 +185,12 @@ const edgeHeadersFor = (request, options, target, body) => {
   const headers = {
     cookie: DEMO_SESSION_COOKIE,
     "x-huoqiu-alpha-access": "true",
+    "x-huoqiu-edge-body-length": bodyLength,
+    "x-huoqiu-edge-body-sha256": bodySha256,
     "x-huoqiu-edge-issued-at": issuedAt,
     "x-huoqiu-edge-issuer": EDGE_ISSUER,
-    "x-huoqiu-edge-signature": `v1=${signature}`,
+    "x-huoqiu-edge-nonce": nonce,
+    "x-huoqiu-edge-signature": `v2=${signature}`,
     "x-huoqiu-edge-subject": EDGE_SUBJECT,
   };
   for (const name of FORWARDED_REQUEST_HEADERS) {

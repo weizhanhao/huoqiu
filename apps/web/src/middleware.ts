@@ -20,7 +20,14 @@ export const WEB_SESSION_COOKIE = Object.freeze({
 
 type RuntimeEnvironment = Readonly<Record<string, string | undefined>>;
 
+type EdgeNonceConsumer = (
+  key: string,
+  expiresAtMilliseconds: number,
+  nowMilliseconds: number,
+) => boolean;
+
 type WebBoundaryRuntime = Readonly<{
+  consumeEdgeNonce: EdgeNonceConsumer;
   environment: RuntimeEnvironment;
   now: () => number;
 }>;
@@ -28,14 +35,20 @@ type WebBoundaryRuntime = Readonly<{
 const EDGE_SUBJECT_HEADER = "x-huoqiu-edge-subject";
 const EDGE_ISSUER_HEADER = "x-huoqiu-edge-issuer";
 const ALPHA_ACCESS_HEADER = "x-huoqiu-alpha-access";
+const EDGE_BODY_LENGTH_HEADER = "x-huoqiu-edge-body-length";
+const EDGE_BODY_SHA256_HEADER = "x-huoqiu-edge-body-sha256";
 const EDGE_ISSUED_AT_HEADER = "x-huoqiu-edge-issued-at";
+const EDGE_NONCE_HEADER = "x-huoqiu-edge-nonce";
 const EDGE_SIGNATURE_HEADER = "x-huoqiu-edge-signature";
 const MAX_IDENTITY_FIELD_LENGTH = 256;
 const CONTROL_CHARACTER_PATTERN = /\p{C}/u;
 const EDGE_TEXT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@/-]*$/u;
 const ALPHA_VALUE_PATTERN = /^[^,\s]{0,16}$/u;
 const UNIX_SECONDS_PATTERN = /^(?:0|[1-9]\d*)$/u;
-const SIGNATURE_PATTERN = /^v1=([0-9a-f]{64})$/u;
+const EDGE_NONCE_PATTERN = /^[0-9a-f]{32}$/u;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
+const SIGNATURE_PATTERN = /^v2=([0-9a-f]{64})$/u;
+const DEFAULT_EDGE_NONCE_CAPACITY = 4096;
 const MAX_SESSION_COOKIE_LENGTH = 4096;
 const MAX_INSPECTED_BODY_BYTES = 8 * 1024;
 const MAX_INSPECTED_BODY_NODES = 1024;
@@ -61,6 +74,34 @@ const BODY_CREDENTIAL_FIELD_FRAGMENTS = [
 const BEARER_VALUE_PATTERN = /^\s*(?:basic|bearer)\s+\S/iu;
 const textEncoder = new TextEncoder();
 const BODY_READ_TIMEOUT = Symbol("BODY_READ_TIMEOUT");
+
+export const createEdgeNonceGuard = (
+  capacity = DEFAULT_EDGE_NONCE_CAPACITY,
+): EdgeNonceConsumer => {
+  if (!Number.isSafeInteger(capacity) || capacity < 1) {
+    throw new Error("EDGE_NONCE_GUARD_INVALID");
+  }
+  const expirations = new Map<string, number>();
+
+  return (key, expiresAtMilliseconds, nowMilliseconds) => {
+    if (
+      key.length === 0 ||
+      !Number.isSafeInteger(expiresAtMilliseconds) ||
+      !Number.isSafeInteger(nowMilliseconds) ||
+      expiresAtMilliseconds <= nowMilliseconds
+    ) {
+      return false;
+    }
+    for (const [knownKey, expiration] of expirations) {
+      if (expiration <= nowMilliseconds) expirations.delete(knownKey);
+    }
+    if (expirations.has(key) || expirations.size >= capacity) return false;
+    expirations.set(key, expiresAtMilliseconds);
+    return true;
+  };
+};
+
+const consumeProductionEdgeNonce = createEdgeNonceGuard();
 
 const rejection = (status: 401 | 403 | 503, message: string): NextResponse =>
   new NextResponse(message, {
@@ -91,6 +132,14 @@ const decodeHex = (value: string): Uint8Array<ArrayBuffer> => {
   return bytes;
 };
 
+const encodeHex = (value: ArrayBuffer): string =>
+  [...new Uint8Array(value)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+
+const sha256Hex = async (value: Uint8Array<ArrayBuffer>): Promise<string> =>
+  encodeHex(await globalThis.crypto.subtle.digest("SHA-256", value));
+
 const verifyHmac = async (
   secret: string,
   canonical: string,
@@ -120,20 +169,30 @@ const hasValidEdgeProof = async (
   request: NextRequest,
   configuration: ZeroTrustConfiguration,
   nowMilliseconds: number,
+  consumeEdgeNonce: EdgeNonceConsumer,
 ): Promise<boolean> => {
   const subject = request.headers.get(EDGE_SUBJECT_HEADER);
   const issuer = request.headers.get(EDGE_ISSUER_HEADER);
   const alphaAccess = request.headers.get(ALPHA_ACCESS_HEADER) ?? "";
+  const bodyLengthValue = request.headers.get(EDGE_BODY_LENGTH_HEADER);
+  const bodySha256Value = request.headers.get(EDGE_BODY_SHA256_HEADER);
   const issuedAtValue = request.headers.get(EDGE_ISSUED_AT_HEADER);
+  const nonce = request.headers.get(EDGE_NONCE_HEADER);
   const signatureValue = request.headers.get(EDGE_SIGNATURE_HEADER);
 
   if (
     !isValidIdentityField(subject) ||
     !isValidIdentityField(issuer) ||
     !ALPHA_VALUE_PATTERN.test(alphaAccess) ||
+    bodyLengthValue === null ||
+    !UNIX_SECONDS_PATTERN.test(bodyLengthValue) ||
+    bodySha256Value === null ||
+    !SHA256_PATTERN.test(bodySha256Value) ||
     issuer !== configuration.issuer ||
     issuedAtValue === null ||
     !UNIX_SECONDS_PATTERN.test(issuedAtValue) ||
+    nonce === null ||
+    !EDGE_NONCE_PATTERN.test(nonce) ||
     signatureValue === null
   ) {
     return false;
@@ -154,17 +213,50 @@ const hasValidEdgeProof = async (
     return false;
   }
 
+  const bodyResult = await readBoundedBody(request);
+  if (!bodyResult.ok) return false;
+  const actualBodyLength = String(bodyResult.bytes.byteLength);
+  const actualBodySha256 = await sha256Hex(bodyResult.bytes);
+  if (
+    bodyLengthValue !== actualBodyLength ||
+    bodySha256Value !== actualBodySha256
+  ) {
+    abortOriginalBody(request);
+    return false;
+  }
+  const contentType = request.headers.get("content-type") ?? "";
+
   const canonical = [
-    "v1",
+    "v2",
     request.method.toUpperCase(),
     `${request.nextUrl.pathname}${request.nextUrl.search}`,
     subject,
     issuer,
     alphaAccess,
     issuedAtValue,
+    nonce,
+    contentType,
+    bodyLengthValue,
+    bodySha256Value,
   ].join("\n");
 
-  return verifyHmac(configuration.hmacSecret, canonical, signatureMatch[1]);
+  const verified = await verifyHmac(
+    configuration.hmacSecret,
+    canonical,
+    signatureMatch[1],
+  );
+  if (!verified) {
+    abortOriginalBody(request);
+    return false;
+  }
+
+  const expiresAtMilliseconds =
+    (issuedAt + configuration.maxSkewSeconds + 1) * 1000;
+  return consumeEdgeNonce(
+    `${issuer}\n${subject}\n${nonce}`,
+    expiresAtMilliseconds,
+    nowMilliseconds,
+  );
 };
 
 const recursivelyDecodePercentEncoding = (
@@ -319,9 +411,7 @@ const failedBodyRead = (request: NextRequest): BodyReadResult => {
   return { ok: false };
 };
 
-const readBoundedBody = async (
-  request: NextRequest,
-): Promise<BodyReadResult> => {
+async function readBoundedBody(request: NextRequest): Promise<BodyReadResult> {
   const rawContentLength = request.headers.get("content-length");
   if (rawContentLength !== null) {
     if (!UNIX_SECONDS_PATTERN.test(rawContentLength)) {
@@ -383,7 +473,7 @@ const readBoundedBody = async (
     offset += chunk.byteLength;
   }
   return { bytes, ok: true };
-};
+}
 
 const containsSensitiveValue = (value: unknown): boolean => {
   const pending: unknown[] = [value];
@@ -536,7 +626,14 @@ export const enforceWebBoundary = async (
     return rejection(503, "Service unavailable");
   }
 
-  if (!(await hasValidEdgeProof(request, configuration, runtime.now()))) {
+  if (
+    !(await hasValidEdgeProof(
+      request,
+      configuration,
+      runtime.now(),
+      runtime.consumeEdgeNonce,
+    ))
+  ) {
     return rejection(401, "Unauthorized");
   }
 
@@ -563,6 +660,7 @@ export const enforceWebBoundary = async (
 
 export const middleware = (request: NextRequest): Promise<NextResponse> =>
   enforceWebBoundary(request, {
+    consumeEdgeNonce: consumeProductionEdgeNonce,
     environment: process.env,
     now: Date.now,
   });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { createServer as createHttpServer } from "node:http";
 import { connect, createServer as createNetServer } from "node:net";
 import { afterEach, describe, it } from "node:test";
@@ -244,7 +244,10 @@ describe("preview-to-Web trust boundary", () => {
           "x-huoqiu-alpha-access": "false",
           "x-huoqiu-edge-issued-at": "1",
           "x-huoqiu-edge-issuer": "attacker.invalid",
-          "x-huoqiu-edge-signature": `v1=${"0".repeat(64)}`,
+          "x-huoqiu-edge-body-length": "999",
+          "x-huoqiu-edge-body-sha256": "0".repeat(64),
+          "x-huoqiu-edge-nonce": "0".repeat(32),
+          "x-huoqiu-edge-signature": `v2=${"0".repeat(64)}`,
           "x-huoqiu-edge-subject": "attacker",
           "x-huoqiu-preview-sha": "forged",
         },
@@ -252,16 +255,24 @@ describe("preview-to-Web trust boundary", () => {
     );
     const received = await response.json();
     const issuedAt = String(FIXED_NOW / 1000);
+    const bodySha256 = createHash("sha256").update("").digest("hex");
+    const nonce = received.headers["x-huoqiu-edge-nonce"];
+    assert.equal(typeof nonce, "string");
+    assert.match(nonce, /^[0-9a-f]{32}$/u);
     const canonical = [
-      "v1",
+      "v2",
       "GET",
       target,
       "preview-user",
       "huoqiu-local-preview",
       "true",
       issuedAt,
+      nonce,
+      "",
+      "0",
+      bodySha256,
     ].join("\n");
-    const expectedSignature = `v1=${createHmac("sha256", HMAC_SECRET)
+    const expectedSignature = `v2=${createHmac("sha256", HMAC_SECRET)
       .update(canonical)
       .digest("hex")}`;
 
@@ -283,6 +294,8 @@ describe("preview-to-Web trust boundary", () => {
     );
     assert.equal(received.headers["x-huoqiu-alpha-access"], "true");
     assert.equal(received.headers["x-huoqiu-edge-issued-at"], issuedAt);
+    assert.equal(received.headers["x-huoqiu-edge-body-length"], "0");
+    assert.equal(received.headers["x-huoqiu-edge-body-sha256"], bodySha256);
     assert.equal(
       received.headers["x-huoqiu-edge-signature"],
       expectedSignature,
@@ -293,8 +306,11 @@ describe("preview-to-Web trust boundary", () => {
       "authorization",
       "cookie",
       "x-huoqiu-alpha-access",
+      "x-huoqiu-edge-body-length",
+      "x-huoqiu-edge-body-sha256",
       "x-huoqiu-edge-issued-at",
       "x-huoqiu-edge-issuer",
+      "x-huoqiu-edge-nonce",
       "x-huoqiu-edge-signature",
       "x-huoqiu-edge-subject",
     ]) {
@@ -319,16 +335,23 @@ describe("preview-to-Web trust boundary", () => {
     );
     const received = await response.json();
     const issuedAt = String(FIXED_NOW / 1000);
+    const bodySha256 = createHash("sha256").update("").digest("hex");
+    const nonce = received.headers["x-huoqiu-edge-nonce"];
+    assert.equal(typeof nonce, "string");
     const canonical = [
-      "v1",
+      "v2",
       "GET",
       "/search?q=a+b",
       "preview-user",
       "huoqiu-local-preview",
       "true",
       issuedAt,
+      nonce,
+      "",
+      "0",
+      bodySha256,
     ].join("\n");
-    const expectedSignature = `v1=${createHmac("sha256", HMAC_SECRET)
+    const expectedSignature = `v2=${createHmac("sha256", HMAC_SECRET)
       .update(canonical)
       .digest("hex")}`;
 
@@ -337,6 +360,61 @@ describe("preview-to-Web trust boundary", () => {
     assert.equal(
       received.headers["x-huoqiu-edge-signature"],
       expectedSignature,
+    );
+  });
+
+  it("binds each POST proof to its body, content type, and a fresh nonce", async () => {
+    const preview = await capturingFixture();
+    const target = "/watchlist";
+    const body = JSON.stringify({ note: "synthetic body" });
+    const request = () =>
+      globalThis.fetch(`http://${HOST}:${preview.gatewayPort}${target}`, {
+        body,
+        headers: authenticatedHeaders({ "content-type": "application/json" }),
+        method: "POST",
+      });
+
+    const first = await (await request()).json();
+    const second = await (await request()).json();
+    const bodySha256 = createHash("sha256").update(body).digest("hex");
+    const bodyLength = String(Buffer.byteLength(body));
+
+    for (const received of [first, second]) {
+      const nonce = received.headers["x-huoqiu-edge-nonce"];
+      const issuedAt = received.headers["x-huoqiu-edge-issued-at"];
+      assert.equal(typeof nonce, "string");
+      assert.match(nonce, /^[0-9a-f]{32}$/u);
+      assert.equal(received.headers["x-huoqiu-edge-body-length"], bodyLength);
+      assert.equal(received.headers["x-huoqiu-edge-body-sha256"], bodySha256);
+      const canonical = [
+        "v2",
+        "POST",
+        target,
+        "preview-user",
+        "huoqiu-local-preview",
+        "true",
+        issuedAt,
+        nonce,
+        "application/json",
+        bodyLength,
+        bodySha256,
+      ].join("\n");
+      const expectedSignature = `v2=${createHmac("sha256", HMAC_SECRET)
+        .update(canonical)
+        .digest("hex")}`;
+      assert.equal(
+        received.headers["x-huoqiu-edge-signature"],
+        expectedSignature,
+      );
+    }
+
+    assert.notEqual(
+      first.headers["x-huoqiu-edge-nonce"],
+      second.headers["x-huoqiu-edge-nonce"],
+    );
+    assert.notEqual(
+      first.headers["x-huoqiu-edge-signature"],
+      second.headers["x-huoqiu-edge-signature"],
     );
   });
 });

@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
@@ -6,6 +6,7 @@ import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
 import nextConfig from "../next.config";
+import * as middlewareBoundary from "./middleware";
 import {
   config as middlewareConfig,
   enforceWebBoundary,
@@ -43,8 +44,13 @@ const protectedRequest = (
 
 type EdgeProofOptions = Readonly<{
   alphaAccess?: string | null;
+  body?: string | Uint8Array;
+  bodyLength?: string;
+  bodySha256?: string;
+  contentType?: string;
   issuedAt?: string;
   issuer?: string;
+  nonce?: string;
   requestMethod?: string;
   signature?: string;
   signedMethod?: string;
@@ -61,41 +67,62 @@ const edgeHeadersFor = (
   const alphaAccess =
     options.alphaAccess === undefined ? "true" : (options.alphaAccess ?? "");
   const issuedAt = options.issuedAt ?? String(fixedNowSeconds);
+  const nonce = options.nonce ?? "a".repeat(32);
+  const contentType = options.contentType ?? "";
+  const body = options.body ?? "";
+  const bodyLength =
+    options.bodyLength ??
+    String(
+      typeof body === "string"
+        ? new TextEncoder().encode(body).byteLength
+        : body.byteLength,
+    );
+  const bodySha256 =
+    options.bodySha256 ?? createHash("sha256").update(body).digest("hex");
   const signedMethod = (
     options.signedMethod ??
     options.requestMethod ??
     "GET"
   ).toUpperCase();
   const canonical = [
-    "v1",
+    "v2",
     signedMethod,
     options.signedTarget ?? target,
     subject,
     issuer,
     alphaAccess,
     issuedAt,
+    nonce,
+    contentType,
+    bodyLength,
+    bodySha256,
   ].join("\n");
   const signature =
     options.signature ??
-    `v1=${createHmac("sha256", validEnvironment.ZERO_TRUST_HMAC_SECRET)
+    `v2=${createHmac("sha256", validEnvironment.ZERO_TRUST_HMAC_SECRET)
       .update(canonical)
       .digest("hex")}`;
 
   const headers: Record<string, string> = {
     cookie: sessionCookie,
+    "x-huoqiu-edge-body-length": bodyLength,
+    "x-huoqiu-edge-body-sha256": bodySha256,
     "x-huoqiu-edge-issued-at": issuedAt,
     "x-huoqiu-edge-issuer": issuer,
+    "x-huoqiu-edge-nonce": nonce,
     "x-huoqiu-edge-signature": signature,
     "x-huoqiu-edge-subject": subject,
   };
   if (options.alphaAccess !== null) {
     headers["x-huoqiu-alpha-access"] = alphaAccess;
   }
+  if (contentType.length > 0) headers["content-type"] = contentType;
   return headers;
 };
 
 const enforce = (request: NextRequest) =>
   enforceWebBoundary(request, {
+    consumeEdgeNonce: () => true,
     environment: validEnvironment,
     now: () => fixedNowMilliseconds,
   });
@@ -295,6 +322,90 @@ describe("Web Alpha boundary", () => {
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 
+  it("binds a valid POST proof to the exact body and content type", async () => {
+    const target = "/watchlist";
+    const body = JSON.stringify({ note: "safe body" });
+    const contentType = "application/json";
+    const headers = edgeHeadersFor(target, {
+      body,
+      contentType,
+      requestMethod: "POST",
+    });
+
+    const accepted = await enforce(
+      protectedRequest(target, { body, headers, method: "POST" }),
+    );
+    const changedBody = await enforce(
+      protectedRequest(target, {
+        body: JSON.stringify({ note: "changed body" }),
+        headers,
+        method: "POST",
+      }),
+    );
+    const changedContentType = await enforce(
+      protectedRequest(target, {
+        body,
+        headers: {
+          ...headers,
+          "content-type": "application/json; charset=utf-8",
+        },
+        method: "POST",
+      }),
+    );
+
+    expect(accepted.status).toBe(200);
+    expect(changedBody.status).toBe(401);
+    expect(changedContentType.status).toBe(401);
+  });
+
+  it("consumes a valid edge nonce only once", async () => {
+    const target = "/watchlist";
+    const headers = edgeHeadersFor(target, { nonce: "b".repeat(32) });
+    const seen = new Set<string>();
+    const consumeEdgeNonce = (key: string): boolean => {
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    };
+    const runtime = {
+      consumeEdgeNonce,
+      environment: validEnvironment,
+      now: () => fixedNowMilliseconds,
+    };
+
+    const first = await enforceWebBoundary(
+      protectedRequest(target, { headers }),
+      runtime,
+    );
+    const replay = await enforceWebBoundary(
+      protectedRequest(target, { headers }),
+      runtime,
+    );
+
+    expect(first.status).toBe(200);
+    expect(replay.status).toBe(401);
+    expect(seen.size).toBe(1);
+  });
+
+  it("provides a bounded nonce guard that rejects replay and fails closed at capacity", () => {
+    const factory = (
+      middlewareBoundary as unknown as {
+        createEdgeNonceGuard?: (
+          capacity: number,
+        ) => (key: string, expiresAt: number, now: number) => boolean;
+      }
+    ).createEdgeNonceGuard;
+
+    expect(factory).toBeTypeOf("function");
+    if (factory === undefined) return;
+    const guard = factory(1);
+
+    expect(guard("issuer:subject:nonce-a", 2_000, 1_000)).toBe(true);
+    expect(guard("issuer:subject:nonce-a", 2_000, 1_001)).toBe(false);
+    expect(guard("issuer:subject:nonce-b", 2_000, 1_001)).toBe(false);
+    expect(guard("issuer:subject:nonce-b", 3_000, 2_000)).toBe(true);
+  });
+
   it("rejects a correctly signed subject containing internal whitespace", async () => {
     const target = "/watchlist";
     const response = await enforce(
@@ -358,7 +469,7 @@ describe("Web Alpha boundary", () => {
     [
       "invalid signature",
       "/search?q=SYN001",
-      { signature: `v1=${"0".repeat(64)}` },
+      { signature: `v2=${"0".repeat(64)}` },
       "GET",
     ],
     [
@@ -448,7 +559,7 @@ describe("Web Alpha boundary", () => {
   it("does not evaluate alpha_access before an invalid edge proof", async () => {
     const target = "/watchlist";
     const headers = edgeHeadersFor(target, {
-      signature: `v1=${"0".repeat(64)}`,
+      signature: `v2=${"0".repeat(64)}`,
     });
     delete headers["x-huoqiu-alpha-access"];
 
@@ -517,7 +628,12 @@ describe("Web Alpha boundary", () => {
     async (_label, target, extraHeaders, body) => {
       const method = body === undefined ? "GET" : "POST";
       const headers: Record<string, string> = {
-        ...edgeHeadersFor(target, { requestMethod: method }),
+        ...edgeHeadersFor(target, {
+          ...(body === undefined
+            ? {}
+            : { body, contentType: "application/json" }),
+          requestMethod: method,
+        }),
         ...extraHeaders,
       };
       delete headers.cookie;
@@ -702,7 +818,11 @@ describe("Web Alpha boundary", () => {
       const request = protectedRequest(target, {
         body,
         headers: {
-          ...edgeHeadersFor(target, { requestMethod: "POST" }),
+          ...edgeHeadersFor(target, {
+            body,
+            contentType,
+            requestMethod: "POST",
+          }),
           "content-type": contentType,
         },
         method: "POST",
@@ -725,7 +845,11 @@ describe("Web Alpha boundary", () => {
       password: "correct-horse-battery-staple",
     });
     const headers: Record<string, string> = {
-      ...edgeHeadersFor(target, { requestMethod: "POST" }),
+      ...edgeHeadersFor(target, {
+        body,
+        contentType: "application/json",
+        requestMethod: "POST",
+      }),
       "content-type": "application/json",
     };
     delete headers.cookie;
@@ -785,7 +909,11 @@ describe("Web Alpha boundary", () => {
     async (_label, target, payload) => {
       const body = JSON.stringify(payload);
       const headers: Record<string, string> = {
-        ...edgeHeadersFor(target, { requestMethod: "POST" }),
+        ...edgeHeadersFor(target, {
+          body,
+          contentType: "application/json",
+          requestMethod: "POST",
+        }),
         "content-type": "application/json",
       };
       delete headers.cookie;
@@ -806,7 +934,11 @@ describe("Web Alpha boundary", () => {
       transport: "cookie",
     });
     const headers: Record<string, string> = {
-      ...edgeHeadersFor(target, { requestMethod: "POST" }),
+      ...edgeHeadersFor(target, {
+        body,
+        contentType: "application/json",
+        requestMethod: "POST",
+      }),
       "content-type": "application/json",
     };
     delete headers.cookie;
@@ -857,7 +989,11 @@ describe("Web Alpha boundary", () => {
       const request = protectedRequest(target, {
         body,
         headers: {
-          ...edgeHeadersFor(target, { requestMethod: "POST" }),
+          ...edgeHeadersFor(target, {
+            body,
+            contentType,
+            requestMethod: "POST",
+          }),
           "content-type": contentType,
         },
         method: "POST",
@@ -877,7 +1013,11 @@ describe("Web Alpha boundary", () => {
     const request = protectedRequest(target, {
       body,
       headers: {
-        ...edgeHeadersFor(target, { requestMethod: "POST" }),
+        ...edgeHeadersFor(target, {
+          body,
+          contentType: "application/json",
+          requestMethod: "POST",
+        }),
         "content-type": "application/json",
       },
       method: "POST",
@@ -903,7 +1043,11 @@ describe("Web Alpha boundary", () => {
       body,
       duplex: "half",
       headers: {
-        ...edgeHeadersFor(target, { requestMethod: "POST" }),
+        ...edgeHeadersFor(target, {
+          body: "{",
+          contentType: "application/json",
+          requestMethod: "POST",
+        }),
         "content-type": "application/json",
       },
       method: "POST",
@@ -937,7 +1081,11 @@ describe("Web Alpha boundary", () => {
     const request = protectedRequest(target, {
       body,
       headers: {
-        ...edgeHeadersFor(target, { requestMethod: "POST" }),
+        ...edgeHeadersFor(target, {
+          body,
+          contentType: "application/json",
+          requestMethod: "POST",
+        }),
         "content-type": "application/json",
       },
       method: "POST",
@@ -1136,7 +1284,7 @@ describe("Web Alpha boundary", () => {
   });
 
   it("returns generic errors and never logs proof, cookie, or invite material", async () => {
-    const signature = `v1=${"a".repeat(64)}`;
+    const signature = `v2=${"a".repeat(64)}`;
     const invite = "invite-super-secret";
     const cookie = "cookie-super-secret";
     const target = `/watchlist?invite_code=${invite}`;
