@@ -647,11 +647,19 @@ git commit -m "feat(market): add deterministic synthetic provider"
 
 ## Task 10: 建立本地 PostgreSQL、Valkey 与可观测壳
 
+**Depends on:** Task 6B migration/seed SHA、Task 8 最终批准的 Identity API SHA、Task 9 最终批准的 Synthetic Provider SHA。
+
 **Files:**
 
+- Create: `infra/generate-local-env.mjs`
 - Create: `infra/compose.yaml`
 - Create: `infra/postgres/init.sql`
 - Create: `.env.example`
+- Modify: `security/artifact-inventory.yml`
+- Modify: `scripts/quality/check-boundaries.mts`
+- Modify: `scripts/quality/test/check-boundaries.spec.ts`
+- Modify: `scripts/quality/test/ci-workflow.spec.ts`
+- Create: `apps/api/src/config/runtime-configuration.ts`
 - Create: `apps/api/src/observability/telemetry.ts`
 - Modify: `apps/api/src/workers/events.main.ts`
 - Modify: `apps/api/src/workers/market.main.ts`
@@ -659,30 +667,40 @@ git commit -m "feat(market): add deterministic synthetic provider"
 - Create: `apps/api/src/workers/outbox-dispatcher.ts`
 - Create: `apps/api/src/workers/consumer-runner.ts`
 - Create: `apps/api/src/workers/dlq-store.ts`
+- Modify: `apps/api/src/workers/worker-runtime.ts`
+- Modify: `apps/api/src/workers/run-worker-process.ts`
 - Modify: `apps/api/src/app.module.ts`
+- Modify: `apps/api/src/main.ts`
 - Modify: `apps/api/package.json`
+- Modify: `apps/api/test/verify-built-entrypoints.mjs`
 - Create: `apps/api/test/workers/process-isolation.spec.ts`
 - Create: `apps/api/test/workers/outbox-runtime.spec.ts`
 - Create: `apps/api/test/workers/composition-registration.spec.ts`
 - Create: `apps/api/test/config/startup-fail-closed.spec.ts`
 
+- [ ] **Step 0: 冻结新增镜像与依赖供应链**
+
+先从官方来源冻结 PostgreSQL、Valkey、Jaeger 的精确版本、repo digest、`linux/amd64` 与 `linux/arm64` manifest/config digest、压缩大小、源码 commit 和许可证，并把三个批准描述符登记到 `security/artifact-inventory.yml` 与独立 Gate oracle。同步冻结最小 OpenTelemetry、队列与 PostgreSQL client 精确版本；未知、浮动 tag、缺平台摘要或未登记镜像必须被 `qa:boundaries` 拒绝。
+
 - [ ] **Step 1: 写生产缺失 Secret 和数据库配置拒绝测试**
 
-`APP_ENV=production` 且缺少 session secret、database URL、Zero Trust verifier 时，API 必须在监听端口前退出。
+`APP_ENV=production` 且分别缺少 session secret、database URL、Zero Trust verifier 时，API 必须在 `NestFactory.create` 和监听端口前退出。测试必须先构造一组完整有效基线并证明配置校验可继续，再逐项删除字段；不得因为另一项恒定失败（包括尚未配置的持久化 Provider）而伪通过。当前若仍只支持 local-only Identity persistence，必须明确报告限制，不能声称 production 启动已验证。
 
 - [ ] **Step 2: 创建 Compose**
 
-服务只包含 PostgreSQL、Valkey、Jaeger；绑定 `127.0.0.1`，使用命名 volume 和 healthcheck。不得内置默认生产密码。
+服务只包含 PostgreSQL、Valkey、Jaeger；镜像只能使用 Step 0 登记的不可变 digest；绑定 `127.0.0.1`，使用命名 volume 和 healthcheck。不得内置默认生产密码。Jaeger 本地壳使用内存存储，避免在磁盘紧张环境额外创建持久 volume；`init.sql` 不得创建业务表或提前创建迁移所拥有的扩展。
 
 - [ ] **Step 3: 创建 `.env.example`**
 
-只放字段名和安全说明，不放可工作的共享 Secret。Local dev secret 由启动脚本生成到 gitignored 文件。
+只放字段名和安全说明，不放可工作的共享 Secret。`infra/generate-local-env.mjs` 以排他创建和 `0600` 权限把随机 local dev secret 写入 gitignored `.env`，已有文件时拒绝覆盖。
 
 - [ ] **Step 4: 建立唯一 HTTP/Worker composition roots**
 
 `AppModule` 是 HTTP 模块唯一 composition root；`events.main.ts` 和 `market.main.ts` 分别调用 `worker-registry.ts` 构造各自进程。后续 capability 创建 controller/module/consumer 时，必须在同一任务的 Files 中明确 `Modify: apps/api/src/app.module.ts` 或 `Modify: apps/api/src/workers/worker-registry.ts` 并增加注册测试；只创建文件但未注册即失败。
 
 `outbox-dispatcher.ts`、`consumer-runner.ts` 与 `dlq-store.ts` 先用合成 handler 证明通用机制：业务写与 Outbox 同事务；Inbox 按 `event_id + consumer` 去重；aggregate sequence 乱序时延迟而非覆盖；重试耗尽进入 DLQ；显式 replay 后仅产生一次副作用。这里不声称任何尚未实现的领域 producer/consumer 已通过。
+
+`WorkerRuntime.stop()` 和 `run-worker-process.ts` 必须统一关闭 dispatcher、consumer、队列/Valkey、数据库与 telemetry；HTTP、events、market 三个进程分别注册自己的职责，worker 不得启动 HTTP listener。Telemetry 使用不同 service name，默认不得采集 cookie、token、invite code 或事件私密 payload。
 
 - [ ] **Step 5: 启动并验证**
 
@@ -695,6 +713,8 @@ pnpm --filter @huoqiu/api exec vitest run test/config/startup-fail-closed.spec.t
 
 `process-isolation.spec.ts` 必须证明 HTTP、events worker、market worker 三个进程只注册各自职责；events worker 承载 Outbox/Inbox consumers，market worker 承载 Synthetic ingest，任一进程重启不重复副作用。
 
+Docker daemon 不可用时，纯单元/进程隔离验证必须继续运行并明确标注 compose/真实 PostgreSQL 证据未执行；不得把环境缺失写成 PASS。拉取镜像前检查已批准压缩大小与剩余磁盘，不自动 prune 用户镜像或 volume。
+
 - [ ] **Step 6: 提交**
 
 ```bash
@@ -705,6 +725,8 @@ git commit -m "chore(infra): add closed-alpha local stack"
 API lane 提交依赖声明后由 Root 单独更新 `pnpm-lock.yaml`；API commit 不得自行修改 lockfile。
 
 ## Task 11: 建立不可自证的 Contract、DDL、Event 与 Fixture Gate
+
+**Depends on:** Task 10 通用 Outbox/Inbox/DLQ runtime 与三个 composition root SHA；contract/DDL/fixture 子 Gate 可在其前并行开发，但 `qa:events:runtime` 不得提前报告 PASS。
 
 **Files:**
 
