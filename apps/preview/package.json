@@ -1,0 +1,14 @@
+{
+  "name": "@huoqiu/preview",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node --check src/gateway.mjs && node --check src/local-runtime.mjs && node --check src/provenance.mjs && node --check scripts/start-local.mjs && node --check scripts/stamp-product.mjs",
+    "lint": "eslint --config ../../packages/config/eslint/base.mjs src scripts test",
+    "stamp:product": "node scripts/stamp-product.mjs",
+    "start:local": "node scripts/start-local.mjs",
+    "test": "node --test test/*.spec.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}
