@@ -295,6 +295,65 @@ const verifyIdentityRoutes = async (baseUrl) => {
   assert.equal(nativeResponse.status, 404);
 };
 
+const verifyCompiledRegistrationReplayGate = async () => {
+  const environment = {
+    ALPHA_INVITE_CODES: "BUILD-VERIFY-REPLAY-INVITE",
+    APP_ENV: "development",
+    BETTER_AUTH_SECRET: identitySecret,
+    NODE_ENV: "test",
+    ZERO_TRUST_HMAC_SECRET: edgeSecret,
+    ZERO_TRUST_ISSUER: edgeIssuer,
+  };
+  const originalEnvironment = Object.fromEntries(
+    Object.keys(environment).map((key) => [key, process.env[key]]),
+  );
+  let application;
+
+  try {
+    Object.assign(process.env, environment);
+    const [{ createHttpApp }, { AuthService }] = await Promise.all([
+      import("../dist/main.js"),
+      import("../dist/identity/auth.service.js"),
+    ]);
+    application = await createHttpApp({ logger: false });
+    const server = application.getHttpAdapter().getInstance();
+    const path = "/v1/auth/register";
+    const payload = {
+      display_name: "Build replay verifier",
+      email: "build-replay-verifier@huoqiu.test",
+      invite_code: "BUILD-VERIFY-REPLAY-INVITE",
+      password: "correct-horse-battery-staple",
+    };
+    const request = {
+      headers: {
+        ...edgeHeaders("POST", path),
+        "idempotency-key": "build-verifier-register-replay",
+      },
+      method: "POST",
+      payload,
+      url: path,
+    };
+    const registration = await server.inject(request);
+    assert.equal(registration.statusCode, 201);
+    const actorId = registration.json().session.actor.actor_id;
+
+    await application.get(AuthService).suspendActor(actorId);
+    const replay = await server.inject(request);
+    assert.equal(replay.statusCode, 403);
+    assert.equal(replay.headers["set-cookie"], undefined);
+    assert.equal(replay.headers["set-auth-token"], undefined);
+    process.stdout.write(
+      "dist/main.js: suspended registration replay gate verified\n",
+    );
+  } finally {
+    await application?.close();
+    for (const [key, value] of Object.entries(originalEnvironment)) {
+      if (value === undefined) Reflect.deleteProperty(process.env, key);
+      else process.env[key] = value;
+    }
+  }
+};
+
 const allocateEphemeralPort = async () => {
   const reservation = createServer();
 
@@ -395,5 +454,6 @@ const verifyWorkerEntrypoint = async (consumer) => {
 };
 
 await verifyHttpEntrypoint();
+await verifyCompiledRegistrationReplayGate();
 await verifyWorkerEntrypoint("events");
 await verifyWorkerEntrypoint("market");

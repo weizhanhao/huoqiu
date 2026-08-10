@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import { HttpException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  createProcessLocalBetterAuthRuntime,
+  CredentialBoundary,
+} from "../../src/identity/auth-provider.adapter.js";
 import { BoundedIdempotencyStore } from "../../src/identity/idempotency-store.js";
 
 const source = async (name: string): Promise<string> =>
@@ -12,6 +16,30 @@ const source = async (name: string): Promise<string> =>
   );
 
 describe("identity private boundaries", () => {
+  it("does not let a separate credential boundary resolve another boundary's capability", async () => {
+    const runtime = await createProcessLocalBetterAuthRuntime({
+      secret: "credential-boundary-test-secret-with-at-least-32-characters",
+    });
+
+    try {
+      const issuer = new CredentialBoundary(runtime);
+      const unrelatedBoundary = new CredentialBoundary(runtime);
+      const credential = issuer.fromIssued(
+        new Headers({ "set-auth-token": "boundary-isolated-token" }),
+        "bearer",
+      );
+
+      expect(issuer.requestHeaders(credential).get("authorization")).toBe(
+        "Bearer boundary-isolated-token",
+      );
+      expect(() => unrelatedBoundary.requestHeaders(credential)).toThrow(
+        "AUTH_CREDENTIAL_INVALID",
+      );
+    } finally {
+      await runtime.close();
+    }
+  });
+
   it.each(["auth-provider.port.ts", "auth.service.ts", "auth.controller.ts"])(
     "keeps raw credential and backend identifiers out of %s",
     async (name) => {

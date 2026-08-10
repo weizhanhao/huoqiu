@@ -95,11 +95,6 @@ type CredentialState = Readonly<{
   requestHeaders: Headers;
 }>;
 
-const credentialStates = new WeakMap<
-  AuthCredentialCapability,
-  CredentialState
->();
-
 export type CredentialInspection =
   | Readonly<{ kind: "none" }>
   | Readonly<{ kind: "invalid" }>
@@ -131,6 +126,11 @@ const hasUnsafeScalarShape = (value: string): boolean =>
   value.length === 0 || /[\r\n,]/u.test(value);
 
 export class CredentialBoundary {
+  private readonly credentialStates = new WeakMap<
+    AuthCredentialCapability,
+    CredentialState
+  >();
+
   constructor(private readonly runtime: BetterAuthRuntime) {}
 
   inspect(request: FastifyRequest): CredentialInspection {
@@ -247,7 +247,7 @@ export class CredentialBoundary {
         .digest("hex"),
       transport,
     } as AuthCredentialCapability;
-    credentialStates.set(capability, {
+    this.credentialStates.set(capability, {
       ...(delivery === undefined ? {} : { delivery }),
       requestHeaders: headers,
     });
@@ -255,7 +255,7 @@ export class CredentialBoundary {
   }
 
   private state(credential: AuthCredentialCapability): CredentialState {
-    const state = credentialStates.get(credential);
+    const state = this.credentialStates.get(credential);
     if (state === undefined) throw new Error("AUTH_CREDENTIAL_INVALID");
     return state;
   }

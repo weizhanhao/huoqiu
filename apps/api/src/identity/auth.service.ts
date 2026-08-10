@@ -226,7 +226,7 @@ export class AuthService {
 
   async register(input: RegisterInput): Promise<IdentitySession> {
     const email = input.body.email.toLowerCase();
-    return await this.idempotency.execute(
+    const session = await this.idempotency.execute(
       {
         callerId: input.callerId,
         key: input.idempotencyKey,
@@ -267,6 +267,7 @@ export class AuthService {
         }
       },
     );
+    return await this.requireActiveSessionActor(session);
   }
 
   async login(input: LoginInput): Promise<IdentitySession> {

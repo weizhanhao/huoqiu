@@ -158,6 +158,28 @@ describe("strong suspension checks", () => {
     await authService.suspendActor(actorId);
     controllerAction.mockClear();
 
+    const replayedRegistrationAfterSuspension = await server.inject({
+      method: "POST",
+      url: "/v1/auth/register",
+      headers: {
+        ...edgeHeaders("POST", "/v1/auth/register"),
+        "idempotency-key": "suspend-register",
+      },
+      payload: {
+        display_name: "待封禁员工",
+        email: "suspended@huoqiu.test",
+        invite_code: inviteCode,
+        password: "correct-horse-battery-staple",
+      },
+    });
+    expect(replayedRegistrationAfterSuspension.statusCode).toBe(403);
+    expect(
+      replayedRegistrationAfterSuspension.headers["set-auth-token"],
+    ).toBeUndefined();
+    expect(
+      replayedRegistrationAfterSuspension.headers["set-cookie"],
+    ).toBeUndefined();
+
     const afterSuspension = await server.inject({
       method: "GET",
       url: "/protected-action",
@@ -288,5 +310,51 @@ describe("strong suspension checks", () => {
     expect(revokeSubjectSessions).toHaveBeenCalledExactlyOnceWith(
       "identity-subject-suspended",
     );
+  });
+
+  it("rejects a cached registration after suspension without provisioning twice", async () => {
+    const credential = {
+      fingerprint: "b".repeat(64),
+      transport: "cookie" as const,
+    } as AuthCredentialCapability;
+    const register = vi.fn(async () => ({
+      credential,
+      expiresAt: new Date("2026-08-10T12:00:00.000Z"),
+      subjectId: "identity-subject-register-replay",
+    }));
+    const provider: AuthProviderPort = {
+      login: vi.fn(async () => {
+        throw new Error("not used");
+      }),
+      logout: vi.fn(async () => undefined),
+      register,
+      resolveSession: vi.fn(async () => null),
+      revokeSubjectSessions: vi.fn(async () => undefined),
+    };
+    const store = new InMemoryIdentityStore([inviteCode]);
+    const service = new AuthService(
+      provider,
+      store,
+      new BoundedIdempotencyStore({ secret: authSecret }),
+    );
+    const input = {
+      body: {
+        display_name: "注册重放测试",
+        email: "register-replay@huoqiu.test",
+        invite_code: inviteCode,
+        password: "correct-horse-battery-staple",
+      },
+      callerId: "registration-replay-unit-test",
+      idempotencyKey: "registration-replay-key",
+    };
+
+    const registration = await service.register(input);
+    await service.suspendActor(registration.actor.actorId);
+
+    await expect(service.register(input)).rejects.toMatchObject({
+      status: 403,
+    });
+    expect(register).toHaveBeenCalledOnce();
+    expect(store.actorCount()).toBe(1);
   });
 });
