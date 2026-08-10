@@ -28,6 +28,7 @@ const MAX_PAGE_SIZE = 100;
 const MAX_HISTORY_SIZE = 10_000;
 const MAX_SEED_LENGTH = 256;
 const MAX_CURSOR_LENGTH = 512;
+const MAX_INSTANT_LENGTH = 128;
 const CURSOR_NONCE_LENGTH = 12;
 const CURSOR_TAG_LENGTH = 16;
 const EXCHANGE_TIMEZONE_PATTERN =
@@ -37,7 +38,7 @@ const CURSOR_KEY_ID_PATTERN = /^[A-Za-z0-9_-]{1,32}$/u;
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/u;
 const SEED_FINGERPRINT_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
 const RFC3339_PATTERN =
-  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/u;
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|([+-])(\d{2}):(\d{2}))$/u;
 
 export interface SyntheticMarketDataProviderOptions {
   readonly seed: string;
@@ -104,7 +105,11 @@ const utcEpochForCalendarParts = (
 };
 
 const canonicalInstant = (value: string): string => {
-  if (typeof value !== "string") {
+  if (
+    typeof value !== "string" ||
+    value.length < 20 ||
+    value.length > MAX_INSTANT_LENGTH
+  ) {
     return invalidInstant();
   }
   const match = RFC3339_PATTERN.exec(value);
@@ -132,7 +137,9 @@ const canonicalInstant = (value: string): string => {
   const hour = Number(hourText);
   const minute = Number(minuteText);
   const second = Number(secondText);
-  const millisecond = Number((fractionText ?? "").padEnd(3, "0") || "0");
+  const millisecond = Number(
+    (fractionText ?? "").slice(0, 3).padEnd(3, "0") || "0",
+  );
   const offsetHour = offsetText === "Z" ? 0 : Number(offsetHourText);
   const offsetMinute = offsetText === "Z" ? 0 : Number(offsetMinuteText);
 
@@ -312,7 +319,10 @@ export class SyntheticMarketDataProvider implements MarketDataProvider {
     const exchangeTimezone = options.exchangeTimezone ?? "Asia/Shanghai";
     assertExchangeTimezone(exchangeTimezone);
     const cursorKeyId = options.cursorKeyId ?? DEFAULT_CURSOR_KEY_ID;
-    if (!CURSOR_KEY_ID_PATTERN.test(cursorKeyId)) {
+    if (
+      typeof cursorKeyId !== "string" ||
+      !CURSOR_KEY_ID_PATTERN.test(cursorKeyId)
+    ) {
       throw new TypeError("cursorKeyId must be a bounded opaque key id");
     }
 

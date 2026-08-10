@@ -78,6 +78,18 @@ const MAX_INT64 = 9_223_372_036_854_775_807n;
 const INT64_PATTERN = /^(?:0|[1-9][0-9]{0,18})$/u;
 const DEFAULT_MAX_OBSERVATION_HISTORY = 256;
 const MAX_OBSERVATION_HISTORY = 4_096;
+const QUOTE_STRING_BOUNDS = {
+  as_of: 128,
+  change: 128,
+  change_percent: 128,
+  entitlement: 32,
+  exchange_timezone: 64,
+  listing_id: 128,
+  price: 128,
+  revision: 19,
+  sequence: 19,
+  source: 32,
+} as const;
 const quoteContractSchema = m1Router.listingGetQuote.responses[200].shape.quote;
 const listingIdContractSchema = m1Router.listingGetQuote.pathParams.shape.id;
 
@@ -162,6 +174,16 @@ const assertRealExchangeTimezone = (value: string): void => {
 };
 
 const assertQuoteContract = (value: NormalizedQuote): void => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new TypeError("quote violates the authoritative M1 contract");
+  }
+  const record = value as unknown as Record<string, unknown>;
+  for (const [field, maximum] of Object.entries(QUOTE_STRING_BOUNDS)) {
+    const fieldValue = record[field];
+    if (typeof fieldValue === "string" && fieldValue.length > maximum) {
+      throw new TypeError("quote exceeds bounded ingestion field bounds");
+    }
+  }
   const result = quoteContractSchema.safeParse(value);
   if (!result.success) {
     throw new TypeError("quote violates the authoritative M1 contract");
@@ -199,15 +221,41 @@ const assertObservationState = (state: QuoteObservationState): void => {
     versions.add(versionKey);
   }
 
-  if (state.current !== null) {
-    const current = state.current;
-    assertQuoteContract(current);
-    if (
-      current.listing_id !== state.listing_id ||
-      !state.history.some((item) => quoteContentMatches(item, current))
-    ) {
-      throw new TypeError("current quote is absent from observation history");
+  if (state.history.length === 0) {
+    if (state.current !== null) {
+      throw new TypeError(
+        "quote observation state has current without history",
+      );
     }
+    return;
+  }
+  if (state.current === null) {
+    throw new TypeError("quote observation state has history without current");
+  }
+
+  const current = state.current;
+  assertQuoteContract(current);
+  const expectedCurrent = state.history.reduce((latest, observation) => {
+    const latestSequence = parseVersion(latest.sequence, "sequence");
+    const observationSequence = parseVersion(observation.sequence, "sequence");
+    if (observationSequence > latestSequence) {
+      return observation;
+    }
+    if (observationSequence < latestSequence) {
+      return latest;
+    }
+    return parseVersion(observation.revision, "revision") >
+      parseVersion(latest.revision, "revision")
+      ? observation
+      : latest;
+  });
+  if (
+    current.listing_id !== state.listing_id ||
+    !quoteContentMatches(expectedCurrent, current)
+  ) {
+    throw new TypeError(
+      "current quote is not the latest observation state version",
+    );
   }
 };
 

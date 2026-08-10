@@ -203,6 +203,30 @@ describe("SyntheticMarketDataProvider conformance", () => {
     );
   });
 
+  it("uses the first representable local instant when DST skips midnight", async () => {
+    const cairo = new SyntheticMarketDataProvider({
+      seed: "dst-midnight-seed",
+      cursorEncryptionKey,
+      clock: () => "2024-04-26T12:00:00.000Z",
+      exchangeTimezone: "Africa/Cairo",
+      pageSize: 1,
+      historySize: 1,
+    });
+
+    expect((await cairo.getBars(listingId, "1d")).items[0]?.starts_at).toBe(
+      "2024-04-25T22:00:00.000Z",
+    );
+  });
+
+  it("accepts authoritative RFC3339 sub-millisecond precision", async () => {
+    const quote = await createProvider().getQuote(
+      listingId,
+      "2026-08-08T06:00:00.123456Z",
+    );
+
+    expect(quote.as_of).toBe("2026-08-08T06:00:00.123Z");
+  });
+
   it("maintains exact decimal OHLC invariants without floating point output", async () => {
     const provider = createProvider();
     const firstPage = await provider.getBars(listingId, "1d");
@@ -313,6 +337,18 @@ describe("SyntheticMarketDataProvider conformance", () => {
             exchangeTimezone: exchangeTimezone as never,
           }),
       ).toThrow("exchangeTimezone");
+    }
+
+    for (const cursorKeyId of [1, { toString: () => "m1" }]) {
+      expect(
+        () =>
+          new SyntheticMarketDataProvider({
+            seed: "seed",
+            cursorEncryptionKey,
+            cursorKeyId: cursorKeyId as never,
+            clock: () => snapshot,
+          }),
+      ).toThrow("cursorKeyId");
     }
   });
 });

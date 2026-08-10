@@ -127,6 +127,13 @@ describe("synthetic quote sequence and revision reduction", () => {
         ),
       ).toThrow("contract");
     }
+
+    expect(() =>
+      applyQuoteObservation(
+        createQuoteObservationState(listingId),
+        quote("20", "0", "9".repeat(1_000_000)),
+      ),
+    ).toThrow("bounds");
   });
 
   it("emits a revision notice for a historical sequence without replacing the latest quote", () => {
@@ -185,5 +192,32 @@ describe("synthetic quote sequence and revision reduction", () => {
     );
     expect(duplicate.reason).toBe("duplicate");
     expect(duplicate.state).toBe(full.state);
+  });
+
+  it("rejects forged state that could move current backwards", () => {
+    const sequence19 = applyQuoteObservation(
+      createQuoteObservationState(listingId),
+      quote("19", "0", "119"),
+    );
+    const sequence20 = applyQuoteObservation(
+      sequence19.state,
+      quote("20", "0", "120"),
+    );
+
+    expect(() =>
+      applyQuoteObservation(
+        { ...sequence20.state, current: null },
+        quote("18", "0", "118"),
+      ),
+    ).toThrow("state");
+    expect(() =>
+      applyQuoteObservation(
+        {
+          ...sequence20.state,
+          current: sequence20.state.history[0] ?? null,
+        },
+        quote("19", "1", "119.5"),
+      ),
+    ).toThrow("state");
   });
 });
