@@ -1,20 +1,20 @@
 export const tokens = {
   brand: {
-    primary: "#C2410C",
-    primaryHover: "#9A3412",
-    secondary: "#F59E0B",
-    accent: "#EA580C",
-    focus: "#FB923C",
+    primary: "#0967C7",
+    primaryHover: "#0756A6",
+    secondary: "#B9DCFF",
+    accent: "#2F88E9",
+    focus: "#73AFFF",
     onPrimary: "#FFFFFF",
   },
   surface: {
-    canvas: "#F6F7F9",
+    canvas: "#F3F5F8",
     base: "#FFFFFF",
-    subtle: "#FFF7ED",
+    subtle: "#EDF5FF",
     raised: "#FFFFFF",
-    inverse: "#171A21",
-    divider: "#E4E7EC",
-    scrim: "rgba(23, 26, 33, 0.48)",
+    inverse: "#0B3157",
+    divider: "#DDE5EF",
+    scrim: "rgba(11, 49, 87, 0.48)",
   },
   text: {
     primary: "#171A21",
@@ -22,12 +22,12 @@ export const tokens = {
     tertiary: "#667085",
     inverse: "#FFFFFF",
     inverseMuted: "#D0D5DD",
-    link: "#9A3412",
+    link: "#0756A6",
     disabled: "#98A2B3",
   },
   market: {
     up: "#F04444",
-    upText: "#D92D20",
+    upText: "#C92A22",
     upSubtle: "#FFF0F0",
     down: "#16A37A",
     downText: "#067647",
@@ -55,9 +55,9 @@ export const tokens = {
     pill: "999px",
   },
   shadow: {
-    card: "0 1px 3px rgba(23, 26, 33, 0.08), 0 8px 24px rgba(23, 26, 33, 0.06)",
-    floating: "0 12px 32px rgba(23, 26, 33, 0.16)",
-    focus: "0 0 0 3px rgba(251, 146, 60, 0.38)",
+    card: "0 1px 3px rgba(11, 49, 87, 0.08), 0 8px 24px rgba(11, 49, 87, 0.05)",
+    floating: "0 12px 32px rgba(11, 49, 87, 0.18)",
+    focus: "0 0 0 3px rgba(115, 175, 255, 0.6)",
   },
   type: {
     family: {

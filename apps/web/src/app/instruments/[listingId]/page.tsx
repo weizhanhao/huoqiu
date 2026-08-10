@@ -1,6 +1,7 @@
 import { PriceChart } from "../../../components/instrument/price-chart";
 import { QuoteHeader } from "../../../components/instrument/quote-header";
 import { DesktopShell } from "../../../components/shell/desktop-shell";
+import { UnavailableAction } from "../../../components/shell/unavailable-action";
 import { PageState } from "../../../components/system/page-state";
 import { loadD0Fixture } from "../../../lib/d0-fixture";
 import { normalizeD0FixtureState } from "../../../lib/d0-page-state";
@@ -58,7 +59,7 @@ export default async function InstrumentPage({
           <QuoteHeader instrument={instrument} quote={quote} />
           <nav className="instrument-tabs" aria-label="标的详情频道">
             <span aria-current="page">走势</span>
-            <span>演示说明</span>
+            <UnavailableAction label="演示说明" />
           </nav>
           <PriceChart
             instrumentName={instrument.name}

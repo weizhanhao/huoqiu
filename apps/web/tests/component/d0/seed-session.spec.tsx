@@ -9,7 +9,7 @@ import {
 } from "../../../src/stores/d0-watchlist";
 
 describe("D0 Web seed session", () => {
-  it("renders only the fixture identity and approved D0 navigation", () => {
+  it("renders the fixture identity, preserved routes, and product navigation", () => {
     const markup = renderToStaticMarkup(
       <DesktopShell>
         <p>内容</p>
@@ -24,18 +24,14 @@ describe("D0 Web seed session", () => {
     expect(markup).toContain('action="/search"');
     expect(markup).toContain("合成示例一号");
     expect(markup).toContain("仅本机演示，不会跨端同步");
-
-    for (const forbidden of [
-      "私募认购",
-      "开户",
-      "交易下单",
-      "基金",
-      "组合",
-      "消息",
-      "发布",
-    ]) {
-      expect(markup).not.toContain(forbidden);
-    }
+    expect(markup).toContain("基金");
+    expect(markup).toContain("组合");
+    expect(markup).toContain("消息");
+    expect(markup).toContain("发布");
+    expect(markup).toContain("暂未开放");
+    expect(markup).not.toContain("私募认购");
+    expect(markup).not.toContain("开户");
+    expect(markup).not.toContain("交易下单");
   });
 
   it("parses the shared fixture once into an explicit ready result", () => {

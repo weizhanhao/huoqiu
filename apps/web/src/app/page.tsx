@@ -24,13 +24,6 @@ export default async function HomePage({ searchParams }: HomePageProperties) {
             </div>
             <p>内容与行情均来自固定离线数据，可重复验证。</p>
           </section>
-          <nav className="channel-tabs" aria-label="首页频道">
-            <a href="/" aria-current="page">
-              首页
-            </a>
-            <span>市场快照</span>
-            <span>公开笔记</span>
-          </nav>
           <D0Feed
             cards={fixtureResult.data.feed}
             fixture={fixtureResult.data}

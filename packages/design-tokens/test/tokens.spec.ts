@@ -40,13 +40,13 @@ const contrastRatio = (foreground: string, background: string): number => {
 };
 
 describe("Huoqiu design tokens", () => {
-  it("uses the agreed financial market semantics and an original brand color", () => {
+  it("uses an original blue financial-community palette and market semantics", () => {
     expect(tokens.market.up).toBe("#F04444");
     expect(tokens.market.down).toBe("#16A37A");
+    expect(tokens.brand.primary).toBe("#0967C7");
     expect(tokens.brand.primary).not.toBe("#1976D2");
-    expect(tokens.brand.primary).not.toMatch(
-      /^#(?:1[0-9A-F]|2[0-9A-F])7[0-9A-F]{3}$/iu,
-    );
+    expect(tokens.surface.canvas).toBe("#F3F5F8");
+    expect(tokens.surface.base).toBe("#FFFFFF");
   });
 
   it("covers information hierarchy, layout, typography, and accessible targets", () => {
@@ -110,7 +110,7 @@ describe("Huoqiu design tokens", () => {
 
   it("generates deterministic, namespaced CSS variables", () => {
     expect(tokensToCssVariables(tokens)).toBe(cssVariables);
-    expect(cssVariables).toContain("--hq-brand-primary: #C2410C;");
+    expect(cssVariables).toContain("--hq-brand-primary: #0967C7;");
     expect(cssVariables).toContain("--hq-market-down: #16A37A;");
     expect(cssVariables).toContain("--hq-market-down-text: #067647;");
     expect(cssVariables).toContain("--hq-touch-app-minimum: 48px;");

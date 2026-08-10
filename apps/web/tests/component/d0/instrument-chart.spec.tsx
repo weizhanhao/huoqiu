@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import InstrumentPage from "../../../src/app/instruments/[listingId]/page";
 import { PriceChart } from "../../../src/components/instrument/price-chart";
 import { QuoteHeader } from "../../../src/components/instrument/quote-header";
 import { loadD0Fixture } from "../../../src/lib/d0-fixture";
@@ -15,6 +16,24 @@ const readyFixture = () => {
 };
 
 describe("D0 instrument detail", () => {
+  it("keeps the active chart tab and explains the unavailable detail tab", async () => {
+    const page = await InstrumentPage({
+      params: Promise.resolve({ listingId: "listing_syn_0001" }),
+      searchParams: Promise.resolve({}),
+    });
+    const markup = renderToStaticMarkup(
+      <D0WatchlistProvider knownListingIds={["listing_syn_0001"]}>
+        {page}
+      </D0WatchlistProvider>,
+    );
+
+    expect(markup).toContain('aria-current="page">走势</span>');
+    expect(markup).toContain('aria-label="演示说明，暂未开放"');
+    expect(markup).toMatch(
+      /aria-label="演示说明，暂未开放"[\s\S]*此功能暂未开放/u,
+    );
+  });
+
   it("discloses quote identity, market metadata, source, and snapshot", () => {
     const fixture = readyFixture();
     const instrument = fixture.instruments[0];
