@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { createServer as createNetServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -48,7 +48,9 @@ const basicAuthorization = (username, password) =>
 const dummyWebScript = async () => {
   const directory = await mkdtemp(join(tmpdir(), "huoqiu-preview-runtime-"));
   resources.push(() => rm(directory, { force: true, recursive: true }));
-  const scriptPath = join(directory, "web.mjs");
+  const scriptsDirectory = join(directory, "scripts");
+  await mkdir(scriptsDirectory);
+  const scriptPath = join(scriptsDirectory, "web.mjs");
   await writeFile(
     scriptPath,
     `
@@ -59,9 +61,15 @@ const dummyWebScript = async () => {
       const hostname = process.argv[hostIndex + 1];
       const server = createServer((request, response) => {
         if (request.url === "/exit") process.exit(7);
+        if (request.url === "/healthz") {
+          response.statusCode = 200;
+          response.end("ok");
+          return;
+        }
         response.setHeader("content-type", "application/json");
         response.end(JSON.stringify({
           appEnv: process.env.APP_ENV,
+          cwd: process.cwd(),
           hasBasicPassword: process.env.PREVIEW_BASIC_PASSWORD !== undefined,
           hasUnrelatedSecret: process.env.UNRELATED_SECRET !== undefined,
           headers: request.headers,
@@ -79,7 +87,7 @@ const dummyWebScript = async () => {
     `,
     "utf8",
   );
-  return scriptPath;
+  return { appRoot: await realpath(directory), scriptPath };
 };
 
 const runtimeFixture = async () => {
@@ -89,7 +97,7 @@ const runtimeFixture = async () => {
     argv: ["--port", String(port), "--web-port", String(webPort)],
     environment: validEnvironment,
   });
-  const webStartScript = await dummyWebScript();
+  const { appRoot, scriptPath: webStartScript } = await dummyWebScript();
   const runtime = await startLocalPreview(configuration, {
     environment: {
       HOME: process.env.HOME,
@@ -102,7 +110,7 @@ const runtimeFixture = async () => {
     webStartScript,
   });
   resources.push(() => runtime.close());
-  return { configuration, runtime };
+  return { appRoot, configuration, runtime };
 };
 
 describe("local preview startup configuration", () => {
@@ -186,7 +194,7 @@ describe("local preview startup configuration", () => {
 
 describe("local preview process lifecycle", () => {
   it("starts Web before the protected gateway without exposing in-memory secrets", async () => {
-    const { configuration, runtime } = await runtimeFixture();
+    const { appRoot, configuration, runtime } = await runtimeFixture();
 
     const response = await globalThis.fetch(runtime.address, {
       headers: {
@@ -209,6 +217,7 @@ describe("local preview process lifecycle", () => {
       configuration.gatewaySha,
     );
     assert.equal(body.appEnv, "local");
+    assert.equal(body.cwd, appRoot);
     assert.equal(body.nodeEnv, "production");
     assert.equal(body.hasBasicPassword, false);
     assert.equal(body.hasUnrelatedSecret, false);

@@ -9,6 +9,7 @@
     "stamp:product": "node scripts/stamp-product.mjs",
     "start:local": "node scripts/start-local.mjs",
     "test": "node --test test/*.spec.mjs",
+    "test:built-web": "node --test test/built-web-runtime.integration.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }
 }

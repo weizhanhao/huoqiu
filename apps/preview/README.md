@@ -40,3 +40,10 @@ to Web and is not printed by the launcher.
 The response headers expose the product SHA, gateway SHA, synthetic-data flag,
 and review status. A stable preview must still be launched from independently
 approved code; this package does not promote `unreviewed` code to stable.
+
+After building Web, verify the real production handler and preview gateway
+together with:
+
+```bash
+pnpm --filter @huoqiu/preview test:built-web
+```

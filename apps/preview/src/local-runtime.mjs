@@ -210,7 +210,7 @@ export const startLocalPreview = async (
       String(configuration.webPort),
     ],
     {
-      cwd: dirname(webStartScript),
+      cwd: dirname(dirname(webStartScript)),
       env: childEnvironmentFor(environment, hmacSecret),
       stdio: "ignore",
     },
