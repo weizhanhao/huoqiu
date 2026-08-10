@@ -2,7 +2,13 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { chromium, type Browser, type Page } from "@playwright/test";
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const host = "127.0.0.1";
@@ -22,6 +28,7 @@ const chromeCandidates = [
 ].filter((candidate): candidate is string => candidate !== undefined);
 
 let browser: Browser;
+let context: BrowserContext;
 let page: Page;
 let vite: ChildProcess;
 
@@ -52,11 +59,13 @@ beforeAll(async () => {
       ? { headless: true }
       : { executablePath, headless: true },
   );
-  page = await browser.newPage({ viewport: { height: 844, width: 390 } });
+  context = await browser.newContext({ viewport: { height: 844, width: 390 } });
+  page = await context.newPage();
   await page.goto(baseUrl);
 }, 20_000);
 
 afterAll(async () => {
+  await context?.close();
   await browser?.close();
   vite?.kill("SIGTERM");
 });
@@ -169,5 +178,70 @@ describe("market and portfolio controls in a real browser DOM", () => {
     const followed = scope.getByRole("button", { name: "已关注组合" });
     expect(await followed.getAttribute("aria-pressed")).toBe("true");
     expect(await scope.getByText("调仓记录", { exact: true }).count()).toBe(1);
+  });
+
+  it("clicks instrument periods, detail tabs, and the shared watchlist control", async () => {
+    const scope = await requiredControl(page.getByTestId("instrument-detail"));
+    const daily = await requiredControl(
+      scope.getByRole("button", { name: "日 K" }),
+    );
+
+    await daily.click();
+
+    expect(await daily.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      await scope
+        .getByText("日 K 走势：10 个固定合成采样点", {
+          exact: true,
+        })
+        .count(),
+    ).toBe(1);
+
+    const news = await requiredControl(
+      scope.getByRole("tab", { name: "资讯" }),
+    );
+    await news.click();
+
+    expect(await news.getAttribute("aria-selected")).toBe("true");
+    expect(
+      await scope.getByText("合成制造业订单保持韧性", { exact: true }).count(),
+    ).toBe(1);
+
+    for (const [tabName, expectedText] of [
+      ["成分股", "星港精工"],
+      ["公告", "演示文件不可下载"],
+      ["相关 ETF", "美股 ETF"],
+      ["讨论", "合成观察员"],
+    ] as const) {
+      const tab = scope.getByRole("tab", { name: tabName });
+      await tab.click();
+      expect(await tab.getAttribute("aria-selected")).toBe("true");
+      expect(await scope.getByText(expectedText, { exact: true }).count()).toBe(
+        tabName === "公告" ? 2 : 1,
+      );
+    }
+
+    const actionBar = scope.getByRole("navigation", {
+      name: "标的快捷操作",
+    });
+    const add = await requiredControl(
+      actionBar.getByRole("button", { name: "加自选" }),
+    );
+    await add.click();
+
+    const remove = actionBar.getByRole("button", { name: "取消自选" });
+    expect(await remove.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("has no serious or critical accessibility violations in the instrument detail", async () => {
+    const results = await new AxeBuilder({ page })
+      .include('[data-testid="instrument-detail"]')
+      .analyze();
+    const blockingViolations = results.violations.filter(
+      (violation) =>
+        violation.impact === "serious" || violation.impact === "critical",
+    );
+
+    expect(blockingViolations).toEqual([]);
   });
 });
