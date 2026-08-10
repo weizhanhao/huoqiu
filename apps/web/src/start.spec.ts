@@ -18,6 +18,7 @@ const appRoot = fileURLToPath(new URL("../", import.meta.url));
 const startScript = fileURLToPath(
   new URL("../scripts/start.mjs", import.meta.url),
 );
+const nextConfigurationUrl = new URL("../next.config.ts", import.meta.url).href;
 const host = "127.0.0.1";
 
 const availablePort = async (): Promise<number> =>
@@ -148,6 +149,43 @@ describe("Web production start preflight", () => {
       'server.on("clientError", handleWebIngressClientError)',
     );
     expect(source).not.toContain("spawn(");
+  });
+
+  it("loads the production Next configuration with Node type stripping", async () => {
+    const child = spawn(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        `await import(${JSON.stringify(nextConfigurationUrl)})`,
+      ],
+      {
+        cwd: appRoot,
+        env: {
+          ...process.env,
+          APP_ENV: "local",
+          NODE_ENV: "production",
+          ZERO_TRUST_HMAC_SECRET:
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          ZERO_TRUST_ISSUER: "huoqiu-local-preview",
+          ZERO_TRUST_MAX_SKEW_SECONDS: "60",
+        },
+        stdio: ["ignore", "ignore", "pipe"],
+      },
+    );
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+
+    const code = await new Promise<number | null>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("exit", resolve);
+    });
+
+    expect(code).toBe(0);
+    expect(stderr).not.toContain("ERR_MODULE_NOT_FOUND");
   });
 });
 

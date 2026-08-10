@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-import { assertZeroTrustStartupConfiguration } from "./src/zero-trust-configuration";
+import { assertZeroTrustStartupConfiguration } from "./src/zero-trust-configuration.ts";
 
 assertZeroTrustStartupConfiguration(process.env);
 
