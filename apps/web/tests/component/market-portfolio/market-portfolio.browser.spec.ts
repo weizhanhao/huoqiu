@@ -233,6 +233,62 @@ describe("market and portfolio controls in a real browser DOM", () => {
     expect(await remove.getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("roves instrument tabs with Arrow, Home, and End keys", async () => {
+    const scope = await requiredControl(page.getByTestId("instrument-detail"));
+    const discussion = scope.getByRole("tab", { name: "讨论" });
+    const constituents = scope.getByRole("tab", { name: "成分股" });
+    const relatedEtfs = scope.getByRole("tab", { name: "相关 ETF" });
+
+    await discussion.focus();
+    await page.keyboard.press("ArrowRight");
+
+    expect(
+      await constituents.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+    expect(await constituents.getAttribute("aria-selected")).toBe("true");
+    expect(await scope.getByText("星港精工", { exact: true }).count()).toBe(1);
+
+    await page.keyboard.press("End");
+
+    expect(
+      await relatedEtfs.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+    expect(await relatedEtfs.getAttribute("aria-selected")).toBe("true");
+    expect(await scope.getByText("美股 ETF", { exact: true }).count()).toBe(1);
+
+    await page.keyboard.press("ArrowRight");
+
+    expect(
+      await discussion.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+    expect(await discussion.getAttribute("aria-selected")).toBe("true");
+    expect(await scope.getByText("合成观察员", { exact: true }).count()).toBe(
+      1,
+    );
+
+    await page.keyboard.press("ArrowLeft");
+    expect(
+      await relatedEtfs.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+
+    await page.keyboard.press("Home");
+    expect(
+      await discussion.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+    expect(await discussion.getAttribute("tabindex")).toBe("0");
+    expect(await relatedEtfs.getAttribute("tabindex")).toBe("-1");
+  });
+
   it("keeps instrument detail panels inside a 390px mobile viewport", async () => {
     const scope = await requiredControl(page.getByTestId("instrument-detail"));
     const quotePanel = scope.locator("header").first();

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { type KeyboardEvent, useState } from "react";
 
 import { UnavailableAction } from "../../components/shell/unavailable-action";
 import { WatchlistToggle } from "../../components/watchlist/watchlist-toggle";
@@ -76,6 +76,33 @@ export function SyntheticInstrumentDetail({
     values.includes(value)
       ? values.filter((candidate) => candidate !== value)
       : [...values, value];
+
+  const handleDetailTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const currentIndex = instrumentDetailTabs.findIndex(
+      (tab) => tab.id === activeTab,
+    );
+    let nextIndex: number | undefined;
+
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % instrumentDetailTabs.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex =
+        (currentIndex - 1 + instrumentDetailTabs.length) %
+        instrumentDetailTabs.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = instrumentDetailTabs.length - 1;
+    }
+
+    if (nextIndex === undefined) return;
+
+    event.preventDefault();
+    const nextTab = instrumentDetailTabs[nextIndex];
+    if (nextTab === undefined) return;
+    setActiveTab(nextTab.id);
+    document.getElementById(`instrument-tab-${nextTab.id}`)?.focus();
+  };
 
   return (
     <article
@@ -182,6 +209,7 @@ export function SyntheticInstrumentDetail({
               id={`instrument-tab-${tab.id}`}
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              onKeyDown={handleDetailTabKeyDown}
               role="tab"
               tabIndex={activeTab === tab.id ? 0 : -1}
               type="button"
