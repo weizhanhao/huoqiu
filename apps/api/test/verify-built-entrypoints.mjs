@@ -429,6 +429,7 @@ const verifyHttpEntrypoint = async () => {
 
 const verifyWorkerEntrypoint = async (consumer) => {
   const entrypoint = spawnEntrypoint(`dist/workers/${consumer}.main.js`, {
+    APP_ENV: "local",
     NODE_ENV: "production",
   });
 
@@ -438,6 +439,8 @@ const verifyWorkerEntrypoint = async (consumer) => {
       (event) => event.event === "worker.ready" && event.consumer === consumer,
     );
     assert.deepEqual(ready.activeConsumers, [consumer]);
+    assert.equal(ready.adapterMode, "local-synthetic");
+    assert.equal(ready.durable, false);
     assert.equal(
       ready.tcpServerCount,
       0,
@@ -446,7 +449,7 @@ const verifyWorkerEntrypoint = async (consumer) => {
 
     await stopGracefully(entrypoint);
     process.stdout.write(
-      `${entrypoint.relativePath}: consumer/no-HTTP boundary and graceful shutdown verified\n`,
+      `${entrypoint.relativePath}: local synthetic/non-durable consumer, no-HTTP boundary, and graceful shutdown verified\n`,
     );
   } finally {
     await forceCleanup(entrypoint);
