@@ -229,4 +229,166 @@ describe("market and portfolio controls in a real browser DOM", () => {
     expect(await followed.getAttribute("aria-pressed")).toBe("true");
     expect(await scope.getByText("调仓记录", { exact: true }).count()).toBe(1);
   });
+
+  it("clicks instrument periods, detail tabs, and the shared watchlist control", async () => {
+    const scope = await requiredControl(page.getByTestId("instrument-detail"));
+    const daily = await requiredControl(
+      scope.getByRole("button", { name: "日 K" }),
+    );
+
+    await daily.click();
+
+    expect(await daily.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      await scope
+        .getByText("日 K 走势：10 个固定合成采样点", {
+          exact: true,
+        })
+        .count(),
+    ).toBe(1);
+
+    const news = await requiredControl(
+      scope.getByRole("tab", { name: "资讯" }),
+    );
+    await news.click();
+
+    expect(await news.getAttribute("aria-selected")).toBe("true");
+    expect(
+      await scope.getByText("合成制造业订单保持韧性", { exact: true }).count(),
+    ).toBe(1);
+
+    for (const [tabName, expectedText] of [
+      ["成分股", "星港精工"],
+      ["公告", "演示文件不可下载"],
+      ["相关 ETF", "美股 ETF"],
+      ["讨论", "合成观察员"],
+    ] as const) {
+      const tab = scope.getByRole("tab", { name: tabName });
+      await tab.click();
+      expect(await tab.getAttribute("aria-selected")).toBe("true");
+      expect(await scope.getByText(expectedText, { exact: true }).count()).toBe(
+        tabName === "公告" ? 2 : 1,
+      );
+    }
+
+    const actionBar = scope.getByRole("navigation", {
+      name: "标的快捷操作",
+    });
+    const add = await requiredControl(
+      actionBar.getByRole("button", { name: "加自选" }),
+    );
+    await add.click();
+
+    const remove = actionBar.getByRole("button", { name: "取消自选" });
+    expect(await remove.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("roves instrument tabs with Arrow, Home, and End keys", async () => {
+    const scope = await requiredControl(page.getByTestId("instrument-detail"));
+    const discussion = scope.getByRole("tab", { name: "讨论" });
+    const constituents = scope.getByRole("tab", { name: "成分股" });
+    const relatedEtfs = scope.getByRole("tab", { name: "相关 ETF" });
+
+    await discussion.focus();
+    await page.keyboard.press("ArrowRight");
+
+    expect(
+      await constituents.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+    expect(await constituents.getAttribute("aria-selected")).toBe("true");
+    expect(await scope.getByText("星港精工", { exact: true }).count()).toBe(1);
+
+    await page.keyboard.press("End");
+
+    expect(
+      await relatedEtfs.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+    expect(await relatedEtfs.getAttribute("aria-selected")).toBe("true");
+    expect(await scope.getByText("美股 ETF", { exact: true }).count()).toBe(1);
+
+    await page.keyboard.press("ArrowRight");
+
+    expect(
+      await discussion.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+    expect(await discussion.getAttribute("aria-selected")).toBe("true");
+    expect(await scope.getByText("合成观察员", { exact: true }).count()).toBe(
+      1,
+    );
+
+    await page.keyboard.press("ArrowLeft");
+    expect(
+      await relatedEtfs.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+
+    await page.keyboard.press("Home");
+    expect(
+      await discussion.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+    expect(await discussion.getAttribute("tabindex")).toBe("0");
+    expect(await relatedEtfs.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("gives the publish-discussion link the project touch target", async () => {
+    const scope = await requiredControl(page.getByTestId("instrument-detail"));
+    const publish = scope.getByRole("link", {
+      exact: true,
+      name: "＋ 发讨论",
+    });
+    const bounds = await publish.boundingBox();
+    const minimum = await page.evaluate(() =>
+      Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          "--hq-touch-web-minimum",
+        ),
+      ),
+    );
+
+    expect(bounds).not.toBeNull();
+    expect(bounds?.width).toBeGreaterThanOrEqual(minimum);
+    expect(bounds?.height).toBeGreaterThanOrEqual(minimum);
+  });
+
+  it("keeps instrument detail panels inside a 390px mobile viewport", async () => {
+    const scope = await requiredControl(page.getByTestId("instrument-detail"));
+    const quotePanel = scope.locator("header").first();
+    const bounds = await quotePanel.boundingBox();
+    const widths = await page.evaluate(() => ({
+      body: document.body.scrollWidth,
+      document: document.documentElement.scrollWidth,
+      viewport: window.innerWidth,
+    }));
+
+    expect(bounds).not.toBeNull();
+    expect(bounds?.x).toBeGreaterThanOrEqual(0);
+    expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(
+      widths.viewport,
+    );
+    expect(widths.body).toBeLessThanOrEqual(widths.viewport);
+    expect(widths.document).toBeLessThanOrEqual(widths.viewport);
+  });
+
+  it("has no serious or critical accessibility violations in the instrument detail", async () => {
+    const scope = await requiredControl(page.getByTestId("instrument-detail"));
+    await scope.getByRole("tab", { name: "成分股" }).click();
+    const results = await new AxeBuilder({ page })
+      .include('[data-testid="instrument-detail"]')
+      .analyze();
+    const blockingViolations = results.violations.filter(
+      (violation) =>
+        violation.impact === "serious" || violation.impact === "critical",
+    );
+
+    expect(blockingViolations).toEqual([]);
+  });
 });

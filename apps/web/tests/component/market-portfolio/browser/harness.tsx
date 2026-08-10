@@ -7,6 +7,7 @@ import { MarketDashboard } from "../../../../src/features/market-portfolio/marke
 import { MarketRankings } from "../../../../src/features/market-portfolio/market-rankings";
 import { PortfolioDashboard } from "../../../../src/features/market-portfolio/portfolio-dashboard";
 import { PortfolioDetail } from "../../../../src/features/market-portfolio/portfolio-detail";
+import { SyntheticInstrumentDetail } from "../../../../src/features/market-portfolio/synthetic-instrument-detail";
 import { syntheticListings } from "../../../../src/features/market-portfolio/synthetic-data";
 import { loadD0Fixture } from "../../../../src/lib/d0-fixture";
 import { D0WatchlistProvider } from "../../../../src/stores/d0-watchlist";
@@ -43,6 +44,12 @@ const surface =
       </div>
       <div data-testid="portfolio-detail">
         <PortfolioDetail />
+      </div>
+      <div
+        data-testid="instrument-detail"
+        style={{ paddingInline: "var(--hq-spacing-3)" }}
+      >
+        <SyntheticInstrumentDetail listing={syntheticListings[1]} />
       </div>
     </>
   );
