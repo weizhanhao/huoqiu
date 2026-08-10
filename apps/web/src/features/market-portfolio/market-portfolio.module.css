@@ -634,6 +634,10 @@
 }
 
 @media (max-width: 900px) {
+  .indexGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .insightGrid,
   .detailColumns {
     grid-template-columns: 1fr;

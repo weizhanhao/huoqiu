@@ -381,10 +381,10 @@ h3 {
 }
 
 .demo-data-badge {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--hq-surface-inverse);
   border: 1px solid rgba(255, 255, 255, 0.38);
   border-radius: var(--hq-radius-pill);
-  color: var(--hq-brand-on-primary);
+  color: var(--hq-text-inverse);
   font-size: var(--hq-type-size-caption);
   font-weight: var(--hq-type-weight-semibold);
   justify-self: end;

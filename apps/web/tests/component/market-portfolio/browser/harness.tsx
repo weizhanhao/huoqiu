@@ -2,6 +2,7 @@ import { cssVariables } from "@huoqiu/web-ui";
 import { createRoot } from "react-dom/client";
 
 import { WatchlistPanel } from "../../../../src/components/watchlist/watchlist-panel";
+import { DesktopShell } from "../../../../src/components/shell/desktop-shell";
 import { MarketDashboard } from "../../../../src/features/market-portfolio/market-dashboard";
 import { MarketRankings } from "../../../../src/features/market-portfolio/market-rankings";
 import { PortfolioDashboard } from "../../../../src/features/market-portfolio/portfolio-dashboard";
@@ -21,25 +22,36 @@ if (root === null) {
   throw new Error("Expected the browser harness root element");
 }
 
+const surface =
+  window.location.pathname === "/markets" ? (
+    <DesktopShell>
+      <MarketDashboard />
+    </DesktopShell>
+  ) : (
+    <>
+      <div data-testid="market-dashboard">
+        <MarketDashboard />
+      </div>
+      <div data-testid="market-rankings">
+        <MarketRankings />
+      </div>
+      <div data-testid="watchlist">
+        <WatchlistPanel fixture={fixtureResult.data} />
+      </div>
+      <div data-testid="portfolio-dashboard">
+        <PortfolioDashboard />
+      </div>
+      <div data-testid="portfolio-detail">
+        <PortfolioDetail />
+      </div>
+    </>
+  );
+
 createRoot(root).render(
   <D0WatchlistProvider
     knownListingIds={syntheticListings.map((listing) => listing.listingId)}
   >
     <style dangerouslySetInnerHTML={{ __html: cssVariables }} />
-    <div data-testid="market-dashboard">
-      <MarketDashboard />
-    </div>
-    <div data-testid="market-rankings">
-      <MarketRankings />
-    </div>
-    <div data-testid="watchlist">
-      <WatchlistPanel fixture={fixtureResult.data} />
-    </div>
-    <div data-testid="portfolio-dashboard">
-      <PortfolioDashboard />
-    </div>
-    <div data-testid="portfolio-detail">
-      <PortfolioDetail />
-    </div>
+    {surface}
   </D0WatchlistProvider>,
 );

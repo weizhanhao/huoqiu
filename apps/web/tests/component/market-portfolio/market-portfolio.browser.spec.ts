@@ -2,7 +2,13 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { chromium, type Browser, type Page } from "@playwright/test";
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const host = "127.0.0.1";
@@ -22,6 +28,7 @@ const chromeCandidates = [
 ].filter((candidate): candidate is string => candidate !== undefined);
 
 let browser: Browser;
+let context: BrowserContext;
 let page: Page;
 let vite: ChildProcess;
 
@@ -52,17 +59,22 @@ beforeAll(async () => {
       ? { headless: true }
       : { executablePath, headless: true },
   );
-  page = await browser.newPage({ viewport: { height: 844, width: 390 } });
+  context = await browser.newContext({
+    viewport: { height: 844, width: 390 },
+  });
+  page = await context.newPage();
   await page.goto(baseUrl);
 }, 20_000);
 
 afterAll(async () => {
+  await context?.close();
   await browser?.close();
   vite?.kill("SIGTERM");
 });
 
 beforeEach(async () => {
-  await page.reload();
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.goto(baseUrl);
 });
 
 const requiredControl = async (locator: ReturnType<Page["getByTestId"]>) => {
@@ -71,6 +83,53 @@ const requiredControl = async (locator: ReturnType<Page["getByTestId"]>) => {
 };
 
 describe("market and portfolio controls in a real browser DOM", () => {
+  it("keeps the shared demo-data badge at WCAG AA text contrast", async () => {
+    await page.goto(`${baseUrl}/markets`);
+
+    const results = await new AxeBuilder({ page })
+      .include(".demo-data-badge")
+      .withRules(["color-contrast"])
+      .analyze();
+
+    expect(results.violations).toEqual([]);
+  });
+
+  it.each([
+    { expectedColumns: 1, height: 844, width: 390 },
+    { expectedColumns: 2, height: 900, width: 768 },
+    { expectedColumns: 3, height: 1000, width: 1440 },
+  ])(
+    "keeps the markets route within $width px with $expectedColumns index columns",
+    async ({ expectedColumns, height, width }) => {
+      await page.setViewportSize({ height, width });
+      await page.goto(`${baseUrl}/markets`);
+
+      const layout = await page.evaluate(() => {
+        const cards = [
+          ...document.querySelectorAll(
+            'section[aria-labelledby="indices-heading"] article',
+          ),
+        ];
+        const firstCardTop = cards[0]?.getBoundingClientRect().top;
+        return {
+          body: document.body.scrollWidth,
+          columns: cards.filter(
+            (card) => card.getBoundingClientRect().top === firstCardTop,
+          ).length,
+          document: document.documentElement.scrollWidth,
+          viewport: window.innerWidth,
+        };
+      });
+
+      expect(layout).toEqual({
+        body: width,
+        columns: expectedColumns,
+        document: width,
+        viewport: width,
+      });
+    },
+  );
+
   it("clicks market and direction controls and updates visible results", async () => {
     const scope = await requiredControl(page.getByTestId("market-dashboard"));
     const market = scope.getByRole("button", { name: "港股" });
