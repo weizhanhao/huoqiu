@@ -255,6 +255,20 @@
   font-size: 12px;
 }
 
+.conceptList .conceptValue {
+  font-family: var(--hq-type-family-mono);
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.conceptList .conceptValue.up {
+  color: var(--hq-market-up-text);
+}
+
+.conceptList .conceptValue.down {
+  color: var(--hq-market-down-text);
+}
+
 .movementList li {
   border-left: 2px solid var(--hq-surface-divider);
   display: grid;

@@ -288,11 +288,31 @@ export const marketBreadth: Readonly<
   GLOBAL: { advances: 6952, flat: 551, declines: 5396, heat: 65 },
 };
 
-export const marketConcepts: Readonly<Record<MarketView, readonly string[]>> = {
-  CN: ["先进制造 +3.8%", "合成算力 +2.9%", "创新药 +1.7%"],
-  HK: ["平台科技 +3.1%", "高股息 +1.2%", "航运 -2.8%"],
-  US: ["云服务 +4.2%", "清洁能源 +2.4%", "物流 -0.9%"],
-  GLOBAL: ["数字基础设施 +2.7%", "清洁能源 +2.1%", "航运 -2.2%"],
+type MarketConcept = Readonly<{ name: string; value: number }>;
+
+export const marketConcepts: Readonly<
+  Record<MarketView, readonly MarketConcept[]>
+> = {
+  CN: [
+    { name: "先进制造", value: 3.8 },
+    { name: "合成算力", value: 2.9 },
+    { name: "创新药", value: 1.7 },
+  ],
+  HK: [
+    { name: "平台科技", value: 3.1 },
+    { name: "高股息", value: 1.2 },
+    { name: "航运", value: -2.8 },
+  ],
+  US: [
+    { name: "云服务", value: 4.2 },
+    { name: "清洁能源", value: 2.4 },
+    { name: "物流", value: -0.9 },
+  ],
+  GLOBAL: [
+    { name: "数字基础设施", value: 2.7 },
+    { name: "清洁能源", value: 2.1 },
+    { name: "航运", value: -2.2 },
+  ],
 };
 
 export const marketMovements: Readonly<

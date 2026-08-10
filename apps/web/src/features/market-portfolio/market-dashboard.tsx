@@ -201,9 +201,16 @@ export function MarketDashboard({
           <h3 id="concepts-heading">热门行业 / 概念</h3>
           <ul className={styles.conceptList}>
             {marketConcepts[state.market].map((concept, index) => (
-              <li key={concept}>
+              <li key={concept.name}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{concept}</strong>
+                <strong>{concept.name}</strong>
+                <span
+                  className={`${styles.conceptValue} ${
+                    concept.value >= 0 ? styles.up : styles.down
+                  }`}
+                >
+                  {formatChange(concept.value)}
+                </span>
               </li>
             ))}
           </ul>
