@@ -42,7 +42,10 @@ createRoot(root).render(
     <div data-testid="portfolio-detail">
       <PortfolioDetail />
     </div>
-    <div data-testid="instrument-detail">
+    <div
+      data-testid="instrument-detail"
+      style={{ paddingInline: "var(--hq-spacing-3)" }}
+    >
       <SyntheticInstrumentDetail listing={syntheticListings[1]} />
     </div>
   </D0WatchlistProvider>,

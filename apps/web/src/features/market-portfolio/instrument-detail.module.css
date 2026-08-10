@@ -605,15 +605,15 @@
     border-left: 0;
     border-radius: 0;
     border-right: 0;
-    margin-inline: -16px;
-    padding-inline: 16px;
+    margin-inline: calc(-1 * var(--hq-spacing-3));
+    padding-inline: var(--hq-spacing-3);
   }
 
   .detailPanel {
     border-left: 0;
     border-radius: 0;
     border-right: 0;
-    margin-inline: -16px;
+    margin-inline: calc(-1 * var(--hq-spacing-3));
   }
 
   .quotePanel {

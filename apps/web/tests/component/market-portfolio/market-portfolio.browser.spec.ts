@@ -233,6 +233,25 @@ describe("market and portfolio controls in a real browser DOM", () => {
     expect(await remove.getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("keeps instrument detail panels inside a 390px mobile viewport", async () => {
+    const scope = await requiredControl(page.getByTestId("instrument-detail"));
+    const quotePanel = scope.locator("header").first();
+    const bounds = await quotePanel.boundingBox();
+    const widths = await page.evaluate(() => ({
+      body: document.body.scrollWidth,
+      document: document.documentElement.scrollWidth,
+      viewport: window.innerWidth,
+    }));
+
+    expect(bounds).not.toBeNull();
+    expect(bounds?.x).toBeGreaterThanOrEqual(0);
+    expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(
+      widths.viewport,
+    );
+    expect(widths.body).toBeLessThanOrEqual(widths.viewport);
+    expect(widths.document).toBeLessThanOrEqual(widths.viewport);
+  });
+
   it("has no serious or critical accessibility violations in the instrument detail", async () => {
     const results = await new AxeBuilder({ page })
       .include('[data-testid="instrument-detail"]')
