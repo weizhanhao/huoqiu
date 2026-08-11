@@ -12,6 +12,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: tokens.brand.primary,
         tabBarInactiveTintColor: tokens.text.tertiary,
+        tabBarItemStyle: { minHeight: appTouchMinimum },
         tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
         tabBarStyle: {
           backgroundColor: tokens.surface.base,

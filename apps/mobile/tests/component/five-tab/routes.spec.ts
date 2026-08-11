@@ -77,4 +77,15 @@ describe("mobile five-tab route registry", () => {
       ]),
     );
   });
+
+  it("applies the App touch minimum directly to every primary tab item", () => {
+    const tabLayout = readFileSync(
+      join(mobileRoot, "app/(tabs)/_layout.tsx"),
+      "utf8",
+    );
+
+    expect(tabLayout).toMatch(
+      /tabBarItemStyle:\s*\{\s*minHeight:\s*appTouchMinimum\s*\}/u,
+    );
+  });
 });
