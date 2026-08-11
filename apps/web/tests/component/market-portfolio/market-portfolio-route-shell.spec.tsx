@@ -46,10 +46,7 @@ const expectPrimaryDestination = (markup: string, href: string): void => {
 describe("market and portfolio route shell truth", () => {
   it("keeps market dashboards and rankings current in both navigation layers", () => {
     expectPrimaryDestination(renderRoute(<MarketsPage />), "/markets");
-    expectPrimaryDestination(
-      renderRoute(<MarketRankingsPage />),
-      "/markets",
-    );
+    expectPrimaryDestination(renderRoute(<MarketRankingsPage />), "/markets");
   });
 
   it("keeps instrument detail current as a market surface", async () => {
@@ -66,13 +63,7 @@ describe("market and portfolio route shell truth", () => {
       params: Promise.resolve({ portfolioId: "portfolio_syn_0001" }),
     });
 
-    expectPrimaryDestination(
-      renderRoute(<PortfoliosPage />),
-      "/portfolios",
-    );
-    expectPrimaryDestination(
-      renderRoute(portfolioDetail),
-      "/portfolios",
-    );
+    expectPrimaryDestination(renderRoute(<PortfoliosPage />), "/portfolios");
+    expectPrimaryDestination(renderRoute(portfolioDetail), "/portfolios");
   });
 });
