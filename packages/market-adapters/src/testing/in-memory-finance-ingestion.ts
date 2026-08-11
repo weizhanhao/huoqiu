@@ -2,6 +2,7 @@ import type {
   FinanceSourceDescriptor,
   NormalizedFinanceRecord,
 } from "@huoqiu/contracts/finance/ingestion-v1";
+import { normalizedFinanceRecordSchema } from "@huoqiu/contracts/finance/ingestion-v1";
 
 import type {
   FinanceRecordPersistResult,
@@ -36,18 +37,25 @@ export class InMemoryFinanceRecordStore implements FinanceRecordStore {
     records: readonly NormalizedFinanceRecord[],
   ): Promise<FinanceRecordPersistResult> {
     const draft = new Map(this.#recordsByIdentity);
+    const validatedRecords = records.map((record) =>
+      normalizedFinanceRecordSchema.parse(record),
+    );
     let created = 0;
     let updated = 0;
     let duplicates = 0;
 
-    for (const record of records) {
-      const identity = JSON.stringify([record.source, record.sourceRecordId]);
+    for (const record of validatedRecords) {
+      const identity = JSON.stringify([
+        record.provenance.source,
+        record.sourceRecordId,
+      ]);
       const existing = draft.get(identity);
       if (existing === undefined) {
         created += 1;
         draft.set(identity, structuredClone(record));
       } else if (existing.contentHash === record.contentHash) {
         duplicates += 1;
+        draft.set(identity, structuredClone(record));
       } else {
         updated += 1;
         draft.set(identity, structuredClone(record));
@@ -59,7 +67,12 @@ export class InMemoryFinanceRecordStore implements FinanceRecordStore {
       this.#recordsByIdentity.set(identity, record);
     }
 
-    return { created, updated, duplicates };
+    return {
+      created,
+      updated,
+      duplicates,
+      records: validatedRecords.map((record) => structuredClone(record)),
+    };
   }
 
   records(): readonly NormalizedFinanceRecord[] {
