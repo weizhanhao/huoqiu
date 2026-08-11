@@ -76,4 +76,26 @@ describe("finance information routes", () => {
     expect(markup).toContain("分享（暂未开放）");
     expect(markup).toContain("收藏（仅本次会话）");
   });
+
+  it("keeps briefing and news on distinct current global channels", async () => {
+    const briefingMarkup = renderToStaticMarkup(<BriefingPage />);
+    const newsMarkup = renderToStaticMarkup(
+      await NewsPage({ searchParams: Promise.resolve({}) }),
+    );
+    const detailMarkup = renderToStaticMarkup(
+      await NewsDetailPage({
+        params: Promise.resolve({ newsId: "company_syn_starport_orders" }),
+      }),
+    );
+
+    expect(briefingMarkup).toContain(
+      '<a aria-current="page" href="/7x24">7x24</a>',
+    );
+    expect(newsMarkup).toContain(
+      '<a aria-current="page" href="/news">资讯</a>',
+    );
+    expect(detailMarkup).toContain(
+      '<a aria-current="page" href="/news">资讯</a>',
+    );
+  });
 });

@@ -3,7 +3,7 @@ import { FinanceBriefingTimeline } from "../../features/finance-information/fina
 
 export default function BriefingPage() {
   return (
-    <DesktopShell>
+    <DesktopShell activeChannel="briefing">
       <FinanceBriefingTimeline />
     </DesktopShell>
   );

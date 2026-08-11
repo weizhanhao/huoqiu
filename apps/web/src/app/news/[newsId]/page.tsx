@@ -20,7 +20,7 @@ export default async function NewsDetailPage({
   const item = getFinanceInformationById(newsId);
 
   return (
-    <DesktopShell>
+    <DesktopShell activeChannel="news">
       {item === undefined ? (
         <PageState state="empty" emptyMessage="没有这条合成资讯" />
       ) : (

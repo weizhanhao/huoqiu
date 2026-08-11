@@ -31,7 +31,7 @@ export default async function NewsPage({ searchParams }: NewsPageProperties) {
     : (resolvedSearchParams.q ?? "");
 
   return (
-    <DesktopShell>
+    <DesktopShell activeChannel="news">
       <FinanceInformationHub initialChannel={channel} initialQuery={query} />
     </DesktopShell>
   );
