@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { NotificationSessionProvider } from "../features/notifications/notification-state";
 import { syntheticListings } from "../features/market-portfolio/synthetic-data";
+import { ProfileSessionProvider } from "../features/profile-settings/profile-session";
 import { loadD0Fixture } from "../lib/d0-fixture";
 import { D0WatchlistProvider } from "../stores/d0-watchlist";
 
@@ -39,14 +40,16 @@ export default function RootLayout({ children }: RootLayoutProperties) {
         <style dangerouslySetInnerHTML={{ __html: cssVariables }} />
       </head>
       <body>
-        <NotificationSessionProvider>
-          <D0WatchlistProvider knownListingIds={knownListingIds}>
-            <span className="visually-hidden">
-              自选与消息状态仅当前会话保存，刷新后重置
-            </span>
-            {children}
-          </D0WatchlistProvider>
-        </NotificationSessionProvider>
+        <ProfileSessionProvider>
+          <NotificationSessionProvider>
+            <D0WatchlistProvider knownListingIds={knownListingIds}>
+              <span className="visually-hidden">
+                自选、消息与资料状态仅当前会话保存，刷新后重置
+              </span>
+              {children}
+            </D0WatchlistProvider>
+          </NotificationSessionProvider>
+        </ProfileSessionProvider>
       </body>
     </html>
   );
