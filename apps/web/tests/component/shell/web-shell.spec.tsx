@@ -105,29 +105,34 @@ describe("financial community web shell", () => {
     expect(markup).toContain(">设置<");
     expect(markup).toContain('aria-label="移动端主导航"');
 
-    for (const item of ["首页", "自选", "行情", "组合", "消息"]) {
+    for (const item of ["首页", "自选", "行情", "组合", "我的"]) {
       expect(markup).toContain(`>${item}<`);
     }
 
     expect(markup).not.toMatch(/<button\b(?![^>]*type="submit")[^>]*>/u);
   });
 
-  it("exposes notifications from desktop, sidebar, and mobile navigation", () => {
+  it("exposes notifications on desktop and carries unread state on mobile My", () => {
     const markup = renderShell();
 
-    expect(markup.match(/href="\/notifications"/gu)).toHaveLength(3);
+    expect(markup.match(/href="\/notifications"/gu)).toHaveLength(2);
+    expect(markup).toContain('href="/users/user_demo_0001"');
+    expect(markup).toContain("<span>我的</span>");
     expect(markup).not.toContain('aria-label="消息，暂未开放"');
     expect(markup).toContain("未读通知");
   });
 
-  it("marks every notification entry as current on the notification route", () => {
+  it("marks desktop notifications and mobile My current on the notification route", () => {
     const markup = renderNotificationShell();
 
     expect(
       markup.match(
         /<a[^>]*aria-current="page"[^>]*href="\/notifications"[^>]*>/gu,
       ),
-    ).toHaveLength(3);
+    ).toHaveLength(2);
+    expect(markup).toMatch(
+      /<a[^>]*aria-current="page"[^>]*href="\/users\/user_demo_0001"[^>]*>/u,
+    );
   });
 
   it("routes every completed product surface instead of labelling it unavailable", () => {

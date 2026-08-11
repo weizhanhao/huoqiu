@@ -5,30 +5,46 @@ import { loadD0Fixture, type D0FixtureLoadResult } from "../../lib/d0-fixture";
 import { DemoDataBadge } from "../system/demo-data-badge";
 import { PageState } from "../system/page-state";
 import { type ActiveChannel, ChannelNavigation } from "./channel-navigation";
-import { MobileBottomNavigation } from "./mobile-bottom-navigation";
+import {
+  type ActivePrimary,
+  MobileBottomNavigation,
+} from "./mobile-bottom-navigation";
 import { NotificationNavigationLink } from "./notification-navigation-link";
-import { UnavailableAction } from "./unavailable-action";
 
 type DesktopShellProperties = Readonly<{
   activeChannel?: ActiveChannel | undefined;
-  activeUtility?: "notifications" | undefined;
+  activePrimary?: ActivePrimary | undefined;
+  activeUtility?: "notifications" | "profile" | "settings" | undefined;
   children: ReactNode;
   fixtureResult?: D0FixtureLoadResult;
 }>;
 
 export function DesktopShell({
   activeChannel,
+  activePrimary,
   activeUtility,
   children,
   fixtureResult = loadD0Fixture(),
 }: DesktopShellProperties) {
   const fixture = fixtureResult.status === "ready" ? fixtureResult.data : null;
   const notificationsActive = activeUtility === "notifications";
+  const profilePageActive = activeUtility === "profile";
+  const profileActive = activeUtility !== undefined;
+  const settingsActive = activeUtility === "settings";
+  const resolvedActivePrimary =
+    activePrimary ??
+    (profileActive
+      ? "profile"
+      : activeChannel === "watchlist"
+        ? "watchlist"
+        : activeChannel === undefined
+          ? undefined
+          : "home");
 
   return (
     <div
       className={`d0-app-shell${
-        notificationsActive ? " d0-app-shell-notifications" : ""
+        profileActive ? " d0-app-shell-notifications" : ""
       }`}
     >
       <header className="d0-topbar">
@@ -61,14 +77,23 @@ export function DesktopShell({
             </span>
             <span>发布</span>
           </Link>
-          <UnavailableAction icon="⚙" label="设置" />
+          <Link
+            aria-current={settingsActive ? "page" : undefined}
+            className="top-action-link"
+            href="/settings"
+          >
+            <span className="unavailable-icon" aria-hidden="true">
+              ⚙
+            </span>
+            <span>设置</span>
+          </Link>
         </nav>
         <DemoDataBadge />
       </header>
 
       <div className="d0-layout">
         <aside className="d0-sidebar" aria-label="用户与主导航">
-          <div className="seed-user">
+          <Link className="seed-user" href="/users/user_demo_0001">
             <span className="seed-avatar" aria-hidden="true">
               演
             </span>
@@ -76,25 +101,65 @@ export function DesktopShell({
               <strong>{fixture?.seed_user.name ?? "演示用户"}</strong>
               <small>固定 Fixture 身份</small>
             </div>
-          </div>
+          </Link>
           <Link className="sidebar-publish" href="/publish">
             ＋ 写帖子
           </Link>
           <nav aria-label="主导航">
-            <Link href="/">首页</Link>
-            <Link href="/watchlist">自选</Link>
-            <Link href="/markets">行情</Link>
-            <Link href="/portfolios">组合</Link>
+            <Link
+              aria-current={
+                resolvedActivePrimary === "home" ? "page" : undefined
+              }
+              href="/"
+            >
+              首页
+            </Link>
+            <Link
+              aria-current={
+                resolvedActivePrimary === "watchlist" ? "page" : undefined
+              }
+              href="/watchlist"
+            >
+              自选
+            </Link>
+            <Link
+              aria-current={
+                resolvedActivePrimary === "markets" ? "page" : undefined
+              }
+              href="/markets"
+            >
+              行情
+            </Link>
+            <Link
+              aria-current={
+                resolvedActivePrimary === "portfolios" ? "page" : undefined
+              }
+              href="/portfolios"
+            >
+              组合
+            </Link>
+            <Link
+              aria-current={profilePageActive ? "page" : undefined}
+              href="/users/user_demo_0001"
+            >
+              我的
+            </Link>
             <NotificationNavigationLink
               active={notificationsActive}
               variant="sidebar"
             />
+            <Link
+              aria-current={settingsActive ? "page" : undefined}
+              href="/settings"
+            >
+              设置
+            </Link>
           </nav>
           <p className="session-disclosure">仅本机演示，不会跨端同步</p>
         </aside>
 
         <main className="d0-main">
-          {notificationsActive ? null : (
+          {profileActive ? null : (
             <ChannelNavigation activeChannel={activeChannel} />
           )}
           {fixtureResult.status === "ready" ? (
@@ -179,7 +244,7 @@ export function DesktopShell({
           </p>
         </aside>
       </div>
-      <MobileBottomNavigation notificationsActive={notificationsActive} />
+      <MobileBottomNavigation activePrimary={resolvedActivePrimary} />
     </div>
   );
 }

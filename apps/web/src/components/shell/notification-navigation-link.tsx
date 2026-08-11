@@ -25,8 +25,6 @@ export function NotificationNavigationLink({
   active = false,
   variant,
 }: NotificationNavigationLinkProperties) {
-  const session = useOptionalNotificationSession();
-  const unreadCount = session?.counts.total ?? initialNotificationUnreadCount;
   const className = `notification-nav-link notification-nav-link-${variant}`;
 
   return (
@@ -39,16 +37,21 @@ export function NotificationNavigationLink({
         <BellIcon />
       </span>
       <span>消息</span>
-      {unreadCount > 0 ? (
-        <span
-          aria-label={`${unreadCount} 条未读通知`}
-          className="notification-nav-badge"
-        >
-          <span aria-hidden="true">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        </span>
-      ) : null}
+      <NotificationUnreadBadge />
     </Link>
   );
+}
+
+export function NotificationUnreadBadge() {
+  const session = useOptionalNotificationSession();
+  const unreadCount = session?.counts.total ?? initialNotificationUnreadCount;
+
+  return unreadCount > 0 ? (
+    <span
+      aria-label={`${unreadCount} 条未读通知`}
+      className="notification-nav-badge"
+    >
+      <span aria-hidden="true">{unreadCount > 99 ? "99+" : unreadCount}</span>
+    </span>
+  ) : null;
 }

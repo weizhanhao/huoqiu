@@ -1,36 +1,48 @@
 import Link from "next/link";
 
-import { NotificationNavigationLink } from "./notification-navigation-link";
+import { ProfileNavigationLink } from "./profile-navigation-link";
+
+export type ActivePrimary =
+  "home" | "markets" | "portfolios" | "profile" | "watchlist";
 
 type MobileBottomNavigationProperties = Readonly<{
-  notificationsActive?: boolean;
+  activePrimary?: ActivePrimary | undefined;
 }>;
 
 export function MobileBottomNavigation({
-  notificationsActive = false,
+  activePrimary,
 }: MobileBottomNavigationProperties) {
   return (
     <nav className="mobile-bottom-nav" aria-label="移动端主导航">
-      <Link href="/">
+      <Link
+        aria-current={activePrimary === "home" ? "page" : undefined}
+        href="/"
+      >
         <span aria-hidden="true">⌂</span>
         <span>首页</span>
       </Link>
-      <Link href="/watchlist">
+      <Link
+        aria-current={activePrimary === "watchlist" ? "page" : undefined}
+        href="/watchlist"
+      >
         <span aria-hidden="true">☆</span>
         <span>自选</span>
       </Link>
-      <Link href="/markets">
+      <Link
+        aria-current={activePrimary === "markets" ? "page" : undefined}
+        href="/markets"
+      >
         <span aria-hidden="true">⌁</span>
         <span>行情</span>
       </Link>
-      <Link href="/portfolios">
+      <Link
+        aria-current={activePrimary === "portfolios" ? "page" : undefined}
+        href="/portfolios"
+      >
         <span aria-hidden="true">◫</span>
         <span>组合</span>
       </Link>
-      <NotificationNavigationLink
-        active={notificationsActive}
-        variant="mobile"
-      />
+      <ProfileNavigationLink active={activePrimary === "profile"} />
     </nav>
   );
 }
