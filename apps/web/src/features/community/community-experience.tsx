@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 
-import { communityFeedCards, postDetail } from "./community-fixtures";
+import {
+  communityAuthors,
+  getCommunityAuthor,
+  getCommunityFeedCards,
+  homeCommunityFeedCards,
+  postDetail,
+  type FeedCard,
+} from "./community-fixtures";
 import {
   addComment,
   addReply,
@@ -20,14 +27,155 @@ import styles from "./community-experience.module.css";
 const isLocalImage = (file: File): boolean =>
   ["image/jpeg", "image/png", "image/webp"].includes(file.type);
 
-export function CommunityFeed() {
-  const [state, setState] = useState(createInitialCommunityState);
-  const cards = communityFeedCards.filter(
-    (card) => card.channel === state.activeChannel,
-  );
+const formatCount = (count: number): string =>
+  new Intl.NumberFormat("zh-CN").format(count);
+
+function CommunityFeedCard({ card }: Readonly<{ card: FeedCard }>) {
+  const author = getCommunityAuthor(card.authorId);
 
   return (
-    <section className={styles.section} aria-labelledby="community-heading">
+    <article
+      className={styles.card}
+      data-card-id={card.id}
+      data-testid="community-feed-card"
+    >
+      <header className={styles.cardAuthor}>
+        <span className={styles.avatar} aria-hidden="true">
+          {author?.initials ?? card.author.slice(0, 1)}
+        </span>
+        <div className={styles.cardAuthorCopy}>
+          <strong>{card.author}</strong>
+          <span className={styles.meta}>
+            {author?.role ?? "合成社区作者"} · {card.publishedLabel}
+          </span>
+        </div>
+        <span className={styles.syntheticBadge}>SYNTHETIC / 固定演示内容</span>
+      </header>
+
+      <div className={styles.cardTitleRow}>
+        <span className={styles.kind}>{card.kind}</span>
+        {card.readTime ? (
+          <span className={styles.meta}>{card.readTime}</span>
+        ) : null}
+      </div>
+      <h3>{card.title}</h3>
+      <p>{card.body}</p>
+
+      {card.media ? (
+        <figure
+          className={`${styles.mediaPlaceholder} ${styles[card.media.type]}`}
+          aria-label={card.media.alt}
+        >
+          <div className={styles.mediaArtwork} aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <figcaption>
+            <span>本地媒体占位</span>
+            <span>{card.media.label}</span>
+            {card.media.duration ? (
+              <strong>{card.media.duration}</strong>
+            ) : null}
+          </figcaption>
+        </figure>
+      ) : null}
+
+      <div className={styles.tagList} aria-label="内容标签">
+        {card.tags.map((tag) => (
+          <span key={tag}>#{tag}</span>
+        ))}
+      </div>
+      <footer className={styles.cardFooter}>
+        <div className={styles.engagement} aria-label="固定合成互动统计">
+          <span>{formatCount(card.engagement.reposts)} 转发</span>
+          <span>{formatCount(card.engagement.comments)} 评论</span>
+          <span>{formatCount(card.engagement.likes)} 赞</span>
+          <span>{formatCount(card.engagement.views)} 次合成浏览</span>
+        </div>
+        {card.detailHref ? (
+          <Link href={card.detailHref}>查看完整帖子</Link>
+        ) : (
+          <span>固定合成内容</span>
+        )}
+      </footer>
+    </article>
+  );
+}
+
+function CommunityAuthorSpotlight() {
+  return (
+    <section
+      className={styles.authorSpotlight}
+      aria-labelledby="synthetic-authors-heading"
+    >
+      <header className={styles.spotlightHeading}>
+        <div>
+          <p className={styles.eyebrow}>SYNTHETIC CREATOR PROFILES</p>
+          <h3 id="synthetic-authors-heading">合成达人观察席</h3>
+        </div>
+        <span>固定资料 · 不连接真实人物</span>
+      </header>
+      <div className={styles.authorGrid}>
+        {communityAuthors.slice(0, 4).map((author) => (
+          <article className={styles.authorCard} key={author.id}>
+            <div className={styles.authorIdentity}>
+              <span className={styles.avatar} aria-hidden="true">
+                {author.initials}
+              </span>
+              <div>
+                <strong>{author.displayName}</strong>
+                <span>{author.role}</span>
+              </div>
+            </div>
+            <p>{author.bio}</p>
+            <div className={styles.authorStats}>
+              <span>{formatCount(author.followers)} 位合成关注者</span>
+              <span>{author.notes} 篇固定笔记</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function HomeCommunityStream() {
+  return (
+    <section
+      className={styles.homeStream}
+      aria-labelledby="home-community-heading"
+      data-testid="home-community-stream"
+    >
+      <header className={styles.streamHeading}>
+        <div>
+          <p className={styles.eyebrow}>SYNTHETIC SOCIAL FEED</p>
+          <h2 id="home-community-heading">社区热帖与长文</h2>
+          <p>固定合成用户内容、互动数与本地媒体占位，不含真实财经资讯。</p>
+        </div>
+        <Link className={styles.streamLink} href="/community">
+          浏览完整合成社区
+        </Link>
+      </header>
+      <div className={styles.feed}>
+        {homeCommunityFeedCards.map((card) => (
+          <CommunityFeedCard card={card} key={card.id} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function CommunityFeed() {
+  const [state, setState] = useState(createInitialCommunityState);
+  const cards = getCommunityFeedCards(state.activeChannel);
+
+  return (
+    <section
+      className={styles.section}
+      aria-labelledby="community-heading"
+      data-testid="community-feed"
+    >
       <header className={styles.intro}>
         <p className={styles.eyebrow}>SYNTHETIC COMMUNITY / SESSION ONLY</p>
         <h2 id="community-heading">社区观察</h2>
@@ -36,6 +184,8 @@ export function CommunityFeed() {
           发布合成草稿
         </Link>
       </header>
+
+      <CommunityAuthorSpotlight />
 
       <nav className={styles.channels} aria-label="社区频道">
         {communityChannels.map((channel) => (
@@ -58,22 +208,7 @@ export function CommunityFeed() {
 
       <div className={styles.feed}>
         {cards.map((card) => (
-          <article className={styles.card} key={card.id}>
-            <span className={styles.kind}>{card.kind}</span>
-            <div>
-              <p className={styles.meta}>{card.author}</p>
-              <h3>{card.title}</h3>
-            </div>
-            <p>{card.body}</p>
-            <footer className={styles.cardFooter}>
-              <span>{card.meta}</span>
-              {card.id === "post_syn_0001" ? (
-                <Link href="/community/posts/post_syn_0001">查看帖子</Link>
-              ) : (
-                <span>合成内容</span>
-              )}
-            </footer>
-          </article>
+          <CommunityFeedCard card={card} key={card.id} />
         ))}
       </div>
     </section>
@@ -84,6 +219,7 @@ export function PostDetail() {
   const [state, setState] = useState(createInitialCommunityState);
   const [commentBody, setCommentBody] = useState("");
   const [replyBodies, setReplyBodies] = useState<Record<string, string>>({});
+  const author = getCommunityAuthor(postDetail.authorId);
 
   const submitComment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -105,15 +241,29 @@ export function PostDetail() {
   };
 
   return (
-    <section className={styles.section} aria-labelledby="post-title">
+    <section
+      className={styles.section}
+      aria-labelledby="post-title"
+      data-testid="community-post-detail"
+    >
       <Link className={styles.backLink} href="/community">
         ← 返回社区
       </Link>
       <article className={styles.detail}>
         <header className={styles.authorRow}>
-          <div className={styles.authorMeta}>
-            <strong>{postDetail.author}</strong>
-            <span className={styles.meta}>{postDetail.time}</span>
+          <div className={styles.detailAuthor}>
+            <span className={styles.avatar} aria-hidden="true">
+              {author?.initials ?? "北"}
+            </span>
+            <div className={styles.authorMeta}>
+              <strong>{postDetail.author}</strong>
+              <span className={styles.meta}>{postDetail.time}</span>
+              <span className={styles.authorBio}>{author?.bio}</span>
+              <span className={styles.meta}>
+                {formatCount(author?.followers ?? 0)} 位合成关注者 ·{" "}
+                {author?.notes ?? 0} 篇固定笔记
+              </span>
+            </div>
           </div>
           <button
             aria-pressed={state.isFollowing}
@@ -170,11 +320,19 @@ export function PostDetail() {
             {state.bookmarkLabel}
           </button>
           <span className={styles.meta}>32 评论 · 合成互动统计</span>
+          <span className={styles.meta}>
+            18 次合成转发 · 96 次合成收藏 · 4,820 次合成浏览
+          </span>
         </div>
       </article>
 
       <section className={styles.detail} aria-labelledby="comments-heading">
-        <h2 id="comments-heading">评论</h2>
+        <div className={styles.commentsHeading}>
+          <h2 id="comments-heading">评论</h2>
+          <span className={styles.meta}>
+            {state.comments.length} 条固定合成评论 · 会话新增内容刷新后重置
+          </span>
+        </div>
         <form className={styles.composer} onSubmit={submitComment}>
           <label htmlFor="new-comment">添加评论</label>
           <textarea
@@ -206,22 +364,36 @@ export function PostDetail() {
 
         <ol className={styles.commentList}>
           {state.comments.map((comment) => (
-            <li className={styles.comment} key={comment.id}>
+            <li
+              className={styles.comment}
+              data-testid="synthetic-comment"
+              key={comment.id}
+            >
               <div>
                 <h3>{comment.author}</h3>
                 <time className={styles.commentTime}>{comment.time}</time>
               </div>
               <p>{comment.body}</p>
+              <span className={styles.commentLikes}>
+                {comment.likes} 个合成点赞
+              </span>
               {comment.replies.length > 0 ? (
                 <ol
                   className={styles.replyList}
                   aria-label={`${comment.author} 的回复`}
                 >
                   {comment.replies.map((reply) => (
-                    <li className={styles.reply} key={reply.id}>
+                    <li
+                      className={styles.reply}
+                      data-testid="synthetic-reply"
+                      key={reply.id}
+                    >
                       <strong>{reply.author}</strong>
                       <p>{reply.body}</p>
                       <time className={styles.commentTime}>{reply.time}</time>
+                      <span className={styles.commentLikes}>
+                        {reply.likes} 个合成点赞
+                      </span>
                     </li>
                   ))}
                 </ol>

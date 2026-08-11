@@ -1,5 +1,6 @@
 import { D0Feed } from "../components/feed/feed-card";
 import { DesktopShell } from "../components/shell/desktop-shell";
+import { HomeCommunityStream } from "../features/community/community-experience";
 import { loadD0Fixture } from "../lib/d0-fixture";
 import { normalizeD0FixtureState } from "../lib/d0-page-state";
 
@@ -29,6 +30,7 @@ export default async function HomePage({ searchParams }: HomePageProperties) {
             fixture={fixtureResult.data}
             state={state}
           />
+          {state === "normal" ? <HomeCommunityStream /> : null}
         </>
       ) : null}
     </DesktopShell>

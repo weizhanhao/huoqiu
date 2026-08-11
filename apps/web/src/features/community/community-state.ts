@@ -15,6 +15,7 @@ export type CommunityReply = Readonly<{
   author: string;
   body: string;
   id: string;
+  likes: number;
   time: string;
 }>;
 
@@ -22,6 +23,7 @@ export type CommunityComment = Readonly<{
   author: string;
   body: string;
   id: string;
+  likes: number;
   replies: readonly CommunityReply[];
   time: string;
 }>;
@@ -62,17 +64,99 @@ const initialComments: readonly CommunityComment[] = [
         author: "火球演示用户",
         body: "同意，假设变化时先记下原因会更清楚。",
         id: "reply_syn_0001",
+        likes: 21,
         time: "今天 10:18",
       },
+      {
+        author: "问题清单",
+        body: "还可以补一栏：什么证据出现时必须重新检查假设。",
+        id: "reply_syn_0002",
+        likes: 16,
+        time: "今天 10:24",
+      },
     ],
+    likes: 52,
     time: "今天 10:12",
   },
   {
     author: "组合练习生",
     body: "谢谢分享，已把这组观察加入自己的研究清单。",
     id: "comment_syn_0002",
-    replies: [],
+    likes: 34,
+    replies: [
+      {
+        author: "北岸观察员",
+        body: "欢迎只取模板，所有案例都是固定合成内容。",
+        id: "reply_syn_0003",
+        likes: 12,
+        time: "今天 09:58",
+      },
+    ],
     time: "今天 09:46",
+  },
+  {
+    author: "慢变量笔记",
+    body: "我会把判断变化的日期也记下来，避免只保留最后一个版本。",
+    id: "comment_syn_0003",
+    likes: 47,
+    replies: [
+      {
+        author: "静观样本",
+        body: "版本线很重要，否则回看时容易忽略当时的信息条件。",
+        id: "reply_syn_0004",
+        likes: 18,
+        time: "今天 09:31",
+      },
+    ],
+    time: "今天 09:22",
+  },
+  {
+    author: "研究练习社",
+    body: "反例最好写成可观察条件，而不是一句笼统的“也可能不对”。",
+    id: "comment_syn_0004",
+    likes: 61,
+    replies: [
+      {
+        author: "问题清单",
+        body: "赞同，明确条件之后讨论才有继续推进的空间。",
+        id: "reply_syn_0005",
+        likes: 24,
+        time: "今天 09:12",
+      },
+    ],
+    time: "今天 09:06",
+  },
+  {
+    author: "离线影像间",
+    body: "详情页段落和评论层级很适合用来检查长内容在小屏上的阅读节奏。",
+    id: "comment_syn_0005",
+    likes: 29,
+    replies: [
+      {
+        author: "火球演示用户",
+        body: "后续还可以继续验证键盘操作和更长回复的换行。",
+        id: "reply_syn_0006",
+        likes: 9,
+        time: "昨天 23:48",
+      },
+    ],
+    time: "昨天 23:40",
+  },
+  {
+    author: "证据整理员",
+    body: "风险提示和合成标识放在正文附近，比只在页面底部说明更容易看到。",
+    id: "comment_syn_0006",
+    likes: 38,
+    replies: [],
+    time: "昨天 22:56",
+  },
+  {
+    author: "样本观察者",
+    body: "固定时间、作者和互动数让每次测试结果都能重复核对。",
+    id: "comment_syn_0007",
+    likes: 26,
+    replies: [],
+    time: "昨天 22:18",
   },
 ];
 
@@ -172,6 +256,7 @@ export const addComment = (
         author: "火球演示用户",
         body: body.trim(),
         id: `comment_session_${state.comments.length + 1}`,
+        likes: 0,
         replies: [],
         time: "刚刚",
       },
@@ -202,6 +287,7 @@ export const addReply = (
                 author: "火球演示用户",
                 body: body.trim(),
                 id: `reply_session_${comment.replies.length + 1}`,
+                likes: 0,
                 time: "刚刚",
               },
             ],
