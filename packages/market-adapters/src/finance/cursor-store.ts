@@ -136,7 +136,9 @@ export class AtomicJsonFinanceCursorStore implements FinanceCursorStore {
   async read(sourceInput: string): Promise<string | undefined> {
     const source = validateSource(sourceInput);
     const state = await readStateFile(this.#path);
-    return state.cursors[source];
+    return Object.hasOwn(state.cursors, source)
+      ? state.cursors[source]
+      : undefined;
   }
 
   async commit(

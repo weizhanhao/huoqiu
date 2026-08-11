@@ -48,6 +48,14 @@ describe("atomic JSON finance cursor store", () => {
     ).toEqual({ schemaVersion: 1, cursors: {} });
   });
 
+  it("does not expose inherited object properties as stored cursors", async () => {
+    const directory = await createDirectory();
+    const store = new AtomicJsonFinanceCursorStore({ directory });
+
+    expect(await store.read("constructor")).toBeUndefined();
+    expect(await store.read("toString")).toBeUndefined();
+  });
+
   it("serializes concurrent source commits without losing either cursor", async () => {
     const directory = await createDirectory();
     const firstStore = new AtomicJsonFinanceCursorStore({ directory });
