@@ -16,6 +16,24 @@ export {
 export { d0FixtureSchema, type D0Fixture } from "./d0/schema.js";
 export { feedCardV1Schema, type FeedCardV1 } from "./feed/card-v1.js";
 export {
+  financeContentSchema,
+  financeLicenseScopeSchema,
+  financePublisherSchema,
+  financeRecordKindSchema,
+  financeSourceDescriptorSchema,
+  financeSourceModeSchema,
+  financeSourceRecordSchema,
+  normalizedFinanceRecordSchema,
+  type FinanceContent,
+  type FinanceLicenseScope,
+  type FinancePublisher,
+  type FinanceRecordKind,
+  type FinanceSourceDescriptor,
+  type FinanceSourceMode,
+  type FinanceSourceRecord,
+  type NormalizedFinanceRecord,
+} from "./finance/ingestion-v1.js";
+export {
   approvedEventTypes,
   createInboxDeduplicator,
   eventEnvelopeSchema,
