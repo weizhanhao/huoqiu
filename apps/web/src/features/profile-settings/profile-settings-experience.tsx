@@ -118,25 +118,29 @@ function ProfileContentTabs() {
         ))}
       </div>
 
-      <div
-        aria-labelledby={`profile-tab-${activeTab}`}
-        className={styles.tabPanel}
-        id={`profile-panel-${activeTab}`}
-        role="tabpanel"
-        tabIndex={0}
-      >
-        <ol className={styles.contentList}>
-          {profileTabItems[activeTab].map((item) => (
-            <li className={styles.contentItem} key={item.title}>
-              <Link className={styles.contentLink} href={item.href}>
-                <span className={styles.contentMeta}>{item.meta}</span>
-                <strong>{item.title}</strong>
-                <p>{item.description}</p>
-              </Link>
-            </li>
-          ))}
-        </ol>
-      </div>
+      {profileTabs.map((tab) => (
+        <div
+          aria-labelledby={`profile-tab-${tab}`}
+          className={styles.tabPanel}
+          hidden={activeTab !== tab}
+          id={`profile-panel-${tab}`}
+          key={tab}
+          role="tabpanel"
+          tabIndex={activeTab === tab ? 0 : -1}
+        >
+          <ol className={styles.contentList}>
+            {profileTabItems[tab].map((item) => (
+              <li className={styles.contentItem} key={item.title}>
+                <Link className={styles.contentLink} href={item.href}>
+                  <span className={styles.contentMeta}>{item.meta}</span>
+                  <strong>{item.title}</strong>
+                  <p>{item.description}</p>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
     </section>
   );
 }

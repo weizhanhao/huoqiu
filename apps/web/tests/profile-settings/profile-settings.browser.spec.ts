@@ -182,6 +182,11 @@ describe("profile and settings in a real Chrome DOM", () => {
 
   it("supports Arrow, Home, and End keys in the profile tab interface", async () => {
     const profile = page.getByTestId("profile-page");
+    for (const tab of await profile.getByRole("tab").all()) {
+      const controlledPanel = await tab.getAttribute("aria-controls");
+      expect(controlledPanel).not.toBeNull();
+      expect(await profile.locator(`#${controlledPanel}`).count()).toBe(1);
+    }
     const activity = profile.getByRole("tab", { name: "动态" });
     await activity.focus();
     await activity.press("ArrowRight");
@@ -232,7 +237,7 @@ describe("profile and settings in a real Chrome DOM", () => {
     { height: 900, width: 768 },
     { height: 900, width: 1440 },
   ])(
-    "has no overflow or serious accessibility issue at $width px",
+    "has no profile or settings overflow or serious accessibility issue at $width px",
     async ({ height, width }) => {
       await page.setViewportSize({ height, width });
       await page.goto(baseUrl);
@@ -256,6 +261,27 @@ describe("profile and settings in a real Chrome DOM", () => {
           ({ impact }) => impact === "serious" || impact === "critical",
         ),
       ).toEqual([]);
+
+      await page.getByRole("link", { name: "设置" }).click();
+      const settingsGeometry = await page.evaluate(() => ({
+        body: document.body.scrollWidth,
+        document: document.documentElement.scrollWidth,
+        viewport: window.innerWidth,
+      }));
+      expect(settingsGeometry).toEqual({
+        body: width,
+        document: width,
+        viewport: width,
+      });
+
+      const settingsAccessibility = await new AxeBuilder({ page })
+        .include("[data-testid=settings-page]")
+        .analyze();
+      expect(
+        settingsAccessibility.violations.filter(
+          ({ impact }) => impact === "serious" || impact === "critical",
+        ),
+      ).toEqual([]);
       expect(browserErrors).toEqual([]);
     },
   );
@@ -267,7 +293,11 @@ describe("profile and settings in a real Chrome DOM", () => {
     await page.getByRole("button", { name: "编辑资料" }).click();
     const profileHeights = await profileControls.evaluateAll((elements) =>
       elements
-        .filter((element) => !element.hasAttribute("disabled"))
+        .filter(
+          (element) =>
+            !element.hasAttribute("disabled") &&
+            element.getClientRects().length > 0,
+        )
         .map((element) => element.getBoundingClientRect().height),
     );
     expect(profileHeights.length).toBeGreaterThan(0);
