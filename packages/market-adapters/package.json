@@ -7,14 +7,16 @@
   "exports": {
     ".": "./src/provider.ts",
     "./ingestion": "./src/ingestion.ts",
+    "./finance/cursor-store": "./src/finance/cursor-store.ts",
     "./finance/public-snapshot": "./src/finance/public-snapshot.ts",
+    "./finance/scheduler": "./src/finance/scheduler.ts",
     "./testing": "./src/testing/in-memory-finance-ingestion.ts",
     "./synthetic": "./src/synthetic/synthetic-provider.ts"
   },
   "scripts": {
     "lint": "eslint --config ../config/eslint/base.mjs src test",
     "test": "vitest run --config ../config/vitest/base.ts test",
-    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals src/provider.ts src/ingestion.ts src/finance/public-snapshot.ts src/testing/in-memory-finance-ingestion.ts src/synthetic/generator.ts src/synthetic/synthetic-provider.ts test/*.spec.ts"
+    "typecheck": "tsc --noEmit --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --useUnknownInCatchVariables --verbatimModuleSyntax --module NodeNext --moduleResolution NodeNext --target ES2023 --types node,vitest/globals src/provider.ts src/ingestion.ts src/finance/cursor-store.ts src/finance/public-snapshot.ts src/finance/scheduler.ts src/testing/in-memory-finance-ingestion.ts src/synthetic/generator.ts src/synthetic/synthetic-provider.ts test/*.spec.ts"
   },
   "dependencies": {
     "@huoqiu/contracts": "workspace:*",
