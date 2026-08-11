@@ -14,7 +14,7 @@ const verifiedDisplayPolicy = {
   officialSource: true,
   authType: "none",
   market: "us",
-  languages: ["en"] as ["en"],
+  languages: ["en", "zh-CN"] as ["en", "zh-CN"],
   historyStartAt: "1990-01-01T00:00:00.000Z",
   documentedRateLimit: { status: "known", requests: 10, perSeconds: 1 },
   configuredRateLimit: { requests: 5, perSeconds: 1 },
@@ -127,7 +127,7 @@ describe("finance ingestion run", () => {
             licenseVerifiedAt: "2026-08-10T00:00:00.000Z",
           },
           contentHash:
-            "sha256:6b0f1e15fadf3618d54aeb5846966fe166e7b79f74a6f959969a0adda792f25b",
+            "sha256:02a9c60df3251eef24ce1b4107321f42d7b7c60dc3c996e8b7ea58e9a2824107",
           content: {
             title: "芯片公司发布财报",
             language: "zh-CN",
@@ -395,6 +395,7 @@ describe("finance ingestion run", () => {
           bodyStorageAllowed: false,
           attribution: "Example Licensed Market Feed",
           licenseVerifiedAt: "2026-08-10T00:00:00.000Z",
+          languages: ["und"],
         },
         fetch: () => {
           fetchAttempts += 1;
@@ -1167,6 +1168,14 @@ describe("finance ingestion run", () => {
       { transportBaseUrl: "https://source.local/data/" },
     ],
     [
+      "reserved example transport",
+      { transportBaseUrl: "https://source.example/data/" },
+    ],
+    [
+      "reserved alt transport",
+      { transportBaseUrl: "https://source.alt/data/" },
+    ],
+    [
       "private address transport",
       { transportBaseUrl: "https://192.168.1.20/data/" },
     ],
@@ -1228,6 +1237,8 @@ describe("finance ingestion run", () => {
     "https://localhost/article",
     "https://intranet/article",
     "https://publisher.local/article",
+    "https://publisher.example/article",
+    "https://publisher.alt/article",
     "https://example.org:8443/article",
     "https://user:password@example.org/article",
     "https://example.org/article#private-fragment",
@@ -1284,6 +1295,58 @@ describe("finance ingestion run", () => {
       expect(store.records()).toEqual([]);
     },
   );
+
+  it("degrades a record whose language is outside the declared source provenance", async () => {
+    const store = new InMemoryFinanceRecordStore();
+    const result = await runFinanceIngestion(
+      {
+        descriptor: {
+          ...verifiedDisplayPolicy,
+          source: "english-only-source",
+          sourceMode: "real",
+          entitlement: "public-metadata",
+          license: null,
+          delaySeconds: 0,
+          capabilities: ["news"],
+          licenseUrl: "https://example.org/source-terms",
+          licenseScope: "public-reuse",
+          externalDisplayAllowed: true,
+          bodyStorageAllowed: false,
+          attribution: "English Only Source",
+          licenseVerifiedAt: "2026-08-10T00:00:00.000Z",
+          languages: ["en"],
+        },
+        fetch: () =>
+          Promise.resolve({
+            records: [
+              {
+                sourceRecordId: "language-mismatch-1",
+                kind: "news",
+                sourceUrl: "https://example.org/news/language-mismatch-1",
+                publishedAt: "2026-08-12T00:00:00.000Z",
+                publisher: { name: "Example Publisher" },
+                content: {
+                  title: "中文标题",
+                  language: "zh-CN",
+                  symbols: [],
+                  topics: ["markets"],
+                  attributes: {},
+                },
+              },
+            ],
+          }),
+      },
+      store,
+    );
+
+    expect(result).toMatchObject({
+      status: "degraded",
+      fetched: 1,
+      records: [],
+      failure: { stage: "normalize", code: "INVALID_SOURCE_RECORD" },
+    });
+    expect(store.records()).toEqual([]);
+  });
 
   it("degrades a null source batch without throwing or dereferencing it", async () => {
     const result = await runFinanceIngestion(

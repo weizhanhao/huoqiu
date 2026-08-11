@@ -16,8 +16,10 @@ const publicDnsHostnamePattern =
   /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/u;
 
 const nonPublicHostnameSuffixes = [
+  ".alt",
   ".arpa",
   ".corp",
+  ".example",
   ".home",
   ".internal",
   ".invalid",
@@ -484,6 +486,14 @@ export const normalizedFinanceRecordSchema = financeSourceRecordSchema
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Finance record kind is outside the source capabilities",
+      });
+    }
+    if (!value.provenance.languages.includes(value.content.language)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["content", "language"],
+        message:
+          "Finance record language is outside the source provenance languages",
       });
     }
     if (Date.parse(value.lastSeenAt) < Date.parse(value.fetchedAt)) {
