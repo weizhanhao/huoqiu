@@ -421,6 +421,19 @@
   font-size: 0.78rem;
 }
 
+.originBadge {
+  background: #edf6ff;
+  border: 1px solid #d1e8ff;
+  border-radius: 999px;
+  color: #2468a8;
+  display: inline-flex;
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-left: 8px;
+  padding: 3px 7px;
+  width: fit-content;
+}
+
 .instrumentList,
 .commentList,
 .replyList {
@@ -479,7 +492,7 @@
   border-radius: 10px;
   color: var(--hq-text-primary);
   font: inherit;
-  min-height: 42px;
+  min-height: 44px;
   padding: 10px;
   width: 100%;
 }

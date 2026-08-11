@@ -1,173 +1,21 @@
 import type { CommunityChannel } from "./community-state";
+import {
+  createSyntheticCommunityCard as card,
+  type FeedCard,
+} from "./community-content-model";
 
-export const syntheticCommunitySource = "huoqiu-synthetic-community" as const;
-
-export type FeedCardKind =
-  "帖子" | "资讯" | "话题" | "长文摘要" | "图文占位" | "视频占位";
-
-export type CommunityAuthor = Readonly<{
-  bio: string;
-  displayName: string;
-  focus: readonly string[];
-  followers: number;
-  id: string;
-  initials: string;
-  notes: number;
-  role: string;
-  synthetic: true;
-}>;
-
-export type CommunityEngagement = Readonly<{
-  comments: number;
-  likes: number;
-  reposts: number;
-  views: number;
-}>;
-
-export type CommunityMedia = Readonly<{
-  alt: string;
-  duration?: string;
-  label: string;
-  type: "chart-placeholder" | "image-placeholder" | "video-placeholder";
-}>;
-
-export type FeedCard = Readonly<{
-  author: string;
-  authorId: string;
-  body: string;
-  channel: CommunityChannel;
-  detailHref?: string;
-  engagement: CommunityEngagement;
-  id: string;
-  kind: FeedCardKind;
-  media?: CommunityMedia;
-  meta: string;
-  publishedLabel: string;
-  readTime?: string;
-  source: typeof syntheticCommunitySource;
-  synthetic: true;
-  tags: readonly string[];
-  title: string;
-}>;
-
-export const communityAuthors: readonly CommunityAuthor[] = [
-  {
-    bio: "把公开信息拆成事实、判断与待验证条件，专注演示研究记录的写法。",
-    displayName: "北岸观察员",
-    focus: ["证据清单", "复盘方法"],
-    followers: 1860,
-    id: "author_syn_northbank",
-    initials: "北",
-    notes: 42,
-    role: "合成观察作者",
-    synthetic: true,
-  },
-  {
-    bio: "整理内容标注、来源字段和阅读清单，不发布任何真实财经资讯。",
-    displayName: "市场资料室",
-    focus: ["资料整理", "来源标注"],
-    followers: 934,
-    id: "author_syn_archive",
-    initials: "资",
-    notes: 28,
-    role: "合成资料编辑",
-    synthetic: true,
-  },
-  {
-    bio: "用问题卡练习反证、复盘与协作讨论，所有案例均为虚构样本。",
-    displayName: "研究练习社",
-    focus: ["反证练习", "讨论提纲"],
-    followers: 2150,
-    id: "author_syn_lab",
-    initials: "研",
-    notes: 64,
-    role: "合成研究小组",
-    synthetic: true,
-  },
-  {
-    bio: "通过虚构指数与 ETF 样本演示笔记结构，不提供真实产品或行情。",
-    displayName: "指数散步者",
-    focus: ["样本分类", "观察模板"],
-    followers: 1280,
-    id: "author_syn_index",
-    initials: "指",
-    notes: 37,
-    role: "合成指数作者",
-    synthetic: true,
-  },
-  {
-    bio: "记录基金学习流程与风险问题清单，不连接产品申购或真实净值。",
-    displayName: "基金学习簿",
-    focus: ["学习清单", "风险语言"],
-    followers: 760,
-    id: "author_syn_fund",
-    initials: "基",
-    notes: 31,
-    role: "合成基金学习者",
-    synthetic: true,
-  },
-  {
-    bio: "维护虚构成长案例的证据链，重点演示长文摘要与媒体版位。",
-    displayName: "成长样本库",
-    focus: ["长文摘要", "样本归档"],
-    followers: 3020,
-    id: "author_syn_growth",
-    initials: "样",
-    notes: 86,
-    role: "合成专栏作者",
-    synthetic: true,
-  },
-  {
-    bio: "把每次判断失误写成可复用的问题，关注记录习惯而非投资结论。",
-    displayName: "慢变量笔记",
-    focus: ["错误复盘", "决策日志"],
-    followers: 1640,
-    id: "author_syn_slow",
-    initials: "慢",
-    notes: 53,
-    role: "合成复盘作者",
-    synthetic: true,
-  },
-  {
-    bio: "用纯本地占位素材演示图文和视频内容密度，不加载外部媒体。",
-    displayName: "离线影像间",
-    focus: ["媒体占位", "视觉整理"],
-    followers: 520,
-    id: "author_syn_media",
-    initials: "影",
-    notes: 19,
-    role: "合成视觉作者",
-    synthetic: true,
-  },
-  {
-    bio: "收集高质量提问方式，用固定讨论样本演示社区互动层级。",
-    displayName: "问题清单",
-    focus: ["提问方式", "评论整理"],
-    followers: 1110,
-    id: "author_syn_questions",
-    initials: "问",
-    notes: 48,
-    role: "合成讨论主持",
-    synthetic: true,
-  },
-  {
-    bio: "维护版本说明和功能演示指南，内容仅描述本地产品能力。",
-    displayName: "火球演示编辑部",
-    focus: ["功能说明", "演示指南"],
-    followers: 680,
-    id: "author_syn_editorial",
-    initials: "编",
-    notes: 23,
-    role: "合成产品编辑",
-    synthetic: true,
-  },
-];
-
-const card = (input: Omit<FeedCard, "source" | "synthetic">): FeedCard => ({
-  ...input,
-  source: syntheticCommunitySource,
-  synthetic: true,
-});
+export {
+  communityAuthors,
+  getCommunityAuthor,
+} from "./community-author-fixtures";
+export {
+  syntheticCommunitySource,
+  type CommunityAuthor,
+  type CommunityEngagement,
+  type CommunityMedia,
+  type FeedCard,
+  type FeedCardKind,
+} from "./community-content-model";
 
 export const communityFeedCards: readonly FeedCard[] = [
   card({
@@ -613,35 +461,12 @@ export const communityFeedCards: readonly FeedCard[] = [
   }),
 ];
 
-export const getCommunityAuthor = (
-  authorId: string,
-): CommunityAuthor | undefined =>
-  communityAuthors.find((author) => author.id === authorId);
-
 export const getCommunityFeedCards = (
   channel?: CommunityChannel,
 ): readonly FeedCard[] =>
   channel === undefined
     ? communityFeedCards
     : communityFeedCards.filter((item) => item.channel === channel);
-
-const homeCardIds = [
-  "post_syn_0001",
-  "post_syn_decision_log",
-  "media_syn_research_desk",
-  "topic_syn_0001",
-  "video_syn_roundtable",
-  "expert_syn_three_pages",
-  "fund_syn_need_card",
-  "video_syn_0001",
-] as const;
-
-export const homeCommunityFeedCards: readonly FeedCard[] = homeCardIds.flatMap(
-  (id) => {
-    const item = communityFeedCards.find((candidate) => candidate.id === id);
-    return item === undefined ? [] : [item];
-  },
-);
 
 export const postDetail = {
   author: "合成作者 · 北岸观察员",
@@ -654,6 +479,7 @@ export const postDetail = {
     "最后保留版本线：每次更新只改变化的部分，并说明为什么改。这样一段时间以后，能看到自己是在根据证据更新，还是被结果牵着走。",
     "文中的数字、名称和情节都不指向真实投资对象；它们只用于演示帖子详情、互动与评论的阅读结构。",
   ],
+  baselineCommentTotal: 32,
   relatedInstruments: ["样本科技 SYN-A", "合成指数 SYN-50", "演示基金 DEMO-F"],
   time: "今天 10:05 · 合成社区",
   title: "一份关于长期观察节奏的合成笔记",

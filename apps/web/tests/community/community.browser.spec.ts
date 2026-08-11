@@ -117,9 +117,7 @@ describe("dense synthetic community in a real Chrome DOM", () => {
         });
 
         const accessibility = await new AxeBuilder({ page })
-          .include(
-            '[data-testid^="community"], [data-testid="home-community-stream"]',
-          )
+          .include(pathname === "/" ? ".d0-main" : '[data-testid^="community"]')
           .analyze();
         expect(
           accessibility.violations.filter(
@@ -133,14 +131,15 @@ describe("dense synthetic community in a real Chrome DOM", () => {
 
   it("switches dense channels without mixing in fabricated finance news", async () => {
     const feed = page.getByTestId("community-feed");
-    expect(await feed.getByTestId("community-feed-card").count()).toBe(5);
+    for (const channel of ["关注", "热门", "资讯", "达人", "基金", "ETF"]) {
+      await feed.getByRole("button", { name: channel, exact: true }).click();
+      expect(await feed.getByTestId("community-feed-card").count()).toBe(5);
+    }
 
-    await feed.getByRole("button", { name: "热门" }).click();
-    expect(await feed.getByTestId("community-feed-card").count()).toBe(5);
+    await feed.getByRole("button", { name: "热门", exact: true }).click();
     expect(await feed.getByText("本地视频封面占位").count()).toBeGreaterThan(0);
 
-    await feed.getByRole("button", { name: "资讯" }).click();
-    expect(await feed.getByTestId("community-feed-card").count()).toBe(5);
+    await feed.getByRole("button", { name: "资讯", exact: true }).click();
     expect(
       await feed
         .getByText(/不包含真实财经新闻、行情、公告或宏观数据/)
@@ -154,6 +153,9 @@ describe("dense synthetic community in a real Chrome DOM", () => {
     await page.goto(`${baseUrl}/`);
     const stream = page.getByTestId("home-community-stream");
 
+    expect(
+      await page.locator(".d0-main .feed-list .feed-card").count(),
+    ).toBeGreaterThan(0);
     expect(await stream.getByTestId("community-feed-card").count()).toBe(8);
     expect(await stream.getByText("本地媒体占位").count()).toBeGreaterThan(1);
     expect(
@@ -169,21 +171,31 @@ describe("dense synthetic community in a real Chrome DOM", () => {
     await page.goto(`${baseUrl}/community/posts/post_syn_0001`);
     const detail = page.getByTestId("community-post-detail");
 
-    expect(await detail.getByTestId("synthetic-comment").count()).toBe(7);
-    expect(await detail.getByTestId("synthetic-reply").count()).toBe(6);
+    expect(await detail.getByTestId("fixed-synthetic-comment").count()).toBe(7);
+    expect(await detail.getByTestId("fixed-synthetic-reply").count()).toBe(6);
+    expect(await detail.getByTestId("session-local-comment").count()).toBe(0);
+    expect(await detail.getByTestId("session-local-reply").count()).toBe(0);
+    expect(
+      await detail.getByTestId("comment-count-summary").textContent(),
+    ).toBe("展示 7 条评论 / 页面基线共 32 条");
 
     await detail
       .getByRole("textbox", { name: "添加评论" })
       .fill("这是一条新的合成会话评论。");
     await detail.getByRole("button", { name: "发布评论" }).click();
-    expect(await detail.getByTestId("synthetic-comment").count()).toBe(8);
+    expect(await detail.getByTestId("fixed-synthetic-comment").count()).toBe(7);
+    expect(await detail.getByTestId("session-local-comment").count()).toBe(1);
+    expect(
+      await detail.getByTestId("comment-count-summary").textContent(),
+    ).toBe("展示 8 条评论 / 页面基线共 32 条（含本次会话新增 1 条）");
 
-    const firstComment = detail.getByTestId("synthetic-comment").first();
+    const firstComment = detail.getByTestId("fixed-synthetic-comment").first();
     await firstComment
       .getByRole("textbox", { name: "回复 静观样本" })
       .fill("补充一条新的合成回复。");
     await firstComment.getByRole("button", { name: "回复" }).click();
-    expect(await detail.getByTestId("synthetic-reply").count()).toBe(7);
+    expect(await detail.getByTestId("fixed-synthetic-reply").count()).toBe(6);
+    expect(await detail.getByTestId("session-local-reply").count()).toBe(1);
     expect(browserErrors).toEqual([]);
   });
 
@@ -214,5 +226,12 @@ describe("dense synthetic community in a real Chrome DOM", () => {
         Math.min(...sizes.map(({ width }) => width)),
       ).toBeGreaterThanOrEqual(44);
     }
+
+    await page.goto(`${baseUrl}/community/posts/post_syn_0001`);
+    const replyInputHeight = await page
+      .locator('[id^="reply-"]')
+      .first()
+      .evaluate((element) => element.getBoundingClientRect().height);
+    expect(replyInputHeight).toBeGreaterThanOrEqual(44);
   });
 });

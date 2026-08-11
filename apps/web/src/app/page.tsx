@@ -1,6 +1,6 @@
 import { D0Feed } from "../components/feed/feed-card";
 import { DesktopShell } from "../components/shell/desktop-shell";
-import { HomeCommunityStream } from "../features/community/community-experience";
+import { HomeCommunityStream } from "../features/community/home-community-stream";
 import { loadD0Fixture } from "../lib/d0-fixture";
 import { normalizeD0FixtureState } from "../lib/d0-page-state";
 

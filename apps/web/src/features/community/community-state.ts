@@ -10,12 +10,14 @@ export const communityChannels = [
 export type CommunityChannel = (typeof communityChannels)[number];
 export type ReactionKind = "like" | "bookmark";
 export type PublisherMode = "discussion" | "article";
+export type CommunityContentOrigin = "fixed-synthetic" | "session-local";
 
 export type CommunityReply = Readonly<{
   author: string;
   body: string;
   id: string;
   likes: number;
+  origin: CommunityContentOrigin;
   time: string;
 }>;
 
@@ -24,6 +26,7 @@ export type CommunityComment = Readonly<{
   body: string;
   id: string;
   likes: number;
+  origin: CommunityContentOrigin;
   replies: readonly CommunityReply[];
   time: string;
 }>;
@@ -54,7 +57,11 @@ export type PublishDraftResult = Readonly<{
   success: string | null;
 }>;
 
-const initialComments: readonly CommunityComment[] = [
+type FixedCommunityReply = Omit<CommunityReply, "origin">;
+type FixedCommunityComment = Omit<CommunityComment, "origin" | "replies"> &
+  Readonly<{ replies: readonly FixedCommunityReply[] }>;
+
+const fixedComments: readonly FixedCommunityComment[] = [
   {
     author: "静观样本",
     body: "我更在意估值假设有没有随着经营数据更新。",
@@ -160,6 +167,17 @@ const initialComments: readonly CommunityComment[] = [
   },
 ];
 
+const initialComments: readonly CommunityComment[] = fixedComments.map(
+  (comment) => ({
+    ...comment,
+    origin: "fixed-synthetic",
+    replies: comment.replies.map((reply) => ({
+      ...reply,
+      origin: "fixed-synthetic",
+    })),
+  }),
+);
+
 const labelsFor = (isLiked: boolean, likes: number, isBookmarked: boolean) => ({
   bookmarkLabel: isBookmarked ? "已收藏" : "收藏",
   likeLabel: `${isLiked ? "已赞" : "点赞"} ${likes}`,
@@ -257,6 +275,7 @@ export const addComment = (
         body: body.trim(),
         id: `comment_session_${state.comments.length + 1}`,
         likes: 0,
+        origin: "session-local",
         replies: [],
         time: "刚刚",
       },
@@ -288,6 +307,7 @@ export const addReply = (
                 body: body.trim(),
                 id: `reply_session_${comment.replies.length + 1}`,
                 likes: 0,
+                origin: "session-local",
                 time: "刚刚",
               },
             ],

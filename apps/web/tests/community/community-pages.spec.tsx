@@ -1,10 +1,13 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import CommunityPage from "../../src/app/community/page";
 import PostDetailPage from "../../src/app/community/posts/post_syn_0001/page";
 import PublishPage from "../../src/app/publish/page";
-import { HomeCommunityStream } from "../../src/features/community/community-experience";
+import { HomeCommunityStream } from "../../src/features/community/home-community-stream";
 import {
   communityAuthors,
   communityFeedCards,
@@ -14,6 +17,40 @@ import {
 } from "../../src/features/community/community-fixtures";
 
 describe("community routes", () => {
+  it("keeps the home community stream in a server-safe, small fixture boundary", () => {
+    const homePageSource = readFileSync(
+      fileURLToPath(new URL("../../src/app/page.tsx", import.meta.url)),
+      "utf8",
+    );
+    const homeStreamSource = readFileSync(
+      fileURLToPath(
+        new URL(
+          "../../src/features/community/home-community-stream.tsx",
+          import.meta.url,
+        ),
+      ),
+      "utf8",
+    );
+    const homeFixtureSource = readFileSync(
+      fileURLToPath(
+        new URL(
+          "../../src/features/community/home-community-fixtures.ts",
+          import.meta.url,
+        ),
+      ),
+      "utf8",
+    );
+
+    expect(homePageSource).toContain(
+      'from "../features/community/home-community-stream"',
+    );
+    expect(homePageSource).not.toContain("community-experience");
+    expect(homeStreamSource).not.toContain('"use client"');
+    expect(homeStreamSource).not.toContain('from "./community-experience"');
+    expect(homeFixtureSource).not.toContain("community-fixtures");
+    expect(homeFixtureSource).not.toContain("communityFeedCards");
+  });
+
   it("renders all six synthetic feed channels and a recognizable card type", () => {
     const markup = renderToStaticMarkup(<CommunityPage />);
 
@@ -68,7 +105,7 @@ describe("community routes", () => {
       "基金",
       "ETF",
     ] as const) {
-      expect(getCommunityFeedCards(channel).length).toBeGreaterThanOrEqual(4);
+      expect(getCommunityFeedCards(channel)).toHaveLength(5);
     }
 
     expect(
@@ -95,12 +132,16 @@ describe("community routes", () => {
     expect(markup).toContain("回复");
     expect(markup).toContain("1,860 位合成关注者");
     expect(markup).toContain("18 次合成转发");
+    expect(markup).toContain("展示 7 条评论 / 页面基线共 32 条");
+    expect(markup).toContain("固定合成 7 条 · 本次会话 0 条");
     expect(
-      markup.match(/data-testid="synthetic-comment"/gu)?.length,
-    ).toBeGreaterThanOrEqual(6);
-    expect(
-      markup.match(/data-testid="synthetic-reply"/gu)?.length,
-    ).toBeGreaterThanOrEqual(5);
+      markup.match(/data-testid="fixed-synthetic-comment"/gu),
+    ).toHaveLength(7);
+    expect(markup.match(/data-testid="fixed-synthetic-reply"/gu)).toHaveLength(
+      6,
+    );
+    expect(markup).not.toContain('data-testid="session-local-comment"');
+    expect(markup).not.toContain('data-testid="session-local-reply"');
   });
 
   it("renders discussion and long-article publisher controls", () => {

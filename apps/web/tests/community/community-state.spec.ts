@@ -11,6 +11,20 @@ import {
 } from "../../src/features/community/community-state";
 
 describe("community session interactions", () => {
+  it("marks every prefilled discussion item as fixed synthetic content", () => {
+    const state = createInitialCommunityState();
+
+    expect(state.comments).toHaveLength(7);
+    expect(
+      state.comments.every(({ origin }) => origin === "fixed-synthetic"),
+    ).toBe(true);
+    expect(
+      state.comments
+        .flatMap(({ replies }) => replies)
+        .every(({ origin }) => origin === "fixed-synthetic"),
+    ).toBe(true);
+  });
+
   it("changes the active feed channel to the user-visible channel label", () => {
     const state = selectChannel(createInitialCommunityState(), "热门");
 
@@ -51,6 +65,7 @@ describe("community session interactions", () => {
 
     expect(invalid.error).toBe("请输入评论内容后再发布。");
     expect(valid.comments.at(-1)?.body).toBe("我会继续观察量能变化。");
+    expect(valid.comments.at(-1)?.origin).toBe("session-local");
     expect(valid.status).toBe("评论已添加到本次会话。");
   });
 
@@ -63,6 +78,7 @@ describe("community session interactions", () => {
     expect(valid.comments[0]?.replies.at(-1)?.body).toBe(
       "同意，先看数据验证。",
     );
+    expect(valid.comments[0]?.replies.at(-1)?.origin).toBe("session-local");
     expect(valid.status).toBe("回复已添加到本次会话。");
   });
 });
