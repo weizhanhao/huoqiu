@@ -23,14 +23,20 @@ describe("D0 mobile seed and navigation", () => {
     }
   });
 
-  it("registers only the two D0 tabs plus search and instrument detail", () => {
+  it("registers the five visible tabs and bounded supporting routes", () => {
     expect(d0RuntimeRoutes.tabs).toEqual([
       { href: "/home", label: "火球" },
       { href: "/watchlist", label: "自选" },
+      { href: "/markets", label: "行情" },
+      { href: "/portfolios", label: "组合" },
+      { href: "/profile", label: "我的" },
     ]);
     expect(d0RuntimeRoutes.stack).toEqual([
       { href: "/search", label: "搜索" },
       { href: "/instrument/[listingId]", label: "标的详情" },
+      { href: "/portfolio/[portfolioId]", label: "组合详情" },
+      { href: "/messages", label: "消息" },
+      { href: "/settings", label: "设置" },
     ]);
 
     const runtimeSurface = JSON.stringify(d0RuntimeRoutes);
@@ -38,8 +44,6 @@ describe("D0 mobile seed and navigation", () => {
       "基金",
       "私募",
       "策略研究",
-      "我的",
-      "消息",
       "开户",
       "认购",
       "交易",

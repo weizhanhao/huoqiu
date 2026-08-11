@@ -14,6 +14,7 @@ import {
   d0OpenInstrumentLabel,
 } from "../../accessibility/d0-maestro-labels";
 import { d0TextColors } from "../../styles/d0-colors";
+import { appTouchMinimum } from "../../styles/app-touch";
 import { PageState } from "./page-state";
 import { ScreenHeader } from "./screen-header";
 
@@ -208,7 +209,7 @@ const styles = StyleSheet.create({
     color: tokens.text.primary,
     flex: 1,
     fontSize: 15,
-    minHeight: 48,
+    minHeight: appTouchMinimum,
     paddingHorizontal: 14,
   },
   submit: {
@@ -217,7 +218,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 12,
     borderTopRightRadius: 12,
     justifyContent: "center",
-    minHeight: 48,
+    minHeight: appTouchMinimum,
     paddingHorizontal: 18,
   },
   submitText: {

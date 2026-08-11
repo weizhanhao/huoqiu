@@ -27,6 +27,9 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="search" />
             <Stack.Screen name="instrument/[listingId]" />
+            <Stack.Screen name="portfolio/[portfolioId]" />
+            <Stack.Screen name="messages" />
+            <Stack.Screen name="settings" />
           </Stack>
         </D0WatchlistProvider>
       </SafeAreaProvider>

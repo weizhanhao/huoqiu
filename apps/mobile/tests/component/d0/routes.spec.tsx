@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   } as D0FixtureLoadResult,
   localSearchParameters: { listingId: "listing_syn_0001" } as Readonly<{
     listingId?: string | string[];
+    portfolioId?: string | string[];
   }>,
   router: {
     back: vi.fn(),
@@ -55,16 +56,36 @@ vi.mock("react", async (importOriginal) => {
 });
 
 import HomeScreen from "../../../app/(tabs)/home";
+import MarketsScreen from "../../../app/(tabs)/markets";
+import PortfoliosScreen from "../../../app/(tabs)/portfolios";
+import ProfileScreen from "../../../app/(tabs)/profile";
 import WatchlistScreen from "../../../app/(tabs)/watchlist";
 import InstrumentScreen from "../../../app/instrument/[listingId]";
+import MessagesScreen from "../../../app/messages";
+import PortfolioDetailScreen from "../../../app/portfolio/[portfolioId]";
 import SearchScreen from "../../../app/search";
+import SettingsScreen from "../../../app/settings";
 
 const readProperties = (element: ReactElement) =>
   element.props as Readonly<{
     onBack?: () => void;
+    detail?: Readonly<{ id: string }>;
+    density?: string;
+    messages?: readonly Readonly<{ id: string }>[];
+    onOpenInstrument?: (listingId: string) => void;
+    onOpenPortfolio?: (portfolioId: string) => void;
+    onNavigate?: (
+      destination: "messages" | "portfolios" | "settings" | "watchlist",
+    ) => void;
     onRetry?: () => void;
+    onSearch?: () => void;
+    onSelectRegion?: (region: "a" | "global" | "hk" | "us") => void;
+    onSelectPeriod?: (period: "day" | "week" | "year") => void;
+    onSelectDensity?: (density: "comfortable" | "compact") => void;
     onSubmit?: () => void;
     query?: string;
+    selectedRegion?: string;
+    selectedPeriod?: string;
     submittedQuery?: string;
   }>;
 
@@ -124,6 +145,86 @@ describe("D0 mobile route behavior", () => {
     expect(search.onSubmit).toBeTypeOf("function");
     search.onSubmit?.();
     expect(mocks.stateSetters[2]).toHaveBeenCalledWith("SYN001");
+  });
+
+  it("keeps market region state and preserves search and instrument deep links", () => {
+    const market = readProperties(MarketsScreen() as ReactElement);
+
+    expect(market.selectedRegion).toBe("a");
+    market.onSelectRegion?.("us");
+    expect(mocks.stateSetters[0]).toHaveBeenCalledWith("us");
+
+    market.onSearch?.();
+    expect(mocks.router.push).toHaveBeenCalledWith("/search");
+    market.onOpenInstrument?.("listing_syn_0001");
+    expect(mocks.router.push).toHaveBeenCalledWith({
+      params: { listingId: "listing_syn_0001" },
+      pathname: "/instrument/[listingId]",
+    });
+  });
+
+  it("keeps portfolio period state and opens the real synthetic detail route", () => {
+    const portfolios = readProperties(PortfoliosScreen() as ReactElement);
+
+    expect(portfolios.selectedPeriod).toBe("day");
+    portfolios.onSelectPeriod?.("year");
+    expect(mocks.stateSetters[0]).toHaveBeenCalledWith("year");
+
+    portfolios.onSearch?.();
+    expect(mocks.router.push).toHaveBeenCalledWith("/search");
+    portfolios.onOpenPortfolio?.("portfolio_syn_0001");
+    expect(mocks.router.push).toHaveBeenCalledWith({
+      params: { portfolioId: "portfolio_syn_0001" },
+      pathname: "/portfolio/[portfolioId]",
+    });
+  });
+
+  it("resolves a portfolio deep link and returns fresh entry to portfolios", () => {
+    mocks.localSearchParameters = { portfolioId: "portfolio_syn_0001" };
+    const detail = readProperties(PortfolioDetailScreen() as ReactElement);
+
+    expect(detail.detail?.id).toBe("portfolio_syn_0001");
+    detail.onBack?.();
+    expect(mocks.router.replace).toHaveBeenCalledWith("/portfolios");
+    expect(mocks.router.back).not.toHaveBeenCalled();
+
+    mocks.router.replace.mockReset();
+    mocks.router.canGoBack.mockReturnValue(true);
+    const stacked = readProperties(PortfolioDetailScreen() as ReactElement);
+    stacked.onBack?.();
+    expect(mocks.router.back).toHaveBeenCalledOnce();
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+
+  it("routes every profile entry to a real local destination", () => {
+    const profile = readProperties(ProfileScreen() as ReactElement);
+
+    profile.onNavigate?.("messages");
+    profile.onNavigate?.("settings");
+    profile.onNavigate?.("watchlist");
+    profile.onNavigate?.("portfolios");
+
+    expect(
+      mocks.router.push.mock.calls.map(([destination]) => destination),
+    ).toEqual(["/messages", "/settings", "/watchlist", "/portfolios"]);
+  });
+
+  it("renders fixed messages and returns a fresh deep link to profile", () => {
+    const messages = readProperties(MessagesScreen() as ReactElement);
+
+    expect(messages.messages).toHaveLength(3);
+    messages.onBack?.();
+    expect(mocks.router.replace).toHaveBeenCalledWith("/profile");
+  });
+
+  it("keeps session settings state and returns a fresh deep link to profile", () => {
+    const settings = readProperties(SettingsScreen() as ReactElement);
+
+    expect(settings.density).toBe("comfortable");
+    settings.onSelectDensity?.("compact");
+    expect(mocks.stateSetters[0]).toHaveBeenCalledWith("compact");
+    settings.onBack?.();
+    expect(mocks.router.replace).toHaveBeenCalledWith("/profile");
   });
 
   it.each([

@@ -9,6 +9,7 @@ import {
 } from "../../accessibility/d0-maestro-labels";
 import { useD0Watchlist } from "../../stores/d0-watchlist";
 import { d0TextColors } from "../../styles/d0-colors";
+import { appTouchMinimum } from "../../styles/app-touch";
 import { PageState } from "./page-state";
 import { ScreenHeader } from "./screen-header";
 import { WatchlistToggle } from "./watchlist-toggle";
@@ -189,7 +190,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     justifyContent: "center",
-    minHeight: 44,
+    minHeight: appTouchMinimum,
     paddingHorizontal: 14,
   },
   resetLabel: {
@@ -209,7 +210,7 @@ const styles = StyleSheet.create({
   identity: {
     flex: 1,
     justifyContent: "center",
-    minHeight: 48,
+    minHeight: appTouchMinimum,
     minWidth: 0,
   },
   name: {
