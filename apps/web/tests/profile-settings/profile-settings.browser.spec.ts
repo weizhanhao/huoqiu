@@ -12,7 +12,7 @@ import {
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 const host = "127.0.0.1";
-const port = 3415;
+const port = 3416;
 const baseUrl = `http://${host}:${port}/users/user_demo_0001`;
 const browserRoot = fileURLToPath(new URL("./browser/", import.meta.url));
 const viteBinary = fileURLToPath(
@@ -32,6 +32,9 @@ let context: BrowserContext;
 let page: Page;
 let vite: ChildProcess;
 let browserErrors: string[];
+
+const openSettingsFromProfile = async () =>
+  page.getByTestId("profile-page").getByRole("link", { name: "设置" }).click();
 
 const waitForHarness = async () => {
   for (let attempt = 0; attempt < 80; attempt += 1) {
@@ -215,7 +218,7 @@ describe("profile and settings in a real Chrome DOM", () => {
   });
 
   it("applies the reduced-motion setting to the shared session boundary", async () => {
-    await page.getByRole("link", { name: "设置" }).click();
+    await openSettingsFromProfile();
     const reducedMotionSwitch = page.getByRole("switch", {
       name: "减少界面动效",
     });
@@ -234,7 +237,7 @@ describe("profile and settings in a real Chrome DOM", () => {
 
   it("keeps the settings kicker clear of its heading", async () => {
     await page.setViewportSize({ height: 900, width: 1440 });
-    await page.getByRole("link", { name: "设置" }).click();
+    await openSettingsFromProfile();
     const kickerBox = await page
       .getByText("SESSION PREFERENCES / SYNTHETIC ACCOUNT")
       .boundingBox();
@@ -280,7 +283,7 @@ describe("profile and settings in a real Chrome DOM", () => {
         ),
       ).toEqual([]);
 
-      await page.getByRole("link", { name: "设置" }).click();
+      await openSettingsFromProfile();
       const settingsGeometry = await page.evaluate(() => ({
         body: document.body.scrollWidth,
         document: document.documentElement.scrollWidth,
@@ -321,7 +324,7 @@ describe("profile and settings in a real Chrome DOM", () => {
     expect(profileHeights.length).toBeGreaterThan(0);
     expect(Math.min(...profileHeights)).toBeGreaterThanOrEqual(44);
 
-    await page.getByRole("link", { name: "设置" }).click();
+    await openSettingsFromProfile();
     const settingsHeights = await page
       .getByTestId("settings-page")
       .locator("button, a")

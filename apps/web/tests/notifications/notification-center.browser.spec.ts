@@ -16,7 +16,7 @@ const port = 3414;
 const baseUrl = `http://${host}:${port}`;
 const browserRoot = fileURLToPath(new URL("./browser/", import.meta.url));
 const viteBinary = fileURLToPath(
-  new URL("../../../../node_modules/.bin/vite", import.meta.url),
+  new URL("../../node_modules/.bin/vite", import.meta.url),
 );
 const chromeCandidates = [
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
