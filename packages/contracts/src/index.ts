@@ -50,6 +50,16 @@ export {
   type NormalizedFinanceRecord,
 } from "./finance/ingestion-v1.js";
 export {
+  publicFinanceFailureCodeSchema,
+  publicFinanceSnapshotSchema,
+  publicFinanceSourceRunStatusSchema,
+  publicFinanceSourceStateSchema,
+  type PublicFinanceFailureCode,
+  type PublicFinanceSnapshot,
+  type PublicFinanceSourceRunStatus,
+  type PublicFinanceSourceState,
+} from "./finance/public-snapshot-v1.js";
+export {
   approvedEventTypes,
   createInboxDeduplicator,
   eventEnvelopeSchema,
