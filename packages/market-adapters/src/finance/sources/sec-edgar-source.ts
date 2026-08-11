@@ -1,17 +1,24 @@
-import { Buffer } from "node:buffer";
-
 import {
   FinanceSourceFetchError,
   type FinanceSourceAdapter,
   type FinanceSourceBatch,
 } from "../../ingestion.js";
 
+export type SecEdgarBodyReader = Readonly<{
+  read(): Promise<Readonly<{ done: boolean; value?: Uint8Array }>>;
+  cancel(reason?: unknown): Promise<void>;
+}>;
+
+export type SecEdgarResponseBody = Readonly<{
+  getReader(): SecEdgarBodyReader;
+}>;
+
 export type SecEdgarHttpResponse = Readonly<{
   status: number;
   redirected: boolean;
   url: string;
   headers: Readonly<{ get(name: string): string | null }>;
-  text(): Promise<string>;
+  body: SecEdgarResponseBody | null;
 }>;
 
 export type SecEdgarFetch = (
@@ -48,6 +55,10 @@ export type SecEdgarSourceOptions = Readonly<{
 }>;
 
 type SecCik = Readonly<{ archive: string; padded: string }>;
+
+interface SecEdgarCircuitBreaker {
+  blockedUntilMilliseconds: number;
+}
 
 type FilingTable = Readonly<{
   accessions: readonly string[];
@@ -140,20 +151,28 @@ const retryAfterMilliseconds = (
   if (requested === undefined || !Number.isSafeInteger(requested)) {
     return 600_000;
   }
-  return Math.min(86_400_000, Math.max(60_000, requested));
+  return Math.min(86_400_000, Math.max(600_000, requested));
 };
 
-const rateLimited = (response: SecEdgarHttpResponse, nowMilliseconds: number) =>
-  new FinanceSourceFetchError("SEC EDGAR rate limited the request", {
-    classification: "rate-limited",
-    retry: {
-      kind: "after",
-      delayMilliseconds: retryAfterMilliseconds(
-        response.headers.get("Retry-After"),
-        nowMilliseconds,
-      ),
-    },
-  });
+const rateLimited = (
+  response: SecEdgarHttpResponse,
+  nowMilliseconds: number,
+): Readonly<{
+  delayMilliseconds: number;
+  failure: FinanceSourceFetchError;
+}> => {
+  const delayMilliseconds = retryAfterMilliseconds(
+    response.headers.get("Retry-After"),
+    nowMilliseconds,
+  );
+  return {
+    delayMilliseconds,
+    failure: new FinanceSourceFetchError("SEC EDGAR rate limited the request", {
+      classification: "rate-limited",
+      retry: { kind: "after", delayMilliseconds },
+    }),
+  };
+};
 
 const missingResource = () =>
   new FinanceSourceFetchError("SEC EDGAR resource was not found", {
@@ -205,6 +224,7 @@ const assertSuccessfulResponse = (
   options: SecEdgarSourceOptions,
   response: SecEdgarHttpResponse,
   requestedUrl: string,
+  breaker: SecEdgarCircuitBreaker,
 ): void => {
   if (response.redirected || response.url !== requestedUrl) {
     throw policyBlocked("SEC EDGAR redirect violates the source policy");
@@ -213,12 +233,34 @@ const assertSuccessfulResponse = (
     throw policyBlocked("SEC EDGAR redirect violates the source policy");
   }
   if (response.status === 403 || response.status === 429) {
-    throw rateLimited(response, clockMilliseconds(options));
+    const nowMilliseconds = clockMilliseconds(options);
+    const limited = rateLimited(response, nowMilliseconds);
+    breaker.blockedUntilMilliseconds = Math.max(
+      breaker.blockedUntilMilliseconds,
+      nowMilliseconds + limited.delayMilliseconds,
+    );
+    throw limited.failure;
   }
   if (response.status === 404) throw missingResource();
   if (response.status !== 200) {
     throw invalidResponse("SEC EDGAR returned an unsafe HTTP response");
   }
+};
+
+const assertCircuitClosed = (
+  options: SecEdgarSourceOptions,
+  breaker: SecEdgarCircuitBreaker,
+): void => {
+  const nowMilliseconds = clockMilliseconds(options);
+  if (nowMilliseconds >= breaker.blockedUntilMilliseconds) return;
+  const remainingMilliseconds = Math.min(
+    86_400_000,
+    Math.max(60_000, breaker.blockedUntilMilliseconds - nowMilliseconds),
+  );
+  throw new FinanceSourceFetchError("SEC EDGAR circuit breaker is open", {
+    classification: "rate-limited",
+    retry: { kind: "after", delayMilliseconds: remainingMilliseconds },
+  });
 };
 
 const responseLimit = (config: SecEdgarSourceConfig): number => {
@@ -233,9 +275,26 @@ const readJson = async (
   response: SecEdgarHttpResponse,
   maxResponseBytes: number,
 ): Promise<unknown> => {
+  if (response.body === null) {
+    throw invalidResponse("SEC EDGAR returned an empty response body");
+  }
+  let reader: SecEdgarBodyReader;
+  try {
+    reader = response.body.getReader();
+  } catch (error) {
+    throw invalidResponse("SEC EDGAR response body could not be read", error);
+  }
+  const cancelReader = (): void => {
+    try {
+      void reader.cancel("SEC EDGAR response rejected").catch(() => undefined);
+    } catch {
+      // The typed source failure below remains authoritative.
+    }
+  };
   const contentLength = response.headers.get("Content-Length");
   if (contentLength !== null) {
     if (!/^\d+$/u.test(contentLength)) {
+      cancelReader();
       throw invalidResponse("SEC EDGAR returned an invalid content length");
     }
     const declaredBytes = Number(contentLength);
@@ -243,17 +302,42 @@ const readJson = async (
       !Number.isSafeInteger(declaredBytes) ||
       declaredBytes > maxResponseBytes
     ) {
+      cancelReader();
       throw invalidResponse("SEC EDGAR response exceeds the byte limit");
     }
   }
-  let text: string;
-  try {
-    text = await response.text();
-  } catch (error) {
-    throw invalidResponse("SEC EDGAR response body could not be read", error);
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let receivedBytes = 0;
+  let text = "";
+  while (true) {
+    let result: Readonly<{ done: boolean; value?: Uint8Array }>;
+    try {
+      result = await reader.read();
+    } catch (error) {
+      cancelReader();
+      throw invalidResponse("SEC EDGAR response body could not be read", error);
+    }
+    if (result.done) break;
+    if (!(result.value instanceof Uint8Array)) {
+      cancelReader();
+      throw invalidResponse("SEC EDGAR returned an invalid response chunk");
+    }
+    receivedBytes += result.value.byteLength;
+    if (receivedBytes > maxResponseBytes) {
+      cancelReader();
+      throw invalidResponse("SEC EDGAR response exceeds the byte limit");
+    }
+    try {
+      text += decoder.decode(result.value, { stream: true });
+    } catch (error) {
+      cancelReader();
+      throw invalidResponse("SEC EDGAR returned invalid UTF-8", error);
+    }
   }
-  if (Buffer.byteLength(text, "utf8") > maxResponseBytes) {
-    throw invalidResponse("SEC EDGAR response exceeds the byte limit");
+  try {
+    text += decoder.decode();
+  } catch (error) {
+    throw invalidResponse("SEC EDGAR returned invalid UTF-8", error);
   }
   try {
     return JSON.parse(text);
@@ -611,55 +695,59 @@ const parseTickerIndex = (value: unknown, ticker: string): string => {
 
 export const createSecEdgarSource = (
   options: SecEdgarSourceOptions,
-): FinanceSourceAdapter => ({
-  descriptor,
-  fetch: async (input) => {
-    const agent = userAgent(options.config);
-    const maxResponseBytes = responseLimit(options.config);
-    const configuredCik = options.config.cik;
-    const configuredTicker = options.config.ticker;
-    if (
-      (configuredCik === undefined && configuredTicker === undefined) ||
-      (configuredCik !== undefined && configuredTicker !== undefined)
-    ) {
-      throw policyBlocked("SEC EDGAR requires exactly one issuer identifier");
-    }
-    let cikValue = configuredCik;
-    if (configuredTicker !== undefined) {
-      if (!tickerPattern.test(configuredTicker)) {
-        throw policyBlocked("SEC EDGAR ticker violates the source policy");
+): FinanceSourceAdapter => {
+  const breaker: SecEdgarCircuitBreaker = { blockedUntilMilliseconds: 0 };
+  return {
+    descriptor,
+    fetch: async (input) => {
+      assertCircuitClosed(options, breaker);
+      const agent = userAgent(options.config);
+      const maxResponseBytes = responseLimit(options.config);
+      const configuredCik = options.config.cik;
+      const configuredTicker = options.config.ticker;
+      if (
+        (configuredCik === undefined && configuredTicker === undefined) ||
+        (configuredCik !== undefined && configuredTicker !== undefined)
+      ) {
+        throw policyBlocked("SEC EDGAR requires exactly one issuer identifier");
       }
-      const companyTickersFile =
-        options.config.companyTickersFile ?? "company_tickers.json";
-      if (!companyTickersFilePattern.test(companyTickersFile)) {
-        throw policyBlocked(
-          "SEC EDGAR company ticker file violates the path policy",
-        );
+      let cikValue = configuredCik;
+      if (configuredTicker !== undefined) {
+        if (!tickerPattern.test(configuredTicker)) {
+          throw policyBlocked("SEC EDGAR ticker violates the source policy");
+        }
+        const companyTickersFile =
+          options.config.companyTickersFile ?? "company_tickers.json";
+        if (!companyTickersFilePattern.test(companyTickersFile)) {
+          throw policyBlocked(
+            "SEC EDGAR company ticker file violates the path policy",
+          );
+        }
+        const tickerUrl = `https://www.sec.gov/files/${companyTickersFile}`;
+        const tickerResponse = await requestSec(options, tickerUrl, agent);
+        assertSuccessfulResponse(options, tickerResponse, tickerUrl, breaker);
+        const tickerIndex = await readJson(tickerResponse, maxResponseBytes);
+        cikValue = parseTickerIndex(tickerIndex, configuredTicker);
       }
-      const tickerUrl = `https://www.sec.gov/files/${companyTickersFile}`;
-      const tickerResponse = await requestSec(options, tickerUrl, agent);
-      assertSuccessfulResponse(options, tickerResponse, tickerUrl);
-      const tickerIndex = await readJson(tickerResponse, maxResponseBytes);
-      cikValue = parseTickerIndex(tickerIndex, configuredTicker);
-    }
-    const cik = normalizedCik(cikValue);
-    const cursor = input.cursor;
-    const historyFiles =
-      cursor === undefined ? [] : parseHistoryCursor(cursor, cik);
-    const historyFile = historyFiles[0];
-    const url = `https://data.sec.gov/submissions/${
-      historyFile ?? `CIK${cik.padded}.json`
-    }`;
-    const response = await requestSec(options, url, agent);
-    assertSuccessfulResponse(options, response, url);
-    const value = await readJson(response, maxResponseBytes);
-    if (historyFile === undefined) return parseCurrentSubmissions(value, cik);
-    const historical = parseHistoricalSubmissions(value, cik);
-    const nextCursor =
-      historyFiles.length > 1 ? historyFiles.slice(1).join(":") : undefined;
-    return {
-      records: historical.records,
-      ...(nextCursor === undefined ? {} : { nextCursor }),
-    };
-  },
-});
+      const cik = normalizedCik(cikValue);
+      const cursor = input.cursor;
+      const historyFiles =
+        cursor === undefined ? [] : parseHistoryCursor(cursor, cik);
+      const historyFile = historyFiles[0];
+      const url = `https://data.sec.gov/submissions/${
+        historyFile ?? `CIK${cik.padded}.json`
+      }`;
+      const response = await requestSec(options, url, agent);
+      assertSuccessfulResponse(options, response, url, breaker);
+      const value = await readJson(response, maxResponseBytes);
+      if (historyFile === undefined) return parseCurrentSubmissions(value, cik);
+      const historical = parseHistoricalSubmissions(value, cik);
+      const nextCursor =
+        historyFiles.length > 1 ? historyFiles.slice(1).join(":") : undefined;
+      return {
+        records: historical.records,
+        ...(nextCursor === undefined ? {} : { nextCursor }),
+      };
+    },
+  };
+};

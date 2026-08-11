@@ -11,6 +11,23 @@ import {
 } from "../src/ingestion.js";
 import { InMemoryFinanceRecordStore } from "../src/testing/in-memory-finance-ingestion.js";
 
+const responseBody = (text: string) => ({
+  getReader: () => {
+    let delivered = false;
+    return {
+      read: () => {
+        if (delivered) return Promise.resolve({ done: true as const });
+        delivered = true;
+        return Promise.resolve({
+          done: false as const,
+          value: new TextEncoder().encode(text),
+        });
+      },
+      cancel: () => Promise.resolve(),
+    };
+  },
+});
+
 const jsonResponse = (
   body: unknown,
   url = "https://data.sec.gov/submissions/CIK0000320193.json",
@@ -19,7 +36,7 @@ const jsonResponse = (
   redirected: false,
   url,
   headers: { get: () => null },
-  text: () => Promise.resolve(JSON.stringify(body)),
+  body: responseBody(JSON.stringify(body)),
 });
 
 const currentSubmissions = {
@@ -371,9 +388,11 @@ describe("SEC EDGAR finance source", () => {
             get: (name: string) =>
               name.toLowerCase() === "retry-after" ? "900" : null,
           },
-          text: () => {
-            bodyRead = true;
-            return Promise.resolve("upstream detail must stay private");
+          body: {
+            getReader: () => {
+              bodyRead = true;
+              throw new Error("rate-limit body must not be read");
+            },
           },
         }),
     });
@@ -389,12 +408,15 @@ describe("SEC EDGAR finance source", () => {
   });
 
   it("backs off for at least ten minutes when a 403 has no Retry-After", async () => {
+    let networkFetches = 0;
     const { source } = createSource({
-      fetch: (url: string) =>
-        Promise.resolve({
+      fetch: (url: string) => {
+        networkFetches += 1;
+        return Promise.resolve({
           ...jsonResponse({}, url),
           status: 403,
-        }),
+        });
+      },
     });
 
     await expect(source.fetch({})).rejects.toMatchObject({
@@ -402,6 +424,54 @@ describe("SEC EDGAR finance source", () => {
       classification: "rate-limited",
       retry: { kind: "after", delayMilliseconds: 600_000 },
     });
+    await expect(source.fetch({})).rejects.toMatchObject({
+      classification: "rate-limited",
+    });
+    expect(networkFetches).toBe(1);
+  });
+
+  it("opens an in-memory breaker for the product backoff window", async () => {
+    let nowMilliseconds = 1_786_483_200_000;
+    let networkFetches = 0;
+    const { source, throttles } = createSource({
+      clock: () => nowMilliseconds,
+      fetch: (url: string) => {
+        networkFetches += 1;
+        if (networkFetches === 1) {
+          return Promise.resolve({
+            status: 429,
+            redirected: false,
+            url,
+            headers: {
+              get: (name: string) =>
+                name.toLowerCase() === "retry-after" ? "120" : null,
+            },
+            body: null,
+          });
+        }
+        return Promise.resolve(jsonResponse(currentSubmissions, url));
+      },
+    });
+
+    await expect(source.fetch({})).rejects.toMatchObject({
+      classification: "rate-limited",
+      retry: { kind: "after", delayMilliseconds: 600_000 },
+    });
+
+    nowMilliseconds += 599_999;
+    await expect(source.fetch({})).rejects.toMatchObject({
+      name: "FinanceSourceFetchError",
+      classification: "rate-limited",
+    });
+    expect(networkFetches).toBe(1);
+    expect(throttles).toHaveLength(1);
+
+    nowMilliseconds += 1;
+    await expect(source.fetch({})).resolves.toMatchObject({
+      records: [{ sourceRecordId: "0009999999-26-000042" }],
+    });
+    expect(networkFetches).toBe(2);
+    expect(throttles).toHaveLength(2);
   });
 
   it("never retries a missing SEC resource", async () => {
@@ -420,8 +490,35 @@ describe("SEC EDGAR finance source", () => {
     });
   });
 
+  it.each([
+    [404, "upstream-unavailable"],
+    [500, "invalid-response"],
+  ] as const)(
+    "does not open the breaker for HTTP %i",
+    async (status, classification) => {
+      let networkFetches = 0;
+      const { source } = createSource({
+        fetch: (url: string) => {
+          networkFetches += 1;
+          return Promise.resolve(
+            networkFetches === 1
+              ? { ...jsonResponse({}, url), status }
+              : jsonResponse(currentSubmissions, url),
+          );
+        },
+      });
+
+      await expect(source.fetch({})).rejects.toMatchObject({ classification });
+      await expect(source.fetch({})).resolves.toMatchObject({
+        records: [{ sourceRecordId: "0009999999-26-000042" }],
+      });
+      expect(networkFetches).toBe(2);
+    },
+  );
+
   it("rejects an oversized response before reading its body", async () => {
     let bodyRead = false;
+    let bodyCancelled = false;
     const { source } = createSource({
       config: { maxResponseBytes: 16 },
       fetch: (url: string) =>
@@ -433,9 +530,17 @@ describe("SEC EDGAR finance source", () => {
             get: (name: string) =>
               name.toLowerCase() === "content-length" ? "17" : null,
           },
-          text: () => {
-            bodyRead = true;
-            return Promise.resolve("{}");
+          body: {
+            getReader: () => ({
+              read: () => {
+                bodyRead = true;
+                return Promise.resolve({ done: true as const });
+              },
+              cancel: () => {
+                bodyCancelled = true;
+                return Promise.resolve();
+              },
+            }),
           },
         }),
     });
@@ -445,6 +550,47 @@ describe("SEC EDGAR finance source", () => {
       retry: { kind: "never" },
     });
     expect(bodyRead).toBe(false);
+    expect(bodyCancelled).toBe(true);
+  });
+
+  it("cancels a JSON stream as soon as cumulative bytes exceed the limit", async () => {
+    const chunks = [new Uint8Array(800), new Uint8Array(225)];
+    let reads = 0;
+    let cancels = 0;
+    const { source } = createSource({
+      config: { maxResponseBytes: 1_024 },
+      fetch: (url: string) =>
+        Promise.resolve({
+          status: 200,
+          redirected: false,
+          url,
+          headers: { get: () => null },
+          body: {
+            getReader: () => ({
+              read: () => {
+                const value = chunks[reads];
+                reads += 1;
+                return Promise.resolve(
+                  value === undefined
+                    ? { done: true as const }
+                    : { done: false as const, value },
+                );
+              },
+              cancel: () => {
+                cancels += 1;
+                return Promise.resolve();
+              },
+            }),
+          },
+        }),
+    });
+
+    await expect(source.fetch({})).rejects.toMatchObject({
+      classification: "invalid-response",
+      retry: { kind: "never" },
+    });
+    expect(reads).toBe(2);
+    expect(cancels).toBe(1);
   });
 
   it("fails safely instead of silently dropping an empty filing field", async () => {
@@ -482,9 +628,11 @@ describe("SEC EDGAR finance source", () => {
           redirected: true,
           url: "https://redirected.example.org/submissions.json",
           headers: { get: () => null },
-          text: () => {
-            bodyRead = true;
-            return Promise.resolve("{}");
+          body: {
+            getReader: () => {
+              bodyRead = true;
+              throw new Error("redirect body must not be read");
+            },
           },
         }),
     });
@@ -682,7 +830,7 @@ describe("SEC EDGAR finance source", () => {
             redirected: false,
             url,
             headers: { get: () => null },
-            text: () => Promise.resolve(body),
+            body: responseBody(body),
           }),
       });
 
