@@ -3,7 +3,7 @@ import { MarketRankings } from "../../../features/market-portfolio/market-rankin
 
 export default function MarketRankingsPage() {
   return (
-    <DesktopShell>
+    <DesktopShell activePrimary="markets">
       <MarketRankings />
     </DesktopShell>
   );

@@ -42,7 +42,11 @@ export default async function InstrumentPage({
   const state = normalizeD0FixtureState((await searchParams).fixture_state);
 
   if (fixtureResult.status !== "ready") {
-    return <DesktopShell fixtureResult={fixtureResult}>{null}</DesktopShell>;
+    return (
+      <DesktopShell activePrimary="markets" fixtureResult={fixtureResult}>
+        {null}
+      </DesktopShell>
+    );
   }
 
   const instrument = fixtureResult.data.instruments.find(
@@ -59,7 +63,7 @@ export default async function InstrumentPage({
   );
 
   return (
-    <DesktopShell fixtureResult={fixtureResult}>
+    <DesktopShell activePrimary="markets" fixtureResult={fixtureResult}>
       {state !== "normal" ? (
         <PageState
           state={state}

@@ -3,7 +3,7 @@ import { PortfolioDashboard } from "../../features/market-portfolio/portfolio-da
 
 export default function PortfoliosPage() {
   return (
-    <DesktopShell>
+    <DesktopShell activePrimary="portfolios">
       <PortfolioDashboard />
     </DesktopShell>
   );

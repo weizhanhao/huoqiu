@@ -3,7 +3,7 @@ import { MarketDashboard } from "../../features/market-portfolio/market-dashboar
 
 export default function MarketsPage() {
   return (
-    <DesktopShell>
+    <DesktopShell activePrimary="markets">
       <MarketDashboard />
     </DesktopShell>
   );

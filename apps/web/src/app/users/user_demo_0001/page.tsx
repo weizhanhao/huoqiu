@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function SyntheticUserProfilePage() {
   return (
-    <DesktopShell>
+    <DesktopShell activeUtility="profile">
       <ProfilePageExperience />
     </DesktopShell>
   );

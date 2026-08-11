@@ -18,7 +18,7 @@ export default async function PortfolioPage({
   const { portfolioId } = await params;
 
   return (
-    <DesktopShell>
+    <DesktopShell activePrimary="portfolios">
       {portfolioId === "portfolio_syn_0001" ? (
         <PortfolioDetail />
       ) : (

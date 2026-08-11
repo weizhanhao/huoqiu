@@ -2,6 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
+import SettingsPage from "../../src/app/settings/page";
+import SyntheticUserProfilePage from "../../src/app/users/user_demo_0001/page";
 import {
   ProfilePageExperience,
   SettingsPageExperience,
@@ -73,5 +75,21 @@ describe("synthetic settings route surface", () => {
     expect(markup.match(/disabled=""/gu)).toHaveLength(5);
     expect(markup.match(/演示环境未接入，无法操作/gu)).toHaveLength(5);
     expect(markup).not.toContain("扫码登录");
+  });
+});
+
+describe("profile and settings shell navigation", () => {
+  it("marks each utility route current without rendering the global channels", () => {
+    const profileMarkup = renderInSession(<SyntheticUserProfilePage />);
+    const settingsMarkup = renderInSession(<SettingsPage />);
+
+    expect(profileMarkup).not.toContain('class="channel-tabs"');
+    expect(profileMarkup).toMatch(
+      /<a[^>]*aria-current="page"[^>]*href="\/users\/user_demo_0001"[^>]*>/u,
+    );
+    expect(settingsMarkup).not.toContain('class="channel-tabs"');
+    expect(settingsMarkup).toContain(
+      'aria-current="page" class="top-action-link" href="/settings"',
+    );
   });
 });
