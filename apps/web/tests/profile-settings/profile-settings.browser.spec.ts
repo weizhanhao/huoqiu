@@ -232,6 +232,24 @@ describe("profile and settings in a real Chrome DOM", () => {
     ).toBe("true");
   });
 
+  it("keeps the settings kicker clear of its heading", async () => {
+    await page.setViewportSize({ height: 900, width: 1440 });
+    await page.getByRole("link", { name: "设置" }).click();
+    const kickerBox = await page
+      .getByText("SESSION PREFERENCES / SYNTHETIC ACCOUNT")
+      .boundingBox();
+    const headingBox = await page
+      .getByRole("heading", { name: "设置", level: 2 })
+      .boundingBox();
+
+    expect(kickerBox).not.toBeNull();
+    expect(headingBox).not.toBeNull();
+    if (kickerBox === null || headingBox === null) {
+      throw new Error("Settings hero geometry was not measurable");
+    }
+    expect(kickerBox.y + kickerBox.height).toBeLessThanOrEqual(headingBox.y);
+  });
+
   it.each([
     { height: 844, width: 390 },
     { height: 900, width: 768 },

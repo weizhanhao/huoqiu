@@ -373,10 +373,10 @@ export function SettingsPageExperience() {
       data-testid="settings-page"
     >
       <header className={styles.settingsHero}>
+        <p className={styles.heroKicker}>
+          SESSION PREFERENCES / SYNTHETIC ACCOUNT
+        </p>
         <div className={styles.settingsHeroCopy}>
-          <p className={styles.heroKicker}>
-            SESSION PREFERENCES / SYNTHETIC ACCOUNT
-          </p>
           <h2 id="settings-heading">设置</h2>
           <p>仅管理本次浏览会话中的演示资料与显示偏好。</p>
         </div>
