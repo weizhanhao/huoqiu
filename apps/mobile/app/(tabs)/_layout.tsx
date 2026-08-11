@@ -3,6 +3,7 @@ import { Tabs } from "expo-router";
 import { Text } from "react-native";
 
 import { d0MaestroLabels } from "../../src/accessibility/d0-maestro-labels";
+import { appTouchMinimum } from "../../src/styles/app-touch";
 
 export default function TabLayout() {
   return (
@@ -15,7 +16,7 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: tokens.surface.base,
           borderTopColor: tokens.surface.divider,
-          minHeight: 64,
+          minHeight: appTouchMinimum + 16,
           paddingBottom: 8,
           paddingTop: 8,
         },
@@ -43,6 +44,42 @@ export default function TabLayout() {
             </Text>
           ),
           title: d0MaestroLabels.watchlistTab,
+        }}
+      />
+      <Tabs.Screen
+        name="markets"
+        options={{
+          tabBarAccessibilityLabel: "行情",
+          tabBarIcon: ({ color }) => (
+            <Text aria-hidden style={{ color, fontSize: 18 }}>
+              ↗
+            </Text>
+          ),
+          title: "行情",
+        }}
+      />
+      <Tabs.Screen
+        name="portfolios"
+        options={{
+          tabBarAccessibilityLabel: "组合",
+          tabBarIcon: ({ color }) => (
+            <Text aria-hidden style={{ color, fontSize: 18 }}>
+              ◈
+            </Text>
+          ),
+          title: "组合",
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          tabBarAccessibilityLabel: "我的",
+          tabBarIcon: ({ color }) => (
+            <Text aria-hidden style={{ color, fontSize: 18 }}>
+              ○
+            </Text>
+          ),
+          title: "我的",
         }}
       />
     </Tabs>

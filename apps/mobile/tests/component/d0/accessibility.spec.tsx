@@ -10,8 +10,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HomeFeed } from "../../../src/components/d0/home-feed";
 import { InstrumentSearch } from "../../../src/components/d0/instrument-search";
+import { ScreenHeader } from "../../../src/components/d0/screen-header";
 import { WatchlistPanel } from "../../../src/components/d0/watchlist-panel";
 import { loadD0Fixture } from "../../../src/lib/d0-fixture";
+import { appTouchMinimum } from "../../../src/styles/app-touch";
 import { d0TextColors } from "../../../src/styles/d0-colors";
 
 vi.mock("../../../src/stores/d0-watchlist", () => ({
@@ -238,5 +240,39 @@ describe("D0 mobile WCAG AA color use", () => {
     ) as Readonly<{ minHeight?: number }> | undefined;
 
     expect(flattened?.minHeight).toBeGreaterThanOrEqual(44);
+  });
+
+  it("uses the App 48px token for shell and watchlist controls", () => {
+    const header = ScreenHeader({
+      onBack: () => undefined,
+      onSearch: () => undefined,
+      title: "演示页面",
+    });
+    const watchlist = WatchlistPanel({
+      fixture: readyFixture(),
+      state: "normal",
+    });
+    const controls = [
+      findElement(
+        header,
+        (element) => propertiesOf(element).accessibilityLabel === "返回",
+      ),
+      findElement(
+        header,
+        (element) =>
+          propertiesOf(element).accessibilityLabel === "搜索演示标的",
+      ),
+      findElement(
+        watchlist,
+        (element) => propertiesOf(element).accessibilityLabel === "重置自选",
+      ),
+    ];
+
+    for (const control of controls) {
+      const flattened = StyleSheet.flatten(
+        propertiesOf(control).style as Parameters<typeof StyleSheet.flatten>[0],
+      ) as Readonly<{ height?: number; minHeight?: number }> | undefined;
+      expect(flattened?.height ?? flattened?.minHeight).toBe(appTouchMinimum);
+    }
   });
 });

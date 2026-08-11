@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { d0MaestroLabels } from "../../accessibility/d0-maestro-labels";
+import { appTouchMinimum } from "../../styles/app-touch";
 
 type ScreenHeaderProperties = Readonly<{
   title: string;
@@ -119,9 +120,9 @@ const styles = StyleSheet.create({
     borderColor: tokens.surface.divider,
     borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
-    height: 44,
+    height: appTouchMinimum,
     justifyContent: "center",
-    width: 44,
+    width: appTouchMinimum,
   },
   backGlyph: {
     color: tokens.text.primary,
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 4,
-    minHeight: 44,
+    minHeight: appTouchMinimum,
     paddingHorizontal: 12,
   },
   searchGlyph: {

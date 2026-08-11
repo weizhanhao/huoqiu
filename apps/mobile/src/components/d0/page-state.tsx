@@ -2,6 +2,8 @@ import { tokens } from "@huoqiu/native-ui";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { appTouchMinimum } from "../../styles/app-touch";
+
 type PageStateProperties = Readonly<{
   state: "normal" | "loading" | "empty" | "error";
   children?: ReactNode;
@@ -102,7 +104,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: "center",
     marginTop: 6,
-    minHeight: 48,
+    minHeight: appTouchMinimum,
     minWidth: 112,
     paddingHorizontal: 20,
   },

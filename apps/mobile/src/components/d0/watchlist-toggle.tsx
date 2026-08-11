@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text } from "react-native";
 
 import { d0MaestroLabels } from "../../accessibility/d0-maestro-labels";
 import { useD0Watchlist } from "../../stores/d0-watchlist";
+import { appTouchMinimum } from "../../styles/app-touch";
 
 type WatchlistToggleProperties = Readonly<{
   listingId: string;
@@ -48,7 +49,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 48,
+    minHeight: appTouchMinimum,
     paddingHorizontal: 18,
   },
   buttonIncluded: {
