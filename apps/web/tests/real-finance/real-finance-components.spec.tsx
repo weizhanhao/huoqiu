@@ -189,6 +189,43 @@ describe("real finance presentational seam", () => {
     }
   });
 
+  it("fails closed instead of rendering unsafe source URLs", () => {
+    const unsafeUrls = [
+      "javascript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "http://example.com/report",
+      "https://127.0.0.1/report",
+      "https://[::1]/report",
+      "https://localhost/report",
+      "https://user:secret@example.com/report",
+      "https://example.com/report#section",
+      "https://example.com:444/report",
+    ];
+    const sourceRecord = denseFinanceModel.records[0];
+
+    expect(sourceRecord).toBeDefined();
+    if (sourceRecord === undefined) return;
+
+    for (const sourceUrl of unsafeUrls) {
+      const unsafeModel = {
+        ...denseFinanceModel,
+        records: [{ ...sourceRecord, sourceUrl }],
+        selectedRecordId: sourceRecord.id,
+      } as unknown as FinancePublicViewModel;
+      const surfaces = [
+        renderToStaticMarkup(<RealFinanceHub model={unsafeModel} />),
+        renderToStaticMarkup(<RealFinanceBriefing model={unsafeModel} />),
+        renderToStaticMarkup(<RealFinanceDetail model={unsafeModel} />),
+      ];
+
+      for (const markup of surfaces) {
+        expect(markup).toContain(sourceRecord.title);
+        expect(markup).toContain("原始来源链接不可用");
+        expect(markup).not.toContain("href=");
+      }
+    }
+  });
+
   it("fails closed across briefing and detail for invalid snapshots", () => {
     const invalidModel = {
       ...denseFinanceModel,

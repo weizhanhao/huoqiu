@@ -2,6 +2,7 @@ import type { FinancePublicViewModel } from "./finance-public-view-model";
 import styles from "./real-finance.module.css";
 import {
   canDisplayFinanceRecords,
+  FinanceExternalSourceLink,
   financeKindLabels,
   financeSourceLabels,
   FinanceStateNotice,
@@ -151,16 +152,13 @@ export function RealFinanceDetail({ model }: RealFinanceDetailProperties) {
               {record.sourceId === "gdelt" && "元数据来自 GDELT · "}
               {record.attribution}
             </p>
-            <a
-              aria-label={`打开外部原始来源：${record.publisher}，${record.title}`}
+            <FinanceExternalSourceLink
               className={styles.outboundLink}
-              href={record.sourceUrl}
-              rel="noopener noreferrer nofollow"
-              target="_blank"
+              record={record}
+              unavailableChildren="原始来源链接不可用"
             >
               打开外部原始来源
-              <span aria-hidden="true"> ↗</span>
-            </a>
+            </FinanceExternalSourceLink>
           </footer>
         </article>
       )}

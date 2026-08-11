@@ -5,6 +5,7 @@ import type {
 import styles from "./real-finance.module.css";
 import {
   canDisplayFinanceRecords,
+  FinanceExternalSourceLink,
   financeKindLabels,
   financeSourceLabels,
   FinanceStateNotice,
@@ -83,17 +84,13 @@ export function RealFinanceBriefing({ model }: RealFinanceBriefingProperties) {
                   </span>
                 </div>
                 <h3>
-                  <a
-                    aria-label={`打开外部原始来源：${record.publisher}，${record.title}`}
+                  <FinanceExternalSourceLink
                     className={styles.recordLink}
-                    href={record.sourceUrl}
-                    lang={record.language}
-                    rel="noopener noreferrer nofollow"
-                    target="_blank"
+                    language={record.language}
+                    record={record}
                   >
                     {record.title}
-                    <span aria-hidden="true"> ↗</span>
-                  </a>
+                  </FinanceExternalSourceLink>
                 </h3>
                 <p className={styles.publisher}>
                   {record.sourceId === "gdelt" && "原发布域 · "}

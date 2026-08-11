@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type {
   FinancePublicRecordViewModel,
   FinancePublicState,
@@ -5,6 +7,7 @@ import type {
   FinanceSourceStatus,
   FinanceSourceViewModel,
 } from "./finance-public-view-model";
+import { validateFinancePublicSourceUrl } from "./finance-public-view-model";
 import styles from "./real-finance.module.css";
 
 export const financeSourceOrder = ["sec", "gdelt", "nbs"] as const;
@@ -142,6 +145,52 @@ export function SourceHealthGrid({
   );
 }
 
+export function FinanceExternalSourceLink({
+  children,
+  className,
+  language,
+  record,
+  unavailableChildren,
+}: Readonly<{
+  children: ReactNode;
+  className: string | undefined;
+  language?: string;
+  record: FinancePublicRecordViewModel;
+  unavailableChildren?: ReactNode;
+}>) {
+  const sourceUrl = validateFinancePublicSourceUrl(record.sourceUrl);
+  const unavailableClassName = [className, styles.unavailableLink]
+    .filter((value): value is string => value !== undefined)
+    .join(" ");
+
+  if (sourceUrl === null) {
+    return (
+      <span
+        className={unavailableClassName}
+        data-source-link-unavailable="true"
+        lang={language}
+      >
+        {unavailableChildren ?? children}
+        {unavailableChildren === undefined && " · 原始来源链接不可用"}
+      </span>
+    );
+  }
+
+  return (
+    <a
+      aria-label={`打开外部原始来源：${record.publisher}，${record.title}`}
+      className={className}
+      href={sourceUrl}
+      lang={language}
+      rel="noopener noreferrer nofollow"
+      target="_blank"
+    >
+      {children}
+      <span aria-hidden="true"> ↗</span>
+    </a>
+  );
+}
+
 export function FinanceRecordSummary({
   record,
 }: Readonly<{ record: FinancePublicRecordViewModel }>) {
@@ -164,17 +213,13 @@ export function FinanceRecordSummary({
         {record.publisher}
       </p>
       <h3>
-        <a
-          aria-label={`打开外部原始来源：${record.publisher}，${record.title}`}
+        <FinanceExternalSourceLink
           className={styles.recordLink}
-          href={record.sourceUrl}
-          lang={record.language}
-          rel="noopener noreferrer nofollow"
-          target="_blank"
+          language={record.language}
+          record={record}
         >
           {record.title}
-          <span aria-hidden="true"> ↗</span>
-        </a>
+        </FinanceExternalSourceLink>
       </h3>
       <dl className={styles.recordTimes}>
         <div>

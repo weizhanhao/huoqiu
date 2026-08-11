@@ -108,6 +108,53 @@ describe("real finance presentational UI in Chrome", () => {
     expect(browserErrors).toEqual([]);
   });
 
+  it("supports Tab navigation and Enter or Space activation", async () => {
+    const hub = page.getByTestId("real-finance-hub");
+    const allSources = hub.getByRole("button", { name: "查看全部来源" });
+    const secFilter = hub.getByRole("button", { name: "只看 SEC EDGAR" });
+    const gdeltFilter = hub.getByRole("button", { name: "只看 GDELT" });
+
+    await allSources.focus();
+    await page.keyboard.press("Tab");
+    expect(
+      await secFilter.evaluate((element) => element === document.activeElement),
+    ).toBe(true);
+    await page.keyboard.press("Enter");
+    expect(await secFilter.getAttribute("aria-pressed")).toBe("true");
+
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    expect(
+      await gdeltFilter.evaluate(
+        (element) => element === document.activeElement,
+      ),
+    ).toBe(true);
+    await page.keyboard.press("Space");
+    expect(await gdeltFilter.getAttribute("aria-pressed")).toBe("true");
+
+    const expand = hub.getByRole("button", {
+      name: "展开 GDELT 全部 14 条",
+    });
+    const search = hub.getByRole("searchbox", { name: "关键词" });
+    await search.focus();
+
+    for (let step = 0; step < 20; step += 1) {
+      await page.keyboard.press("Tab");
+      if (
+        await expand.evaluate((element) => element === document.activeElement)
+      )
+        break;
+    }
+
+    expect(
+      await expand.evaluate((element) => element === document.activeElement),
+    ).toBe(true);
+    await page.keyboard.press("Enter");
+    expect(await hub.locator('[data-record-source="gdelt"]').count()).toBe(14);
+    expect(browserErrors).toEqual([]);
+  });
+
   it.each([
     { height: 844, width: 390 },
     { height: 900, width: 768 },

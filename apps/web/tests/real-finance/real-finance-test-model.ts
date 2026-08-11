@@ -3,6 +3,15 @@ import type {
   FinancePublicViewModel,
   FinanceSourceId,
 } from "../../src/features/real-finance";
+import { validateFinancePublicSourceUrl } from "../../src/features/real-finance";
+
+const sourceUrl = (value: string) => {
+  const validated = validateFinancePublicSourceUrl(value);
+  if (validated === null) {
+    throw new Error(`Expected a valid test-only public HTTPS URL: ${value}`);
+  }
+  return validated;
+};
 
 const publishedAt = (offsetMinutes: number) =>
   new Date(
@@ -25,7 +34,9 @@ const secRecords = Array.from({ length: 10 }, (_, index) => ({
   kind: "filing" as const,
   title: `测试公司 ${index + 1} 向 SEC 提交 Form 8-K`,
   publisher: "U.S. Securities and Exchange Commission",
-  sourceUrl: `https://www.sec.gov/Archives/edgar/data/1000${index}/filing-index.html`,
+  sourceUrl: sourceUrl(
+    `https://www.sec.gov/Archives/edgar/data/1000${index}/filing-index.html`,
+  ),
   attribution: "Source: SEC EDGAR",
   facts: [
     { label: "表单", value: "8-K" },
@@ -39,7 +50,7 @@ const gdeltRecords = Array.from({ length: 14 }, (_, index) => ({
   kind: "news-link" as const,
   title: `Global market source link ${index + 1}`,
   publisher: `Publisher ${index + 1}`,
-  sourceUrl: `https://publisher.example/news/${index + 1}`,
+  sourceUrl: sourceUrl(`https://publisher.example/news/${index + 1}`),
   attribution: "Discovered via GDELT; rights remain with the publisher",
 }));
 
@@ -49,7 +60,9 @@ const nbsRecords = Array.from({ length: 8 }, (_, index) => ({
   kind: "macro-release" as const,
   title: `国家统计局发布测试宏观指标 ${index + 1}`,
   publisher: "国家统计局",
-  sourceUrl: `https://www.stats.gov.cn/sj/zxfb/202608/t${index + 1}.html`,
+  sourceUrl: sourceUrl(
+    `https://www.stats.gov.cn/sj/zxfb/202608/t${index + 1}.html`,
+  ),
   attribution: "来源：国家统计局官方网站",
   facts: [{ label: "发布类型", value: "官方数据发布" }],
 }));

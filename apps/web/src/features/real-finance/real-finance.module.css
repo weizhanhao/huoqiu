@@ -354,6 +354,17 @@
   text-decoration: underline;
 }
 
+.unavailableLink {
+  color: var(--hq-text-secondary);
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.outboundLink.unavailableLink {
+  background: var(--hq-surface-subtle);
+  border: 1px solid var(--hq-surface-divider);
+}
+
 .sourceGrid {
   display: grid;
   gap: var(--hq-spacing-4);
