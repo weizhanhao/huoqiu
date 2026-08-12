@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type {
@@ -246,9 +247,20 @@ export function FinanceRecordSummary({
           ))}
         </ul>
       )}
-      <footer className={styles.attribution}>
-        {record.sourceId === "gdelt" && "元数据来自 GDELT · "}
-        {record.attribution}
+      <footer className={styles.recordFooter}>
+        <p className={styles.attribution}>
+          {record.sourceId === "gdelt" && "元数据来自 GDELT · "}
+          {record.attribution}
+        </p>
+        <div className={styles.recordActions}>
+          <Link href={`/news/${record.id}`}>查看站内详情</Link>
+          <FinanceExternalSourceLink
+            className={styles.recordSourceAction}
+            record={record}
+          >
+            原始来源
+          </FinanceExternalSourceLink>
+        </div>
       </footer>
     </article>
   );

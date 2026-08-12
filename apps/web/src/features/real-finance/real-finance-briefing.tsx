@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type {
   FinancePublicRecordViewModel,
   FinancePublicViewModel,
@@ -100,6 +102,15 @@ export function RealFinanceBriefing({ model }: RealFinanceBriefingProperties) {
                   {record.sourceId === "gdelt" && "元数据来自 GDELT · "}
                   {record.attribution}
                 </p>
+                <div className={styles.recordActions}>
+                  <Link href={`/news/${record.id}`}>查看站内详情</Link>
+                  <FinanceExternalSourceLink
+                    className={styles.recordSourceAction}
+                    record={record}
+                  >
+                    原始来源
+                  </FinanceExternalSourceLink>
+                </div>
               </li>
             ))}
           </ol>

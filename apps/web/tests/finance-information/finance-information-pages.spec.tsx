@@ -1,30 +1,47 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import BriefingPage from "../../src/app/7x24/page";
-import NewsDetailPage, {
-  generateStaticParams,
-} from "../../src/app/news/[newsId]/page";
+import NewsDetailPage from "../../src/app/news/[newsId]/page";
 import NewsPage from "../../src/app/news/page";
 
+const temporaryDirectories: string[] = [];
+
+const useEmptyFinanceRuntime = async () => {
+  const directory = await mkdtemp(join(tmpdir(), "huoqiu-finance-routes-"));
+  temporaryDirectories.push(directory);
+  process.env.HUOQIU_FINANCE_SNAPSHOT_DIRECTORY = directory;
+};
+
+afterEach(async () => {
+  delete process.env.HUOQIU_FINANCE_SNAPSHOT_DIRECTORY;
+  await Promise.all(
+    temporaryDirectories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
+
 describe("finance information routes", () => {
-  it("renders the public news hub with channels, absolute times, and detail links", async () => {
+  it("renders an honest real-source news state without synthetic fallback", async () => {
+    await useEmptyFinanceRuntime();
     const markup = renderToStaticMarkup(
       await NewsPage({ searchParams: Promise.resolve({}) }),
     );
 
-    for (const channel of ["全部", "市场", "公司", "公告", "专栏"]) {
-      expect(markup).toContain(`>${channel}</button>`);
-    }
     expect(markup).toContain("财经资讯");
-    expect(markup).toContain("星港制造合成订单样本保持韧性");
-    expect(markup).toContain("2026-08-08 13:42 CST");
-    expect(markup).toContain('href="/news/company_syn_starport_orders"');
-    expect(markup).toContain("演示数据 / 合成数据");
-    expect(markup).toContain("不构成投资建议");
+    expect(markup).toContain('data-testid="real-finance-hub"');
+    expect(markup).toContain("真实财经采集任务尚未生成公共快照");
+    expect(markup).toContain("不使用合成财经信息补位");
+    expect(markup).not.toContain("星港制造合成订单样本保持韧性");
   });
 
-  it("keeps a local search deep link and renders an honest empty state", async () => {
+  it("fails closed when the runtime snapshot directory is misconfigured", async () => {
+    process.env.HUOQIU_FINANCE_SNAPSHOT_DIRECTORY = ".runtime/finance";
     const markup = renderToStaticMarkup(
       await NewsPage({
         searchParams: Promise.resolve({
@@ -34,51 +51,40 @@ describe("finance information routes", () => {
       }),
     );
 
-    expect(markup).toContain('value="不存在的标的"');
-    expect(markup).toMatch(
-      /<button\b[^>]*aria-pressed="true"[^>]*>公司<\/button>/u,
-    );
-    expect(markup).toContain("没有匹配的合成资讯");
+    expect(markup).toContain("真实财经快照校验失败");
+    expect(markup).toContain("当前与上一份真实财经快照均未通过完整性校验");
     expect(markup).not.toContain("星港制造合成订单样本保持韧性");
   });
 
-  it("renders 7x24 briefs grouped by absolute date and time", () => {
-    const markup = renderToStaticMarkup(<BriefingPage />);
+  it("renders an honest real-source 7x24 state without synthetic fallback", async () => {
+    await useEmptyFinanceRuntime();
+    const markup = renderToStaticMarkup(await BriefingPage());
 
-    expect(markup).toContain("7×24 合成快讯");
-    expect(markup).toContain('aria-label="2026-08-08 快讯"');
-    expect(markup).toContain('aria-label="2026-08-07 快讯"');
-    expect(markup).toContain("2026-08-08");
-    expect(markup).toContain("14:32 CST");
-    expect(markup).toContain("09:18 CST");
-    expect(markup).toContain("18:05 CST");
-    expect(markup).toContain('href="/news/brief_syn_afternoon_pulse"');
-    expect(markup).toContain("演示数据 / 合成数据");
+    expect(markup).toContain('data-testid="real-finance-briefing"');
+    expect(markup).toContain("最新 20 条真实来源记录");
+    expect(markup).toContain("真实财经采集任务尚未生成公共快照");
+    expect(markup).not.toContain("7×24 合成快讯");
+    expect(markup).not.toContain("brief_syn_afternoon_pulse");
   });
 
-  it("renders a fixed news detail with source, body, listings, topics, and risk", async () => {
+  it("renders an honest real-source detail state without synthetic fallback", async () => {
+    await useEmptyFinanceRuntime();
     const markup = renderToStaticMarkup(
       await NewsDetailPage({
-        params: Promise.resolve({ newsId: "company_syn_starport_orders" }),
+        params: Promise.resolve({ newsId: "finance_missing_record" }),
       }),
     );
 
-    expect(generateStaticParams()).toContainEqual({
-      newsId: "company_syn_starport_orders",
-    });
-    expect(markup).toContain("星港制造合成订单样本保持韧性");
-    expect(markup).toContain("公司新闻");
-    expect(markup).toContain("2026-08-08 13:42 CST");
-    expect(markup).toContain("连续第三期位于合成景气区间");
-    expect(markup).toContain('href="/instruments/listing_syn_0002"');
-    expect(markup).toContain("先进制造");
-    expect(markup).toContain("风险提示");
-    expect(markup).toContain("分享（暂未开放）");
-    expect(markup).toContain("收藏（仅本次会话）");
+    expect(markup).toContain('data-testid="real-finance-detail"');
+    expect(markup).toContain("财经记录详情");
+    expect(markup).toContain("真实财经采集任务尚未生成公共快照");
+    expect(markup).not.toContain("company_syn_starport_orders");
+    expect(markup).not.toContain("星港制造合成订单样本保持韧性");
   });
 
   it("keeps briefing and news on distinct current global channels", async () => {
-    const briefingMarkup = renderToStaticMarkup(<BriefingPage />);
+    await useEmptyFinanceRuntime();
+    const briefingMarkup = renderToStaticMarkup(await BriefingPage());
     const newsMarkup = renderToStaticMarkup(
       await NewsPage({ searchParams: Promise.resolve({}) }),
     );

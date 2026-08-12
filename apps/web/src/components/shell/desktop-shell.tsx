@@ -17,6 +17,7 @@ type DesktopShellProperties = Readonly<{
   activeUtility?: "notifications" | "profile" | "settings" | undefined;
   children: ReactNode;
   fixtureResult?: D0FixtureLoadResult;
+  requiresD0Fixture?: boolean;
 }>;
 
 export function DesktopShell({
@@ -25,6 +26,7 @@ export function DesktopShell({
   activeUtility,
   children,
   fixtureResult = loadD0Fixture(),
+  requiresD0Fixture = true,
 }: DesktopShellProperties) {
   const fixture = fixtureResult.status === "ready" ? fixtureResult.data : null;
   const notificationsActive = activeUtility === "notifications";
@@ -88,7 +90,7 @@ export function DesktopShell({
             <span>设置</span>
           </Link>
         </nav>
-        <DemoDataBadge />
+        <DemoDataBadge variant="environment" />
       </header>
 
       <div className="d0-layout">
@@ -162,7 +164,7 @@ export function DesktopShell({
           {profileActive ? null : (
             <ChannelNavigation activeChannel={activeChannel} />
           )}
-          {fixtureResult.status === "ready" ? (
+          {!requiresD0Fixture || fixtureResult.status === "ready" ? (
             children
           ) : (
             <PageState state="error" errorMessage={fixtureResult.message} />

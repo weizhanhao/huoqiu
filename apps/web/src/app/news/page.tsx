@@ -1,9 +1,8 @@
 import { DesktopShell } from "../../components/shell/desktop-shell";
-import { FinanceInformationHub } from "../../features/finance-information/finance-information-hub";
-import {
-  financeInformationChannels,
-  type FinanceInformationChannel,
-} from "../../features/finance-information/finance-information-fixtures";
+import { RealFinanceHub } from "../../features/real-finance";
+import { loadRuntimeFinancePublicViewModel } from "../../features/real-finance/finance-snapshot.server";
+
+export const dynamic = "force-dynamic";
 
 type NewsPageProperties = Readonly<{
   searchParams: Promise<
@@ -14,25 +13,15 @@ type NewsPageProperties = Readonly<{
   >;
 }>;
 
-const normalizeChannel = (
-  value: string | readonly string[] | undefined,
-): FinanceInformationChannel => {
-  const candidate = Array.isArray(value) ? value[0] : value;
-  return financeInformationChannels.some((channel) => channel.id === candidate)
-    ? (candidate as FinanceInformationChannel)
-    : "all";
-};
-
 export default async function NewsPage({ searchParams }: NewsPageProperties) {
-  const resolvedSearchParams = await searchParams;
-  const channel = normalizeChannel(resolvedSearchParams.channel);
-  const query = Array.isArray(resolvedSearchParams.q)
-    ? (resolvedSearchParams.q[0] ?? "")
-    : (resolvedSearchParams.q ?? "");
+  await searchParams;
+  const model = await loadRuntimeFinancePublicViewModel({
+    selectedRecordId: null,
+  });
 
   return (
     <DesktopShell activeChannel="news">
-      <FinanceInformationHub initialChannel={channel} initialQuery={query} />
+      <RealFinanceHub model={model} />
     </DesktopShell>
   );
 }

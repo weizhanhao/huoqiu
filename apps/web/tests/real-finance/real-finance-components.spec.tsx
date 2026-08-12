@@ -5,6 +5,7 @@ import {
   RealFinanceBriefing,
   RealFinanceDetail,
   RealFinanceHub,
+  RealFinanceHomeSummary,
   type FinancePublicViewModel,
 } from "../../src/features/real-finance";
 import { denseFinanceModel } from "./real-finance-test-model";
@@ -46,6 +47,19 @@ const sourceOnlyModel = {
 } satisfies FinancePublicViewModel;
 
 describe("real finance presentational seam", () => {
+  it("renders the latest six real records on home with local detail links", () => {
+    const markup = renderToStaticMarkup(
+      <RealFinanceHomeSummary model={denseFinanceModel} />,
+    );
+
+    expect(markup).toContain('data-testid="real-finance-home-summary"');
+    expect(markup.match(/data-home-finance-record="true"/gu)).toHaveLength(6);
+    expect(markup).toContain(
+      `href="/news/${denseFinanceModel.records[0]?.id}"`,
+    );
+    expect(markup).not.toContain("合成财经");
+  });
+
   it("renders the three injected source states without inventing finance data", () => {
     const markup = renderToStaticMarkup(
       <RealFinanceHub model={sourceOnlyModel} />,
@@ -75,6 +89,8 @@ describe("real finance presentational seam", () => {
     expect(markup).toContain("新鲜");
     expect(markup).toContain("已陈旧");
     expect(markup).toContain("Source: SEC EDGAR");
+    expect(markup).toContain('href="/news/sec-record-01"');
+    expect(markup).toContain("查看站内详情");
     expect(markup).toMatch(
       /<a\b[^>]*rel="noopener noreferrer nofollow"[^>]*>/u,
     );
@@ -130,6 +146,8 @@ describe("real finance presentational seam", () => {
     expect(markup).toContain("测试公司 1 向 SEC 提交 Form 8-K");
     expect(markup).not.toContain("Global market source link 14");
     expect(markup).toContain("最新 20 条真实来源记录");
+    expect(markup).toContain('href="/news/sec-record-01"');
+    expect(markup).toContain("查看站内详情");
     expect(markup).toMatch(/<time\b[^>]*dateTime=/u);
     expect(markup).toMatch(
       /<a\b[^>]*rel="noopener noreferrer nofollow"[^>]*>/u,
@@ -221,7 +239,8 @@ describe("real finance presentational seam", () => {
       for (const markup of surfaces) {
         expect(markup).toContain(sourceRecord.title);
         expect(markup).toContain("原始来源链接不可用");
-        expect(markup).not.toContain("href=");
+        expect(markup).not.toContain(sourceUrl);
+        expect(markup).not.toContain('target="_blank"');
       }
     }
   });

@@ -139,7 +139,7 @@ describe("real finance presentational UI in Chrome", () => {
     const search = hub.getByRole("searchbox", { name: "关键词" });
     await search.focus();
 
-    for (let step = 0; step < 20; step += 1) {
+    for (let step = 0; step < 100; step += 1) {
       await page.keyboard.press("Tab");
       if (
         await expand.evaluate((element) => element === document.activeElement)

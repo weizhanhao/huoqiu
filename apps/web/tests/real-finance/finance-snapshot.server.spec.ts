@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   loadFinancePublicViewModel,
+  loadRuntimeFinancePublicViewModel,
   toFinancePublicViewModel,
 } from "../../src/features/real-finance/finance-snapshot.server";
 
@@ -381,5 +382,30 @@ describe("public finance snapshot server boundary", () => {
         selectedRecordId: null,
       }),
     ).rejects.toThrow(/absolute/u);
+  });
+
+  it("loads only from an explicitly configured absolute runtime directory", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "huoqiu-web-finance-"));
+    temporaryDirectories.push(directory);
+
+    await expect(
+      loadRuntimeFinancePublicViewModel({
+        environment: { HUOQIU_FINANCE_SNAPSHOT_DIRECTORY: directory },
+        now: "2026-08-12T03:00:00.000Z",
+        selectedRecordId: null,
+      }),
+    ).resolves.toMatchObject({ state: "missing", records: [] });
+  });
+
+  it("fails closed for a relative runtime directory configuration", async () => {
+    await expect(
+      loadRuntimeFinancePublicViewModel({
+        environment: {
+          HUOQIU_FINANCE_SNAPSHOT_DIRECTORY: ".runtime/finance",
+        },
+        now: "2026-08-12T03:00:00.000Z",
+        selectedRecordId: null,
+      }),
+    ).resolves.toMatchObject({ state: "invalid", records: [] });
   });
 });

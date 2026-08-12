@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 
 import {
   publicFinanceSnapshotSchema,
@@ -83,6 +83,16 @@ type FinanceSnapshotViewOptions = Readonly<{
 
 type FinanceSnapshotLoadOptions = FinanceSnapshotViewOptions &
   Readonly<{ directory: string }>;
+
+type RuntimeFinanceSnapshotLoadOptions = Readonly<{
+  selectedRecordId: string | null;
+  now?: string;
+  environment?: Readonly<Record<string, string | undefined>>;
+  cwd?: string;
+}>;
+
+const RUNTIME_DIRECTORY_ENVIRONMENT_VARIABLE =
+  "HUOQIU_FINANCE_SNAPSHOT_DIRECTORY";
 
 const isMissingFile = (error: unknown): boolean =>
   error instanceof Error &&
@@ -375,4 +385,26 @@ export const loadFinancePublicViewModel = async (
   } catch {
     return terminalModel("invalid", options.selectedRecordId);
   }
+};
+
+export const loadRuntimeFinancePublicViewModel = async (
+  options: RuntimeFinanceSnapshotLoadOptions,
+): Promise<FinancePublicViewModel> => {
+  const environment = options.environment ?? process.env;
+  const configuredDirectory =
+    environment[RUNTIME_DIRECTORY_ENVIRONMENT_VARIABLE];
+  const directory =
+    configuredDirectory === undefined
+      ? resolve(options.cwd ?? process.cwd(), ".runtime/finance")
+      : configuredDirectory.trim();
+
+  if (directory.length === 0 || !isAbsolute(directory)) {
+    return terminalModel("invalid", options.selectedRecordId);
+  }
+
+  return loadFinancePublicViewModel({
+    directory,
+    now: options.now ?? new Date().toISOString(),
+    selectedRecordId: options.selectedRecordId,
+  });
 };

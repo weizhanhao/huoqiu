@@ -1,10 +1,17 @@
 import { DesktopShell } from "../../components/shell/desktop-shell";
-import { FinanceBriefingTimeline } from "../../features/finance-information/finance-briefing-timeline";
+import { RealFinanceBriefing } from "../../features/real-finance";
+import { loadRuntimeFinancePublicViewModel } from "../../features/real-finance/finance-snapshot.server";
 
-export default function BriefingPage() {
+export const dynamic = "force-dynamic";
+
+export default async function BriefingPage() {
+  const model = await loadRuntimeFinancePublicViewModel({
+    selectedRecordId: null,
+  });
+
   return (
     <DesktopShell activeChannel="briefing">
-      <FinanceBriefingTimeline />
+      <RealFinanceBriefing model={model} />
     </DesktopShell>
   );
 }
