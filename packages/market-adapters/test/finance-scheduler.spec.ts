@@ -295,6 +295,57 @@ describe("finance ingestion coordinator", () => {
     expect(events).toEqual(["snapshot", "cursor:source-a:next-a"]);
   });
 
+  it("accumulates continuation pages but replaces them when a new polling cycle starts", async () => {
+    const cursorStore = new MemoryCursorStore();
+    const snapshotRepository = new MemorySnapshotRepository();
+    const coordinator = new FinanceIngestionCoordinator({
+      cursorStore,
+      snapshotRepository,
+      clock: () => "2026-08-12T00:05:00.000Z",
+    });
+    let initialPage = 0;
+    const fetch = vi.fn(async ({ cursor }: Readonly<{ cursor?: string }>) => {
+      if (cursor === "page-2") {
+        return { records: [sourceRecordFor("source-a", "002")] };
+      }
+      initialPage += 1;
+      return initialPage === 1
+        ? {
+            records: [sourceRecordFor("source-a", "001")],
+            nextCursor: "page-2",
+          }
+        : { records: [sourceRecordFor("source-a", "003")] };
+    });
+    const job = createJob(createSource({ source: "source-a", fetch }));
+
+    await coordinator.run(job);
+    expect(
+      snapshotRepository.current?.records.map(
+        ({ sourceRecordId }) => sourceRecordId,
+      ),
+    ).toEqual(["source-a-001"]);
+
+    await coordinator.run(job);
+    expect(
+      snapshotRepository.current?.records.map(
+        ({ sourceRecordId }) => sourceRecordId,
+      ),
+    ).toEqual(["source-a-001", "source-a-002"]);
+    expect(cursorStore.values.has("source-a")).toBe(false);
+
+    await coordinator.run(job);
+    expect(
+      snapshotRepository.current?.records.map(
+        ({ sourceRecordId }) => sourceRecordId,
+      ),
+    ).toEqual(["source-a-003"]);
+    expect(fetch.mock.calls.map(([input]) => input)).toEqual([
+      {},
+      { cursor: "page-2" },
+      {},
+    ]);
+  });
+
   it("never advances a cursor when publication fails", async () => {
     const cursorStore = new MemoryCursorStore();
     cursorStore.values.set("source-a", "current-a");

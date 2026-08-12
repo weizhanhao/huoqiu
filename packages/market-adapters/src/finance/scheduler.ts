@@ -294,6 +294,7 @@ export class FinanceIngestionCoordinator {
         const publication: FinanceSourcePublication = {
           descriptor,
           attemptedAt,
+          continuation: cursor !== undefined,
           result: ingestion,
         };
         const next = createPublicFinanceSnapshot({

@@ -21,6 +21,7 @@ const PREVIOUS_FILENAME = "public-v1.previous.json";
 export type FinanceSourcePublication = Readonly<{
   descriptor: FinanceSourceDescriptor;
   attemptedAt: string;
+  continuation?: boolean;
   result: FinanceIngestionRunResult;
 }>;
 
@@ -47,6 +48,19 @@ const recordsForSource = (
 ) =>
   snapshot?.records.filter((record) => record.provenance.source === source) ??
   [];
+
+const mergeContinuationRecords = (
+  previousRecords: readonly PublicFinanceSnapshot["records"][number][],
+  currentRecords: readonly PublicFinanceSnapshot["records"][number][],
+): PublicFinanceSnapshot["records"] => {
+  const recordsByIdentity = new Map(
+    previousRecords.map((record) => [record.sourceRecordId, record]),
+  );
+  for (const record of currentRecords) {
+    recordsByIdentity.set(record.sourceRecordId, record);
+  }
+  return [...recordsByIdentity.values()];
+};
 
 const stateForReadyPublication = (
   descriptor: FinanceSourceDescriptor,
@@ -129,15 +143,25 @@ export const createPublicFinanceSnapshot = (
 
     const previousState = sourceStates.get(descriptor.source);
     if (publication.result.status === "ready") {
+      if (
+        publication.continuation !== undefined &&
+        typeof publication.continuation !== "boolean"
+      ) {
+        throw new TypeError(
+          "Public finance publication continuation must be boolean",
+        );
+      }
+      const records = publication.continuation
+        ? mergeContinuationRecords(
+            recordsBySource.get(descriptor.source) ?? [],
+            publication.result.records,
+          )
+        : [...publication.result.records];
       sourceStates.set(
         descriptor.source,
-        stateForReadyPublication(
-          descriptor,
-          attemptedAt,
-          publication.result.records.length,
-        ),
+        stateForReadyPublication(descriptor, attemptedAt, records.length),
       );
-      recordsBySource.set(descriptor.source, [...publication.result.records]);
+      recordsBySource.set(descriptor.source, records);
     } else {
       sourceStates.set(
         descriptor.source,
