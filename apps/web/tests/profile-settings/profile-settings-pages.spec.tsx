@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import SettingsLayout from "../../src/app/settings/layout";
 import SettingsPage from "../../src/app/settings/page";
@@ -15,6 +15,15 @@ const renderInSession = (children: ReactNode): string =>
   renderToStaticMarkup(
     <ProfileSessionProvider>{children}</ProfileSessionProvider>,
   );
+
+/*
+ * 导航选中态由地址决定（见 src/components/shell/active-nav.ts），
+ * 所以这里设定地址再渲染，而不是往壳里传参数。
+ */
+let currentPathname = "/";
+vi.mock("next/navigation", () => ({
+  usePathname: () => currentPathname,
+}));
 
 describe("synthetic profile route surface", () => {
   it("renders the allowlisted identity, disclosure, statistics, and editable profile controls", () => {
@@ -106,12 +115,14 @@ describe("synthetic settings route surface", () => {
 
 describe("profile and settings shell navigation", () => {
   it("marks each utility route current without rendering the global channels", () => {
+    currentPathname = "/users/user_demo_0001";
     const profileMarkup = renderInSession(<SyntheticUserProfilePage />);
     /*
      * 设置页现在由 app/settings/layout.tsx 提供外壳与八项导航，页面本身只负责
      * 「个人资料」那一项的内容。所以这里按 Next 的实际组合方式渲染——单独渲染
      * 页面组件已经拿不到外壳，那不是回归，是结构变了。
      */
+    currentPathname = "/settings";
     const settingsMarkup = renderInSession(
       <SettingsLayout>
         <SettingsPage />

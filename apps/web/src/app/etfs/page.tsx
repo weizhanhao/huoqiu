@@ -12,8 +12,9 @@ type EtfsPageProperties = Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>;
 
-const firstValue = (value: string | string[] | undefined): string | undefined =>
-  Array.isArray(value) ? value[0] : value;
+const firstValue = (
+  value: string | string[] | undefined,
+): string | undefined => (Array.isArray(value) ? value[0] : value);
 
 /*
  * 可深链的排序。认不出来的取值回落到默认，而不是原样传下去——

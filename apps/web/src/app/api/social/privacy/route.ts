@@ -24,8 +24,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       commentPolicy:
         accountId === null ? "everyone" : getCommentPolicy(accountId),
       marketColors: accountId === null ? "red-up" : getMarketColors(accountId),
-      mutedCategories:
-        accountId === null ? [] : getMutedCategories(accountId),
+      mutedCategories: accountId === null ? [] : getMutedCategories(accountId),
     },
     { headers: { "cache-control": "no-store" } },
   );

@@ -12,8 +12,9 @@ type RankingsPageProperties = Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>;
 
-const firstValue = (value: string | string[] | undefined): string | undefined =>
-  Array.isArray(value) ? value[0] : value;
+const firstValue = (
+  value: string | string[] | undefined,
+): string | undefined => (Array.isArray(value) ? value[0] : value);
 
 /*
  * 可深链的市场与方向。
@@ -35,7 +36,7 @@ export default async function MarketRankingsPage({
   const direction = firstValue(parameters.direction);
 
   return (
-    <DesktopShell activePrimary="markets">
+    <DesktopShell>
       <RealMarketRankings
         initialDirection={
           DIRECTIONS.includes(direction as DirectionId)

@@ -8,7 +8,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     payload = await request.json();
   } catch {
-    return NextResponse.json({ error: "请求体不是合法 JSON。" }, { status: 400 });
+    return NextResponse.json(
+      { error: "请求体不是合法 JSON。" },
+      { status: 400 },
+    );
   }
   // 关注动作只能代表持票人自己，不能由请求体指定「谁去关注」。
   const followerId = currentAccountId(request);

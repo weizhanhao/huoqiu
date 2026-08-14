@@ -44,7 +44,9 @@ export async function GET(request: Request): Promise<NextResponse> {
   const [overseas, domestic, metrics, tape] = await Promise.all([
     isOverseas ? loadOverseasSnapshot(symbol, 1) : Promise.resolve(null),
     /* 第三个参数跳过缓存：实时视图要的是此刻，不是一分钟前。 */
-    isOverseas ? Promise.resolve(null) : loadInstrumentSnapshot(symbol, 1, true),
+    isOverseas
+      ? Promise.resolve(null)
+      : loadInstrumentSnapshot(symbol, 1, true),
     loadQuoteMetrics(symbol),
     loadTickDetails(symbol),
   ]);

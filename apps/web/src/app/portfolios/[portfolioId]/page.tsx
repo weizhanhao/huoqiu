@@ -46,7 +46,7 @@ export default async function PortfolioPage({
   const owner = getAccount(portfolio.ownerId);
 
   return (
-    <DesktopShell activePrimary="portfolios">
+    <DesktopShell>
       <div className={styles.content}>
         <h1 className={styles.heading}>
           {portfolio.name}

@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import StudioLayout from "../../../src/app/studio/layout";
 import { DesktopShell } from "../../../src/components/shell/desktop-shell";
 import { StockShell } from "../../../src/components/shell/stock-shell";
 
@@ -35,6 +36,15 @@ const homeTopbar = (): string =>
     ),
   );
 
+const studioTopbar = (): string =>
+  topbarOf(
+    renderToStaticMarkup(
+      <StudioLayout>
+        <p>创作者中心正文</p>
+      </StudioLayout>,
+    ),
+  );
+
 const stockTopbar = (): string =>
   topbarOf(
     renderToStaticMarkup(
@@ -45,26 +55,30 @@ const stockTopbar = (): string =>
   );
 
 describe("the top bar is the same one on every page", () => {
-  it("renders an identical top bar in both shells", () => {
+  it("renders an identical top bar in every shell", () => {
     const home = homeTopbar();
-    const stock = stockTopbar();
 
     /* 先确认真的取到了，否则下面的相等断言在两个空串上也会通过。 */
     expect(home.length).toBeGreaterThan(200);
-    expect(stock).toBe(home);
+    expect(stockTopbar()).toBe(home);
+    /*
+     * 创作者中心是第三套外壳，一开始也自己写了一条顶栏（logo + 分隔线 +
+     * 「创作者中心」标题 + 搜索框），同样少了消息、发帖、设置。
+     */
+    expect(studioTopbar()).toBe(home);
   });
 
-  it("keeps every top-bar entry present on an instrument page", () => {
+  it("keeps every top-bar entry present outside the community shell", () => {
     /*
      * 上一条只要求「两边一样」——两边一起退化成一条空栏也满足。
      * 这一条钉住里面到底该有什么。
      */
-    const stock = stockTopbar();
-
-    expect(stock).toContain("火球");
-    expect(stock).toContain('action="/search"');
-    for (const entry of ["消息", "发帖", "设置"]) {
-      expect(stock).toContain(`>${entry}<`);
+    for (const topbar of [stockTopbar(), studioTopbar()]) {
+      expect(topbar).toContain("火球");
+      expect(topbar).toContain('action="/search"');
+      for (const entry of ["消息", "发帖", "设置"]) {
+        expect(topbar).toContain(`>${entry}<`);
+      }
     }
   });
 });

@@ -2562,7 +2562,9 @@ a.fund-row:hover strong:first-child {
     display: none;
   }
 
-  .top-actions .notification-nav-link > span:not(.notification-nav-icon):not(.notification-nav-badge) {
+  .top-actions
+    .notification-nav-link
+    > span:not(.notification-nav-icon):not(.notification-nav-badge) {
     display: none;
   }
 

@@ -1,5 +1,9 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { activeNavHref } from "./active-nav";
 import { GlobalSearchBox } from "./global-search-box";
 import { NotificationNavigationLink } from "./notification-navigation-link";
 import { PublishDialog } from "../../features/publish/publish-dialog";
@@ -15,15 +19,18 @@ import { DemoDataBadge } from "../system/demo-data-badge";
  *
  * 现在两个壳渲染的是同一个组件。要改顶栏只有这一处可改，也就不会再出现
  * 「一边改了、另一边忘了」。
+ *
+ * 选中态自己按地址算，不由调用方传：传参这件事页面很容易忘或传错，
+ * 而错了只表现为「高亮在别处」，不报任何错。
  */
-export function SiteTopbar({
-  notificationsActive = false,
-  settingsActive = false,
-}: Readonly<{
-  /** 当前停在消息 / 设置时给出，用来标 aria-current。 */
-  notificationsActive?: boolean;
-  settingsActive?: boolean;
-}> = {}) {
+const TOPBAR_MATCHES = ["/notifications", "/settings"];
+
+export function SiteTopbar() {
+  /* 没有路由上下文时返回 null（静态渲染、测试里单独渲染都是）。 */
+  const active = activeNavHref(usePathname() ?? "", TOPBAR_MATCHES);
+  const notificationsActive = active === "/notifications";
+  const settingsActive = active === "/settings";
+
   return (
     <header className="d0-topbar">
       <Link className="d0-brand" href="/" aria-label="火球首页">

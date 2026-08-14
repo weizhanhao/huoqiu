@@ -1,8 +1,7 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import styles from "./studio.module.css";
-import { GlobalSearchBox } from "../../components/shell/global-search-box";
+import { SiteTopbar } from "../../components/shell/site-topbar";
 import { StudioNav } from "../../features/studio/studio-nav";
 
 /*
@@ -20,20 +19,17 @@ export default function StudioLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <div className={styles.shell}>
-      <header className={styles.topbar}>
-        <Link className={styles.brand} href="/" aria-label="火球首页">
-          <span aria-hidden="true" className={styles.brandMark}>
-            火
-          </span>
-          <span className={styles.brandWord}>火球</span>
-        </Link>
-        <span className={styles.divider} aria-hidden="true" />
-        <p className={styles.title}>创作者中心</p>
-        <GlobalSearchBox />
-      </header>
+      {/*
+        顶栏用全站共用的那一条。这里原先自己写了一条（logo + 分隔线 +
+        「创作者中心」标题 + 搜索框），少了消息、发帖、设置和环境标识——
+        从首页点进来，最上面整个跳一下，像换了个站。
+        「创作者中心」这个标题移到左侧导航的顶部，那里本来就是讲这一节的。
+      */}
+      <SiteTopbar />
 
       <div className={styles.layout}>
         <aside aria-label="创作者中心导航" className={styles.nav}>
+          <p className={styles.title}>创作者中心</p>
           <StudioNav />
         </aside>
         <main className={styles.main}>{children}</main>

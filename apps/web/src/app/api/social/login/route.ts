@@ -18,7 +18,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     payload = await request.json();
   } catch {
-    return NextResponse.json({ error: "请求体不是合法 JSON。" }, { status: 400 });
+    return NextResponse.json(
+      { error: "请求体不是合法 JSON。" },
+      { status: 400 },
+    );
   }
   const body = payload as Record<string, unknown>;
   const email = typeof body.email === "string" ? body.email : "";

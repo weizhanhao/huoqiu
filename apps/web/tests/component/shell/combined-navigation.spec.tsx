@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { DesktopShell } from "../../../src/components/shell/desktop-shell";
 
@@ -17,11 +17,10 @@ const channelMarkup = (activeChannel: "briefing" | "news"): string => {
   );
 };
 
-const mobileMarkup = (
-  activeUtility: "notifications" | "profile" | "settings",
-): string => {
+const mobileMarkup = (pathname: string): string => {
+  currentPathname = pathname;
   const shellMarkup = renderToStaticMarkup(
-    <DesktopShell activeUtility={activeUtility}>
+    <DesktopShell>
       <p>页面内容</p>
     </DesktopShell>,
   );
@@ -33,14 +32,24 @@ const mobileMarkup = (
   );
 };
 
-const utilityShellMarkup = (
-  activeUtility: "notifications" | "profile" | "settings",
-): string =>
-  renderToStaticMarkup(
-    <DesktopShell activeUtility={activeUtility}>
+const utilityShellMarkup = (pathname: string): string => {
+  currentPathname = pathname;
+  return renderToStaticMarkup(
+    <DesktopShell activeUtility="profile">
       <p>页面内容</p>
     </DesktopShell>,
   );
+};
+
+/*
+ * 导航选中态现在由地址决定，不再由页面传 activePrimary——原先那个参数
+ * /markets/rankings 传成了 "markets"，人站在涨跌榜上点亮的是「行情」。
+ * 所以这里改成设定地址，而不是传参数。
+ */
+let currentPathname = "/";
+vi.mock("next/navigation", () => ({
+  usePathname: () => currentPathname,
+}));
 
 describe("combined profile and finance navigation", () => {
   it("gives 7x24 and news distinct deep links with exactly one current channel", () => {
@@ -61,12 +70,16 @@ describe("combined profile and finance navigation", () => {
   });
 
   it("keeps five mobile items and groups profile, settings, and messages under My", () => {
-    for (const activeUtility of [
-      "notifications",
-      "profile",
-      "settings",
-    ] as const) {
-      const mobileNavigation = mobileMarkup(activeUtility);
+    /*
+     * 消息、设置、个人主页在移动端都归到「我的」底下——底栏只有五格，
+     * 这三页各占一格的话，行情类入口就得让位。
+     */
+    for (const pathname of [
+      "/notifications",
+      "/users/acct_demo",
+      "/settings",
+    ]) {
+      const mobileNavigation = mobileMarkup(pathname);
 
       expect(mobileNavigation.match(/<a\b/gu)).toHaveLength(5);
       // 未登录态的「我的」落到 /login，不再写死内置样本用户。
@@ -82,6 +95,10 @@ describe("combined profile and finance navigation", () => {
        */
       expect(mobileNavigation).not.toContain("条未读通知");
       expect(mobileNavigation).not.toContain('href="/notifications"');
+      /*
+       * 这三页都归在「我的」这一格下，所以点亮的都是它；未登录时它的
+       * 链接落在 /login。
+       */
       expect(mobileNavigation.match(/aria-current="page"/gu)).toHaveLength(1);
       expect(mobileNavigation).toMatch(
         /<a aria-current="page"[^>]*href="\/login"/u,
@@ -90,9 +107,9 @@ describe("combined profile and finance navigation", () => {
   });
 
   it("exposes profile and settings as real desktop utility routes", () => {
-    const profileShell = utilityShellMarkup("profile");
-    const settingsShell = utilityShellMarkup("settings");
-    const notificationsShell = utilityShellMarkup("notifications");
+    const profileShell = utilityShellMarkup("/users/acct_demo");
+    const settingsShell = utilityShellMarkup("/settings");
+    const notificationsShell = utilityShellMarkup("/notifications");
 
     /*
      * 三处「我的」入口——侧栏身份区、侧栏「我的主页」、移动端底栏——
@@ -139,11 +156,11 @@ describe("combined profile and finance navigation", () => {
       watchlist: "/watchlist",
     } as const;
 
-    for (const [activePrimary, href] of Object.entries(destinations)) {
+    for (const [, href] of Object.entries(destinations)) {
+      /* 「我的」未登录时落在 /login，但地址是 /users/<id> 才算停在它上面。 */
+      currentPathname = href === "/login" ? "/users/acct_demo" : href;
       const shellMarkup = renderToStaticMarkup(
-        <DesktopShell
-          activePrimary={activePrimary as keyof typeof destinations}
-        >
+        <DesktopShell>
           <p>页面内容</p>
         </DesktopShell>,
       );
@@ -165,17 +182,23 @@ describe("combined profile and finance navigation", () => {
 
   it("keeps the desktop primary navigation aligned with the active surface", () => {
     const destinations = {
+      bookmarks: "/bookmarks",
       home: "/",
       markets: "/markets",
+      /*
+        涨跌榜是这次出问题的那一条：它在 /markets 之下，按短前缀算会把
+        「行情」点亮，而人明明站在涨跌榜上。
+      */
+      rankings: "/markets/rankings",
       portfolios: "/portfolios",
+      studio: "/studio",
       watchlist: "/watchlist",
     } as const;
 
-    for (const [activePrimary, href] of Object.entries(destinations)) {
+    for (const [, href] of Object.entries(destinations)) {
+      currentPathname = href;
       const shellMarkup = renderToStaticMarkup(
-        <DesktopShell
-          activePrimary={activePrimary as keyof typeof destinations}
-        >
+        <DesktopShell>
           <p>页面内容</p>
         </DesktopShell>,
       );

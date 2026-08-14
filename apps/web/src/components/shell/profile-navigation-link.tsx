@@ -23,9 +23,7 @@ import { NotificationUnreadBadge } from "./notification-navigation-link";
  * 本人主页」就得连 React context 一起搭起来，仓库里没有一个测试这么做过，
  * 于是登录态那一半始终没有测试看着。纯函数没有这个门槛。
  */
-export function profileHref(
-  account: Readonly<{ id: string }> | null,
-): string {
+export function profileHref(account: Readonly<{ id: string }> | null): string {
   return account === null ? "/login" : `/users/${account.id}`;
 }
 

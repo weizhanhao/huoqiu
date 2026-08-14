@@ -1,9 +1,18 @@
 import { readFileSync } from "node:fs";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { DesktopShell } from "../../../src/components/shell/desktop-shell";
+
+/*
+ * 导航选中态由地址决定，不再由页面传参——原先 /markets/rankings 传成
+ * "markets"，人站在涨跌榜上点亮的是「行情」。所以这里设定地址而不是传参数。
+ */
+let currentPathname = "/";
+vi.mock("next/navigation", () => ({
+  usePathname: () => currentPathname,
+}));
 
 const renderShell = (): string =>
   renderToStaticMarkup(
@@ -19,12 +28,14 @@ const renderActiveShell = (activeChannel: "home" | "watchlist"): string =>
     </DesktopShell>,
   );
 
-const renderNotificationShell = (): string =>
-  renderToStaticMarkup(
+const renderNotificationShell = (): string => {
+  currentPathname = "/notifications";
+  return renderToStaticMarkup(
     <DesktopShell activeUtility="notifications">
       <p>页面内容</p>
     </DesktopShell>,
   );
+};
 
 describe("financial community web shell", () => {
   it("renders semantic header, centered content, and both desktop sidebars", () => {
@@ -174,9 +185,9 @@ describe("financial community web shell", () => {
      * 六个入口不变，但其中四个侧栏子链接现在带 ?category= 直达对应分类——
      * 过去它们全部指向同一个默认视图。正则放宽到允许查询串，计数不变。
      */
-    expect(
-      markup.match(/href="\/notifications(?:\?[^"]*)?"/gu),
-    ).toHaveLength(6);
+    expect(markup.match(/href="\/notifications(?:\?[^"]*)?"/gu)).toHaveLength(
+      6,
+    );
     expect(markup).toContain('href="/notifications?category=replies"');
     /*
      * 「我的」不再写死到内置样本用户：已登录指向本人主页，未登录指向 /login。
@@ -197,12 +208,16 @@ describe("financial community web shell", () => {
   it("marks desktop notifications and mobile My current on the notification route", () => {
     const markup = renderNotificationShell();
 
+    /* 顶栏与侧栏各一条「消息」，停在通知页时两条都要标出来。 */
     expect(
       markup.match(
         /<a[^>]*aria-current="page"[^>]*href="\/notifications"[^>]*>/gu,
       ),
     ).toHaveLength(2);
-    // 未登录态下「我的」落到 /login，当前页标记必须跟着走到那条链接上。
+    /*
+     * 移动端底栏只有五格，消息归在「我的」那一格下；未登录时它落到 /login，
+     * 当前页标记必须跟着走到那条链接上。
+     */
     expect(markup).toMatch(
       /<a[^>]*aria-current="page"[^>]*href="\/login"[^>]*>/u,
     );

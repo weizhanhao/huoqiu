@@ -23,7 +23,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     payload = await request.json();
   } catch {
-    return NextResponse.json({ error: "请求体不是合法 JSON。" }, { status: 400 });
+    return NextResponse.json(
+      { error: "请求体不是合法 JSON。" },
+      { status: 400 },
+    );
   }
 
   const body = payload as Record<string, unknown>;
@@ -39,7 +42,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "密码至少 12 位。" }, { status: 400 });
   }
   if (displayName.trim().length === 0 || displayName.length > 80) {
-    return NextResponse.json({ error: "显示名需要 1–80 个字符。" }, { status: 400 });
+    return NextResponse.json(
+      { error: "显示名需要 1–80 个字符。" },
+      { status: 400 },
+    );
   }
 
   // 限流放在写库之前：先挡住，别让被挡下的请求也去动存储。
@@ -80,8 +86,5 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 503 },
     );
   }
-  return NextResponse.json(
-    { account: result.account, token },
-    { status: 201 },
-  );
+  return NextResponse.json({ account: result.account, token }, { status: 201 });
 }

@@ -26,14 +26,16 @@ const topics = (): readonly Topic[] => {
       counts.set(tag, (counts.get(tag) ?? 0) + 1);
     }
   }
-  return [...counts.entries()]
-    .map(([tag, count]) => ({ count, tag }))
-    /* 记录多的排前面；一样多时按名字排，免得每次构建顺序都不一样。 */
-    .sort((left, right) =>
-      right.count === left.count
-        ? left.tag.localeCompare(right.tag, "zh-CN")
-        : right.count - left.count,
-    );
+  return (
+    [...counts.entries()]
+      .map(([tag, count]) => ({ count, tag }))
+      /* 记录多的排前面；一样多时按名字排，免得每次构建顺序都不一样。 */
+      .sort((left, right) =>
+        right.count === left.count
+          ? left.tag.localeCompare(right.tag, "zh-CN")
+          : right.count - left.count,
+      )
+  );
 };
 
 export default function TopicsPage() {

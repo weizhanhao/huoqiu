@@ -18,6 +18,15 @@ import { createPortfolio } from "../../../src/server/portfolio-store";
 import { registerAccount } from "../../../src/server/social-store";
 import { D0WatchlistProvider } from "../../../src/stores/d0-watchlist";
 
+/*
+ * 导航选中态由地址决定（见 src/components/shell/active-nav.ts），所以这里
+ * 设定地址再渲染，而不是往壳里传参数。
+ */
+let currentPathname = "/";
+vi.mock("next/navigation", () => ({
+  usePathname: () => currentPathname,
+}));
+
 const renderRoute = (children: ReactNode): string =>
   renderToStaticMarkup(
     <D0WatchlistProvider
@@ -30,7 +39,15 @@ const renderRoute = (children: ReactNode): string =>
 const extractNavigation = (markup: string, pattern: RegExp): string =>
   pattern.exec(markup)?.[1] ?? "";
 
-const expectPrimaryDestination = (markup: string, href: string): void => {
+/*
+ * 移动端底栏只有五格，二级页归在它所属的那一格下（涨跌榜归「行情」、
+ * 组合详情归「组合」）；侧栏则有自己的条目，要精确到当前这一条。
+ */
+const expectPrimaryDestination = (
+  markup: string,
+  href: string,
+  mobileHref: string = href,
+): void => {
   const desktopNavigation = extractNavigation(
     markup,
     /<nav aria-label="主导航">([\s\S]*?)<\/nav>/u,
@@ -39,16 +56,18 @@ const expectPrimaryDestination = (markup: string, href: string): void => {
     markup,
     /<nav class="mobile-bottom-nav"[^>]*>([\s\S]*?)<\/nav>/u,
   );
-  const escapedHref = href.replaceAll("/", "\\/");
-  const currentDestination = new RegExp(
-    `<a[^>]*(?:aria-current="page"[^>]*href="${escapedHref}"|href="${escapedHref}"[^>]*aria-current="page")`,
-    "u",
-  );
+  const current = (target: string): RegExp => {
+    const escaped = target.replaceAll("/", "\\/");
+    return new RegExp(
+      `<a[^>]*(?:aria-current="page"[^>]*href="${escaped}"|href="${escaped}"[^>]*aria-current="page")`,
+      "u",
+    );
+  };
 
   expect(desktopNavigation.match(/aria-current="page"/gu)).toHaveLength(1);
-  expect(desktopNavigation).toMatch(currentDestination);
+  expect(desktopNavigation).toMatch(current(href));
   expect(mobileNavigation.match(/aria-current="page"/gu)).toHaveLength(1);
-  expect(mobileNavigation).toMatch(currentDestination);
+  expect(mobileNavigation).toMatch(current(mobileHref));
 };
 
 /*
@@ -94,7 +113,9 @@ const makeRealPortfolio = (): string => {
 
 describe("market and portfolio route shell truth", () => {
   it("keeps market dashboards and rankings current in both navigation layers", async () => {
+    currentPathname = "/markets";
     expectPrimaryDestination(renderRoute(<MarketsPage />), "/markets");
+
     /*
      * 榜单页现在读 ?market= / ?direction= 做深链，所以是 async 且要
      * searchParams——不给的话它在解构那一步就抛了。
@@ -102,7 +123,18 @@ describe("market and portfolio route shell truth", () => {
     const rankings = await MarketRankingsPage({
       searchParams: Promise.resolve({}),
     });
-    expectPrimaryDestination(renderRoute(rankings), "/markets");
+
+    /*
+     * 这条断言原先要求涨跌榜把「行情」标成当前项——那正是用户报的那个 bug：
+     * 「点了页面过去了，但是导航栏的选中状态并不是选中的页面」。侧栏里
+     * 涨跌榜是独立一条，就该亮它自己；移动端底栏没有这一格，归在「行情」下。
+     */
+    currentPathname = "/markets/rankings";
+    expectPrimaryDestination(
+      renderRoute(rankings),
+      "/markets/rankings",
+      "/markets",
+    );
   });
 
   it("gives instrument detail its own page instead of a community surface", async () => {
@@ -139,7 +171,11 @@ describe("market and portfolio route shell truth", () => {
       params: Promise.resolve({ portfolioId: makeRealPortfolio() }),
     });
 
+    currentPathname = "/portfolios";
     expectPrimaryDestination(renderRoute(<PortfoliosPage />), "/portfolios");
+
+    /* 组合详情仍归在「组合」这一条下——它是那一节里的一页。 */
+    currentPathname = "/portfolios/pf_example";
     expectPrimaryDestination(renderRoute(portfolioDetail), "/portfolios");
   });
 });

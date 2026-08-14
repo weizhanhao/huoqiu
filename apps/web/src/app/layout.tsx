@@ -30,7 +30,9 @@ export default function RootLayout({ children }: RootLayoutProperties) {
    * 点开就是 404 的东西。
    */
   const knownListingIds = [
-    ...new Set((loadKlineSnapshot()?.series ?? []).map((series) => series.symbol)),
+    ...new Set(
+      (loadKlineSnapshot()?.series ?? []).map((series) => series.symbol),
+    ),
   ];
 
   return (
@@ -56,19 +58,19 @@ export default function RootLayout({ children }: RootLayoutProperties) {
       <body>
         <AccountSessionProvider>
           <ProfileSessionProvider>
-          <NotificationSessionProvider>
-            <D0WatchlistProvider knownListingIds={knownListingIds}>
-              <SessionPostsProvider>
-                <WatchlistGroupsProvider>
-                  {/*
+            <NotificationSessionProvider>
+              <D0WatchlistProvider knownListingIds={knownListingIds}>
+                <SessionPostsProvider>
+                  <WatchlistGroupsProvider>
+                    {/*
                     只说自选。消息、资料和组合都已经跟着账号落盘了，
                     继续写「刷新后重置」等于告诉用户他刚改的东西保不住。
                   */}
-                  {children}
-                </WatchlistGroupsProvider>
-              </SessionPostsProvider>
-            </D0WatchlistProvider>
-          </NotificationSessionProvider>
+                    {children}
+                  </WatchlistGroupsProvider>
+                </SessionPostsProvider>
+              </D0WatchlistProvider>
+            </NotificationSessionProvider>
           </ProfileSessionProvider>
         </AccountSessionProvider>
       </body>

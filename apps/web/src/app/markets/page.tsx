@@ -25,7 +25,7 @@ export default function MarketsPage() {
   const snapshot = loadKlineSnapshot();
 
   return (
-    <DesktopShell activePrimary="markets">
+    <DesktopShell>
       {/*
         概览放在最前面，因为该页的 <h1> 在它里面。
         此前八张 K 线卡的 <h3> 排在 h1 之前——靠标题导航的人要先听完八只
@@ -62,7 +62,6 @@ export default function MarketsPage() {
           </InstrumentLink>
         ))
       )}
-
     </DesktopShell>
   );
 }

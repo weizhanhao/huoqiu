@@ -78,7 +78,9 @@ export function RailHotPosts() {
                   真实数据里确实有标题为空的帖子，读屏会念成「链接」，
                   用户既不知道它去哪，也没法在列表里定位它。
                 */}
-                <strong>{post.title.trim() === "" ? "无标题" : post.title}</strong>
+                <strong>
+                  {post.title.trim() === "" ? "无标题" : post.title}
+                </strong>
               </Link>
             </li>
           ))}

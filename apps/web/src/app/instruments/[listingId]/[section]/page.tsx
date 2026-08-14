@@ -25,9 +25,7 @@ import {
   TicksSection,
 } from "../../../../features/real-finance/tick-sections";
 import styles from "../../../../features/real-finance/instrument-section.module.css";
-import {
-  findInstrumentSection,
-} from "../../../../features/real-finance/instrument-sections";
+import { findInstrumentSection } from "../../../../features/real-finance/instrument-sections";
 import {
   loadCompanyExecutives,
   loadCompanyProfile,
@@ -161,7 +159,10 @@ const loadSectionContent = async (
     return { flow, kind: "ticks", value };
   }
   if (slug === "executives") {
-    return { kind: "executives", value: await loadCompanyExecutives(listingId) };
+    return {
+      kind: "executives",
+      value: await loadCompanyExecutives(listingId),
+    };
   }
   if (slug === "insider-trades") {
     return { kind: "insider", value: await loadInsiderTrades(listingId) };
@@ -332,21 +333,21 @@ export default async function InstrumentSectionPage({
      * DOM 节点，容器宽度稍有出入就是一次硬跳。
      */
     <div className={styles.content}>
-        {/*
+      {/*
           分区名是这一页的副标题，不是另一个 h1——一页两个 h1，靠标题
           导航的人分不清哪个才是主体。
         */}
-        <h2 className={styles.heading}>{section.label}</h2>
+      <h2 className={styles.heading}>{section.label}</h2>
 
-        <SectionBody content={content} slug={section.slug} />
+      <SectionBody content={content} slug={section.slug} />
 
-        <p className={styles.disclosure}>
-          {content.kind === "executives"
-            ? "资料来源：新浪财经公开 F10 页面"
-            : content.kind === "statement" || content.kind === "forecast"
-              ? "资料来源：东方财富数据中心公开接口"
-              : "资料来源：东方财富公开 F10 接口"}{" "}
-          · 按公司披露口径，非实时，不构成投资建议。
+      <p className={styles.disclosure}>
+        {content.kind === "executives"
+          ? "资料来源：新浪财经公开 F10 页面"
+          : content.kind === "statement" || content.kind === "forecast"
+            ? "资料来源：东方财富数据中心公开接口"
+            : "资料来源：东方财富公开 F10 接口"}{" "}
+        · 按公司披露口径，非实时，不构成投资建议。
       </p>
     </div>
   );

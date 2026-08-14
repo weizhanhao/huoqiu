@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { SidebarAccount } from "../../features/account/sidebar-account";
@@ -10,18 +9,13 @@ import { RailHotFunds } from "./rail-hot-funds";
 import { RailHotPosts } from "./rail-hot-posts";
 import { PageState } from "../system/page-state";
 import { type ActiveChannel, ChannelNavigation } from "./channel-navigation";
-import {
-  type ActivePrimary,
-  MobileBottomNavigation,
-} from "./mobile-bottom-navigation";
-import { NotificationNavigationLink } from "./notification-navigation-link";
+import { MobileBottomNavigation } from "./mobile-bottom-navigation";
+import { SidebarNavigation } from "./sidebar-navigation";
 import { SiteTopbar } from "./site-topbar";
 import { PublishDialog } from "../../features/publish/publish-dialog";
-import { SidebarProfileLink } from "./profile-navigation-link";
 
 type DesktopShellProperties = Readonly<{
   activeChannel?: ActiveChannel | undefined;
-  activePrimary?: ActivePrimary | undefined;
   activeUtility?: "notifications" | "profile" | "settings" | undefined;
   children: ReactNode;
   fixtureResult?: D0FixtureLoadResult;
@@ -30,7 +24,6 @@ type DesktopShellProperties = Readonly<{
 
 export function DesktopShell({
   activeChannel,
-  activePrimary,
   activeUtility,
   children,
   fixtureResult = loadD0Fixture(),
@@ -39,19 +32,11 @@ export function DesktopShell({
   const fixture = fixtureResult.status === "ready" ? fixtureResult.data : null;
   // 真实汇率：服务端读本地快照，浏览器不直连第三方。
   const fx = loadFxSnapshot();
-  const notificationsActive = activeUtility === "notifications";
-  const profilePageActive = activeUtility === "profile";
+  /*
+   * 只影响版面：消息、设置、个人主页这几页用更窄的正文栏。
+   * 导航选中态不再看它——那由各导航组件按地址自己算。
+   */
   const profileActive = activeUtility !== undefined;
-  const settingsActive = activeUtility === "settings";
-  const resolvedActivePrimary =
-    activePrimary ??
-    (profileActive
-      ? "profile"
-      : activeChannel === "watchlist"
-        ? "watchlist"
-        : activeChannel === undefined
-          ? undefined
-          : "home");
 
   return (
     <div
@@ -59,10 +44,7 @@ export function DesktopShell({
         profileActive ? " d0-app-shell-notifications" : ""
       }`}
     >
-      <SiteTopbar
-        notificationsActive={notificationsActive}
-        settingsActive={settingsActive}
-      />
+      <SiteTopbar />
 
       <div className="d0-layout">
         <aside className="d0-sidebar" aria-label="用户与主导航">
@@ -72,155 +54,7 @@ export function DesktopShell({
 
           <PublishDialog className="sidebar-publish">＋ 发帖</PublishDialog>
 
-          <nav aria-label="主导航">
-            <p className="sidebar-group-label">行情</p>
-            <Link
-              aria-current={
-                resolvedActivePrimary === "home" ? "page" : undefined
-              }
-              href="/"
-            >
-              <span aria-hidden="true" className="nav-icon">
-                ⌂
-              </span>
-              首页
-            </Link>
-            <Link
-              aria-current={
-                resolvedActivePrimary === "watchlist" ? "page" : undefined
-              }
-              href="/watchlist"
-            >
-              <span aria-hidden="true" className="nav-icon">
-                ☆
-              </span>
-              自选
-            </Link>
-            <Link
-              aria-current={
-                resolvedActivePrimary === "markets" ? "page" : undefined
-              }
-              href="/markets"
-            >
-              <span aria-hidden="true" className="nav-icon">
-                ⌁
-              </span>
-              行情
-            </Link>
-            {/*
-              涨跌榜与选股器此前只有路由、导航里一个入口都没有——两页都是
-              真实行情，却只能靠手输地址到达。雪球把它们摆在行情这一组里。
-            */}
-            <Link href="/markets/rankings">
-              <span aria-hidden="true" className="nav-icon">
-                ⇅
-              </span>
-              涨跌榜
-            </Link>
-            <Link href="/screener">
-              <span aria-hidden="true" className="nav-icon">
-                ⋔
-              </span>
-              选股器
-            </Link>
-            <Link href="/funds">
-              <span aria-hidden="true" className="nav-icon">
-                ◇
-              </span>
-              基金
-            </Link>
-            <Link href="/etfs">
-              <span aria-hidden="true" className="nav-icon">
-                ◈
-              </span>
-              ETF
-            </Link>
-            <Link href="/private-funds">
-              <span aria-hidden="true" className="nav-icon">
-                ♦
-              </span>
-              私募
-            </Link>
-
-            <p className="sidebar-group-label">我的</p>
-            <Link
-              aria-current={
-                resolvedActivePrimary === "portfolios" ? "page" : undefined
-              }
-              href="/portfolios"
-            >
-              <span aria-hidden="true" className="nav-icon">
-                ◫
-              </span>
-              组合
-            </Link>
-            {/*
-              雪球顶栏的「交易」是券商对接，需要牌照与真实资金通道，做不了；
-              它同样有「模拟交易」，那个能真做——价格用真实行情，盈亏照真实
-              价格算，只有钱是虚拟的。这里放的是后者，并且写明是模拟。
-            */}
-            <Link href="/trade">
-              <span aria-hidden="true" className="nav-icon">
-                ⇄
-              </span>
-              模拟交易
-            </Link>
-            <SidebarProfileLink active={profilePageActive} />
-            {/*
-              收藏此前只是个人主页里的一个页签：得先进主页、再切页签才能看到，
-              左栏一个入口都没有。收藏本身是真的（按钮、bookmarks 表都在），
-              只是找不到——雪球把它摆在「我的」里。
-            */}
-            <Link href="/bookmarks">
-              <span aria-hidden="true" className="nav-icon">
-                ☆
-              </span>
-              收藏
-            </Link>
-            {/*
-              创作者中心此前从站内任何地方都点不到：草稿箱、内容管理、
-              数据中心全都做好了，只有直接敲地址才进得去。
-            */}
-            <Link href="/studio">
-              <span aria-hidden="true" className="nav-icon">
-                ✎
-              </span>
-              创作者中心
-            </Link>
-            <NotificationNavigationLink
-              active={notificationsActive}
-              variant="sidebar"
-            />
-            {/*
-              这四条过去全部指向 /notifications，点哪条都落到默认视图——
-              四个入口做同一件事，等于没做。现在各自带分类参数直达。
-            */}
-            <Link className="nav-sub" href="/notifications?category=replies">
-              回复
-            </Link>
-            <Link className="nav-sub" href="/notifications?category=mentions">
-              @ 我
-            </Link>
-            <Link className="nav-sub" href="/notifications?category=likes">
-              赞与收藏
-            </Link>
-            <Link className="nav-sub" href="/notifications?category=system">
-              系统消息
-            </Link>
-            {/* 私信是独立路由：它是账号之间的真实会话，不是通知流的一类。 */}
-            <Link className="nav-sub" href="/messages">
-              私信
-            </Link>
-            <Link
-              aria-current={settingsActive ? "page" : undefined}
-              href="/settings"
-            >
-              <span aria-hidden="true" className="nav-icon">
-                ⚙
-              </span>
-              设置
-            </Link>
-          </nav>
+          <SidebarNavigation />
 
           {/*
             这句话此前是「本地会话数据，刷新后重置」——而账号、帖子、评论、
@@ -330,7 +164,7 @@ export function DesktopShell({
         <span aria-hidden="true">＋</span>
       </PublishDialog>
 
-      <MobileBottomNavigation activePrimary={resolvedActivePrimary} />
+      <MobileBottomNavigation />
     </div>
   );
 }

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function PortfoliosPage() {
   return (
-    <DesktopShell activePrimary="portfolios">
+    <DesktopShell>
       {/*
         跟随账号保存的组合放在最前面：那是「我的东西」，
         下面的榜单是所有人的。此前组合只活在本次会话里，刷新就没了。

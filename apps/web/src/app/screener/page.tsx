@@ -58,7 +58,8 @@ const isMarket = (value: string | undefined): value is ScreenerMarket =>
 
 const single = (
   value: string | readonly string[] | undefined,
-): string | undefined => (Array.isArray(value) ? value[0] : (value as string | undefined));
+): string | undefined =>
+  Array.isArray(value) ? value[0] : (value as string | undefined);
 
 type Filters = Readonly<{
   ascending: boolean;
@@ -163,7 +164,7 @@ export default async function ScreenerPage({
       : Math.max(1, Math.ceil(result.total / PAGE_SIZE));
 
   return (
-    <DesktopShell activePrimary="markets">
+    <DesktopShell>
       <div className={styles.page}>
         <header className={styles.header}>
           <h1>火球选股器</h1>
