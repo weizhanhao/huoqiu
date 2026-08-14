@@ -87,7 +87,7 @@ export function InstrumentDiscussionComposer({
   };
 
   return (
-    <form className={styles.discussionComposer} onSubmit={submit}>
+    <form method="post" className={styles.discussionComposer} onSubmit={submit}>
       <label className="visually-hidden" htmlFor="instrument-discussion-body">
         对 {name} 的看法
       </label>

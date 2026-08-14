@@ -139,6 +139,7 @@ export function PrivateFundsHub() {
       </div>
 
       <form
+        method="post"
         className={styles.filters}
         onSubmit={(event) => {
           event.preventDefault();

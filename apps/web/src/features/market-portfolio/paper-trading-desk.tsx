@@ -205,6 +205,7 @@ export function PaperTradingDesk() {
             <span>按下单时的真实现价成交</span>
           </div>
           <form
+            method="post"
             className={styles.filters}
             onSubmit={(event) => void submit(event)}
           >

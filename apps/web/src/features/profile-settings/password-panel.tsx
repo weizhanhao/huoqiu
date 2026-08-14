@@ -86,7 +86,7 @@ export function PasswordPanel() {
           登录后修改密码
         </Link>
       ) : (
-        <form onSubmit={submit}>
+        <form method="post" onSubmit={submit}>
           {/* 截图里没有这一栏。加它是因为：不验旧口令，拿到会话就能改密码。 */}
           <div className={styles.formField}>
             <label htmlFor="current-password">当前密码</label>

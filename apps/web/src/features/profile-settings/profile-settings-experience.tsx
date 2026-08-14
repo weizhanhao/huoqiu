@@ -278,6 +278,7 @@ export function ProfilePageExperience() {
 
       {editing ? (
         <form
+          method="post"
           aria-label="编辑个人资料"
           className={styles.editor}
           onSubmit={submitProfile}

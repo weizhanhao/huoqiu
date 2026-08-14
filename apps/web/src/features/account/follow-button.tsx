@@ -56,7 +56,9 @@ export function FollowButton({
   return (
     <span className={styles.followSlot}>
       <button
-        aria-label={isFollowing ? `取消关注 ${targetName}` : `关注 ${targetName}`}
+        aria-label={
+          isFollowing ? `取消关注 ${targetName}` : `关注 ${targetName}`
+        }
         aria-pressed={isFollowing}
         className={styles.followButton}
         disabled={pending}

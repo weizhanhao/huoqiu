@@ -195,7 +195,11 @@ function CreatePortfolio({ onCreated }: Readonly<{ onCreated: () => void }>) {
   };
 
   return (
-    <form className="watchlist-quotes" onSubmit={(event) => void submit(event)}>
+    <form
+      method="post"
+      className="watchlist-quotes"
+      onSubmit={(event) => void submit(event)}
+    >
       <label htmlFor="portfolio-name">组合名称</label>
       <input
         id="portfolio-name"

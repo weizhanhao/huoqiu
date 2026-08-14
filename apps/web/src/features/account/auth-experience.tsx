@@ -183,7 +183,7 @@ export function AuthExperience({
           </p>
         </div>
 
-        <form className={styles.form} onSubmit={submit}>
+        <form method="post" className={styles.form} onSubmit={submit}>
           {isRegister ? (
             <label className={styles.field}>
               <span>显示名</span>

@@ -170,7 +170,11 @@ export function WatchlistPanel({
           ))}
         </nav>
 
-        <form className="watchlist-group-form" onSubmit={submitGroup}>
+        <form
+          method="post"
+          className="watchlist-group-form"
+          onSubmit={submitGroup}
+        >
           <label className="visually-hidden" htmlFor="watchlist-new-group">
             新建分组名称
           </label>

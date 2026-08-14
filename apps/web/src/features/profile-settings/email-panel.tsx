@@ -68,7 +68,11 @@ export function EmailPanel() {
   }
 
   return (
-    <form className={styles.form} onSubmit={(event) => void submit(event)}>
+    <form
+      method="post"
+      className={styles.form}
+      onSubmit={(event) => void submit(event)}
+    >
       <p className={styles.hint}>
         当前登录邮箱：<strong>{account.email}</strong>
       </p>

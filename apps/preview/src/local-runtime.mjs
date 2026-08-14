@@ -268,7 +268,15 @@ export const startLocalPreview = async (
     {
       cwd: dirname(dirname(webStartScript)),
       env: childEnvironmentFor(environment, hmacSecret),
-      stdio: "ignore",
+      /*
+       * 子进程的输出接到父进程上，而不是丢掉。
+       *
+       * 原先是 "ignore"：Next 的报错、堆栈、每一条请求日志全部消失。
+       * 本机开发时无所谓，装到服务器上就成了睁眼瞎——页面回 502，
+       * journalctl 里只有一行「PREVIEW_READY」，没有任何线索说明哪里炸了。
+       * 交给父进程之后，systemd 会把它们收进 journal。
+       */
+      stdio: "inherit",
     },
   );
 

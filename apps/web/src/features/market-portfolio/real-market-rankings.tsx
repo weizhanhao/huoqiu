@@ -140,7 +140,11 @@ export function RealMarketRankings({
       </header>
 
       <section className={styles.panel}>
-        <div aria-label="榜单市场切换" className={styles.segmented} role="group">
+        <div
+          aria-label="榜单市场切换"
+          className={styles.segmented}
+          role="group"
+        >
           {MARKETS.map((entry) => (
             <button
               aria-pressed={market === entry.id}
@@ -153,7 +157,11 @@ export function RealMarketRankings({
           ))}
         </div>
 
-        <div aria-label="榜单涨跌切换" className={styles.segmented} role="group">
+        <div
+          aria-label="榜单涨跌切换"
+          className={styles.segmented}
+          role="group"
+        >
           {DIRECTIONS.map((entry) => (
             <button
               aria-pressed={direction === entry.id}

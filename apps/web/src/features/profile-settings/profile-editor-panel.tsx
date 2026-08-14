@@ -136,7 +136,7 @@ export function ProfileEditorPanel() {
           登录后编辑资料
         </Link>
       ) : (
-        <form onSubmit={submit}>
+        <form method="post" onSubmit={submit}>
           <div className={styles.formField}>
             <label htmlFor="profile-display-name">昵称</label>
             <input

@@ -43,7 +43,9 @@ import {
  */
 const PAGE_SIZE = 8;
 
-const FIRST_POST_DETAIL: PostDetailView = getPostDetailView("post_syn_0001") ?? {
+const FIRST_POST_DETAIL: PostDetailView = getPostDetailView(
+  "post_syn_0001",
+) ?? {
   author: postDetail.author,
   authorId: postDetail.authorId,
   baselineCommentTotal: postDetail.baselineCommentTotal,
@@ -418,141 +420,150 @@ export function PostDetail({
       */}
       {realPostId === undefined ? (
         <section className={styles.detail} aria-labelledby="comments-heading">
-        <div className={styles.commentsHeading}>
-          <h2 id="comments-heading">评论</h2>
-          <div className={styles.commentSort} role="group" aria-label="评论排序">
-            {(
-              [
-                ["newest", "最新"],
-                ["likes", "最热"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                aria-pressed={commentSort === id}
-                key={id}
-                onClick={() => setCommentSort(id)}
-                type="button"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <span className={styles.meta}>
-            栏目 {fixedCommentCount} 条 · 本次会话 {sessionCommentCount} 条
-            · 回复：固定 {fixedReplyCount} / 会话 {sessionReplyCount} ·
-            会话新增内容刷新后重置
-          </span>
-        </div>
-        <form className={styles.composer} onSubmit={submitComment}>
-          <label htmlFor="new-comment">添加评论</label>
-          <textarea
-            id="new-comment"
-            onChange={(event) => setCommentBody(event.target.value)}
-            placeholder="写下你的评论"
-            value={commentBody}
-          />
-          <div className={styles.composerActions}>
-            <button className={styles.submit} type="submit">
-              发布评论
-            </button>
-            <span className={styles.disclosure}>
-              仅添加到本次会话，不会保存。
+          <div className={styles.commentsHeading}>
+            <h2 id="comments-heading">评论</h2>
+            <div
+              className={styles.commentSort}
+              role="group"
+              aria-label="评论排序"
+            >
+              {(
+                [
+                  ["newest", "最新"],
+                  ["likes", "最热"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  aria-pressed={commentSort === id}
+                  key={id}
+                  onClick={() => setCommentSort(id)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className={styles.meta}>
+              栏目 {fixedCommentCount} 条 · 本次会话 {sessionCommentCount} 条 ·
+              回复：固定 {fixedReplyCount} / 会话 {sessionReplyCount} ·
+              会话新增内容刷新后重置
             </span>
           </div>
-        </form>
-
-        {state.error ? (
-          <p className={styles.error} role="alert">
-            {state.error}
-          </p>
-        ) : null}
-        {state.status ? (
-          <p className={styles.notice} aria-live="polite">
-            {state.status}
-          </p>
-        ) : null}
-
-        <ol className={styles.commentList}>
-          {sortComments(state.comments, commentSort).map((comment) => (
-            <li
-              className={styles.comment}
-              data-content-origin={comment.origin}
-              data-testid={`${comment.origin}-comment`}
-              key={comment.id}
-            >
-              <div>
-                <h3>{comment.author}</h3>
-                <time className={styles.commentTime}>{comment.time}</time>
-                <span className={styles.originBadge}>
-                  {comment.origin === "fixed-synthetic"
-                    ? "栏目"
-                    : "本次会话"}
-                </span>
-              </div>
-              <p>{comment.body}</p>
-              {/* 这里原本是静态文本，和当初点不动的转发数是同一类问题。 */}
-              <button
-                aria-pressed={comment.liked === true}
-                className={styles.commentLikeButton}
-                onClick={() =>
-                  setState((current) => toggleCommentLike(current, comment.id))
-                }
-                type="button"
-              >
-                {comment.liked === true ? "已赞" : "赞"} {comment.likes}
+          <form
+            method="post"
+            className={styles.composer}
+            onSubmit={submitComment}
+          >
+            <label htmlFor="new-comment">添加评论</label>
+            <textarea
+              id="new-comment"
+              onChange={(event) => setCommentBody(event.target.value)}
+              placeholder="写下你的评论"
+              value={commentBody}
+            />
+            <div className={styles.composerActions}>
+              <button className={styles.submit} type="submit">
+                发布评论
               </button>
-              {comment.replies.length > 0 ? (
-                <ol
-                  className={styles.replyList}
-                  aria-label={`${comment.author} 的回复`}
-                >
-                  {comment.replies.map((reply) => (
-                    <li
-                      className={styles.reply}
-                      data-content-origin={reply.origin}
-                      data-testid={`${reply.origin}-reply`}
-                      key={reply.id}
-                    >
-                      <strong>{reply.author}</strong>
-                      <span className={styles.originBadge}>
-                        {reply.origin === "fixed-synthetic"
-                          ? "栏目"
-                          : "本次会话"}
-                      </span>
-                      <p>{reply.body}</p>
-                      <time className={styles.commentTime}>{reply.time}</time>
-                      <span className={styles.commentLikes}>
-                        {reply.likes} 个赞
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              ) : null}
-              <form
-                className={styles.replyComposer}
-                onSubmit={(event) => submitReply(event, comment.id)}
+              <span className={styles.disclosure}>
+                仅添加到本次会话，不会保存。
+              </span>
+            </div>
+          </form>
+
+          {state.error ? (
+            <p className={styles.error} role="alert">
+              {state.error}
+            </p>
+          ) : null}
+          {state.status ? (
+            <p className={styles.notice} aria-live="polite">
+              {state.status}
+            </p>
+          ) : null}
+
+          <ol className={styles.commentList}>
+            {sortComments(state.comments, commentSort).map((comment) => (
+              <li
+                className={styles.comment}
+                data-content-origin={comment.origin}
+                data-testid={`${comment.origin}-comment`}
+                key={comment.id}
               >
-                <label htmlFor={`reply-${comment.id}`}>
-                  回复 {comment.author}
-                </label>
-                <input
-                  id={`reply-${comment.id}`}
-                  onChange={(event) =>
-                    setReplyBodies((current) => ({
-                      ...current,
-                      [comment.id]: event.target.value,
-                    }))
+                <div>
+                  <h3>{comment.author}</h3>
+                  <time className={styles.commentTime}>{comment.time}</time>
+                  <span className={styles.originBadge}>
+                    {comment.origin === "fixed-synthetic" ? "栏目" : "本次会话"}
+                  </span>
+                </div>
+                <p>{comment.body}</p>
+                {/* 这里原本是静态文本，和当初点不动的转发数是同一类问题。 */}
+                <button
+                  aria-pressed={comment.liked === true}
+                  className={styles.commentLikeButton}
+                  onClick={() =>
+                    setState((current) =>
+                      toggleCommentLike(current, comment.id),
+                    )
                   }
-                  placeholder="写下回复"
-                  value={replyBodies[comment.id] ?? ""}
-                />
-                <button className={styles.action} type="submit">
-                  回复
+                  type="button"
+                >
+                  {comment.liked === true ? "已赞" : "赞"} {comment.likes}
                 </button>
-              </form>
-            </li>
-          ))}
-        </ol>
+                {comment.replies.length > 0 ? (
+                  <ol
+                    className={styles.replyList}
+                    aria-label={`${comment.author} 的回复`}
+                  >
+                    {comment.replies.map((reply) => (
+                      <li
+                        className={styles.reply}
+                        data-content-origin={reply.origin}
+                        data-testid={`${reply.origin}-reply`}
+                        key={reply.id}
+                      >
+                        <strong>{reply.author}</strong>
+                        <span className={styles.originBadge}>
+                          {reply.origin === "fixed-synthetic"
+                            ? "栏目"
+                            : "本次会话"}
+                        </span>
+                        <p>{reply.body}</p>
+                        <time className={styles.commentTime}>{reply.time}</time>
+                        <span className={styles.commentLikes}>
+                          {reply.likes} 个赞
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+                <form
+                  method="post"
+                  className={styles.replyComposer}
+                  onSubmit={(event) => submitReply(event, comment.id)}
+                >
+                  <label htmlFor={`reply-${comment.id}`}>
+                    回复 {comment.author}
+                  </label>
+                  <input
+                    id={`reply-${comment.id}`}
+                    onChange={(event) =>
+                      setReplyBodies((current) => ({
+                        ...current,
+                        [comment.id]: event.target.value,
+                      }))
+                    }
+                    placeholder="写下回复"
+                    value={replyBodies[comment.id] ?? ""}
+                  />
+                  <button className={styles.action} type="submit">
+                    回复
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ol>
         </section>
       ) : (
         <RealComments postId={realPostId} />
@@ -742,7 +753,7 @@ export function Publisher() {
         <p>草稿只会存在于本次会话；不会上传、保存或发布到真实社区。</p>
       </header>
 
-      <form className={styles.publisher} onSubmit={submit}>
+      <form method="post" className={styles.publisher} onSubmit={submit}>
         <div className={styles.modeTabs} aria-label="发布模式">
           <button
             aria-pressed={mode === "discussion"}
@@ -777,9 +788,7 @@ export function Publisher() {
           {mode === "article" ? "长文正文" : "讨论正文"}
           <textarea
             onChange={(event) => setBody(event.target.value)}
-            placeholder={
-              mode === "article" ? "写下长文正文" : "写下你的讨论"
-            }
+            placeholder={mode === "article" ? "写下长文正文" : "写下你的讨论"}
             value={body}
           />
         </label>

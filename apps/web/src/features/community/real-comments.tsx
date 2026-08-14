@@ -127,6 +127,7 @@ export function RealComments({ postId }: Readonly<{ postId: string }>) {
         </Link>
       ) : (
         <form
+          method="post"
           className={styles.commentForm}
           onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
@@ -188,6 +189,7 @@ export function RealComments({ postId }: Readonly<{ postId: string }>) {
 
             {replyTo === comment.id ? (
               <form
+                method="post"
                 onSubmit={(event: FormEvent<HTMLFormElement>) => {
                   event.preventDefault();
                   void submit(replyBody, comment.id);

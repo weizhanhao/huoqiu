@@ -221,7 +221,7 @@ export function MessagesExperience() {
           </p>
         </div>
 
-        <form className={styles.form} onSubmit={send}>
+        <form method="post" className={styles.form} onSubmit={send}>
           <label className={styles.field}>
             <span>收件人</span>
             <select

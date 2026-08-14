@@ -37,10 +37,7 @@ export function CommunityFeedCard({ card }: Readonly<{ card: FeedCard }>) {
         {author === undefined ? null : (
           <span className={styles.syntheticBadge}>栏目</span>
         )}
-        <BlockAuthorButton
-          authorId={card.authorId}
-          authorName={card.author}
-        />
+        <BlockAuthorButton authorId={card.authorId} authorName={card.author} />
       </header>
 
       <div className={styles.cardTitleRow}>
