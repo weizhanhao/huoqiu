@@ -1,0 +1,152 @@
+.header {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-4);
+  padding: var(--hq-spacing-4);
+}
+
+.priceRow {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-4);
+  justify-content: space-between;
+}
+
+.name {
+  align-items: baseline;
+  display: flex;
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-bold);
+  gap: var(--hq-spacing-2);
+}
+
+.symbol {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-regular);
+}
+
+.tradedAt {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 现价是这一页最重要的数字，给它最大的字号——
+ * 层级靠尺寸对比拉开，而不是靠加粗和颜色堆。
+ */
+.price {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+  gap: var(--hq-spacing-3);
+}
+
+.price strong {
+  font-size: var(--hq-type-size-data-hero);
+  font-weight: var(--hq-type-weight-bold);
+  letter-spacing: var(--hq-type-tracking-tight);
+  line-height: var(--hq-type-line-height-flat);
+}
+
+.price span {
+  font-size: var(--hq-type-size-data);
+}
+
+/*
+ * 涨跌配色走用户在「股票设置」里选的令牌，不硬编码红绿——
+ * 那一页允许把涨跌配色对调，写死就会和用户的选择相反。
+ */
+.up {
+  color: var(--hq-market-up-text);
+}
+
+.down {
+  color: var(--hq-market-down-text);
+}
+
+.stats {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  margin: 0;
+}
+
+.stats div {
+  display: grid;
+  gap: 2px;
+}
+
+.stats dt {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.stats dd {
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-data);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.book {
+  border-top: 1px solid var(--hq-border-subtle);
+  display: grid;
+  gap: var(--hq-spacing-2);
+  padding-top: var(--hq-spacing-3);
+}
+
+.bookTitle {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-medium);
+}
+
+.bookTable {
+  border-collapse: collapse;
+  font-size: var(--hq-type-size-body-compact);
+  width: 100%;
+}
+
+.bookTable th,
+.bookTable td {
+  padding: var(--hq-spacing-1) var(--hq-spacing-2);
+  text-align: left;
+}
+
+.bookTable thead th {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-regular);
+}
+
+.bookTable tbody th {
+  color: var(--hq-text-secondary);
+  font-weight: var(--hq-type-weight-regular);
+  width: 3.5em;
+}
+
+/*
+ * 卖盘与买盘之间加一条分隔线：五档盘口最容易读错的，
+ * 就是中间那道分界在哪一行。
+ */
+.bookTable tbody + tbody tr:first-child th,
+.bookTable tbody + tbody tr:first-child td {
+  border-top: 1px solid var(--hq-border-default);
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bookTable th.numeric,
+.bookTable td.numeric {
+  text-align: right;
+}

@@ -1,0 +1,168 @@
+/*
+ * 个股页的版面。
+ *
+ * 和社区那套壳的取舍完全相反：社区页要把人留在信息流里，所以左右两侧都是
+ * 别的内容；个股页只讲一只股票，两侧任何东西都是在跟主体抢注意力。
+ * 所以这里只留一条窄顶栏和一列分区导航，正文给到最宽。
+ */
+.shell {
+  background: var(--hq-surface-canvas);
+  min-height: 100vh;
+}
+
+/*
+ * 顶栏。
+ *
+ * 只保留「回得去」和「搜得了」两件事。社区壳那条顶栏还挂着消息、发布、
+ * 设置和环境标记——在个股页上，那些都是让人离开这只股票的入口。
+ */
+.topbar {
+  align-items: center;
+  background: var(--hq-surface-raised);
+  border-bottom: 1px solid var(--hq-border-default);
+  display: flex;
+  gap: var(--hq-spacing-5);
+  padding: var(--hq-spacing-3) var(--hq-spacing-5);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.brand {
+  align-items: center;
+  color: var(--hq-text-primary);
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--hq-spacing-2);
+  text-decoration: none;
+}
+
+.brandMark {
+  align-items: center;
+  background: var(--hq-brand-primary);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-brand-on-primary);
+  display: flex;
+  font-weight: var(--hq-type-weight-semibold);
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.brandWord {
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 3px;
+}
+
+/*
+ * 正文区：分区导航 / 正文 / 公司资料，三列。
+ *
+ * 三个 class 合并成一个 + 修饰符。此前是 .layout / .layoutWithRail /
+ * .layoutWide 三份，五条声明里重复四条，只有列定义和 max-width 不同——
+ * 于是两个 max-width 写歪了（1280 与 1440），左侧导航在切换分区时水平
+ * 跳一下。重复的代价从来不是多打几行字，是它们迟早会漂移。
+ *
+ * 右栏那一列**恒定占位**，不因上游取没取到而变。版面模式由标的类型决定，
+ * 不由数据可用性决定：F10 抖一下就换一次版面，比空着更难看。
+ */
+.layout {
+  display: grid;
+  gap: var(--hq-spacing-5);
+  grid-template-columns: 168px minmax(0, 1fr) 280px;
+  margin: 0 auto;
+  max-width: 1440px;
+  padding: var(--hq-spacing-5);
+}
+
+/* 指数与港美股没有分区导航，也没有 F10 右栏——单列铺满。 */
+.layoutWide {
+  display: grid;
+  gap: var(--hq-spacing-5);
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1440px;
+  padding: var(--hq-spacing-5);
+}
+
+.nav {
+  align-self: start;
+  position: sticky;
+  top: calc(var(--hq-spacing-5) + 56px);
+}
+
+@media (max-width: 1200px) {
+  /* 先砍右栏：行情本身比公司资料重要。 */
+  .layout {
+    grid-template-columns: 168px minmax(0, 1fr);
+  }
+
+  .layout > :nth-child(3) {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  /*
+   * 窄屏单列，分区导航排到正文下面。
+   *
+   * 这两条规则原先只写了两列那个 class，而 .nav 是裸类选择器、对三列
+   * 那个也生效——于是 800px 以下打开行情页，正文被挤进 168px 那一列，
+   * 导航反而撑满。合并成一个 class 之后这类漏网从根上没有了。
+   */
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .layout > .nav {
+    order: 2;
+    position: static;
+  }
+}
+
+.main {
+  align-content: start;
+  display: grid;
+  gap: var(--hq-spacing-4);
+  min-width: 0;
+}
+
+/*
+ * 名称行。
+ *
+ * 名字压过代码：找股票的人先认名字，代码是确认用的。
+ */
+.identity {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-3);
+  justify-content: space-between;
+}
+
+.name {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  gap: var(--hq-spacing-2);
+  line-height: var(--hq-type-line-height-flat);
+}
+
+.code {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-body-compact);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-regular);
+}
+
+.actions {
+  align-items: center;
+  display: flex;
+  gap: var(--hq-spacing-2);
+}

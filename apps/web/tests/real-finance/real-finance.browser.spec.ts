@@ -33,7 +33,16 @@ let page: Page;
 let vite: ChildProcess;
 
 const waitForHarness = async () => {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  /*
+   * 15 秒，不是 4 秒。
+   *
+   * 原先是 80 次 × 50ms。单独跑一个 spec 时绰绰有余，但全量跑时七个浏览器
+   * spec 各自 spawn 一个 Vite 和一个 Chrome，4 秒内绑不上端口的那一个就会
+   * 报「did not start」——每次轮到谁取决于调度顺序，看起来像随机抽风。
+   *
+   * 这不是偶发故障，是预算定得太短。hookTimeout 是 20 秒，这里留 5 秒余量。
+   */
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     try {
       const response = await fetch(baseUrl);
       if (response.ok) return;

@@ -30,14 +30,14 @@ export function PriceChart({
     return (
       <PageState
         state={state}
-        emptyMessage="暂无日 K 演示数据"
+        emptyMessage="暂无日 K 数据"
         errorMessage="日 K 演示数据校验失败"
       />
     );
   }
 
   if (points.length === 0) {
-    return <PageState state="empty" emptyMessage="暂无日 K 演示数据" />;
+    return <PageState state="empty" emptyMessage="暂无日 K 数据" />;
   }
 
   const lows = points.map((point) => toNumber(point.low));
@@ -57,7 +57,7 @@ export function PriceChart({
     <figure className="price-chart">
       <div className="chart-heading">
         <div>
-          <p className="card-kicker">20-DAY FIXTURE</p>
+          <p className="card-kicker">近 20 日</p>
           <h2>日 K 走势</h2>
         </div>
         <span>只读 · 1d</span>
@@ -69,7 +69,7 @@ export function PriceChart({
       >
         <title id="d0-chart-title">{`${instrumentName} 20 个日 K 点`}</title>
         <desc id="d0-chart-description">
-          固定合成数据的开盘、最高、最低、收盘与成交量图。上涨为红色，下跌为绿色。
+          固定样本数据的开盘、最高、最低、收盘与成交量图。上涨为红色，下跌为绿色。
         </desc>
         {[0, 1, 2, 3].map((index) => {
           const y = PRICE_TOP + (PRICE_HEIGHT / 3) * index;
@@ -148,7 +148,7 @@ export function PriceChart({
       </svg>
       <figcaption>
         <span>{points.length} 个日 K 点</span>
-        <span>成交量使用同一固定快照</span>
+        <span>成交量使用同一样本 · 非实时</span>
       </figcaption>
     </figure>
   );

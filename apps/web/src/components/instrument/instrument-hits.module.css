@@ -1,0 +1,79 @@
+/*
+ * 搜索页的标的结果。
+ *
+ * 一行一只，代码与分类压在名字下面：扫一列名字比扫一张表快，
+ * 而代码只在「同名两只」时才需要看。
+ */
+.panel {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-4);
+}
+
+.heading {
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.list {
+  display: grid;
+  gap: var(--hq-spacing-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  display: block;
+}
+
+/*
+ * 整行可点。只动背景色——它不触发重排，鼠标扫过一列时下面的行不会跟着动。
+ * 聚焦另给轮廓：键盘走到这里必须看得出停在哪一行。
+ */
+.link,
+.plain {
+  border-radius: var(--hq-radius-control);
+  color: inherit;
+  display: grid;
+  gap: 2px;
+  padding: var(--hq-spacing-2) var(--hq-spacing-3);
+  text-decoration: none;
+}
+
+.link:hover {
+  background: var(--hq-surface-sunken);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .link {
+    transition: background-color var(--hq-motion-duration-fast)
+      var(--hq-motion-ease-out);
+  }
+}
+
+.name {
+  font-size: var(--hq-type-size-body-compact);
+  font-weight: var(--hq-type-weight-medium);
+}
+
+/* 代码用等宽数字，两行代码上下对得齐。 */
+.meta {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 打不开的那几条不该看着像能点。 */
+.plain {
+  color: var(--hq-text-secondary);
+  cursor: default;
+}

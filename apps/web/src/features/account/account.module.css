@@ -1,0 +1,303 @@
+.page {
+  display: grid;
+  gap: var(--hq-spacing-4);
+}
+
+.card {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-4);
+  padding: var(--hq-spacing-5);
+}
+
+.heading {
+  display: grid;
+  gap: var(--hq-spacing-1);
+}
+
+.heading h1 {
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.heading p {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-body-compact);
+  line-height: var(--hq-type-line-height-body);
+}
+
+.form {
+  display: grid;
+  gap: var(--hq-spacing-3);
+}
+
+.field {
+  display: grid;
+  gap: var(--hq-spacing-1);
+}
+
+.field span {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-label-compact);
+}
+
+.field input {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  font: inherit;
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-3);
+  width: 100%;
+}
+
+.field input:focus-visible {
+  border-color: var(--hq-border-focus);
+  box-shadow: var(--hq-shadow-focus);
+  outline: none;
+}
+
+.hint {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.submit {
+  background: var(--hq-brand-primary);
+  border: 1px solid var(--hq-brand-primary);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-brand-on-primary);
+  font-weight: var(--hq-type-weight-semibold);
+  min-height: var(--hq-touch-web-minimum);
+  transition: background var(--hq-motion-duration-fast)
+    var(--hq-motion-ease-out);
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--hq-brand-primary-hover);
+}
+
+.submit:disabled {
+  color: var(--hq-text-disabled);
+  cursor: progress;
+}
+
+/*
+ * 状态行常驻。无消息时也占同样高度，出错时不会把下方内容顶下去——
+ * 这是「任何情况下不许抖动」的直接落实。
+ */
+.status {
+  align-items: center;
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  min-height: 20px;
+}
+
+.statusError {
+  color: var(--hq-market-down-text);
+}
+
+.statusOk {
+  color: var(--hq-market-up-text);
+}
+
+.switchLine {
+  border-top: 1px solid var(--hq-border-subtle);
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-body-compact);
+  padding-top: var(--hq-spacing-3);
+}
+
+.signedIn {
+  display: grid;
+  gap: var(--hq-spacing-3);
+}
+
+.signedInStats {
+  color: var(--hq-text-secondary);
+  display: flex;
+  font-size: var(--hq-type-size-body-compact);
+  font-variant-numeric: tabular-nums;
+  gap: var(--hq-spacing-4);
+}
+
+.signedInStats strong {
+  color: var(--hq-text-primary);
+}
+
+.secondary {
+  align-items: center;
+  align-self: start;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  display: inline-flex;
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
+}
+
+.secondary:hover {
+  border-color: var(--hq-border-strong);
+}
+
+/*
+ * 关注按钮固定最小宽度：「关注」「已关注」「处理中」字数不同，
+ * 若让按钮随文案伸缩，每次点击都会把同一行右侧的元素推一下。
+ */
+.followSlot {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--hq-spacing-2);
+}
+
+.followButton {
+  align-items: center;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-strong);
+  border-radius: var(--hq-radius-pill);
+  color: var(--hq-text-link);
+  display: inline-flex;
+  font-size: var(--hq-type-size-label-compact);
+  justify-content: center;
+  min-height: var(--hq-touch-web-minimum);
+  min-width: 6.5em;
+  padding: 0 var(--hq-spacing-3);
+  text-decoration: none;
+  transition: border-color var(--hq-motion-duration-fast)
+    var(--hq-motion-ease-out);
+}
+
+.followButton:hover {
+  border-color: var(--hq-text-link);
+}
+
+.followButton[aria-pressed="true"] {
+  color: var(--hq-text-secondary);
+}
+
+.followError {
+  color: var(--hq-market-down-text);
+  font-size: var(--hq-type-size-caption);
+}
+
+.profileHeader {
+  align-items: start;
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: auto 1fr auto;
+}
+
+.profileAvatar {
+  align-items: center;
+  background: var(--hq-brand-subtle);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 50%;
+  color: var(--hq-text-link);
+  display: inline-flex;
+  flex: 0 0 56px;
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-bold);
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+
+.profileMeta {
+  display: grid;
+  gap: var(--hq-spacing-1);
+  min-width: 0;
+}
+
+.profileMeta h1 {
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.profileRole {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.profileBio {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-body-compact);
+  line-height: var(--hq-type-line-height-body);
+}
+
+.focusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2);
+}
+
+.focusRow span {
+  background: var(--hq-surface-sunken);
+  border-radius: var(--hq-radius-chip);
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  padding: 2px var(--hq-spacing-2);
+}
+
+.postList {
+  display: grid;
+  gap: var(--hq-spacing-3);
+}
+
+.postRow {
+  border-top: 1px solid var(--hq-border-subtle);
+  display: grid;
+  gap: var(--hq-spacing-1);
+  padding-top: var(--hq-spacing-3);
+}
+
+.postRow a {
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.postRow p {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-body-compact);
+  line-height: var(--hq-type-line-height-body);
+}
+
+.postRow small {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.directory {
+  display: grid;
+  gap: var(--hq-spacing-2);
+}
+
+.directoryRow {
+  align-items: center;
+  border-top: 1px solid var(--hq-border-subtle);
+  display: flex;
+  gap: var(--hq-spacing-3);
+  justify-content: space-between;
+  min-height: var(--hq-touch-web-minimum);
+  padding-top: var(--hq-spacing-2);
+}
+
+.directoryRow > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.directoryRow strong {
+  font-size: var(--hq-type-size-label-compact);
+}
+
+.directoryRow small {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}

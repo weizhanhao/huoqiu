@@ -1,0 +1,60 @@
+/*
+ * 骨架。
+ *
+ * 微光只动 background-position——动 width 或 height 会让骨架自己制造位移，
+ * 而它本来是来消除位移的。
+ */
+.line {
+  background: linear-gradient(
+    90deg,
+    var(--hq-surface-sunken) 25%,
+    var(--hq-surface-subtle) 37%,
+    var(--hq-surface-sunken) 63%
+  );
+  background-size: 400% 100%;
+  border-radius: var(--hq-radius-control);
+  display: block;
+  height: 1em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .line {
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/*
+ * 卡片的内边距、圆角、边框必须和真实卡片同源。
+ *
+ * 差一条 1px 边框，五张卡就累计差 10px——骨架换成内容时抖第二次，
+ * 比不做骨架还糟。
+ */
+.card {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-4);
+}
+
+.rail {
+  display: grid;
+  gap: var(--hq-spacing-4);
+  min-width: 0;
+}
+
+.page {
+  display: grid;
+  gap: var(--hq-spacing-4);
+}

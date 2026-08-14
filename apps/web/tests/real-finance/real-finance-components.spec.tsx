@@ -128,7 +128,7 @@ describe("real finance presentational seam", () => {
       );
 
       expect(markup).toContain(message);
-      expect(markup).toContain("不会使用合成财经信息补位");
+      expect(markup).toContain("不会使用样本内容补位");
       expect(markup).not.toContain('class="undefined"');
       expect(markup).not.toContain(" undefined");
       expect(markup.includes('data-record-source="sec"')).toBe(keepsRecords);
@@ -145,7 +145,15 @@ describe("real finance presentational seam", () => {
     expect(markup).toContain('aria-label="2026-08-11 快讯"');
     expect(markup).toContain("测试公司 1 向 SEC 提交 Form 8-K");
     expect(markup).not.toContain("Global market source link 14");
-    expect(markup).toContain("最新 20 条真实来源记录");
+    // 页头改成「7×24 快讯」，申报记录降为其中一块，见组件里的说明。
+    expect(markup).toContain("7×24 快讯");
+    /*
+     * 「官方申报记录」这个小标题改成了「境外申报存档」：那份 SEC 快照是
+     * 美股申报，而这是 A 股站；它也不是实时的，靠采集任务定期刷新。
+     * A 股公告另起一块，走巨潮，实时。
+     */
+    expect(markup).toContain("上市公司公告");
+    expect(markup).toContain("境外申报存档");
     expect(markup).toContain('href="/news/sec-record-01"');
     expect(markup).toContain("查看站内详情");
     expect(markup).toMatch(/<time\b[^>]*dateTime=/u);

@@ -1,0 +1,83 @@
+.nav {
+  display: grid;
+  gap: var(--hq-spacing-4);
+}
+
+.group {
+  display: grid;
+  gap: var(--hq-spacing-1);
+}
+
+.groupTitle {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-semibold);
+  letter-spacing: var(--hq-type-tracking-normal);
+  padding: 0 var(--hq-spacing-2);
+}
+
+.list {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* 可达的项与「未实现」的项共享盒模型，只有交互与颜色不同。 */
+.item,
+.link {
+  align-items: center;
+  border-radius: var(--hq-radius-control);
+  display: flex;
+  font-size: var(--hq-type-size-body-compact);
+  gap: var(--hq-spacing-2);
+  justify-content: space-between;
+  line-height: var(--hq-type-line-height-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: var(--hq-spacing-2) var(--hq-spacing-3);
+}
+
+.link {
+  color: var(--hq-text-primary);
+  text-decoration: none;
+  transition: background-color var(--hq-motion-duration-fast)
+    var(--hq-motion-ease-out);
+}
+
+.link:hover {
+  background: var(--hq-surface-sunken);
+  color: var(--hq-text-link-hover);
+}
+
+.link:focus-visible {
+  box-shadow: var(--hq-shadow-focus);
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: -2px;
+}
+
+.current {
+  background: var(--hq-brand-subtle);
+  color: var(--hq-brand-primary);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+/*
+ * 「未实现」的项。
+ *
+ * 用不可交互的观感而不是可点的链接：点进去是空页面的东西，不该长得像能点。
+ */
+.planned {
+  color: var(--hq-text-disabled);
+  cursor: default;
+}
+
+.tag {
+  border: 1px solid var(--hq-border-subtle);
+  border-radius: var(--hq-radius-chip);
+  color: var(--hq-text-tertiary);
+  flex: none;
+  font-size: var(--hq-type-size-micro);
+  line-height: var(--hq-type-line-height-flat);
+  padding: 2px var(--hq-spacing-1);
+}

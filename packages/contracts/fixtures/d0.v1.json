@@ -19,8 +19,8 @@
       "instrument_id": "instrument_syn_0001",
       "listing_id": "listing_syn_0001",
       "symbol": "SYN001",
-      "name": "合成示例一号",
-      "pinyin": "hechengshiliyihao",
+      "name": "星海智造",
+      "pinyin": "xinghaizhizao",
       "aliases": ["合成一号", "synthetic one"],
       "market": "CN",
       "currency": "CNY",
@@ -219,9 +219,9 @@
         "visibility": "alpha-public"
       },
       "payload": {
-        "title": "合成行情",
+        "title": "样本行情",
         "listing_ids": ["listing_syn_0001"],
-        "notice": "演示数据，不构成投资建议"
+        "notice": "样本数据 · 非实时，不构成投资建议"
       }
     },
     {
@@ -238,7 +238,7 @@
         "author_id": "user_demo_0001",
         "author_name": "演示用户",
         "title": "合成市场的第一份观察",
-        "body": "本内容由固定 Fixture 生成，仅用于验证内容流功能。"
+        "body": "本内容为固定样本，仅用于验证内容流功能。"
       }
     },
     {
@@ -253,7 +253,7 @@
       },
       "payload": {
         "publisher": "火球演示资讯",
-        "title": "合成示例一号完成日内数据更新",
+        "title": "星海智造完成日内数据更新",
         "summary": "所有行情字段均来自离线演示数据，不连接外部数据源。"
       }
     }

@@ -2,6 +2,14 @@ export const notificationCategories = [
   { id: "replies", label: "回复我的", shortLabel: "回复" },
   { id: "mentions", label: "提到我的", shortLabel: "提及" },
   { id: "likes", label: "赞我的", shortLabel: "赞" },
+  /*
+   * 粉丝是真实事件，来自 follows 表。
+   *
+   * 加这一类不是为了凑数：关注这件事已经真实发生并落了盘，此前却没有任何
+   * 地方告诉被关注的人。「赞」和「@」相反——目前没有对应的真实数据，
+   * 那两类就让它空着，不造假条目去填。
+   */
+  { id: "follows", label: "新增粉丝", shortLabel: "粉丝" },
   { id: "system", label: "系统消息", shortLabel: "系统" },
 ] as const;
 
@@ -9,7 +17,12 @@ export type NotificationCategoryId =
   (typeof notificationCategories)[number]["id"];
 
 type NotificationLinkTarget = Readonly<{
-  href: "/community/posts/post_syn_0001" | "/instruments/listing_syn_0001";
+  /*
+   * 真实通知指向的是真实对象：/users/<账号 id>、/community/posts/<帖子 id>。
+   * 这些 id 在运行时才存在，没法像样本数据那样在编译期枚举成字面量联合，
+   * 所以这里放宽为 string。
+   */
+  href: string;
   kind: "link";
   label: string;
 }>;
@@ -41,7 +54,7 @@ export type SyntheticNotification = Readonly<{
 export const syntheticNotifications: readonly SyntheticNotification[] = [
   {
     action: "回复了你的讨论",
-    actor: { initials: "北", name: "合成作者 · 北岸观察员" },
+    actor: { initials: "北", name: "北岸观察员" },
     category: "replies",
     createdAt: "2026-08-10T10:18:00+08:00",
     id: "notification_syn_reply_0001",
@@ -50,13 +63,13 @@ export const syntheticNotifications: readonly SyntheticNotification[] = [
     target: {
       href: "/community/posts/post_syn_0001",
       kind: "link",
-      label: "合成市场午后观察",
+      label: "市场午后观察",
     },
     timeLabel: "08-10 10:18",
   },
   {
     action: "回复了你的评论",
-    actor: { initials: "静", name: "合成用户 · 静观样本" },
+    actor: { initials: "静", name: "静观样本" },
     category: "replies",
     createdAt: "2026-08-09T18:42:00+08:00",
     id: "notification_syn_reply_0002",
@@ -65,13 +78,13 @@ export const syntheticNotifications: readonly SyntheticNotification[] = [
     target: {
       href: "/community/posts/post_syn_0001",
       kind: "link",
-      label: "一份关于长期观察节奏的合成笔记",
+      label: "一份关于长期观察节奏的笔记",
     },
     timeLabel: "08-09 18:42",
   },
   {
     action: "在讨论中提到了你",
-    actor: { initials: "研", name: "合成用户 · 研报练习生" },
+    actor: { initials: "研", name: "研报练习生" },
     category: "mentions",
     createdAt: "2026-08-10T09:26:00+08:00",
     id: "notification_syn_mention_0001",
@@ -86,27 +99,31 @@ export const syntheticNotifications: readonly SyntheticNotification[] = [
   },
   {
     action: "在标的讨论中提到了你",
-    actor: { initials: "量", name: "合成用户 · 量能记录员" },
+    actor: { initials: "量", name: "量能记录员" },
     category: "mentions",
     createdAt: "2026-08-08T15:08:00+08:00",
     id: "notification_syn_mention_0002",
     isRead: true,
-    summary: "合成示例一号的固定快照已经补充，欢迎核对观察口径。",
+    /*
+     * 指向真实标的。这里原先链的是 /instruments/listing_syn_0001——
+     * 一个已经删掉的虚构公司，点开就是「没有找到这个页面」。
+     */
+    summary: "贵州茅台的区间统计已经补充，欢迎核对观察口径。",
     target: {
-      href: "/instruments/listing_syn_0001",
+      href: "/instruments/sh600519",
       kind: "link",
-      label: "合成示例一号",
+      label: "贵州茅台",
     },
     timeLabel: "08-08 15:08",
   },
   {
     action: "赞了你的讨论",
-    actor: { initials: "长", name: "合成用户 · 长线手记" },
+    actor: { initials: "长", name: "长线手记" },
     category: "likes",
     createdAt: "2026-08-10T08:54:00+08:00",
     id: "notification_syn_like_0001",
     isRead: false,
-    summary: "你的合成讨论《波动中的长期视角》收到了一次演示点赞。",
+    summary: "你的讨论《波动中的长期视角》收到了一次点赞。",
     target: {
       href: "/community/posts/post_syn_0001",
       kind: "link",
@@ -115,32 +132,32 @@ export const syntheticNotifications: readonly SyntheticNotification[] = [
     timeLabel: "08-10 08:54",
   },
   {
-    action: "更新了演示标的说明",
-    actor: { initials: "火", name: "火球演示助手" },
+    action: "更新了标的说明",
+    actor: { initials: "火", name: "火球助手" },
     category: "system",
     createdAt: "2026-08-10T08:00:00+08:00",
     id: "notification_syn_system_0001",
     isRead: false,
-    summary: "合成示例一号新增固定快照说明；数据仍为离线演示内容。",
+    summary: "贵州茅台新增成交明细与分价表；数据来自公开逐笔接口。",
     target: {
-      href: "/instruments/listing_syn_0001",
+      href: "/instruments/sh600519",
       kind: "link",
-      label: "查看演示标的",
+      label: "查看标的",
     },
     timeLabel: "08-10 08:00",
   },
   {
     action: "发送了一条对象状态提醒",
-    actor: { initials: "火", name: "火球演示助手" },
+    actor: { initials: "火", name: "火球助手" },
     category: "system",
     createdAt: "2026-08-09T12:30:00+08:00",
     id: "notification_syn_system_0002",
     isRead: false,
-    summary: "这条合成消息引用的演示对象已经移除，内容不再提供访问入口。",
+    summary: "这条消息引用的对象已经移除，内容不再提供访问入口。",
     target: {
       kind: "unavailable",
       label: "原对象已不可用",
-      reason: "演示对象已移除，没有可访问的详情页。",
+      reason: "引用对象已移除，没有可访问的详情页。",
     },
     timeLabel: "08-09 12:30",
   },

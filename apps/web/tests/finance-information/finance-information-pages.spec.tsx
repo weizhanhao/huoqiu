@@ -36,7 +36,7 @@ describe("finance information routes", () => {
     expect(markup).toContain("财经资讯");
     expect(markup).toContain('data-testid="real-finance-hub"');
     expect(markup).toContain("真实财经采集任务尚未生成公共快照");
-    expect(markup).toContain("不使用合成财经信息补位");
+    expect(markup).toContain("不使用样本内容补位");
     expect(markup).not.toContain("星港制造合成订单样本保持韧性");
   });
 
@@ -61,7 +61,19 @@ describe("finance information routes", () => {
     const markup = renderToStaticMarkup(await BriefingPage());
 
     expect(markup).toContain('data-testid="real-finance-briefing"');
-    expect(markup).toContain("最新 20 条真实来源记录");
+    /*
+     * 页头原先是「最新 20 条真实来源记录」。那一页现在分两块：上面是分钟级
+     * 实时快讯，下面才是这份官方申报记录——申报快照更新得慢，最新一条常常
+     * 是两天前的，而栏目名叫 7×24。
+     */
+    expect(markup).toContain("7×24 快讯");
+    /*
+     * 「官方申报记录」这个小标题改成了「境外申报存档」：那份 SEC 快照是
+     * 美股申报，而这是 A 股站；它也不是实时的，靠采集任务定期刷新。
+     * A 股公告另起一块，走巨潮，实时。
+     */
+    expect(markup).toContain("上市公司公告");
+    expect(markup).toContain("境外申报存档");
     expect(markup).toContain("真实财经采集任务尚未生成公共快照");
     expect(markup).not.toContain("7×24 合成快讯");
     expect(markup).not.toContain("brief_syn_afternoon_pulse");

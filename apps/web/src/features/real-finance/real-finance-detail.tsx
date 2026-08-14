@@ -45,7 +45,7 @@ export function RealFinanceDetail({ model }: RealFinanceDetailProperties) {
         >
           <h2>未找到这条真实财经记录</h2>
           <p>记录可能已从当前公共快照移除。</p>
-          <p>不会使用合成财经信息补位。</p>
+          <p>不会使用样本内容补位。</p>
         </section>
       )}
 

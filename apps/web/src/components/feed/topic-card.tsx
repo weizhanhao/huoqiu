@@ -11,7 +11,7 @@ type TopicCardProperties = Readonly<{
 export function TopicCard({ card }: TopicCardProperties) {
   return (
     <section className="feed-card compact-card">
-      <p className="card-kicker">TOPIC FIXTURE</p>
+      <p className="card-kicker">话题 · 演示数据</p>
       <h2>{readPayloadString(card.payload, "title", "演示话题")}</h2>
       <p>{readPayloadString(card.payload, "summary", "暂无话题摘要")}</p>
     </section>

@@ -51,7 +51,7 @@ describe("D0 mobile session watchlist", () => {
     );
 
     expect(markup.match(/SYN001/gu)).toHaveLength(1);
-    expect(markup).toContain("合成示例一号");
+    expect(markup).toContain("星海智造");
     expect(markup).toContain("108.64");
     expect(markup).toContain("移出自选");
     expect(markup).toContain("自选标的 1 个");

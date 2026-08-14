@@ -17,8 +17,8 @@ export const homeCommunityFeedCards: readonly FeedCard[] = [
     kind: "帖子",
     meta: "今天 10:05 · 128 赞 · 32 评论",
     publishedLabel: "今天 10:05",
-    tags: ["复盘方法", "合成笔记"],
-    title: "一份关于长期观察节奏的合成笔记",
+    tags: ["复盘方法", "笔记"],
+    title: "一份关于长期观察节奏的笔记",
   }),
   card({
     author: "慢变量笔记",
@@ -43,7 +43,7 @@ export const homeCommunityFeedCards: readonly FeedCard[] = [
     id: "media_syn_research_desk",
     kind: "图文占位",
     media: {
-      alt: "三张本地合成研究卡片占位图",
+      alt: "三张本地研究卡片占位图",
       label: "3 张本地占位图 · 无外部素材",
       type: "image-placeholder",
     },
@@ -74,7 +74,7 @@ export const homeCommunityFeedCards: readonly FeedCard[] = [
     id: "video_syn_roundtable",
     kind: "视频占位",
     media: {
-      alt: "合成研究圆桌视频封面占位",
+      alt: "研究圆桌视频封面占位",
       duration: "05:42",
       label: "本地视频封面占位 · 无真实媒体",
       type: "video-placeholder",
@@ -82,7 +82,7 @@ export const homeCommunityFeedCards: readonly FeedCard[] = [
     meta: "今天 09:15 · 05:42",
     publishedLabel: "今天 09:15",
     tags: ["圆桌占位", "研究习惯"],
-    title: "合成圆桌：哪些笔记值得长期保留",
+    title: "圆桌：哪些笔记值得长期保留",
   }),
   card({
     author: "北岸观察员",
@@ -121,7 +121,7 @@ export const homeCommunityFeedCards: readonly FeedCard[] = [
     id: "video_syn_0001",
     kind: "视频占位",
     media: {
-      alt: "ETF 合成观察框架视频封面占位",
+      alt: "ETF 观察框架视频封面占位",
       duration: "03:18",
       label: "视频封面占位 · 无真实产品与行情",
       type: "video-placeholder",

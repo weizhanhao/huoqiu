@@ -37,7 +37,16 @@ const openSettingsFromProfile = async () =>
   page.getByTestId("profile-page").getByRole("link", { name: "设置" }).click();
 
 const waitForHarness = async () => {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  /*
+   * 15 秒，不是 4 秒。
+   *
+   * 原先是 80 次 × 50ms。单独跑一个 spec 时绰绰有余，但全量跑时七个浏览器
+   * spec 各自 spawn 一个 Vite 和一个 Chrome，4 秒内绑不上端口的那一个就会
+   * 报「did not start」——每次轮到谁取决于调度顺序，看起来像随机抽风。
+   *
+   * 这不是偶发故障，是预算定得太短。hookTimeout 是 20 秒，这里留 5 秒余量。
+   */
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     try {
       const response = await fetch(baseUrl);
       if (response.ok) return;
@@ -95,7 +104,8 @@ describe("profile and settings in a real Chrome DOM", () => {
       .fill("  只记录可验证的合成信息。  ");
     await profile.getByRole("button", { name: "保存资料" }).click();
 
-    expect(await profile.getByRole("heading", { level: 2 }).textContent()).toBe(
+    // 主页标题升成了 h1：这一页整页原先没有 h1，读屏按 1 键跳不到主标题。
+    expect(await profile.getByRole("heading", { level: 1 }).textContent()).toBe(
       "火球研究员",
     );
     expect(
@@ -114,7 +124,15 @@ describe("profile and settings in a real Chrome DOM", () => {
 
     const settings = page.getByTestId("settings-page");
     expect(page.url()).toBe(`http://${host}:${port}/settings`);
-    expect(await settings.getByText("会话研究员").isVisible()).toBe(true);
+    /*
+     * 这里原先还断言设置页顶部会跟着显示刚改的「会话研究员」。那是旧行为
+     * 留下的耦合：那块资料当时读的是演示会话里的名字，于是任何人打开设置页
+     * 都会看到一份写死的身份和三个写死的数字。
+     *
+     * 现在它读的是真实登录账号——不会再跟着演示页上的会话内改名走。
+     * 演示身份仍然只留在 /users/user_demo_0001 那一页，本用例下面几条
+     * （统计开关、返回主页、刷新复位）测的正是那一页，照旧有效。
+     */
     const statsSwitch = settings.getByRole("switch", {
       name: "显示关注与粉丝统计",
     });
@@ -198,19 +216,27 @@ describe("profile and settings in a real Chrome DOM", () => {
         .getByRole("tab", { name: "收藏" })
         .getAttribute("aria-selected"),
     ).toBe("true");
-    expect(await profile.getByText("合成成长样本 SYN-A").isVisible()).toBe(
+    /*
+     * 收藏页签里那条原先叫「成长样本 SYN-A」，链接指向
+     * /instruments/listing_syn_0001——那只虚构标的早就删了，点进去 404。
+     * 现在指向一只真股票。这一条测的是键盘换页签，名字换了照样成立。
+     */
+    expect(await profile.getByText("贵州茅台").isVisible()).toBe(
       true,
     );
 
+    // 页签顺序：动态 → 收藏 → 关注 → 粉丝。「粉丝」是后加的，
+    // 所以 End 现在落在粉丝而不是关注。
     await profile.getByRole("tab", { name: "收藏" }).press("End");
     expect(
       await profile
-        .getByRole("tab", { name: "关注" })
+        .getByRole("tab", { name: "粉丝" })
         .getAttribute("aria-selected"),
     ).toBe("true");
-    expect(await profile.getByText("北岸观察员").isVisible()).toBe(true);
+    // 用粉丝面板独有的 meta 文案定位；作者名在关注与粉丝两个面板都出现。
+    expect(await profile.getByText("粉丝 · 今天").isVisible()).toBe(true);
 
-    await profile.getByRole("tab", { name: "关注" }).press("Home");
+    await profile.getByRole("tab", { name: "粉丝" }).press("Home");
     expect(await activity.getAttribute("aria-selected")).toBe("true");
     expect(await profile.getByText("本周公开数据观察清单").isVisible()).toBe(
       true,
@@ -238,9 +264,8 @@ describe("profile and settings in a real Chrome DOM", () => {
   it("keeps the settings kicker clear of its heading", async () => {
     await page.setViewportSize({ height: 900, width: 1440 });
     await openSettingsFromProfile();
-    const kickerBox = await page
-      .getByText("SESSION PREFERENCES / SYNTHETIC ACCOUNT")
-      .boundingBox();
+    // kicker 原先写「会话偏好 · 演示账号」，而这一页已接真实账号，文案已改。
+    const kickerBox = await page.getByText("账号与偏好").boundingBox();
     const headingBox = await page
       .getByRole("heading", { name: "设置", level: 2 })
       .boundingBox();

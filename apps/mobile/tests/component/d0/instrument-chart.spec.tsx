@@ -26,7 +26,7 @@ describe("D0 mobile instrument detail", () => {
       </D0WatchlistProvider>,
     );
 
-    expect(markup).toContain("合成示例一号");
+    expect(markup).toContain("星海智造");
     expect(markup).toContain("SYN001");
     expect(markup).toContain("108.64");
     expect(markup).toContain("CN · CNY · 交易中");

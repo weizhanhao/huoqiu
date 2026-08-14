@@ -45,6 +45,14 @@ const FORWARDED_REQUEST_HEADERS = [
   "if-none-match",
   "range",
   "user-agent",
+  /*
+   * 应用自己的会话令牌。
+   *
+   * 它不能走 Authorization——那个头被本网关用于接入鉴权（Basic），而且本来
+   * 就不在这份白名单里。缺了这一行，登录之后的每个请求都会被判为未登录，
+   * 且没有任何报错线索：令牌是在代理这一层被悄悄丢掉的。
+   */
+  "x-huoqiu-session",
 ];
 const FORWARDED_RESPONSE_HEADERS = [
   "accept-ranges",
@@ -55,6 +63,14 @@ const FORWARDED_RESPONSE_HEADERS = [
   "content-type",
   "etag",
   "last-modified",
+  /*
+   * 限流的等待时长。
+   *
+   * 应用在 429 上带了这个头，但它没在白名单里就会被本网关滤掉——客户端只
+   * 看到「稍后再试」，不知道是三秒还是五分钟，于是只能盲目重试，反而把
+   * 窗口一直顶满。
+   */
+  "retry-after",
   "vary",
   "x-content-type-options",
   "x-frame-options",

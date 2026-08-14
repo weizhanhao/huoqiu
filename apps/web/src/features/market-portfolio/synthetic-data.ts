@@ -2,7 +2,6 @@ export type ListingMarket = "CN" | "HK" | "US";
 export type MarketView = ListingMarket | "GLOBAL";
 export type RankingMarket = ListingMarket | "ALL";
 export type RankingDirection = "gainers" | "losers";
-export type PortfolioPeriod = "day" | "week" | "year";
 
 export type SyntheticListing = Readonly<{
   listingId: string;
@@ -21,7 +20,7 @@ export const syntheticListings = [
   {
     listingId: "listing_syn_0001",
     symbol: "SYN001",
-    name: "合成示例一号",
+    name: "星海智造",
     market: "CN",
     marketLabel: "A 股",
     currency: "CNY",
@@ -81,7 +80,7 @@ export const syntheticListings = [
   {
     listingId: "listing_syn_0006",
     symbol: "SYN006",
-    name: "纳斯达克合成云",
+    name: "纳斯达克云服务",
     market: "US",
     marketLabel: "美股",
     currency: "USD",
@@ -129,7 +128,7 @@ export const syntheticListings = [
   {
     listingId: "listing_syn_0010",
     symbol: "SYN010",
-    name: "合成医药",
+    name: "景元医药",
     market: "CN",
     marketLabel: "A 股",
     currency: "CNY",
@@ -202,13 +201,13 @@ export const marketIndices: Readonly<
       trend: [18, 16, 17, 13, 12, 8],
     },
     {
-      name: "合成科创 50",
+      name: "样本科创 50",
       price: "1,102.84",
       changePct: 2.14,
       trend: [19, 18, 14, 15, 10, 7],
     },
     {
-      name: "合成中小盘",
+      name: "样本中小盘",
       price: "6,731.09",
       changePct: -0.42,
       trend: [8, 10, 9, 13, 12, 16],
@@ -216,13 +215,13 @@ export const marketIndices: Readonly<
   ],
   HK: [
     {
-      name: "恒生合成指数",
+      name: "恒生样本指数",
       price: "25,186.40",
       changePct: 0.94,
       trend: [19, 16, 17, 12, 11, 8],
     },
     {
-      name: "港股合成科技",
+      name: "港股样本科技",
       price: "5,882.13",
       changePct: 1.73,
       trend: [20, 17, 13, 15, 9, 6],
@@ -242,7 +241,7 @@ export const marketIndices: Readonly<
       trend: [17, 15, 16, 12, 9, 7],
     },
     {
-      name: "合成科技综合",
+      name: "样本科技综合",
       price: "17,306.11",
       changePct: 1.39,
       trend: [20, 18, 15, 11, 12, 6],
@@ -262,13 +261,13 @@ export const marketIndices: Readonly<
       trend: [19, 17, 15, 13, 10, 7],
     },
     {
-      name: "全球合成成长",
+      name: "全球样本成长",
       price: "4,219.60",
       changePct: 1.46,
       trend: [21, 18, 14, 15, 9, 5],
     },
     {
-      name: "全球合成价值",
+      name: "全球样本价值",
       price: "3,768.24",
       changePct: -0.22,
       trend: [8, 10, 9, 11, 13, 15],
@@ -295,7 +294,7 @@ export const marketConcepts: Readonly<
 > = {
   CN: [
     { name: "先进制造", value: 3.8 },
-    { name: "合成算力", value: 2.9 },
+    { name: "样本算力", value: 2.9 },
     { name: "创新药", value: 1.7 },
   ],
   HK: [
@@ -323,116 +322,16 @@ export const marketMovements: Readonly<
     { at: "11:18", text: "澄明消费跌幅扩大至 2% 以上" },
   ],
   HK: [
-    { at: "15:26", text: "全球航运触及合成日内低位" },
+    { at: "15:26", text: "全球航运触及样本日内低位" },
     { at: "14:03", text: "香江科技热度升至市场前三" },
   ],
   US: [
-    { at: "10:14", text: "纳斯达克合成云涨幅超过 5%" },
-    { at: "09:51", text: "北美稳健出现合成波动提醒" },
+    { at: "10:14", text: "纳斯达克云服务涨幅超过 5%" },
+    { at: "09:51", text: "北美稳健出现样本波动提醒" },
   ],
   GLOBAL: [
-    { at: "15:26", text: "全球航运领跌合成观察池" },
+    { at: "15:26", text: "全球航运领跌样本观察池" },
     { at: "10:14", text: "全球成长方向热度继续抬升" },
   ],
 };
 
-export type SyntheticPortfolio = Readonly<{
-  portfolioId: string;
-  name: string;
-  owner: string;
-  summary: string;
-  returns: Readonly<Record<PortfolioPeriod, number>>;
-  direction: string;
-}>;
-
-export const syntheticPortfolios = [
-  {
-    portfolioId: "portfolio_syn_0001",
-    name: "稳健火种组合",
-    owner: "演示研究室",
-    summary: "制造、科技与防御方向的固定合成观察组合",
-    returns: { day: 1.28, week: 3.64, year: 18.42 },
-    direction: "偏多 · 68",
-  },
-  {
-    portfolioId: "portfolio_syn_0002",
-    name: "远望全球组合",
-    owner: "合成观察员",
-    summary: "跨市场成长方向的固定权重演示组合",
-    returns: { day: 0.76, week: 4.52, year: 24.8 },
-    direction: "积极 · 76",
-  },
-  {
-    portfolioId: "portfolio_syn_0003",
-    name: "逆风观察组合",
-    owner: "火球实验台",
-    summary: "用于观察波动与防御资产关系的演示组合",
-    returns: { day: -0.32, week: 1.15, year: 12.66 },
-    direction: "中性 · 51",
-  },
-] as const satisfies readonly SyntheticPortfolio[];
-
-export const portfolioHoldings = [
-  {
-    listingId: "listing_syn_0002",
-    name: "星港制造",
-    symbol: "SYN002",
-    weight: 28,
-    returnPct: 12.4,
-  },
-  {
-    listingId: "listing_syn_0004",
-    name: "香江科技",
-    symbol: "SYN004",
-    weight: 24,
-    returnPct: 8.7,
-  },
-  {
-    listingId: "listing_syn_0006",
-    name: "纳斯达克合成云",
-    symbol: "SYN006",
-    weight: 20,
-    returnPct: 15.2,
-  },
-  {
-    listingId: "listing_syn_0005",
-    name: "维港公用",
-    symbol: "SYN005",
-    weight: 16,
-    returnPct: -1.8,
-  },
-  {
-    listingId: "listing_syn_0010",
-    name: "合成医药",
-    symbol: "SYN010",
-    weight: 12,
-    returnPct: 3.1,
-  },
-] as const;
-
-export const portfolioCurve = [
-  100, 101, 99, 103, 106, 105, 109, 112, 111, 116, 118.42,
-] as const;
-
-export const rebalanceHistory = [
-  {
-    date: "2026-08-01",
-    action: "增持星港制造",
-    detail: "合成权重由 24% 调至 28%",
-  },
-  {
-    date: "2026-07-18",
-    action: "加入合成医药",
-    detail: "以 12% 合成权重纳入观察",
-  },
-  {
-    date: "2026-06-30",
-    action: "降低维港公用",
-    detail: "合成权重由 20% 调至 16%",
-  },
-  {
-    date: "2026-06-06",
-    action: "组合建立",
-    detail: "按固定演示权重生成初始持仓",
-  },
-] as const;

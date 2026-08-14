@@ -35,7 +35,16 @@ let resourceUrls: string[];
 let vite: ChildProcess;
 
 const waitForHarness = async () => {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  /*
+   * 15 秒，不是 4 秒。
+   *
+   * 原先是 80 次 × 50ms。单独跑一个 spec 时绰绰有余，但全量跑时七个浏览器
+   * spec 各自 spawn 一个 Vite 和一个 Chrome，4 秒内绑不上端口的那一个就会
+   * 报「did not start」——每次轮到谁取决于调度顺序，看起来像随机抽风。
+   *
+   * 这不是偶发故障，是预算定得太短。hookTimeout 是 20 秒，这里留 5 秒余量。
+   */
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     try {
       const response = await fetch(`${baseUrl}/community`);
       if (response.ok) return;
@@ -167,7 +176,17 @@ describe("dense synthetic community in a real Chrome DOM", () => {
     expect(browserErrors).toEqual([]);
   });
 
-  it("adds a session comment and nested reply to the prefilled discussion", async () => {
+  /*
+   * 这条用例原先验证的是「匿名也能评论」。
+   *
+   * 那条路径本身就是缺陷：会话内评论一律署名「火球演示用户」——真实账号
+   * 写下的评论挂着别人的名字，未登录访客发的评论则根本没人认领。现在未登录
+   * 会被拒绝并说明原因。
+   *
+   * 浏览器夹具里没有账号会话，能覆盖的就是未登录这一侧；「发成功且署名正确」
+   * 由 community-state.spec.ts 的单测守着。
+   */
+  it("refuses to post a comment while signed out instead of inventing an author", async () => {
     await page.goto(`${baseUrl}/community/posts/post_syn_0001`);
     const detail = page.getByTestId("community-post-detail");
 
@@ -181,21 +200,24 @@ describe("dense synthetic community in a real Chrome DOM", () => {
 
     await detail
       .getByRole("textbox", { name: "添加评论" })
-      .fill("这是一条新的合成会话评论。");
+      .fill("未登录时不该发得出去。");
     await detail.getByRole("button", { name: "发布评论" }).click();
-    expect(await detail.getByTestId("fixed-synthetic-comment").count()).toBe(7);
-    expect(await detail.getByTestId("session-local-comment").count()).toBe(1);
+
+    // 计数一动不动：不能有一条没人认领的评论悄悄进到列表里。
+    expect(await detail.getByTestId("session-local-comment").count()).toBe(0);
     expect(
       await detail.getByTestId("comment-count-summary").textContent(),
-    ).toBe("展示 8 条评论 / 页面基线共 32 条（含本次会话新增 1 条）");
+    ).toBe("展示 7 条评论 / 页面基线共 32 条");
+    // 而且必须说明为什么，不能点了没反应。
+    expect(await detail.textContent()).toContain("登录后才能发表评论。");
 
     const firstComment = detail.getByTestId("fixed-synthetic-comment").first();
     await firstComment
       .getByRole("textbox", { name: "回复 静观样本" })
-      .fill("补充一条新的合成回复。");
+      .fill("未登录时也不该回复得出去。");
     await firstComment.getByRole("button", { name: "回复" }).click();
-    expect(await detail.getByTestId("fixed-synthetic-reply").count()).toBe(6);
-    expect(await detail.getByTestId("session-local-reply").count()).toBe(1);
+    expect(await detail.getByTestId("session-local-reply").count()).toBe(0);
+    expect(await detail.textContent()).toContain("登录后才能回复评论。");
     expect(browserErrors).toEqual([]);
   });
 
@@ -205,7 +227,17 @@ describe("dense synthetic community in a real Chrome DOM", () => {
       "/community",
       "/community/posts/post_syn_0001",
     ]) {
-      await page.goto(`${baseUrl}${pathname}`);
+      /*
+       * 等到网络静默再量。
+       *
+       * 这里原本 goto 完就直接测量。Vite 的 CSS 模块是 JS 执行后才注入
+       * <style> 的，测量窗口一旦落在注入之前，量到的就是浏览器默认样式下的
+       * 按钮高度——曾经偶发地报出 42px，重跑又过。
+       *
+       * 偶尔通过的门禁等于没有门禁：它既会假报警，也会在真的违规时凑巧放行。
+       * 这里只是把测量点钉死，44 的阈值一个字没动。
+       */
+      await page.goto(`${baseUrl}${pathname}`, { waitUntil: "networkidle" });
       const controls = page.locator(
         '[data-testid^="community"] button, [data-testid^="community"] a, [data-testid^="community"] input, [data-testid^="community"] textarea, [data-testid="home-community-stream"] a',
       );

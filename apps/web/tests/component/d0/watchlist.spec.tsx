@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import RootLayout from "../../../src/app/layout";
 import { WatchlistPanel } from "../../../src/components/watchlist/watchlist-panel";
 import { WatchlistToggle } from "../../../src/components/watchlist/watchlist-toggle";
+import { loadKlineSnapshot } from "../../../src/features/real-finance/kline.server";
 import { loadD0Fixture } from "../../../src/lib/d0-fixture";
 import {
   createD0WatchlistState,
@@ -22,19 +23,24 @@ const readyFixture = () => {
 const renderWithWatchlist = (
   children: ReactNode,
   initialListingIds: readonly string[],
-) => {
-  const fixture = readyFixture();
-  return renderToStaticMarkup(
+  /*
+   * 认得哪些代码。默认取 D0 夹具，但真实标的的用例要自己传——
+   * createD0WatchlistState 会把不在这份清单里的 id 过滤掉，于是传一个真实
+   * 代码进来，面板会显示成空的，而那和「这个代码加不进自选」是两回事。
+   */
+  knownListingIds?: readonly string[],
+) =>
+  renderToStaticMarkup(
     <D0WatchlistProvider
-      knownListingIds={fixture.instruments.map(
-        (instrument) => instrument.listing_id,
-      )}
+      knownListingIds={
+        knownListingIds ??
+        readyFixture().instruments.map((instrument) => instrument.listing_id)
+      }
       initialListingIds={initialListingIds}
     >
       {children}
     </D0WatchlistProvider>,
   );
-};
 
 describe("D0 session watchlist", () => {
   it("normalizes initial state to unique, known listing IDs", () => {
@@ -48,26 +54,61 @@ describe("D0 session watchlist", () => {
 
   it("renders an explicit empty state before any listing is added", () => {
     const markup = renderWithWatchlist(
-      <WatchlistPanel fixture={readyFixture()} />,
+      <WatchlistPanel />,
       [],
     );
 
-    expect(markup).toContain("暂无自选标的");
+    // 空态与行情表那一条用同一句话；此前两条并存、措辞不一，读起来像两个功能。
+    expect(markup).toContain("还没有自选");
     expect(markup).toContain("仅在当前浏览会话中保存");
     expect(markup).not.toContain("SYN001");
   });
 
   it("renders stable quote identity and a removal control after add", () => {
+    /*
+     * 用真实标的。夹具标的的回落分支已经删掉了——可加自选的代码只剩
+     * 真实代码，加一个虚构 id 进来只会得到一份空列表。
+     */
+    const series = loadKlineSnapshot()?.series[0];
+    if (series === undefined) throw new Error("需要一个真实标的快照");
+    const latest = series.bars.at(-1);
+    const previous = series.bars.at(-2);
+    if (latest === undefined || previous === undefined) {
+      throw new Error("需要至少两根日线才能算涨跌幅");
+    }
+
     const markup = renderWithWatchlist(
-      <WatchlistPanel fixture={readyFixture()} />,
-      ["listing_syn_0001"],
+      <WatchlistPanel
+        realEntries={[
+          {
+            changePct: (
+              ((latest.close - previous.close) / previous.close) *
+              100
+            ).toFixed(2),
+            listingId: series.symbol,
+            market: series.market,
+            name: series.name,
+            price: latest.close.toFixed(2),
+            symbol: series.symbol,
+          },
+        ]}
+      />,
+      [series.symbol],
+      [series.symbol],
     );
 
     expect(markup).toContain("我的自选");
-    expect(markup).toContain("合成示例一号");
-    expect(markup).toContain("SYN001");
-    expect(markup).toContain("108.64");
-    expect(markup).toContain('href="/instruments/listing_syn_0001"');
+    /*
+     * 自选页上不该再挂「样本数据 · 非实时」。
+     *
+     * 这一页只有「哪几只在我的自选里」是会话内的，价格是向
+     * /api/market/quotes 实时取的真行情。那枚徽标把真数据说成了样本——
+     * 说自己更假，和说自己更真一样，都是不实。会话内保存这件事，
+     * 标题下面那句已经讲清楚了。
+     */
+    expect(markup).not.toContain("样本数据 · 非实时");
+    expect(markup).toContain(series.name);
+    expect(markup).toContain(`href="/instruments/${series.symbol}"`);
     expect(markup).toContain("移出自选");
   });
 
@@ -94,7 +135,15 @@ describe("D0 session watchlist", () => {
       </RootLayout>,
     );
 
+    /*
+     * 这条用例守的是「自选 Provider 挂在根布局上」——按钮能渲染出来，
+     * 就说明 context 拿得到。
+     *
+     * 原先还断言根布局里有一句「自选刷新后重置」的无障碍说明。那句话已经
+     * 移走了：它落在任何 landmark 之外，axe 在每一次页面加载上都报
+     * region 违规。同一句话在侧栏的 <aside> 里仍然有，位置也更合理。
+     */
     expect(markup).toContain("加自选");
-    expect(markup).toContain("仅当前会话");
+    expect(markup).not.toContain("自选刷新后重置");
   });
 });

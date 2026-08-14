@@ -1,0 +1,160 @@
+/*
+ * 个股页右栏。
+ *
+ * 这一栏是辅助材料，不该跟中间的行情抢注意力：卡片用低一层的表面色，
+ * 标题小一号，数字也不加粗到和主价一个分量。
+ */
+/*
+ * align-content 必须钉成 start。
+ *
+ * 这一栏是外层三列 grid 的子项，会被拉伸到跟中间那条很长的正文一样高；
+ * 而 grid 默认把多出来的高度摊给自动行，于是几张卡片之间、以及卡片内部
+ * 标题与正文之间，都会空出大片间距。个股页的标题行早先就栽过同一个坑。
+ */
+.rail {
+  align-content: start;
+  display: grid;
+  gap: var(--hq-spacing-4);
+  min-width: 0;
+}
+
+.card {
+  align-content: start;
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-4);
+}
+
+.heading {
+  align-items: baseline;
+  display: flex;
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+  gap: var(--hq-spacing-2);
+  justify-content: space-between;
+}
+
+.sector {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-regular);
+}
+
+/*
+ * 简介动辄上千字，右栏放不下。
+ *
+ * 限到八行截断——完整的一份在「公司简介」那一页，左边导航点得过去。
+ * 不做展开交互：这一栏是让人扫一眼知道这家公司做什么，不是让人读完。
+ *
+ * max-height 和 line-clamp 一起给：单靠 line-clamp，元素被 grid 拉高之后
+ * 会出现「第八行已经打了省略号、下面还继续渲染再被卡片切掉」的样子——
+ * 半个字悬在边缘，看着像渲染坏了。两者都写死，行数与高度就对得上。
+ */
+.profile {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  color: var(--hq-text-secondary);
+  display: -webkit-box;
+  font-size: var(--hq-type-size-body-compact);
+  line-height: var(--hq-type-line-height-body);
+  margin: 0;
+  max-height: calc(8 * var(--hq-type-line-height-body) * 1em);
+  overflow: hidden;
+}
+
+.list {
+  display: grid;
+  gap: var(--hq-spacing-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  align-items: baseline;
+  display: flex;
+  gap: var(--hq-spacing-3);
+  justify-content: space-between;
+  min-width: 0;
+}
+
+/* 名字与代码上下叠，右边留给价格——两列各自对齐，扫读时不用来回找。 */
+.peer {
+  color: inherit;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.peerName {
+  font-size: var(--hq-type-size-body-compact);
+  font-weight: var(--hq-type-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peerCode {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 数值列按字符数预留宽度。
+ *
+ * tabular-nums 只统一单个数字的宽度，不统一位数——9.99 → 10.01 多一个
+ * 字符，宽度照样变。这一列变宽，左边的名字列就被压缩，于是每 30 秒
+ * 刷新一次，股票名字的截断位置就换一次，省略号来回跳。
+ */
+.peerQuote {
+  display: grid;
+  flex-shrink: 0;
+  min-width: 9ch;
+  gap: 1px;
+  justify-items: end;
+  text-align: right;
+}
+
+.peerQuote strong {
+  font-size: var(--hq-type-size-body-compact);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-medium);
+}
+
+.peerQuote small {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+a.peer:hover .peerName {
+  text-decoration: underline;
+}
+
+a.peer:focus-visible {
+  border-radius: var(--hq-radius-control);
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}
+
+/*
+ * 涨跌色必须压过上面那条三级灰。
+ *
+ * .peerQuote small 是 (0,1,1)，.up 只有 (0,1,0)——灰色一直在赢，于是
+ * 「+20.01%」和「-1.40%」在屏上是同一个颜色。着色代码写了、也传了 class，
+ * 就是从来没生效过。这种失效不报错、不留痕，只能靠取计算样式发现。
+ */
+.peerQuote small.up,
+.up {
+  color: var(--hq-market-up-text);
+}
+
+.peerQuote small.down,
+.down {
+  color: var(--hq-market-down-text);
+}

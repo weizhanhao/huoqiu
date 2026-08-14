@@ -50,7 +50,25 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const SIGNATURE_PATTERN = /^v2=([0-9a-f]{64})$/u;
 const DEFAULT_EDGE_NONCE_CAPACITY = 4096;
 const MAX_SESSION_COOKIE_LENGTH = 4096;
+/*
+ * 请求体上限。
+ *
+ * 边界要把每个请求体完整读出来、按 UTF-8 解码、再扫一遍凭证，所以请求体
+ * 必须小——8 KB 是全站的默认值。
+ *
+ * 帖子配图再怎么压也不止 8 KB，所以给上传那一条路径单独放宽。放宽的只是
+ * **体积**：完整读取、UTF-8 解码、凭证扫描一样不少，其余路径也一律照旧。
+ * 全站抬高的话，每一条接口的边缘缓冲压力和被滥用的面都跟着变大，而那正是
+ * 这道上限本来要防的事。
+ */
 const MAX_INSPECTED_BODY_BYTES = 8 * 1024;
+
+/** 图片走 JSON + base64，base64 会把体积撑到约 4/3。 */
+const UPLOAD_PATH = "/api/social/uploads";
+const MAX_UPLOAD_BODY_BYTES = 700 * 1024;
+
+const inspectedBodyLimit = (pathname: string): number =>
+  pathname === UPLOAD_PATH ? MAX_UPLOAD_BODY_BYTES : MAX_INSPECTED_BODY_BYTES;
 const MAX_INSPECTED_BODY_NODES = 1024;
 const MAX_BODY_READ_MILLISECONDS = 1_000;
 const MAX_PERCENT_DECODE_PASSES = 4;
@@ -412,6 +430,7 @@ const failedBodyRead = (request: NextRequest): BodyReadResult => {
 };
 
 async function readBoundedBody(request: NextRequest): Promise<BodyReadResult> {
+  const limit = inspectedBodyLimit(request.nextUrl.pathname);
   const rawContentLength = request.headers.get("content-length");
   if (rawContentLength !== null) {
     if (!UNIX_SECONDS_PATTERN.test(rawContentLength)) {
@@ -420,7 +439,7 @@ async function readBoundedBody(request: NextRequest): Promise<BodyReadResult> {
     const contentLength = Number(rawContentLength);
     if (
       !Number.isSafeInteger(contentLength) ||
-      contentLength > MAX_INSPECTED_BODY_BYTES
+      contentLength > limit
     ) {
       return failedBodyRead(request);
     }
@@ -453,7 +472,7 @@ async function readBoundedBody(request: NextRequest): Promise<BodyReadResult> {
       }
       if (result.done) break;
       totalBytes += result.value.byteLength;
-      if (totalBytes > MAX_INSPECTED_BODY_BYTES) {
+      if (totalBytes > limit) {
         void reader.cancel().catch(() => undefined);
         return failedBodyRead(request);
       }

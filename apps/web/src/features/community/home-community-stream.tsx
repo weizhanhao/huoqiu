@@ -13,12 +13,12 @@ export function HomeCommunityStream() {
     >
       <header className={styles.streamHeading}>
         <div>
-          <p className={styles.eyebrow}>SYNTHETIC SOCIAL FEED</p>
+          <p className={styles.eyebrow}>社区内容</p>
           <h2 id="home-community-heading">社区热帖与长文</h2>
-          <p>固定合成用户内容、互动数与本地媒体占位，不含真实财经资讯。</p>
+          <p>栏目记录与用户内容，均为本地数据，不含真实财经资讯。</p>
         </div>
         <Link className={styles.streamLink} href="/community">
-          浏览完整合成社区
+          浏览完整社区
         </Link>
       </header>
       <div className={styles.feed}>

@@ -322,6 +322,68 @@ describe("Web Alpha boundary", () => {
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 
+  it("keeps the 8 KB body cap everywhere except the upload path", async () => {
+    /*
+     * 边界要把每个请求体完整读出来、按 UTF-8 解码、再扫一遍凭证，所以
+     * 请求体必须小——8 KB 就是这么来的。而帖子配图再怎么压也不止 8 KB。
+     *
+     * 放宽只给 /api/social/uploads 一条路径，且只放宽**体积**：完整读取、
+     * 解码、扫描一样不少。全站抬高上限的话，每一条接口的边缘缓冲压力和
+     * 被滥用的面都跟着变大，而那是这道上限本来要防的事。
+     *
+     * 两个方向都要守：上传路径放得进去，别的路径必须照旧挡住。只验前者的话，
+     * 哪天有人把上限改成全局的，这条用例照样绿。
+     */
+    const big = JSON.stringify({ data: "A".repeat(64 * 1024) });
+    const contentType = "application/json";
+
+    const upload = "/api/social/uploads";
+    const accepted = await enforce(
+      protectedRequest(upload, {
+        body: big,
+        headers: edgeHeadersFor(upload, {
+          body: big,
+          contentType,
+          requestMethod: "POST",
+        }),
+        method: "POST",
+      }),
+    );
+    expect(accepted.status).toBe(200);
+
+    const other = "/api/social/posts";
+    const rejected = await enforce(
+      protectedRequest(other, {
+        body: big,
+        headers: edgeHeadersFor(other, {
+          body: big,
+          contentType,
+          requestMethod: "POST",
+        }),
+        method: "POST",
+      }),
+    );
+    expect(rejected.status).toBe(401);
+  });
+
+  it("still caps the upload path so it cannot buffer without limit", async () => {
+    /* 放宽不是取消：超过上传上限的请求体照样挡在边界外。 */
+    const huge = JSON.stringify({ data: "A".repeat(900 * 1024) });
+    const upload = "/api/social/uploads";
+    const response = await enforce(
+      protectedRequest(upload, {
+        body: huge,
+        headers: edgeHeadersFor(upload, {
+          body: huge,
+          contentType: "application/json",
+          requestMethod: "POST",
+        }),
+        method: "POST",
+      }),
+    );
+    expect(response.status).toBe(401);
+  });
+
   it("binds a valid POST proof to the exact body and content type", async () => {
     const target = "/watchlist";
     const body = JSON.stringify({ note: "safe body" });

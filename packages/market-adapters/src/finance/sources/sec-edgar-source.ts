@@ -117,6 +117,8 @@ const primaryDocumentPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/u;
 const tickerPattern = /^[A-Z0-9][A-Z0-9.-]{0,15}$/u;
 const companyTickersFilePattern = /^company_tickers[A-Za-z0-9_-]*\.json$/u;
 const MAX_CURSOR_LENGTH = 2_048;
+/** 单次处理的最新申报条数上限。内存护栏，超出部分截断而不是拒绝整个响应。 */
+const MAX_RECENT_FILINGS = 1_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 5_000_000;
 const MAX_RESPONSE_BYTES = 10_000_000;
 
@@ -517,19 +519,28 @@ const parseFilingTable = (value: unknown): FilingTable => {
     forms.length,
     primaryDocuments.length,
   ];
-  if (
-    accessions.length > 1_000 ||
-    lengths.some((length) => length !== accessions.length)
-  ) {
+  // 六个平行数组长度必须一致：不一致说明响应本身错位，取任何一条都会把
+  // 甲文件的表单号配到乙文件的日期上。这是真正的完整性问题，必须拒绝。
+  if (lengths.some((length) => length !== accessions.length)) {
     throw invalidResponse("SEC EDGAR returned misaligned filing metadata");
   }
+
+  /*
+   * 条数上限只是内存护栏，不是契约断言。
+   *
+   * 原先超过 1000 条就整体抛 invalidResponse——实测苹果的 recent 有 1001 条，
+   * 于是整家公司被判为不可用，而微软的 1000 条正好压线通过。
+   * 一家公司多报一份文件不该让它整个消失，所以改为取最新的 1000 条
+   * （SEC 的 recent 按时间倒序，前 1000 条即最新的 1000 条）。
+   */
+  const limit = Math.min(accessions.length, MAX_RECENT_FILINGS);
   return {
-    accessions,
-    filingDates,
-    reportDates,
-    acceptedAt,
-    forms,
-    primaryDocuments,
+    accessions: accessions.slice(0, limit),
+    acceptedAt: acceptedAt.slice(0, limit),
+    filingDates: filingDates.slice(0, limit),
+    forms: forms.slice(0, limit),
+    primaryDocuments: primaryDocuments.slice(0, limit),
+    reportDates: reportDates.slice(0, limit),
   };
 };
 
@@ -624,11 +635,25 @@ const parseCurrentSubmissions = (
   if (new Set(historyNames).size !== historyNames.length) {
     throw invalidResponse("SEC EDGAR returned duplicate historical paths");
   }
-  const nextCursor =
-    historyNames.length === 0 ? undefined : historyNames.join(":");
-  if (nextCursor !== undefined && nextCursor.length > MAX_CURSOR_LENGTH) {
-    throw invalidResponse("SEC EDGAR historical cursor exceeds the byte limit");
+  /*
+   * 历史分片游标放不下时降级，而不是拒绝整个发行人。
+   *
+   * 游标是把历史申报分片的文件名拼起来做分页用的。摩根大通这类高频申报的
+   * 机构分片非常多，拼出来的游标超过长度上限——原实现直接抛
+   * invalid-response，于是这家公司一条记录都拿不到。
+   *
+   * 但游标只影响「能否继续翻历史」，不影响本次已经取到的最新申报。放不下
+   * 就只保留能装下的前几片；实在一片都装不下就不提供历史分页。
+   * 用户看到的是「有最新申报、翻不了太久以前」，而不是「这家公司不存在」。
+   */
+  const fittingHistory: string[] = [];
+  for (const name of historyNames) {
+    const candidate = [...fittingHistory, name].join(":");
+    if (candidate.length > MAX_CURSOR_LENGTH) break;
+    fittingHistory.push(name);
   }
+  const nextCursor =
+    fittingHistory.length === 0 ? undefined : fittingHistory.join(":");
 
   return {
     records,

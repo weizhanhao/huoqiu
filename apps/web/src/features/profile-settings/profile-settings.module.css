@@ -31,80 +31,52 @@
   outline: 2px solid transparent;
 }
 
+/*
+ * 个人主页 / 设置的页头。
+ * 原来是渐变蓝 + 220px 最小高度 + 装饰圆环 + 倾斜投影头像，
+ * 一屏里最重的视觉全给了「这是谁」，而这页真正的内容是下面的资料和开关。
+ * 现在退回白底描边，头像收成 40px 方圆角。
+ */
 .profileHero,
 .settingsHero {
-  background:
-    radial-gradient(circle at 88% 10%, rgb(255 255 255 / 18%), transparent 28%),
-    linear-gradient(
-      135deg,
-      #0756a6 0%,
-      var(--hq-brand-primary) 58%,
-      #3d91e7 100%
-    );
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
-  box-shadow: var(--hq-shadow-card);
-  color: var(--hq-text-inverse);
+  color: var(--hq-text-primary);
   min-width: 0;
-  overflow: hidden;
-  position: relative;
-}
-
-.profileHero::after,
-.settingsHero::after {
-  border: 34px solid rgb(255 255 255 / 10%);
-  border-radius: 50%;
-  content: "";
-  height: 170px;
-  pointer-events: none;
-  position: absolute;
-  right: -72px;
-  top: -94px;
-  width: 170px;
 }
 
 .profileHero {
   align-items: center;
   display: grid;
-  gap: 20px;
+  gap: var(--hq-spacing-3);
   grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 220px;
-  padding: 64px 28px 28px;
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
 }
 
 .heroKicker,
 .sectionLabel {
-  font-family: var(--hq-type-family-mono);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-medium);
 }
 
 .heroKicker {
-  color: var(--hq-text-inverse-muted);
-  left: 28px;
-  position: absolute;
-  right: 28px;
-  top: 24px;
-  z-index: 1;
+  grid-column: 1 / -1;
 }
 
 .avatar {
   align-items: center;
-  background: rgb(255 255 255 / 94%);
-  border: 4px solid rgb(255 255 255 / 25%);
-  border-radius: 28px;
-  box-shadow: 0 16px 28px rgb(0 35 76 / 20%);
-  color: var(--hq-brand-primary);
+  background: var(--hq-brand-subtle);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  color: var(--hq-text-link);
   display: flex;
-  font-size: 34px;
-  font-weight: 800;
-  height: 86px;
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-bold);
+  height: 40px;
   justify-content: center;
-  position: relative;
-  transform: rotate(-4deg);
-  width: 86px;
-  z-index: 1;
+  width: 40px;
 }
 
 .profileIdentity {
@@ -117,26 +89,24 @@
 
 .profileIdentity h2,
 .settingsHero h2 {
-  font-size: clamp(30px, 4vw, 44px);
-  letter-spacing: -0.045em;
-  line-height: 1.08;
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  letter-spacing: var(--hq-type-tracking-tight);
+  line-height: var(--hq-type-line-height-compact);
 }
 
 .identityLabel,
 .handle {
-  color: var(--hq-text-inverse-muted);
-  font-size: 13px;
-}
-
-.handle {
-  font-family: var(--hq-type-family-mono);
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
 }
 
 .bio {
-  color: var(--hq-text-inverse-muted);
-  line-height: 1.55;
-  margin-top: 5px;
-  max-width: 560px;
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-label-compact);
+  line-height: var(--hq-type-line-height-snug);
+  margin-top: var(--hq-spacing-1);
+  max-width: 60ch;
   overflow-wrap: anywhere;
 }
 
@@ -163,22 +133,38 @@
   text-decoration: none;
 }
 
+/*
+ * 页头里的主行动。原来是「白底白边蓝字」——只在深色 hero 上成立，
+ * 页头改白底后会整个消失。改成实心蓝。
+ */
 .primaryButton {
-  background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-base);
-  color: var(--hq-brand-primary);
+  background: var(--hq-brand-primary);
+  border: 1px solid var(--hq-brand-primary);
+  color: var(--hq-brand-on-primary);
 }
 
+.primaryButton:hover {
+  background: var(--hq-brand-primary-hover);
+  border-color: var(--hq-brand-primary-hover);
+  color: var(--hq-brand-on-primary);
+}
+
+/* 页头里的次级入口。页头已改白底，这里跟着退成描边幽灵按钮。 */
 .inverseLink {
-  background: rgb(4 36 72 / 34%);
-  border: 1px solid rgb(255 255 255 / 36%);
-  color: var(--hq-text-inverse);
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-strong);
+  color: var(--hq-text-secondary);
+}
+
+.inverseLink:hover {
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
 }
 
 .secondaryButton,
 .restoreButton {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   color: var(--hq-text-secondary);
 }
 
@@ -196,7 +182,7 @@
 
 .statCard {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   box-shadow: var(--hq-shadow-card);
   display: grid;
@@ -214,7 +200,7 @@
 .statCard dd,
 .summaryStats dd {
   color: var(--hq-text-primary);
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 20px;
   font-weight: 750;
   margin: 0;
@@ -223,7 +209,7 @@
 .disclosure {
   align-items: center;
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-left: 4px solid var(--hq-brand-primary);
   border-radius: var(--hq-radius-card);
   display: grid;
@@ -262,7 +248,7 @@
 .settingsCard,
 .sessionSummary {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   box-shadow: var(--hq-shadow-card);
   min-width: 0;
@@ -316,14 +302,14 @@
 
 .fieldHeading span {
   color: var(--hq-text-tertiary);
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
 
 .formField input,
 .formField textarea {
   background: var(--hq-surface-subtle);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-control);
   color: var(--hq-text-primary);
   padding: 10px 12px;
@@ -415,7 +401,7 @@
 }
 
 .tabs {
-  border-bottom: 1px solid var(--hq-surface-divider);
+  border-bottom: 1px solid var(--hq-border-default);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -480,17 +466,28 @@
 
 .contentMeta {
   color: var(--hq-brand-primary);
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 700;
 }
 
+/*
+ * kicker 曾经是绝对定位在页头左上角的，所以这里用 64px 上内边距给它让位。
+ * 现在它是普通流元素：改成可换行的 flex，让 kicker 独占第一行
+ * （靠 .heroKicker 的 flex-basis: 100%），标题与右侧入口再排第二行。
+ * 保持 kicker 底边不越过标题顶边——这条由 profile-settings.browser.spec.ts 守住。
+ */
 .settingsHero {
-  align-items: end;
+  align-items: baseline;
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2) var(--hq-spacing-4);
   justify-content: space-between;
-  min-height: 190px;
-  padding: 64px 28px 28px;
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+}
+
+.settingsHero > .heroKicker {
+  flex: 0 0 100%;
 }
 
 .settingsHeroCopy {
@@ -502,8 +499,9 @@
 }
 
 .settingsHeroCopy > p:last-child {
-  color: var(--hq-text-inverse-muted);
-  line-height: 1.5;
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-snug);
 }
 
 .settingsHero > .inverseLink {
@@ -532,7 +530,7 @@
 
 .sessionIdentity > span {
   color: var(--hq-text-tertiary);
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
 }
 
@@ -554,7 +552,7 @@
 .preferenceRow,
 .unavailableRow {
   align-items: center;
-  border-top: 1px solid var(--hq-surface-divider);
+  border-top: 1px solid var(--hq-border-default);
   display: flex;
   gap: 18px;
   justify-content: space-between;
@@ -579,7 +577,7 @@
 
 .switchControl {
   background: var(--hq-surface-subtle);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: 999px;
   color: var(--hq-text-secondary);
   cursor: pointer;
@@ -606,7 +604,7 @@
 .productLinks > a {
   align-items: center;
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   box-shadow: var(--hq-shadow-card);
   color: var(--hq-text-primary);
@@ -653,7 +651,7 @@
 
 .unavailableRow button {
   background: var(--hq-surface-subtle);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: 999px;
   color: var(--hq-text-tertiary);
   cursor: not-allowed;

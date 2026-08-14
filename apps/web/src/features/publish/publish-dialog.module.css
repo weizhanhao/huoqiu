@@ -1,0 +1,57 @@
+/*
+ * 发帖弹框。
+ *
+ * 轻：一块白底、一条标题、一个输入区。雪球那个框看着舒服，正是因为
+ * 除了「写字」和「发布」之外什么都没有。
+ */
+.dialog {
+  background: transparent;
+  border: none;
+  max-height: 100dvh;
+  max-width: 100vw;
+  padding: 0;
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.panel {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-5);
+  width: min(560px, calc(100vw - var(--hq-spacing-5) * 2));
+}
+
+.header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.close {
+  background: none;
+  border: none;
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-tertiary);
+  height: 32px;
+  width: 32px;
+}
+
+.close:hover {
+  background: var(--hq-surface-sunken);
+  color: var(--hq-text-primary);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}

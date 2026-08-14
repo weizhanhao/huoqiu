@@ -1,0 +1,104 @@
+/* 全局搜索的分组结果。沿用全站规则：描边分层、44px 触控、tabular-nums。 */
+
+.results {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.heading {
+  align-items: baseline;
+  border-bottom: 1px solid var(--hq-border-default);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2) var(--hq-spacing-3);
+  justify-content: space-between;
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+}
+
+.heading h2 {
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  letter-spacing: var(--hq-type-tracking-tight);
+}
+
+.heading span {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.group {
+  border-bottom: 1px solid var(--hq-border-subtle);
+}
+
+.group:last-child {
+  border-bottom: 0;
+}
+
+.groupHeading {
+  align-items: center;
+  background: var(--hq-surface-canvas);
+  display: flex;
+  justify-content: space-between;
+  padding: var(--hq-spacing-2) var(--hq-spacing-4);
+}
+
+.groupHeading h3 {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.groupHeading a {
+  align-items: center;
+  display: inline-flex;
+  font-size: var(--hq-type-size-caption);
+  min-height: var(--hq-touch-web-minimum);
+  text-decoration: none;
+}
+
+.list {
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list > li + li {
+  border-top: 1px solid var(--hq-border-subtle);
+}
+
+.row {
+  color: var(--hq-text-primary);
+  display: grid;
+  gap: 2px;
+  justify-content: start;
+  min-height: 52px;
+  padding: var(--hq-spacing-2) var(--hq-spacing-4);
+  text-decoration: none;
+}
+
+.row:hover {
+  background: var(--hq-surface-canvas);
+}
+
+.row strong {
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-medium);
+}
+
+.row span {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+}

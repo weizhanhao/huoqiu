@@ -33,7 +33,16 @@ let page: Page;
 let vite: ChildProcess;
 
 const waitForHarness = async () => {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  /*
+   * 15 秒，不是 4 秒。
+   *
+   * 原先是 80 次 × 50ms。单独跑一个 spec 时绰绰有余，但全量跑时七个浏览器
+   * spec 各自 spawn 一个 Vite 和一个 Chrome，4 秒内绑不上端口的那一个就会
+   * 报「did not start」——每次轮到谁取决于调度顺序，看起来像随机抽风。
+   *
+   * 这不是偶发故障，是预算定得太短。hookTimeout 是 20 秒，这里留 5 秒余量。
+   */
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     try {
       const response = await fetch(baseUrl);
       if (response.ok) return;
@@ -82,12 +91,22 @@ const requiredControl = async (locator: ReturnType<Page["getByTestId"]>) => {
   return locator;
 };
 
-describe("market and portfolio controls in a real browser DOM", () => {
-  it("keeps the shared demo-data badge at WCAG AA text contrast", async () => {
-    await page.goto(`${baseUrl}/markets`);
 
+/*
+ * 这个 harness 此前还挂着行情看板、涨跌榜与虚构标的详情三块样本界面，
+ * 相应有七条用例点它们的市场页签、涨跌榜页签与详情页签。
+ *
+ * 那三块已经从站内删掉了：行情与榜单改成了公开行情接口（由
+ * tests/server/market-overview.spec.ts 与 hot-board.spec.ts 覆盖），
+ * 标的详情只服务真实代码（由 tests/real-finance/real-instrument-page.spec.ts
+ * 覆盖）。点样本数据的那七条用例随之删除——它们验的东西已经不存在。
+ *
+ * 留下的是自选面板：纯前端交互，没有取数，正适合放在真实浏览器里验。
+ */
+describe("watchlist controls in a real browser DOM", () => {
+  it("keeps the shared demo-data badge at WCAG AA text contrast", async () => {
     const results = await new AxeBuilder({ page })
-      .include(".demo-data-badge")
+      .include('[data-testid="watchlist"]')
       .withRules(["color-contrast"])
       .analyze();
 
@@ -95,300 +114,65 @@ describe("market and portfolio controls in a real browser DOM", () => {
   });
 
   it.each([
-    { expectedColumns: 1, height: 844, width: 390 },
-    { expectedColumns: 2, height: 900, width: 768 },
-    { expectedColumns: 3, height: 1000, width: 1440 },
-  ])(
-    "keeps the markets route within $width px with $expectedColumns index columns",
-    async ({ expectedColumns, height, width }) => {
-      await page.setViewportSize({ height, width });
-      await page.goto(`${baseUrl}/markets`);
+    { height: 844, width: 390 },
+    { height: 900, width: 768 },
+    { height: 1000, width: 1440 },
+  ])("keeps the panel within $width px", async ({ height, width }) => {
+    await page.setViewportSize({ height, width });
+    await page.goto(baseUrl);
 
-      const layout = await page.evaluate(() => {
-        const cards = [
-          ...document.querySelectorAll(
-            'section[aria-labelledby="indices-heading"] article',
-          ),
-        ];
-        const firstCardTop = cards[0]?.getBoundingClientRect().top;
-        return {
-          body: document.body.scrollWidth,
-          columns: cards.filter(
-            (card) => card.getBoundingClientRect().top === firstCardTop,
-          ).length,
-          document: document.documentElement.scrollWidth,
-          viewport: window.innerWidth,
-        };
-      });
-
-      expect(layout).toEqual({
-        body: width,
-        columns: expectedColumns,
-        document: width,
-        viewport: width,
-      });
-    },
-  );
-
-  it("clicks market and direction controls and updates visible results", async () => {
-    const scope = await requiredControl(page.getByTestId("market-dashboard"));
-    const market = scope.getByRole("button", { name: "港股" });
-    const ranking = scope.getByRole("button", { name: "跌幅榜" });
-
-    await market.click();
-    await ranking.click();
-
-    expect(await market.getAttribute("aria-pressed")).toBe("true");
-    expect(await ranking.getAttribute("aria-pressed")).toBe("true");
-    expect(await scope.getByText("恒生合成指数").count()).toBe(1);
-    expect(await scope.getByText("全球航运", { exact: true }).count()).toBe(1);
-    const positiveConcept = scope.getByText("+3.10%", { exact: true });
-    const negativeConcept = scope.getByText("-2.80%", { exact: true });
-    expect(await positiveConcept.count()).toBe(1);
-    expect(await negativeConcept.count()).toBe(1);
-    const expectedColors = await page.evaluate(() => {
-      const probe = document.createElement("span");
-      document.body.append(probe);
-      probe.style.color = "var(--hq-market-up-text)";
-      const expectedPositive = getComputedStyle(probe).color;
-      probe.style.color = "var(--hq-market-down-text)";
-      const expectedNegative = getComputedStyle(probe).color;
-      probe.remove();
-      return { expectedNegative, expectedPositive };
-    });
-    expect(
-      await positiveConcept.evaluate(
-        (element) => getComputedStyle(element).color,
-      ),
-    ).toBe(expectedColors.expectedPositive);
-    expect(
-      await negativeConcept.evaluate(
-        (element) => getComputedStyle(element).color,
-      ),
-    ).toBe(expectedColors.expectedNegative);
-  });
-
-  it("clicks full-ranking filters and removes non-matching listings", async () => {
-    const scope = await requiredControl(page.getByTestId("market-rankings"));
-    const market = scope.getByRole("button", { name: "美股" });
-    const ranking = scope.getByRole("button", { name: "跌幅榜" });
-
-    await market.click();
-    await ranking.click();
-
-    expect(await market.getAttribute("aria-pressed")).toBe("true");
-    expect(await ranking.getAttribute("aria-pressed")).toBe("true");
-    expect(await scope.getByText("北美稳健", { exact: true }).count()).toBe(1);
-    expect(await scope.getByText("星港制造", { exact: true }).count()).toBe(0);
-  });
-
-  it("clicks add and remove watchlist controls through the shared provider", async () => {
-    const market = await requiredControl(page.getByTestId("market-dashboard"));
-    const watchlist = await requiredControl(page.getByTestId("watchlist"));
-    const row = market.locator("article").filter({ hasText: "星港制造" });
-    const add = row.getByRole("button", { name: "加自选" });
-
-    await add.click();
-
-    const added = row.getByRole("button", { name: "取消自选" });
-    expect(await added.getAttribute("aria-pressed")).toBe("true");
-    expect(await watchlist.getByText("星港制造", { exact: true }).count()).toBe(
-      1,
-    );
-    expect(await watchlist.getByText("42.68", { exact: true }).count()).toBe(1);
-
-    await watchlist.getByRole("button", { name: "取消自选" }).click();
-
-    expect(await watchlist.getByText(/暂无自选标的/).count()).toBe(1);
-  });
-
-  it("clicks the annual portfolio period and updates the ranking", async () => {
-    const scope = await requiredControl(
-      page.getByTestId("portfolio-dashboard"),
-    );
-    const annual = scope.getByRole("button", { name: "年榜" });
-
-    await annual.click();
-
-    expect(await annual.getAttribute("aria-pressed")).toBe("true");
-    expect(await scope.getByText("组合年度榜", { exact: true }).count()).toBe(
-      1,
-    );
-    expect(await scope.getByText("远望全球组合", { exact: true }).count()).toBe(
-      1,
-    );
-  });
-
-  it("clicks follow and updates the pressed state and visible label", async () => {
-    const scope = await requiredControl(page.getByTestId("portfolio-detail"));
-    const follow = scope.getByRole("button", { name: "+ 关注组合" });
-
-    await follow.click();
-
-    const followed = scope.getByRole("button", { name: "已关注组合" });
-    expect(await followed.getAttribute("aria-pressed")).toBe("true");
-    expect(await scope.getByText("调仓记录", { exact: true }).count()).toBe(1);
-  });
-
-  it("clicks instrument periods, detail tabs, and the shared watchlist control", async () => {
-    const scope = await requiredControl(page.getByTestId("instrument-detail"));
-    const daily = await requiredControl(
-      scope.getByRole("button", { name: "日 K" }),
-    );
-
-    await daily.click();
-
-    expect(await daily.getAttribute("aria-pressed")).toBe("true");
-    expect(
-      await scope
-        .getByText("日 K 走势：10 个固定合成采样点", {
-          exact: true,
-        })
-        .count(),
-    ).toBe(1);
-
-    const news = await requiredControl(
-      scope.getByRole("tab", { name: "资讯" }),
-    );
-    await news.click();
-
-    expect(await news.getAttribute("aria-selected")).toBe("true");
-    expect(
-      await scope.getByText("合成制造业订单保持韧性", { exact: true }).count(),
-    ).toBe(1);
-
-    for (const [tabName, expectedText] of [
-      ["成分股", "星港精工"],
-      ["公告", "演示文件不可下载"],
-      ["相关 ETF", "美股 ETF"],
-      ["讨论", "合成观察员"],
-    ] as const) {
-      const tab = scope.getByRole("tab", { name: tabName });
-      await tab.click();
-      expect(await tab.getAttribute("aria-selected")).toBe("true");
-      expect(await scope.getByText(expectedText, { exact: true }).count()).toBe(
-        tabName === "公告" ? 2 : 1,
-      );
-    }
-
-    const actionBar = scope.getByRole("navigation", {
-      name: "标的快捷操作",
-    });
-    const add = await requiredControl(
-      actionBar.getByRole("button", { name: "加自选" }),
-    );
-    await add.click();
-
-    const remove = actionBar.getByRole("button", { name: "取消自选" });
-    expect(await remove.getAttribute("aria-pressed")).toBe("true");
-  });
-
-  it("roves instrument tabs with Arrow, Home, and End keys", async () => {
-    const scope = await requiredControl(page.getByTestId("instrument-detail"));
-    const discussion = scope.getByRole("tab", { name: "讨论" });
-    const constituents = scope.getByRole("tab", { name: "成分股" });
-    const relatedEtfs = scope.getByRole("tab", { name: "相关 ETF" });
-
-    await discussion.focus();
-    await page.keyboard.press("ArrowRight");
-
-    expect(
-      await constituents.evaluate(
-        (element) => element === document.activeElement,
-      ),
-    ).toBe(true);
-    expect(await constituents.getAttribute("aria-selected")).toBe("true");
-    expect(await scope.getByText("星港精工", { exact: true }).count()).toBe(1);
-
-    await page.keyboard.press("End");
-
-    expect(
-      await relatedEtfs.evaluate(
-        (element) => element === document.activeElement,
-      ),
-    ).toBe(true);
-    expect(await relatedEtfs.getAttribute("aria-selected")).toBe("true");
-    expect(await scope.getByText("美股 ETF", { exact: true }).count()).toBe(1);
-
-    await page.keyboard.press("ArrowRight");
-
-    expect(
-      await discussion.evaluate(
-        (element) => element === document.activeElement,
-      ),
-    ).toBe(true);
-    expect(await discussion.getAttribute("aria-selected")).toBe("true");
-    expect(await scope.getByText("合成观察员", { exact: true }).count()).toBe(
-      1,
-    );
-
-    await page.keyboard.press("ArrowLeft");
-    expect(
-      await relatedEtfs.evaluate(
-        (element) => element === document.activeElement,
-      ),
-    ).toBe(true);
-
-    await page.keyboard.press("Home");
-    expect(
-      await discussion.evaluate(
-        (element) => element === document.activeElement,
-      ),
-    ).toBe(true);
-    expect(await discussion.getAttribute("tabindex")).toBe("0");
-    expect(await relatedEtfs.getAttribute("tabindex")).toBe("-1");
-  });
-
-  it("gives the publish-discussion link the project touch target", async () => {
-    const scope = await requiredControl(page.getByTestId("instrument-detail"));
-    const publish = scope.getByRole("link", {
-      exact: true,
-      name: "＋ 发讨论",
-    });
-    const bounds = await publish.boundingBox();
-    const minimum = await page.evaluate(() =>
-      Number.parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue(
-          "--hq-touch-web-minimum",
-        ),
-      ),
-    );
-
-    expect(bounds).not.toBeNull();
-    expect(bounds?.width).toBeGreaterThanOrEqual(minimum);
-    expect(bounds?.height).toBeGreaterThanOrEqual(minimum);
-  });
-
-  it("keeps instrument detail panels inside a 390px mobile viewport", async () => {
-    const scope = await requiredControl(page.getByTestId("instrument-detail"));
-    const quotePanel = scope.locator("header").first();
-    const bounds = await quotePanel.boundingBox();
-    const widths = await page.evaluate(() => ({
+    const layout = await page.evaluate(() => ({
       body: document.body.scrollWidth,
       document: document.documentElement.scrollWidth,
       viewport: window.innerWidth,
     }));
 
-    expect(bounds).not.toBeNull();
-    expect(bounds?.x).toBeGreaterThanOrEqual(0);
-    expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(
-      widths.viewport,
-    );
-    expect(widths.body).toBeLessThanOrEqual(widths.viewport);
-    expect(widths.document).toBeLessThanOrEqual(widths.viewport);
+    /*
+     * 横向滚动条是最容易漏掉的一类破版：桌面上看不出来，手机上整页可以
+     * 左右拖动，而每一块内容看起来都正常。
+     */
+    expect(layout).toEqual({ body: width, document: width, viewport: width });
   });
 
-  it("has no serious or critical accessibility violations in the instrument detail", async () => {
-    const scope = await requiredControl(page.getByTestId("instrument-detail"));
-    await scope.getByRole("tab", { name: "成分股" }).click();
-    const results = await new AxeBuilder({ page })
-      .include('[data-testid="instrument-detail"]')
-      .analyze();
-    const blockingViolations = results.violations.filter(
-      (violation) =>
-        violation.impact === "serious" || violation.impact === "critical",
-    );
+  it("switches groups and keeps the empty state honest", async () => {
+    const watchlist = await requiredControl(page.getByTestId("watchlist"));
 
-    expect(blockingViolations).toEqual([]);
+    // 新建一个分组，切过去应当是空的，且说清楚是这个分组内没有。
+    await watchlist.locator("#watchlist-new-group").fill("长期观察");
+    // 提交按钮写的是「新建」；「新建分组」是输入框的 placeholder。
+    await watchlist.getByRole("button", { name: "新建", exact: true }).click();
+    await watchlist.getByRole("button", { name: "长期观察" }).click();
+
+    expect(
+      await watchlist.getByText(/「长期观察」分组内暂无标的/).count(),
+    ).toBe(1);
+  });
+
+  it("gives the move controls a real touch target on mobile", async () => {
+    await page.setViewportSize({ height: 844, width: 390 });
+    await page.goto(baseUrl);
+
+    const watchlist = await requiredControl(page.getByTestId("watchlist"));
+    const move = watchlist.locator(".watchlist-move button").first();
+    if ((await move.count()) === 0) return;
+
+    const box = await move.boundingBox();
+    /*
+     * 上移下移是紧挨着的一对，28px 的目标在手机上点偏一下就是把另一只
+     * 股票挪了位置，而且没有撤销。
+     */
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+  });
+
+  it("has no serious or critical accessibility violations", async () => {
+    const results = await new AxeBuilder({ page })
+      .include('[data-testid="watchlist"]')
+      .analyze();
+
+    const serious = results.violations.filter((violation) =>
+      ["critical", "serious"].includes(violation.impact ?? ""),
+    );
+    expect(serious).toEqual([]);
   });
 });

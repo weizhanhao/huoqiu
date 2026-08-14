@@ -1,0 +1,73 @@
+/*
+ * 行情页那一片指标。
+ *
+ * 二十多格数字要能扫读：标签压低、数值提亮，靠这一层对比让眼睛在数值上走，
+ * 而不是在标签上走。等宽数字让上下两行的小数点对齐——不对齐的话，
+ * 比较两个数得先找小数点在哪。
+ */
+.grid {
+  display: grid;
+  gap: var(--hq-spacing-3) var(--hq-spacing-5);
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  margin: 0;
+}
+
+/*
+ * 标签与数值紧挨成一对，整对左对齐。
+ *
+ * 原先是 space-between：标签贴左、数值贴右，中间一道空档——三十来格
+ * 排在一起时，眼睛得横跨整格才能把标签和它的数配上，扫读格外费劲。
+ * 冒号把两者拴在一起，读起来才是「最高 55.38」而不是两列各自的数。
+ */
+.cell {
+  align-items: baseline;
+  display: flex;
+  gap: var(--hq-spacing-1);
+  min-width: 0;
+}
+
+.label {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  white-space: nowrap;
+}
+
+.label::after {
+  content: "：";
+}
+
+/*
+ * 数值加粗、标签压淡。
+ *
+ * 两者同重时整片是均匀的灰，没有任何落点；拉开一档，眼睛自然落在数上，
+ * 标签退成索引。
+ */
+.value {
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-body-compact);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-semibold);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * 只给有方向的数字上色。
+ *
+ * 换手 8% 涂成红色是没有意义的——它不表示涨，只表示换手高。给一个没有
+ * 方向的数字加上方向，比不上色更误导。所以昨收、换手、振幅、市盈率、
+ * 股本、市值这些一律走 .flat 的中性色。
+ */
+.up {
+  color: var(--hq-market-up-text);
+}
+
+.down {
+  color: var(--hq-market-down-text);
+}
+
+.flat {
+  color: var(--hq-text-primary);
+}

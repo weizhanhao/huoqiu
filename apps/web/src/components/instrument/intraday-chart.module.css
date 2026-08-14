@@ -1,0 +1,182 @@
+/*
+ * 分时图。
+ *
+ * 价格线要压过均价线：均价是参照，价格才是主体。所以均价线细一号、
+ * 用一个固定的橙色让开涨跌配色，价格线更粗并且跟着涨跌上色。
+ *
+ * 橙色写死而不是走 token：设计令牌里没有「参照线」这一档，
+ * 硬套一个不存在的变量名，未定义的 CSS 变量会静默失效——那条线会直接
+ * 不见，而页面一切正常。
+ */
+.wrap {
+  display: grid;
+  gap: var(--hq-spacing-2);
+}
+
+.legend {
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  gap: var(--hq-spacing-4);
+  margin: 0;
+}
+
+.averageKey {
+  color: #c07d16;
+}
+
+.chart {
+  /* 比例跟着 viewBox 走，版位在首帧就占住，图画完不会把下面顶开。 */
+  aspect-ratio: 720 / 298;
+  background: var(--hq-surface-sunken);
+  border-radius: var(--hq-radius-control);
+  display: block;
+  width: 100%;
+}
+
+.axis line {
+  stroke: var(--hq-border-subtle);
+  stroke-width: 1;
+}
+
+/*
+ * 轴文字。
+ *
+ * 原先写死 9px。这是 viewBox 坐标，SVG 按容器宽度缩放——图列在 620px 时
+ * 有效字号 7.7px，窄屏单列时只有 4.7px。那不是「淡」的问题，是笔画根本
+ * 渲染不出来；而价格刻度和时间刻度是这张图上仅有的绝对数值锚点，
+ * 读不出来整张图就退化成一个走势剪影。
+ *
+ * 颜色也从三级提到二级：极小加极淡，两头都占。
+ */
+.axis text,
+.axisText {
+  fill: var(--hq-text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 昨收那条零轴。
+ *
+ * 五条参考线里只有它是基准，得看得出来。虚线加重色——实线会和价格线
+ * 抢注意力，而这条是标尺不是数据。
+ */
+.baseLine {
+  stroke: var(--hq-border-default);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+
+
+/*
+ * 成交量柱。
+ *
+ * 原先统一用边框色——那是「看得见但不抢眼」的角色 token，通常只有
+ * 1.5:1~2.5:1。而这些柱子没有任何文字等价物，它们是这块区域唯一的数据
+ * 载体，按 WCAG 1.4.11 需要 3:1，所以改用涨跌色。
+ *
+ * crispEdges：xOf() 返回小数坐标，1px 竖线会被抗锯齿摊成两列半透明灰，
+ * 柱子边缘发虚。
+ */
+.volume line {
+  shape-rendering: crispEdges;
+  stroke-width: 1;
+}
+
+.volUp {
+  stroke: var(--hq-market-up-text);
+}
+
+.volDown {
+  stroke: var(--hq-market-down-text);
+}
+
+/*
+ * 最新点。
+ *
+ * 横轴按全天布，右边留白表示「还没到」。没有这个点的话，「行情正常、
+ * 只是走到这里」和「数据源挂了、之后再没更新」看起来完全一样——
+ * 而轮询失败时是静默保留旧数据的，页面不会有任何异样。
+ */
+.dotUp {
+  fill: var(--hq-market-up-text);
+}
+
+.dotDown {
+  fill: var(--hq-market-down-text);
+}
+
+/* 均价线：细、稳、不抢眼——它是参照物。 */
+.averageLine {
+  fill: none;
+  stroke: #c07d16;
+  stroke-linejoin: round;
+  stroke-width: 1.2;
+}
+
+.priceUp,
+.priceDown {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.priceUp {
+  stroke: var(--hq-market-up-text);
+}
+
+.priceDown {
+  stroke: var(--hq-market-down-text);
+}
+
+/*
+ * 刻度的涨跌色同样要压过 .axis text 的二级灰——同一个优先级问题。
+ *
+ * SVG 文字用 fill，不是 color；写 color 完全不起作用，而且一样静默。
+ */
+.axis text.up,
+.up {
+  color: var(--hq-market-up-text);
+  fill: var(--hq-market-up-text);
+}
+
+.axis text.down,
+.down {
+  color: var(--hq-market-down-text);
+  fill: var(--hq-market-down-text);
+}
+
+/* 零轴那一档：不涨不跌，用中性色把红绿隔开。 */
+.axis text.baseTick,
+.baseTick {
+  fill: var(--hq-text-primary);
+}
+
+/*
+ * 十字光标：虚线、颜色压低——它是量尺，不该看着像图里的一条数据线。
+ */
+.crosshair line {
+  stroke: var(--hq-text-tertiary);
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+}
+
+.time,
+.volumeKey {
+  color: var(--hq-text-tertiary);
+}
+
+/* 图可聚焦时要看得出焦点在哪。 */
+.chart:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}
+
+.empty {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  margin: 0;
+  padding: var(--hq-spacing-4) 0;
+}

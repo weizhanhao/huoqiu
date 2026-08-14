@@ -18,8 +18,10 @@ describe("synthetic D0 market fixture", () => {
         instrument_id: "instrument_syn_0001",
         listing_id: "listing_syn_0001",
         symbol: "SYN001",
-        name: "合成示例一号",
-        pinyin: "hechengshiliyihao",
+        name: "星海智造",
+        // 拼音必须与 name 对应：此前 name 改了而 pinyin 留着旧名的拼音，
+        // 结果用户按看到的名字打拼音搜不到，搜一个页面上不存在的拼音反而能搜到。
+        pinyin: "xinghaizhizao",
         aliases: ["合成一号", "synthetic one"],
         market: "CN",
         currency: "CNY",

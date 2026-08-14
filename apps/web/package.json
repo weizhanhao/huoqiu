@@ -6,6 +6,9 @@
   "scripts": {
     "build": "next build --webpack",
     "dev": "next dev",
+    "finance:fx": "node scripts/fetch-fx-rates.mjs",
+    "finance:kline": "node scripts/fetch-kline.mjs",
+    "finance:news": "../../node_modules/.bin/tsx scripts/fetch-finance-public.ts",
     "lint": "eslint --config ../../packages/config/eslint/react.mjs src scripts tests next.config.ts vitest.config.ts",
     "start": "node scripts/start.mjs",
     "test": "vitest run --config vitest.config.ts tests src/middleware.spec.ts src/start.spec.ts",

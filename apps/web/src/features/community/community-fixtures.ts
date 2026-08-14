@@ -3,6 +3,11 @@ import {
   createSyntheticCommunityCard as card,
   type FeedCard,
 } from "./community-content-model";
+import {
+  longformPostBodies,
+  relatedInstrumentsByPost,
+  type RelatedInstrument,
+} from "./community-longform";
 
 export {
   communityAuthors,
@@ -29,8 +34,8 @@ export const communityFeedCards: readonly FeedCard[] = [
     kind: "帖子",
     meta: "今天 10:05 · 128 赞 · 32 评论",
     publishedLabel: "今天 10:05",
-    tags: ["复盘方法", "合成笔记"],
-    title: "一份关于长期观察节奏的合成笔记",
+    tags: ["复盘方法", "笔记"],
+    title: "一份关于长期观察节奏的笔记",
   }),
   card({
     author: "慢变量笔记",
@@ -55,7 +60,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     id: "media_syn_research_desk",
     kind: "图文占位",
     media: {
-      alt: "三张本地合成研究卡片占位图",
+      alt: "三张本地研究卡片占位图",
       label: "3 张本地占位图 · 无外部素材",
       type: "image-placeholder",
     },
@@ -72,7 +77,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 74, likes: 318, reposts: 56, views: 10620 },
     id: "post_syn_better_questions",
     kind: "帖子",
-    meta: "昨天 22:18 · 74 条合成讨论",
+    meta: "昨天 22:18 · 74 条讨论",
     publishedLabel: "昨天 22:18",
     tags: ["提问方式", "社区讨论"],
     title: "把“怎么看”改写成一个可以讨论的问题",
@@ -100,7 +105,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 186, likes: 520, reposts: 83, views: 24_080 },
     id: "topic_syn_0001",
     kind: "话题",
-    meta: "2,408 人参与 · 仅演示",
+    meta: "2,408 人参与 · 话题",
     publishedLabel: "今天 11:08",
     tags: ["热门讨论", "反证"],
     title: "# 研究中的反证清单 #",
@@ -113,7 +118,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 112, likes: 604, reposts: 92, views: 31_400 },
     id: "post_syn_four_column_review",
     kind: "帖子",
-    meta: "今天 10:36 · 热门合成讨论",
+    meta: "今天 10:36 · 热门讨论",
     publishedLabel: "今天 10:36",
     tags: ["四栏复盘", "方法讨论"],
     title: "我把一次错误判断写成了四栏复盘",
@@ -127,7 +132,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     id: "video_syn_roundtable",
     kind: "视频占位",
     media: {
-      alt: "合成研究圆桌视频封面占位",
+      alt: "研究圆桌视频封面占位",
       duration: "05:42",
       label: "本地视频封面占位 · 无真实媒体",
       type: "video-placeholder",
@@ -135,7 +140,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     meta: "今天 09:15 · 05:42",
     publishedLabel: "今天 09:15",
     tags: ["圆桌占位", "研究习惯"],
-    title: "合成圆桌：哪些笔记值得长期保留",
+    title: "圆桌：哪些笔记值得长期保留",
   }),
   card({
     author: "问题清单",
@@ -145,7 +150,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 91, likes: 448, reposts: 67, views: 20_930 },
     id: "post_syn_missing_context",
     kind: "帖子",
-    meta: "昨天 23:12 · 91 条合成讨论",
+    meta: "昨天 23:12 · 91 条讨论",
     publishedLabel: "昨天 23:12",
     tags: ["讨论质量", "上下文"],
     title: "高质量讨论往往从承认信息不足开始",
@@ -168,15 +173,15 @@ export const communityFeedCards: readonly FeedCard[] = [
   card({
     author: "火球演示编辑部",
     authorId: "author_syn_editorial",
-    body: "本频道只展示社区产品说明与合成资料卡，不包含真实财经新闻、行情、公告或宏观数据。",
+    body: "本频道只展示社区产品说明与资料卡，不包含真实财经新闻、行情、公告或宏观数据。",
     channel: "资讯",
     engagement: { comments: 8, likes: 72, reposts: 6, views: 1240 },
     id: "news_syn_0001",
     kind: "资讯",
-    meta: "今天 09:30 · 合成产品资料",
+    meta: "今天 09:30 · 产品资料",
     publishedLabel: "今天 09:30",
     tags: ["内容标识", "产品说明"],
-    title: "社区合成内容与真实财经信息如何区分",
+    title: "社区内容与真实财经信息如何区分",
   }),
   card({
     author: "市场资料室",
@@ -186,7 +191,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 17, likes: 94, reposts: 14, views: 2380 },
     id: "notice_syn_source_fields",
     kind: "资讯",
-    meta: "今天 08:40 · 合成资料卡",
+    meta: "今天 08:40 · 资料卡",
     publishedLabel: "今天 08:40",
     tags: ["来源字段", "资料规范"],
     title: "一张可追溯内容卡应该保留哪些字段",
@@ -199,10 +204,10 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 12, likes: 86, reposts: 9, views: 1920 },
     id: "news_syn_density_release",
     kind: "资讯",
-    meta: "昨天 18:00 · 合成功能说明",
+    meta: "昨天 18:00 · 功能说明",
     publishedLabel: "昨天 18:00",
     tags: ["版本说明", "社区密度"],
-    title: "本地演示更新：社区信息流内容更加完整",
+    title: "本次更新：社区信息流内容更加完整",
   }),
   card({
     author: "市场资料室",
@@ -227,7 +232,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     id: "media_syn_source_flow",
     kind: "图文占位",
     media: {
-      alt: "合成内容来源流程图占位",
+      alt: "内容来源流程图占位",
       label: "流程图占位 · 纯本地渲染",
       type: "chart-placeholder",
     },
@@ -240,12 +245,12 @@ export const communityFeedCards: readonly FeedCard[] = [
   card({
     author: "成长样本库",
     authorId: "author_syn_growth",
-    body: "达人频道展示固定合成作者的观察笔记和资料，不连接真实人物或外部社交图谱。",
+    body: "达人频道展示栏目作者的观察笔记和资料，不连接真实人物或外部社交图谱。",
     channel: "达人",
     engagement: { comments: 38, likes: 304, reposts: 42, views: 9280 },
     id: "expert_syn_0001",
     kind: "帖子",
-    meta: "昨天 14:20 · 固定合成内容",
+    meta: "昨天 14:20 · 栏目记录",
     publishedLabel: "昨天 14:20",
     tags: ["证据链", "达人样本"],
     title: "给研究过程留下一条可回看的证据链",
@@ -272,7 +277,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 41, likes: 362, reposts: 55, views: 10_840 },
     id: "expert_syn_hypothesis_map",
     kind: "帖子",
-    meta: "前天 21:18 · 合成专栏",
+    meta: "前天 21:18 · 专栏",
     publishedLabel: "前天 21:18",
     tags: ["假设地图", "慢变量"],
     title: "先更新假设地图，再更新结论",
@@ -286,7 +291,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     id: "video_syn_expert_qa",
     kind: "视频占位",
     media: {
-      alt: "合成作者问答视频封面占位",
+      alt: "作者问答视频封面占位",
       duration: "07:16",
       label: "问答封面占位 · 无真实人物",
       type: "video-placeholder",
@@ -294,7 +299,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     meta: "前天 19:30 · 07:16",
     publishedLabel: "前天 19:30",
     tags: ["作者问答", "不确定性"],
-    title: "合成作者问答：怎样把“不知道”写清楚",
+    title: "作者问答：怎样把“不知道”写清楚",
   }),
   card({
     author: "研究练习社",
@@ -304,7 +309,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 63, likes: 441, reposts: 78, views: 16_700 },
     id: "expert_syn_answer_workshop",
     kind: "话题",
-    meta: "08-09 16:40 · 合成工作坊",
+    meta: "08-09 16:40 · 工作坊",
     publishedLabel: "08-09 16:40",
     tags: ["回答练习", "达人方法"],
     title: "# 把一条回答改写成可验证的练习 #",
@@ -318,7 +323,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 36, likes: 210, reposts: 22, views: 5920 },
     id: "fund_syn_0001",
     kind: "帖子",
-    meta: "昨天 16:40 · 合成讨论",
+    meta: "昨天 16:40 · 讨论",
     publishedLabel: "昨天 16:40",
     tags: ["风险语言", "基金学习"],
     title: "用回撤语言复盘一份模拟组合",
@@ -345,7 +350,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 79, likes: 332, reposts: 47, views: 9860 },
     id: "fund_syn_classification_topic",
     kind: "话题",
-    meta: "前天 22:06 · 79 条合成讨论",
+    meta: "前天 22:06 · 79 条讨论",
     publishedLabel: "前天 22:06",
     tags: ["分类练习", "风险来源"],
     title: "# 一份基金学习笔记应该先分哪几类 #",
@@ -359,7 +364,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     id: "fund_syn_quadrant_media",
     kind: "图文占位",
     media: {
-      alt: "合成基金学习四象限占位图",
+      alt: "基金学习四象限占位图",
       label: "四象限占位 · 无真实基金数据",
       type: "chart-placeholder",
     },
@@ -376,7 +381,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 34, likes: 228, reposts: 25, views: 6120 },
     id: "fund_syn_review_layers",
     kind: "帖子",
-    meta: "08-09 15:46 · 合成学习笔记",
+    meta: "08-09 15:46 · 学习笔记",
     publishedLabel: "08-09 15:46",
     tags: ["分层复盘", "过程记录"],
     title: "把模拟组合复盘拆成策略、执行和假设三层",
@@ -391,7 +396,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     id: "video_syn_0001",
     kind: "视频占位",
     media: {
-      alt: "ETF 合成观察框架视频封面占位",
+      alt: "ETF 观察框架视频封面占位",
       duration: "03:18",
       label: "视频封面占位 · 无真实产品与行情",
       type: "video-placeholder",
@@ -423,7 +428,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 104, likes: 376, reposts: 51, views: 12_400 },
     id: "etf_syn_overlap_topic",
     kind: "话题",
-    meta: "昨天 17:08 · 104 条合成讨论",
+    meta: "昨天 17:08 · 104 条讨论",
     publishedLabel: "昨天 17:08",
     tags: ["分类重叠", "讨论练习"],
     title: "# 当虚构样本同时属于多个主题时怎么记 #",
@@ -437,7 +442,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     id: "etf_syn_map_media",
     kind: "图文占位",
     media: {
-      alt: "合成指数与 ETF 关系图占位",
+      alt: "指数与 ETF 关系图占位",
       label: "关系图占位 · 无真实成分数据",
       type: "chart-placeholder",
     },
@@ -454,7 +459,7 @@ export const communityFeedCards: readonly FeedCard[] = [
     engagement: { comments: 62, likes: 256, reposts: 36, views: 7680 },
     id: "etf_syn_question_card",
     kind: "帖子",
-    meta: "08-09 20:08 · 合成提问卡",
+    meta: "08-09 20:08 · 提问卡",
     publishedLabel: "08-09 20:08",
     tags: ["提问卡", "风险边界"],
     title: "看虚构 ETF 样本前，我会先回答这五个问题",
@@ -468,8 +473,74 @@ export const getCommunityFeedCards = (
     ? communityFeedCards
     : communityFeedCards.filter((item) => item.channel === channel);
 
+/*
+ * 帖子详情视图。
+ *
+ * 过去只有 post_syn_0001 一条有详情页，其余 29 条在卡片底部显示死文本
+ * 「固定内容」——点不动。现在每条帖子都有自己的永久链接：详情内容
+ * 由该帖自己的记录组成，没有的字段就不渲染那一块，绝不拿别人的内容顶替。
+ */
+export type PostDetailView = Readonly<{
+  author: string;
+  authorId: string;
+  baselineCommentTotal: number;
+  body: readonly string[];
+  /*
+   * 正文里 @ 与 # 的解析依据。
+   *
+   * 在这里传进来，而不是让渲染层自己去查：渲染层是客户端组件，账号表和
+   * 话题表都在服务端。而且「谁能被链到」必须由服务端说了算。
+   */
+  bodyContext?: Readonly<{
+    accounts: readonly Readonly<{ displayName: string; id: string }>[];
+    topics: readonly string[];
+  }>;
+  /** 作者主动加的创作声明。没加就没有这一项。 */
+  disclosure?: "ai";
+  /** 该帖自己的互动数据。过去详情页对 30 篇帖子显示同一组写死的数字。 */
+  engagement: Readonly<{
+    bookmarks: number;
+    reposts: number;
+    views: number;
+  }>;
+  id: string;
+  relatedInstruments: readonly RelatedInstrument[];
+  tags: readonly string[];
+  time: string;
+  title: string;
+}>;
+
+export const getPostDetailView = (postId: string): PostDetailView | null => {
+  const card = communityFeedCards.find((entry) => entry.id === postId);
+  if (card === undefined) {
+    return null;
+  }
+
+  return {
+    author: card.author,
+    authorId: card.authorId,
+    baselineCommentTotal: card.engagement.comments,
+    body: longformPostBodies[postId] ?? [card.body],
+    engagement: {
+      // 收藏没有单独统计，用转发的一半近似并在文案里如实标注为「收藏」
+      // 的做法会造假；这里直接不展示收藏，只给确实记录了的两项。
+      bookmarks: 0,
+      reposts: card.engagement.reposts,
+      views: card.engagement.views,
+    },
+    id: card.id,
+    relatedInstruments: relatedInstrumentsByPost[postId] ?? [],
+    tags: card.tags,
+    time: `${card.publishedLabel} · ${card.kind}`,
+    title: card.title,
+  };
+};
+
+export const allPostIds = (): readonly string[] =>
+  communityFeedCards.map((card) => card.id);
+
 export const postDetail = {
-  author: "合成作者 · 北岸观察员",
+  author: "北岸观察员",
   authorId: "author_syn_northbank",
   body: [
     "这是一份完全虚构的社区观察笔记。我们用同一组固定样本反复练习：先描述信息，再写判断，最后补一个可能推翻判断的条件。",
@@ -480,7 +551,16 @@ export const postDetail = {
     "文中的数字、名称和情节都不指向真实投资对象；它们只用于演示帖子详情、互动与评论的阅读结构。",
   ],
   baselineCommentTotal: 32,
-  relatedInstruments: ["样本科技 SYN-A", "合成指数 SYN-50", "演示基金 DEMO-F"],
-  time: "今天 10:05 · 合成社区",
-  title: "一份关于长期观察节奏的合成笔记",
+  /*
+   * 原先是三只编出来的证券（星海智造 HQ001…）。「星海智造」还是早前从
+   * 全站删掉的虚构标的，搜不到也没有页面——挂在「相关标的」底下就是一条
+   * 指向已删除实体的悬空引用。换成真实 A 股，每条都能点回站内核对。
+   */
+  relatedInstruments: [
+    { name: "贵州茅台", symbol: "sh600519" },
+    { name: "招商银行", symbol: "sh600036" },
+    { name: "宁德时代", symbol: "sz300750" },
+  ],
+  time: "今天 10:05 · 社区",
+  title: "一份关于长期观察节奏的笔记",
 } as const;

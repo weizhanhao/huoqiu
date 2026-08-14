@@ -60,24 +60,41 @@ describe("community session interactions", () => {
 
   it("adds a comment and rejects an empty comment with an accessible message", () => {
     const initial = createInitialCommunityState();
-    const invalid = addComment(initial, "  ");
-    const valid = addComment(initial, "我会继续观察量能变化。");
+    const invalid = addComment(initial, "  ", "张远");
+    const valid = addComment(initial, "我会继续观察量能变化。", "张远");
 
     expect(invalid.error).toBe("请输入评论内容后再发布。");
     expect(valid.comments.at(-1)?.body).toBe("我会继续观察量能变化。");
+    /*
+     * 署名必须是发评论的人。这里过去写死「火球演示用户」，真实账号写下的
+     * 评论挂着别人的名字；未登录时也不再伪造署名，而是直接拒绝。
+     */
+    expect(valid.comments.at(-1)?.author).toBe("张远");
+    expect(addComment(initial, "我会继续观察量能变化。", null).error).toBe(
+      "登录后才能发表评论。",
+    );
     expect(valid.comments.at(-1)?.origin).toBe("session-local");
     expect(valid.status).toBe("评论已添加到本次会话。");
   });
 
   it("adds a nested reply and rejects a blank reply", () => {
     const initial = createInitialCommunityState();
-    const invalid = addReply(initial, "comment_syn_0001", "");
-    const valid = addReply(initial, "comment_syn_0001", "同意，先看数据验证。");
+    const invalid = addReply(initial, "comment_syn_0001", "", "张远");
+    const valid = addReply(
+      initial,
+      "comment_syn_0001",
+      "同意，先看数据验证。",
+      "张远",
+    );
 
     expect(invalid.error).toBe("请输入回复内容后再发布。");
     expect(valid.comments[0]?.replies.at(-1)?.body).toBe(
       "同意，先看数据验证。",
     );
+    expect(valid.comments[0]?.replies.at(-1)?.author).toBe("张远");
+    expect(
+      addReply(initial, "comment_syn_0001", "同意，先看数据验证。", null).error,
+    ).toBe("登录后才能回复评论。");
     expect(valid.comments[0]?.replies.at(-1)?.origin).toBe("session-local");
     expect(valid.status).toBe("回复已添加到本次会话。");
   });
@@ -93,7 +110,7 @@ describe("publisher session interactions", () => {
     });
 
     expect(empty.error).toBe("请输入讨论正文后再发布。");
-    expect(published.success).toBe("合成草稿已发布到本次会话。");
+    expect(published.success).toBe("草稿已发布到本次会话。");
   });
 
   it("requires a title and body for a long article", () => {
@@ -109,6 +126,6 @@ describe("publisher session interactions", () => {
     });
 
     expect(missingTitle.error).toBe("请输入长文标题后再发布。");
-    expect(published.success).toBe("合成草稿已发布到本次会话。");
+    expect(published.success).toBe("草稿已发布到本次会话。");
   });
 });

@@ -1,0 +1,108 @@
+/*
+ * 发帖框。
+ *
+ * 内嵌和弹框共用一套：只有外框（背景、边框、内边距）不同，里面的输入区
+ * 与工具条完全一致。两套各写一遍的话，同一个框在两处会慢慢长得不一样。
+ */
+.composer {
+  display: grid;
+  gap: var(--hq-spacing-2);
+}
+
+.inline {
+  background: var(--hq-surface-sunken);
+  border-radius: var(--hq-radius-card);
+  padding: var(--hq-spacing-4);
+}
+
+.modal {
+  padding: 0;
+}
+
+/*
+ * 输入区无边框、贴着底色。
+ *
+ * 发一句话的框加一圈边线，视觉上像在填表；去掉边线之后它就是一块可以
+ * 直接写字的地方——这也是雪球那个弹框看着轻的原因。
+ */
+.input {
+  background: var(--hq-surface-base);
+  border: none;
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  font: inherit;
+  line-height: var(--hq-type-line-height-body);
+  min-height: 96px;
+  padding: var(--hq-spacing-3);
+  resize: vertical;
+  width: 100%;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: -1px;
+}
+
+.toolbar {
+  align-items: center;
+  display: flex;
+  gap: var(--hq-spacing-3);
+  justify-content: space-between;
+}
+
+.longform {
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-body-compact);
+  padding: var(--hq-spacing-1) var(--hq-spacing-2);
+  text-decoration: none;
+}
+
+.longform:hover {
+  background: var(--hq-surface-base);
+  color: var(--hq-text-primary);
+}
+
+.longform:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 1px;
+}
+
+.actions {
+  display: flex;
+  gap: var(--hq-spacing-2);
+}
+
+.primary,
+.secondary {
+  border-radius: var(--hq-radius-control);
+  font-size: var(--hq-type-size-body-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
+}
+
+.primary {
+  background: var(--hq-brand-primary);
+  border: 1px solid var(--hq-brand-primary);
+  color: var(--hq-brand-on-primary);
+}
+
+/*
+ * 空文时按钮压暗但不隐藏：藏起来会让工具条在打字的第一个字符时
+ * 突然变宽，整条抖一下。
+ */
+.primary:disabled {
+  opacity: 0.5;
+}
+
+.secondary {
+  background: transparent;
+  border: 1px solid var(--hq-border-default);
+  color: var(--hq-text-secondary);
+}
+
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}

@@ -25,7 +25,7 @@ export function QuoteHeader({ instrument, quote }: QuoteHeaderProperties) {
     <header className="quote-header">
       <div className="quote-identity">
         <div>
-          <p className="card-kicker">SYNTHETIC INSTRUMENT</p>
+          <p className="card-kicker">演示标的</p>
           <h2>{instrument.name}</h2>
           <p>
             {instrument.symbol} · {instrument.market} · {instrument.currency}

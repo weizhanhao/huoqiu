@@ -18,9 +18,16 @@ describe("D0 Web page state matrix", () => {
   it("renders an accessible stable loading state", () => {
     const markup = renderToStaticMarkup(<PageState state="loading" />);
 
+    /*
+     * aria-busy 不能和 role="status" 挂在同一个节点上：aria-busy 的意思正是
+     * 「这块正在变，先别处理它的更新」，等于把自己的播报堵死。现在播报独立
+     * 成一个 role="status"，aria-busy 挂在被替换的骨架上。
+     */
     expect(markup).toContain('role="status"');
     expect(markup).toContain('aria-busy="true"');
-    expect(markup).toContain("正在加载演示数据");
+    expect(markup).toContain("正在加载");
+    expect(markup).not.toMatch(/role="status"[^>]*aria-busy/u);
+    expect(markup).not.toMatch(/aria-busy[^>]*role="status"/u);
   });
 
   it("renders an explicit empty state", () => {
@@ -28,7 +35,11 @@ describe("D0 Web page state matrix", () => {
       <PageState state="empty" emptyMessage="暂无演示内容" />,
     );
 
-    expect(markup).toContain('role="status"');
+    /*
+     * 空态不再挂 role="status"：它首屏就在 DOM 里、没有变化可播，挂上去
+     * 只是白白多一块常驻 live region，之后任何文案改动都会打断朗读。
+     */
+    expect(markup).not.toContain('role="status"');
     expect(markup).toContain("暂无演示内容");
   });
 

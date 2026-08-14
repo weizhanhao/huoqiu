@@ -1,0 +1,108 @@
+/*
+ * 创作者中心的版面。
+ *
+ * 和个股页一样，只有一套列定义 + 一个修饰符：三份重复的布局迟早漂移，
+ * 而漂移出来的样子是导航在切页时横跳一下，没人看得出那是 bug。
+ */
+.shell {
+  background: var(--hq-surface-canvas);
+  min-height: 100dvh;
+}
+
+.topbar {
+  align-items: center;
+  background: var(--hq-surface-raised);
+  border-bottom: 1px solid var(--hq-border-default);
+  display: flex;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-3) var(--hq-spacing-5);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.brand {
+  align-items: center;
+  color: var(--hq-text-primary);
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--hq-spacing-2);
+  text-decoration: none;
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 3px;
+}
+
+.brandMark {
+  align-items: center;
+  background: var(--hq-brand-primary);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-brand-on-primary);
+  display: flex;
+  font-weight: var(--hq-type-weight-semibold);
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.brandWord {
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.divider {
+  background: var(--hq-border-default);
+  height: 20px;
+  width: 1px;
+}
+
+.title {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-label);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.layout {
+  display: grid;
+  gap: var(--hq-spacing-5);
+  grid-template-columns: 200px minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: var(--hq-spacing-5);
+}
+
+.nav {
+  align-self: start;
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  padding: var(--hq-spacing-3) var(--hq-spacing-2);
+  position: sticky;
+  top: calc(var(--hq-spacing-5) + 56px);
+}
+
+/*
+ * align-content 钉成 start：这一列是外层 grid 的子项，会被拉伸到跟左边
+ * 那列导航一样高，而 grid 默认把多出来的高度摊给自动行——标题和正文
+ * 之间会平白空出一大片。个股页早先就栽过这个。
+ */
+.main {
+  align-content: start;
+  display: grid;
+  gap: var(--hq-spacing-4);
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .layout > .nav {
+    order: 2;
+    position: static;
+  }
+}

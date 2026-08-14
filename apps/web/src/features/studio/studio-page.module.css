@@ -1,0 +1,143 @@
+/*
+ * 创作者中心各页共用的卡片与表格。
+ *
+ * 一份而不是每页各写一遍：重复的样式迟早漂移，而漂移出来的样子是
+ * 各页的卡片边距差几像素——没人说得出哪里不对，但就是不齐整。
+ */
+.card {
+  align-content: start;
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-5);
+}
+
+.heading {
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.subheading {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  margin: 0;
+}
+
+/* 数据卡：一排大数字。 */
+.metrics {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+}
+
+.metric {
+  background: var(--hq-surface-sunken);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-1);
+  padding: var(--hq-spacing-4);
+}
+
+.metricLabel {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.metricValue {
+  font-size: var(--hq-type-size-data-large);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-semibold);
+  line-height: var(--hq-type-line-height-flat);
+}
+
+/* 高亮那一格：和其余拉开一档，指出「这是主指标」。 */
+.metricPrimary {
+  background: var(--hq-brand-primary);
+}
+
+.metricPrimary .metricLabel,
+.metricPrimary .metricValue {
+  color: var(--hq-brand-on-primary);
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: var(--hq-type-size-body-compact);
+  width: 100%;
+}
+
+.table th {
+  color: var(--hq-text-tertiary);
+  font-weight: var(--hq-type-weight-regular);
+  padding: var(--hq-spacing-2);
+  text-align: left;
+}
+
+.table td {
+  border-top: 1px solid var(--hq-border-subtle);
+  padding: var(--hq-spacing-2);
+  vertical-align: top;
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.rowTitle {
+  color: inherit;
+  display: block;
+  font-weight: var(--hq-type-weight-medium);
+  text-decoration: none;
+}
+
+.rowTitle:hover {
+  text-decoration: underline;
+}
+
+.rowBody {
+  color: var(--hq-text-tertiary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  font-size: var(--hq-type-size-caption);
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.tag {
+  background: var(--hq-surface-sunken);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-micro);
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.tabs {
+  border-bottom: 1px solid var(--hq-border-subtle);
+  display: flex;
+  gap: var(--hq-spacing-3);
+  padding-bottom: var(--hq-spacing-2);
+}
+
+.tab {
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-body-compact);
+  padding: var(--hq-spacing-1) var(--hq-spacing-2);
+  text-decoration: none;
+}
+
+.tab[aria-current="page"] {
+  color: var(--hq-brand-primary);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.empty {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-body-compact);
+  padding: var(--hq-spacing-6) 0;
+  text-align: center;
+}

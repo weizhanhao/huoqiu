@@ -1,0 +1,55 @@
+/*
+ * 帖子正文里的记号。
+ *
+ * 股票和 @ 用两种颜色：股票链到行情、@ 链到人，去处不同就不该长得一样。
+ * 都用同一个蓝色的话，读者点之前分不出自己要去哪。
+ */
+.paragraph {
+  color: var(--hq-text-primary);
+  line-height: var(--hq-type-line-height-body);
+  margin: 0 0 var(--hq-spacing-3);
+}
+
+.cashtag {
+  color: var(--hq-brand-primary);
+  text-decoration: none;
+}
+
+.mention {
+  color: var(--hq-text-link);
+  text-decoration: none;
+}
+
+/*
+ * 悬停才加下划线。
+ *
+ * 一段话里嵌了三四个记号，全部常驻下划线会把整段切得七零八落，
+ * 反而更难读。
+ */
+.cashtag:hover,
+.mention:hover {
+  text-decoration: underline;
+}
+
+.cashtag:focus-visible,
+.mention:focus-visible {
+  border-radius: var(--hq-radius-control);
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}
+
+/*
+ * 图片单独占一行并限高。
+ *
+ * 不限高的话，一张竖构图的长截图能把整页撑成几屏，读者得一直滚才能看到
+ * 下一段。宽度按容器收，避免横向溢出。
+ */
+.image {
+  border-radius: var(--hq-radius-card);
+  display: block;
+  height: auto;
+  margin: var(--hq-spacing-3) 0;
+  max-height: 520px;
+  max-width: 100%;
+  object-fit: contain;
+}

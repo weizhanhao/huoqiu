@@ -1,0 +1,63 @@
+/*
+ * 图右侧那一列：五档盘口 + 成交明细。
+ *
+ * 这一列是密集数字，行高压到最紧、字号降一档，为的是在图的高度之内塞下
+ * 十档盘口加二十笔成交——拉开行距就得滚动，而滚动会让人错过正在跳的那几行。
+ */
+.side {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  min-width: 0;
+}
+
+.block {
+  display: grid;
+  gap: var(--hq-spacing-1);
+  min-width: 0;
+}
+
+.heading {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-regular);
+  text-align: center;
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: var(--hq-type-size-micro);
+  table-layout: fixed;
+  width: 100%;
+}
+
+.table th,
+.table td {
+  padding: 1px var(--hq-spacing-1);
+  white-space: nowrap;
+}
+
+.table th {
+  color: var(--hq-text-tertiary);
+  font-weight: var(--hq-type-weight-regular);
+  text-align: left;
+  width: 24%;
+}
+
+/* 等宽数字：上下两行的小数点对齐，扫一列价格不用逐行找位置。 */
+.numeric {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.tickTime {
+  color: var(--hq-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.up {
+  color: var(--hq-market-up-text);
+}
+
+.down {
+  color: var(--hq-market-down-text);
+}

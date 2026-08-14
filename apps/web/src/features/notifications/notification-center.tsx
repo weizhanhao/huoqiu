@@ -12,7 +12,7 @@ import {
   type SyntheticNotification,
 } from "./notification-state";
 
-type NotificationFilter = "all" | NotificationCategoryId;
+export type NotificationFilter = "all" | NotificationCategoryId;
 
 type NotificationStoryProperties = Readonly<{
   notification: SyntheticNotification;
@@ -122,10 +122,20 @@ function NotificationCard({
   );
 }
 
-export function NotificationCenter() {
+/*
+ * initialFilter 来自 URL 的 ?category= 参数。
+ *
+ * 侧栏那四条「回复 / @我 / 赞与收藏 / 系统消息」过去全部指向同一个
+ * /notifications，点哪条落地都是默认视图——四个入口做了同一件事，
+ * 和没做没区别。现在分类进 URL，链接各自直达，也可以被收藏和分享。
+ */
+export function NotificationCenter({
+  initialFilter = "all",
+}: Readonly<{ initialFilter?: NotificationFilter }> = {}) {
   const { counts, hide, markAllRead, markRead, markUnread, notifications } =
     useNotificationSession();
-  const [activeFilter, setActiveFilter] = useState<NotificationFilter>("all");
+  const [activeFilter, setActiveFilter] =
+    useState<NotificationFilter>(initialFilter);
   const [announcement, setAnnouncement] = useState(
     `当前共有 ${counts.total} 条未读通知。`,
   );
@@ -158,7 +168,7 @@ export function NotificationCenter() {
 
   const openNotification = (notification: SyntheticNotification) => {
     markRead(notification.id);
-    setAnnouncement("通知已读，正在打开关联的合成内容。");
+    setAnnouncement("通知已读，正在打开关联的内容。");
   };
 
   const hideNotification = (notification: SyntheticNotification) => {
@@ -179,9 +189,9 @@ export function NotificationCenter() {
     >
       <header className={styles.hero}>
         <div className={styles.heroCopy}>
-          <p className={styles.kicker}>SESSION INBOX · FIXED FIXTURE</p>
-          <h2 id="notification-center-heading">消息中心</h2>
-          <p>查看与你的合成讨论、标的观察和演示账户相关的消息。</p>
+          <p className={styles.kicker}>消息中心</p>
+          <h1 id="notification-center-heading">消息中心</h1>
+          <p>查看与你的讨论、标的观察相关的消息。</p>
         </div>
         <div className={styles.unreadSummary}>
           <span>当前未读</span>
@@ -192,13 +202,19 @@ export function NotificationCenter() {
         </div>
       </header>
 
+      {/*
+        这段说明必须跟着实现走。
+        原文是「发送者、动作与时间均为固定离线 fixture……不代表真实用户消息」
+        ——而登录之后，关注、提及这些真实事件就是从库里读出来、并入同一个
+        列表渲染的。那句话会把一条真人的关注明确说成假的，方向刚好反了。
+      */}
       <aside className={styles.disclosure} aria-label="消息数据说明">
-        <span aria-hidden="true">演</span>
+        <span aria-hidden="true">说</span>
         <div>
-          <strong>演示数据 / 合成数据 · 不构成投资建议</strong>
+          <strong>登录后显示你的真实消息</strong>
           <p>
-            发送者、动作与时间均为固定离线 fixture；刷新后交互状态会重置，
-            不代表真实用户消息或跨端同步。
+            关注、提及等事件来自本站账号的真实记录；已读与隐藏只在本次会话
+            保留，刷新后重置。
           </p>
         </div>
       </aside>
@@ -267,7 +283,7 @@ export function NotificationCenter() {
         >
           <span aria-hidden="true">✓</span>
           <h3 id="notification-empty-heading">这个分类暂时没有消息</h3>
-          <p>已隐藏的消息只在本次会话中移除，刷新页面会恢复固定演示数据。</p>
+          <p>已隐藏的消息只在本次会话中移除，刷新页面会恢复初始记录。</p>
           {activeFilter !== "all" ? (
             <button onClick={() => chooseFilter("all")} type="button">
               查看全部消息
@@ -277,8 +293,8 @@ export function NotificationCenter() {
       )}
 
       <footer className={styles.footer}>
-        <span>合成消息 · 未经运营审核</span>
-        <span>SESSION ONLY / NO LIVE SERVICE</span>
+        <span>消息 · 未经运营审核</span>
+        <span>仅本次会话 · 未接入实时服务</span>
       </footer>
     </section>
   );

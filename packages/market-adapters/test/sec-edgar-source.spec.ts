@@ -840,4 +840,113 @@ describe("SEC EDGAR finance source", () => {
       });
     },
   );
+
+  /*
+   * 回归：申报条数超过内存护栏时必须截断，不能把整个发行人丢掉。
+   *
+   * 这是实测出来的缺陷：苹果的 filings.recent 有 1001 条，原实现直接抛
+   * invalid-response，于是整家公司拿不到任何数据；微软的 1000 条正好压线
+   * 通过，所以问题看起来像是「某些公司没有数据」。一家公司多报一份文件
+   * 不该让它整个消失。
+   */
+  const parallelArrays = (count: number) => ({
+    accessionNumber: Array.from(
+      { length: count },
+      (_unused, index) => `0009999999-26-${String(index).padStart(6, "0")}`,
+    ),
+    acceptanceDateTime: Array.from(
+      { length: count },
+      () => "2026-08-11T20:15:30.000Z",
+    ),
+    filingDate: Array.from({ length: count }, () => "2026-08-11"),
+    form: Array.from({ length: count }, () => "10-Q"),
+    primaryDocument: Array.from(
+      { length: count },
+      (_unused, index) => `example-${index}.htm`,
+    ),
+    reportDate: Array.from({ length: count }, () => "2026-06-30"),
+  });
+
+  it("truncates oversized filing tables instead of dropping the issuer", async () => {
+    const { source } = createSource({
+      fetch: (url: string) =>
+        Promise.resolve(
+          jsonResponse(
+            {
+              ...currentSubmissions,
+              filings: { files: [], recent: parallelArrays(1_001) },
+            },
+            url,
+          ),
+        ),
+    });
+
+    const batch = await source.fetch({});
+
+    expect(batch.records.length).toBeGreaterThan(0);
+    expect(batch.records.length).toBeLessThanOrEqual(1_000);
+  });
+
+  /*
+   * 回归：历史分片游标放不下时降级，不能把整个发行人丢掉。
+   *
+   * 摩根大通有两万多条申报、极多历史分片，拼出来的游标超过长度上限，
+   * 原实现直接抛 invalid-response，于是这家公司一条记录都拿不到。
+   * 游标只决定「能否继续翻历史」，不该决定「这家公司是否存在」。
+   */
+  it("degrades an oversized history cursor instead of dropping the issuer", async () => {
+    const manyFiles = Array.from({ length: 400 }, (_unused, index) => ({
+      name: `CIK0000320193-submissions-${String(index).padStart(3, "0")}.json`,
+    }));
+    const { source } = createSource({
+      fetch: (url: string) =>
+        Promise.resolve(
+          jsonResponse(
+            {
+              ...currentSubmissions,
+              filings: {
+                files: manyFiles,
+                recent: currentSubmissions.filings.recent,
+              },
+            },
+            url,
+          ),
+        ),
+    });
+
+    const batch = await source.fetch({});
+
+    expect(batch.records.length).toBeGreaterThan(0);
+    // 游标要么被截到装得下，要么干脆没有——但绝不能因此丢掉记录。
+    expect(batch.nextCursor === undefined || batch.nextCursor.length > 0).toBe(
+      true,
+    );
+  });
+
+  it("still rejects filing tables whose parallel arrays disagree", async () => {
+    const recent = parallelArrays(3);
+    const { source } = createSource({
+      fetch: (url: string) =>
+        Promise.resolve(
+          jsonResponse(
+            {
+              ...currentSubmissions,
+              filings: {
+                files: [],
+                // 少一个日期：取任何一条都会把甲文件的表单号配到乙文件的日期上。
+                recent: {
+                  ...recent,
+                  filingDate: recent.filingDate.slice(0, 2),
+                },
+              },
+            },
+            url,
+          ),
+        ),
+    });
+
+    await expect(source.fetch({})).rejects.toMatchObject({
+      classification: "invalid-response",
+    });
+  });
 });

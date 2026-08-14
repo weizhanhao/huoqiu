@@ -1,0 +1,103 @@
+/*
+ * 长文编辑。
+ *
+ * 标题与正文都做成无边框的大输入区：写长文时那些框线只会打断视线，
+ * 而这一页除了写字没有别的事可做。
+ */
+.editor {
+  align-content: start;
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-4);
+  min-height: 60dvh;
+  padding: var(--hq-spacing-5);
+}
+
+.title {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hq-border-subtle);
+  border-radius: 0;
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  padding: var(--hq-spacing-2) 0;
+}
+
+.title:focus-visible,
+.body:focus-visible {
+  border-color: var(--hq-border-focus);
+  outline: none;
+}
+
+.body {
+  background: none;
+  border: none;
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-body);
+  line-height: var(--hq-type-line-height-body);
+  min-height: 40dvh;
+  padding: 0;
+  resize: vertical;
+}
+
+.settings {
+  border-top: 1px solid var(--hq-border-subtle);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding-top: var(--hq-spacing-4);
+}
+
+.field {
+  align-items: center;
+  display: flex;
+  gap: var(--hq-spacing-3);
+}
+
+.fieldLabel {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  white-space: nowrap;
+}
+
+.field select {
+  max-width: 200px;
+}
+
+.actions {
+  display: flex;
+  gap: var(--hq-spacing-2);
+  justify-content: flex-end;
+}
+
+.primary,
+.secondary {
+  border-radius: var(--hq-radius-control);
+  font-size: var(--hq-type-size-body-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-5);
+}
+
+.primary {
+  background: var(--hq-brand-primary);
+  border: 1px solid var(--hq-brand-primary);
+  color: var(--hq-brand-on-primary);
+}
+
+.primary:disabled {
+  opacity: 0.5;
+}
+
+.secondary {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  color: var(--hq-text-primary);
+}
+
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}

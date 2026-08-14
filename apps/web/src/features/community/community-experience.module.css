@@ -30,7 +30,7 @@
 .streamHeading,
 .authorCard {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
 }
 
@@ -66,7 +66,7 @@
 }
 
 .channels {
-  border-bottom: 1px solid var(--hq-surface-divider);
+  border-bottom: 1px solid var(--hq-border-default);
   padding-bottom: 10px;
 }
 
@@ -76,7 +76,7 @@
 .toolButton,
 .submit,
 .remove {
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: 999px;
   cursor: pointer;
   font: inherit;
@@ -203,12 +203,146 @@
   gap: 7px 12px;
 }
 
-.tagList span {
-  background: #f1f7ff;
-  border-radius: 999px;
-  color: var(--hq-brand-primary);
+/*
+ * 评论排序与点赞。
+ * 两者都固定最小宽度：「最新/最热」「赞/已赞」切换时不推动相邻元素。
+ */
+.commentSort {
+  background: var(--hq-surface-sunken);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  display: inline-flex;
+  padding: 2px;
+}
+
+.commentSort button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: calc(var(--hq-radius-control) - 2px);
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: var(--hq-type-size-caption);
+  justify-content: center;
+  min-height: 28px;
+  min-width: 3.5em;
+}
+
+.commentSort button[aria-pressed="true"] {
+  background: var(--hq-surface-raised);
+  color: var(--hq-text-primary);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.commentLikeButton {
+  background: transparent;
+  border: 0;
+  color: var(--hq-text-tertiary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  min-width: 4.5em;
+  padding: 0;
+  text-align: left;
+}
+
+.commentLikeButton:hover {
+  color: var(--hq-text-link);
+}
+
+.commentLikeButton[aria-pressed="true"] {
+  color: var(--hq-text-link);
+}
+
+/*
+ * 列表底部。常驻一行——不论是「加载更多」还是「已显示全部」，高度一致，
+ * 加载后不会把页脚顶一下。
+ */
+.feedFooter {
+  align-items: center;
+  color: var(--hq-text-tertiary);
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  gap: var(--hq-spacing-3);
+  justify-content: center;
+  min-height: var(--hq-touch-web-minimum);
+  padding: var(--hq-spacing-3) 0;
+}
+
+/*
+ * 屏蔽入口。放在卡片头部右端，视觉上弱于内容本身——它是治理动作，
+ * 不该和阅读争夺注意力。固定最小宽度，「屏蔽 / 取消屏蔽」切换时不推动相邻元素。
+ */
+.blockButton {
+  background: transparent;
+  border: 0;
+  color: var(--hq-text-tertiary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--hq-type-size-caption);
+  min-width: 4.5em;
+  padding: 0;
+  text-align: right;
+}
+
+.blockButton:hover:not(:disabled) {
+  color: var(--hq-text-link);
+}
+
+.blockButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/*
+ * 转发控件。
+ *
+ * 输入框展开时用 flex-wrap 换行而不是撑宽卡片：卡片宽度固定，
+ * 展开一个输入框不该把整张卡的布局推变形。
+ */
+.repostSlot {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2);
+}
+
+.repostComposer {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--hq-spacing-2);
+}
+
+.repostComposer input {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  font: inherit;
+  font-size: var(--hq-type-size-caption);
+  min-height: 32px;
+  min-width: 0;
+  padding: 0 var(--hq-spacing-2);
+  width: 12em;
+}
+
+/* 标签现在是通往话题页的链接，选择器要同时覆盖旧的 span 形态。 */
+.tagList span,
+.tagList a {
+  background: var(--hq-brand-subtle);
+  border-radius: var(--hq-radius-pill);
+  color: var(--hq-text-link);
   font-size: 0.78rem;
   padding: 5px 9px;
+  text-decoration: none;
+}
+
+.tagList a:hover {
+  color: var(--hq-text-link-hover);
+  text-decoration: underline;
 }
 
 .engagement {
@@ -467,7 +601,7 @@
 }
 
 .replyList {
-  border-left: 2px solid var(--hq-surface-divider);
+  border-left: 2px solid var(--hq-border-default);
   margin-left: 4px;
   padding-left: 12px;
 }
@@ -488,7 +622,7 @@
 .publisher textarea,
 .publisher input[type="text"] {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: 10px;
   color: var(--hq-text-primary);
   font: inherit;
@@ -508,8 +642,23 @@
   gap: 16px;
 }
 
+/* 原生文件选择控件默认只有 25px 高，触屏上够不着。 */
 .fileInput {
   max-width: 100%;
+  min-height: var(--hq-touch-web-minimum);
+}
+
+.fileInput::file-selector-button {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-strong);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  margin-right: var(--hq-spacing-3);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
 }
 
 .mediaPreview {
@@ -576,4 +725,117 @@
     padding-left: 18px;
     padding-right: 18px;
   }
+}
+
+/* 发布器工具条的插入器 */
+
+.toolPicker {
+  align-items: center;
+  color: var(--hq-text-tertiary);
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  gap: var(--hq-spacing-2);
+}
+
+.toolPicker select {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  max-width: 180px;
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-2);
+}
+
+.toolPicker select:hover {
+  border-color: var(--hq-brand-primary);
+}
+
+/*
+ * 移动端触控下限。
+ *
+ * 本轮新增的几个控件（评论排序、评论点赞、屏蔽、转发输入框）为了桌面密度
+ * 都写了小于 44px 的显式高度。显式声明会盖过 globals 里那条 :where() 兜底
+ * 规则（它的优先级是 0），于是这些控件在触屏上不达标。
+ *
+ * 这里按仓库既有做法——和频道 Tab 一样——在移动断点内单独抬回 44px。
+ * 密度不能拿命中区去换。
+ */
+@media (max-width: 720px) {
+  .commentSort button,
+  .commentLikeButton,
+  .blockButton,
+  .repostComposer input {
+    min-height: var(--hq-touch-web-minimum);
+    min-width: var(--hq-touch-web-minimum);
+  }
+}
+
+/*
+ * 评论、回复与发帖表单的排版。
+ *
+ * 这几个表单此前一条排布规则都没有：<label> 和输入框挤在同一行，
+ * 输入框是浏览器默认的小方块，按钮撑满整行——三样东西各说各话。
+ *
+ * 控件本身的外观由 globals.css 的表单基线统一；这里只管排布，
+ * 而且一次覆盖三个表单，不是只修被看到的那一个。
+ */
+.commentForm,
+.composer,
+.replyComposer,
+.publisher {
+  display: grid;
+  gap: var(--hq-spacing-2);
+}
+
+.commentForm label,
+.composer label,
+.replyComposer label,
+.publisher label {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-medium);
+}
+
+.commentForm textarea,
+.composer textarea,
+.publisher textarea {
+  min-height: 6rem;
+}
+
+/* 提交键不撑满整行：那在这种小表单里显得过重，也不像个按钮。 */
+.commentForm button,
+.composer button,
+.replyComposer button,
+.publisher button {
+  justify-self: start;
+}
+
+/*
+ * 创作声明。
+ *
+ * 摆在正文之前、压成次要色：它是一句需要读者知道的提示，但不是这篇的
+ * 标题——做得比正文还显眼，读者第一眼看到的就成了声明本身。
+ */
+.disclosure {
+  align-items: center;
+  color: var(--hq-text-secondary);
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  gap: var(--hq-spacing-2);
+  margin: 0 0 var(--hq-spacing-3);
+}
+
+.disclosure span {
+  align-items: center;
+  background: var(--hq-brand-primary);
+  border-radius: 50%;
+  color: var(--hq-brand-on-primary);
+  display: inline-flex;
+  font-size: 11px;
+  height: 16px;
+  justify-content: center;
+  width: 16px;
 }

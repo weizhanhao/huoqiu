@@ -1,4 +1,5 @@
 import type { D0Fixture } from "@huoqiu/contracts/d0";
+import { InstrumentLink } from "../instrument/instrument-link";
 import type { FeedCardV1 } from "@huoqiu/contracts/feed/card-v1";
 
 import { readPayloadString, readPayloadStringArray } from "./feed-payload";
@@ -15,11 +16,11 @@ export function MarketStripCard({ card, fixture }: MarketStripCardProperties) {
   );
 
   return (
-    <section className="feed-card market-strip-card" aria-label="合成市场快照">
+    <section className="feed-card market-strip-card" aria-label="样本市场快照">
       <div className="feed-card-heading">
         <div>
-          <p className="card-kicker">MARKET FIXTURE</p>
-          <h2>{readPayloadString(card.payload, "title", "合成行情")}</h2>
+          <p className="card-kicker">行情 · 演示数据</p>
+          <h2>{readPayloadString(card.payload, "title", "样本行情")}</h2>
         </div>
         <span>{fixture.market.as_of.slice(0, 16).replace("T", " ")} UTC</span>
       </div>
@@ -29,10 +30,10 @@ export function MarketStripCard({ card, fixture }: MarketStripCardProperties) {
             (candidate) => candidate.listing_id === instrument.listing_id,
           );
           return (
-            <a
+            <InstrumentLink
               className="market-strip-quote"
-              href={`/instruments/${instrument.listing_id}`}
               key={instrument.listing_id}
+              symbol={instrument.listing_id}
             >
               <span>
                 <strong>{instrument.name}</strong>
@@ -42,7 +43,7 @@ export function MarketStripCard({ card, fixture }: MarketStripCardProperties) {
                 <strong>{quote?.last ?? "--"}</strong>
                 <small>+{quote?.change_pct ?? "--"}%</small>
               </span>
-            </a>
+            </InstrumentLink>
           );
         })}
       </div>

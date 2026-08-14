@@ -51,7 +51,7 @@ export function InstrumentDetailChart({
   const summaryLabel = series.label.endsWith("K")
     ? `${series.label} 走势`
     : `${series.label}走势`;
-  const summary = `${summaryLabel}：${displayValues.length} 个固定合成采样点`;
+  const summary = `${summaryLabel}：${displayValues.length} 个固定样本采样点`;
   const isUp = changePct >= 0;
 
   return (
@@ -59,7 +59,7 @@ export function InstrumentDetailChart({
       <div className={styles.chartMeta}>
         <div>
           <strong>{series.label}走势</strong>
-          <span>固定合成序列 · 非实时</span>
+          <span>固定样本序列 · 非实时</span>
         </div>
         <span className={isUp ? styles.up : styles.down}>
           区间末值 {lastChange >= 0 ? "+" : ""}

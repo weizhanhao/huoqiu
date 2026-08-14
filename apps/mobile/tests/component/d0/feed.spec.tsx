@@ -20,11 +20,11 @@ describe("D0 mobile home feed", () => {
 
     expect(markup).toContain("演示数据");
     expect(markup).toContain("合成行情");
-    expect(markup).toContain("合成示例一号");
+    expect(markup).toContain("星海智造");
     expect(markup).toContain("SYN001");
     expect(markup).toContain("108.64");
     expect(markup).toContain("合成市场的第一份观察");
-    expect(markup).toContain("合成示例一号完成日内数据更新");
+    expect(markup).toContain("星海智造完成日内数据更新");
     expect(markup).toContain("huoqiu-synthetic");
     expect(markup).toContain("2026-08-08T06:00:00.000Z");
     expect(markup).toContain("演示数据，不构成投资建议");

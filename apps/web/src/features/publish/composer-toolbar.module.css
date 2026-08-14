@@ -1,0 +1,258 @@
+/*
+ * 发帖框底下那一排小按钮，以及它们弹出的面板。
+ *
+ * 图标一律压成次要色、只在悬停与聚焦时才亮起来：这一排是辅助操作，
+ * 和右边的「发布」抢对比度的话，主操作就找不到了。
+ */
+.root {
+  display: grid;
+  gap: var(--hq-spacing-2);
+  position: relative;
+}
+
+.bar {
+  align-items: center;
+  display: flex;
+  gap: var(--hq-spacing-2);
+}
+
+.icons {
+  display: flex;
+  gap: var(--hq-spacing-1);
+}
+
+/*
+ * 触摸目标按站内最小尺寸给足。
+ *
+ * 图标只有十几像素宽，按视觉大小做按钮的话，手机上几乎点不中——
+ * 而点不中和「按钮坏了」在用户那里是同一件事。
+ */
+.icon {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-tertiary);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--hq-type-size-body);
+  justify-content: center;
+  line-height: 1;
+  min-height: var(--hq-touch-web-minimum);
+  min-width: var(--hq-touch-web-minimum);
+  padding: 0;
+}
+
+.icon:hover:not(:disabled) {
+  background: var(--hq-surface-base);
+  color: var(--hq-text-primary);
+}
+
+.icon:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: -2px;
+}
+
+.icon:disabled {
+  cursor: progress;
+  opacity: 0.5;
+}
+
+/* 分隔线把「往正文里插东西」和「换一种写法」两组分开。 */
+.divider {
+  background: var(--hq-border-subtle);
+  height: 18px;
+  width: 1px;
+}
+
+.longform {
+  align-items: center;
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  display: inline-flex;
+  font-size: var(--hq-type-size-body-compact);
+  gap: var(--hq-spacing-1);
+  padding: var(--hq-spacing-1) var(--hq-spacing-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.longform:hover {
+  background: var(--hq-surface-base);
+  color: var(--hq-text-primary);
+}
+
+.longform:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 1px;
+}
+
+/*
+ * 文件输入框不能用 display: none。
+ *
+ * 那样它在部分浏览器里连 click() 都不响应，图片按钮会变成一个点不动的
+ * 按钮——正是这一排最不该出现的东西。挪出视口即可。
+ */
+.file {
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 1px;
+}
+
+.uploadError {
+  color: var(--hq-market-down-text);
+  font-size: var(--hq-type-size-caption);
+  margin: 0;
+}
+
+/* 声明是给读者看的承诺，所以在发之前就显式摆出来，而不是藏在菜单里。 */
+.disclosureChip {
+  align-items: center;
+  color: var(--hq-text-secondary);
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  gap: var(--hq-spacing-2);
+  margin: 0;
+}
+
+.disclosureDot {
+  align-items: center;
+  background: var(--hq-brand-primary);
+  border-radius: 50%;
+  color: var(--hq-brand-on-primary);
+  display: inline-flex;
+  font-size: 11px;
+  height: 16px;
+  justify-content: center;
+  width: 16px;
+}
+
+.disclosureClear {
+  background: none;
+  border: none;
+  color: var(--hq-text-tertiary);
+  cursor: pointer;
+  font-size: var(--hq-type-size-caption);
+  padding: 0;
+  text-decoration: underline;
+}
+
+.disclosureClear:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}
+
+/*
+ * 面板浮在工具栏之上。
+ *
+ * 用绝对定位而不是把它排进文档流：撑开文档流会把「发布」按钮往下顶，
+ * 选个表情整块跳一下。
+ */
+.panel {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-subtle);
+  border-radius: var(--hq-radius-card);
+  bottom: calc(100% + var(--hq-spacing-2));
+  box-shadow: var(--hq-shadow-floating);
+  left: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: var(--hq-spacing-2);
+  position: absolute;
+  width: min(320px, 100%);
+  z-index: 5;
+}
+
+.panelBody {
+  display: grid;
+  gap: var(--hq-spacing-2);
+}
+
+.search {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-subtle);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  font: inherit;
+  font-size: var(--hq-type-size-body-compact);
+  padding: var(--hq-spacing-2);
+  width: 100%;
+}
+
+.search:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: -1px;
+}
+
+.panelList {
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.panelRow {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  cursor: pointer;
+  display: flex;
+  font-size: var(--hq-type-size-body-compact);
+  gap: var(--hq-spacing-2);
+  justify-content: space-between;
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-2);
+  text-align: left;
+  width: 100%;
+}
+
+.panelRow small {
+  color: var(--hq-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.panelRow:hover {
+  background: var(--hq-surface-sunken);
+}
+
+.panelRow:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: -2px;
+}
+
+.panelEmpty {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  margin: 0;
+  padding: var(--hq-spacing-2);
+}
+
+.emojiGrid {
+  display: grid;
+  gap: var(--hq-spacing-1);
+  grid-template-columns: repeat(8, 1fr);
+}
+
+.emoji {
+  aspect-ratio: 1;
+  background: transparent;
+  border: none;
+  border-radius: var(--hq-radius-control);
+  cursor: pointer;
+  font-size: var(--hq-type-size-body);
+  line-height: 1;
+  padding: 0;
+}
+
+.emoji:hover {
+  background: var(--hq-surface-sunken);
+}
+
+.emoji:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: -2px;
+}

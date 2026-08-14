@@ -1,0 +1,259 @@
+/*
+ * 整张图表卡片作为一条链接。
+ *
+ * 只动 border-color 和 box-shadow：两者都不触发重排，鼠标划过时下方内容
+ * 一动不动。悬停与键盘聚焦给不同信号——聚焦必须自带可见轮廓，否则键盘
+ * 用户走到这里会完全失去位置感。
+ */
+.chartLink {
+  border-radius: var(--hq-radius-card);
+  color: inherit;
+  display: block;
+  text-decoration: none;
+}
+
+.chartLink:hover .chartCard {
+  border-color: var(--hq-border-strong);
+}
+
+.chartLink:focus-visible .chartCard {
+  border-color: var(--hq-border-focus);
+  box-shadow: var(--hq-shadow-focus);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chartLink .chartCard {
+    transition:
+      border-color var(--hq-motion-duration-fast) var(--hq-motion-ease-out),
+      box-shadow var(--hq-motion-duration-fast) var(--hq-motion-ease-out);
+  }
+}
+
+.chartCard {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-4);
+}
+
+.chartHeading {
+  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-3);
+  justify-content: space-between;
+}
+
+.chartHeading h3 {
+  align-items: baseline;
+  display: flex;
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+  gap: var(--hq-spacing-2);
+}
+
+.symbol {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-regular);
+}
+
+.market {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.quote {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  text-align: right;
+}
+
+.quote strong {
+  font-size: var(--hq-type-size-data-large);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--hq-type-line-height-flat);
+}
+
+.quote span {
+  font-size: var(--hq-type-size-body-compact);
+  font-variant-numeric: tabular-nums;
+}
+
+.quote small {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.up {
+  color: var(--hq-market-up-text);
+}
+
+.down {
+  color: var(--hq-market-down-text);
+}
+
+.upStroke {
+  color: var(--hq-market-up-text);
+  stroke: currentColor;
+}
+
+.downStroke {
+  color: var(--hq-market-down-text);
+  stroke: currentColor;
+}
+
+/*
+ * aspect-ratio 与 viewBox 一致：版位在首帧就被占住，图画完不会把下方
+ * 内容顶下去。这是这张图不产生任何布局位移的关键。
+ */
+.chart {
+  /*
+   * 比例跟着 viewBox 走。底部加了日期轴之后 viewBox 高了 18，
+   * 这里不跟着改，preserveAspectRatio 的默认 meet 会在上下留出空白带。
+   */
+  aspect-ratio: 720 / 338;
+  background: var(--hq-surface-sunken);
+  border-radius: var(--hq-radius-control);
+  display: block;
+  width: 100%;
+}
+
+/*
+ * 价格网格、价格刻度与日期刻度。
+ *
+ * 这张图此前没有任何刻度：一根 K 线画在哪个价位、是哪一天，全读不出来。
+ * 线要淡——它是背景参照，不该盖过 K 线本身。
+ */
+.axis line {
+  stroke: var(--hq-border-subtle);
+  stroke-width: 1;
+}
+
+.axis text,
+text.axis {
+  fill: var(--hq-text-tertiary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.maLine {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.legend {
+  color: var(--hq-text-tertiary);
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  gap: var(--hq-spacing-4);
+  list-style: none;
+  margin: var(--hq-spacing-2) 0 0;
+  padding: 0;
+}
+
+.legend li {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.legend span {
+  border-radius: 1px;
+  display: inline-block;
+  height: 2px;
+  width: 14px;
+}
+
+.stats {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+}
+
+.stats div {
+  display: grid;
+  gap: 2px;
+}
+
+.stats dt {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.stats dd {
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-data);
+  font-variant-numeric: tabular-nums;
+}
+
+.source,
+.empty {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-body);
+}
+
+/*
+ * 十字光标。
+ *
+ * 虚线、颜色压低：它是量尺，不该看着像图里的一条数据线。
+ */
+.crosshair line {
+  stroke: var(--hq-text-tertiary);
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+}
+
+.crosshairTag {
+  fill: var(--hq-text-secondary);
+}
+
+.crosshairValue {
+  fill: var(--hq-text-inverse);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 图本身可聚焦，键盘用户要能看出焦点在哪。 */
+.chart:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}
+
+/*
+ * 光标那一根的明细。
+ *
+ * 常驻一行，不做浮层：浮层会盖住 K 线，触屏上也没有 hover 可用。
+ * 位置固定，数值随光标变——不会因为鼠标一动就整块跳来跳去。
+ */
+.readout {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--hq-type-size-caption);
+  gap: var(--hq-spacing-2) var(--hq-spacing-5);
+  margin: var(--hq-spacing-3) 0 0;
+}
+
+.readout > div {
+  align-items: baseline;
+  display: flex;
+  gap: var(--hq-spacing-2);
+}
+
+.readout dt {
+  color: var(--hq-text-tertiary);
+}
+
+.readout dd {
+  color: var(--hq-text-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-medium);
+  margin: 0;
+}

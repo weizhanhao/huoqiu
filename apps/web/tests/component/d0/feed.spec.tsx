@@ -19,13 +19,13 @@ describe("fixture-driven D0 feed", () => {
       <D0Feed cards={fixture.feed} fixture={fixture} state="normal" />,
     );
 
-    expect(markup).toContain("合成行情");
-    expect(markup).toContain("合成示例一号");
+    expect(markup).toContain("样本行情");
+    expect(markup).toContain("星海智造");
     expect(markup).toContain("SYN001");
     expect(markup).toContain("108.64");
     expect(markup).toContain("合成市场的第一份观察");
-    expect(markup).toContain("合成示例一号完成日内数据更新");
-    expect(markup).toContain("演示数据，不构成投资建议");
+    expect(markup).toContain("星海智造完成日内数据更新");
+    expect(markup).toContain("样本数据 · 非实时，不构成投资建议");
   });
 
   it("renders stable loading, empty, and error states", () => {
@@ -35,7 +35,7 @@ describe("fixture-driven D0 feed", () => {
       renderToStaticMarkup(
         <D0Feed cards={fixture.feed} fixture={fixture} state="loading" />,
       ),
-    ).toContain("正在加载演示数据");
+    ).toContain("正在加载");
     expect(
       renderToStaticMarkup(
         <D0Feed cards={[]} fixture={fixture} state="empty" />,

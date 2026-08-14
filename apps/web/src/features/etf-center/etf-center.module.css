@@ -1,0 +1,838 @@
+.pageStack {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  padding-bottom: 36px;
+  width: 100%;
+}
+
+.hero {
+  align-items: baseline;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2) var(--hq-spacing-4);
+  justify-content: space-between;
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+}
+
+.hero h2 {
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  letter-spacing: var(--hq-type-tracking-tight);
+  line-height: var(--hq-type-line-height-compact);
+  margin: 0;
+}
+
+.hero p:last-child {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-snug);
+}
+
+/* 区块小标签：去掉全大写英文横幅腔调，退成安静的次级说明。 */
+.kicker {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-medium);
+}
+
+.disclosure {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: right;
+}
+
+.disclosure strong {
+  background: var(--hq-brand-primary);
+  border-radius: 999px;
+  color: var(--hq-brand-on-primary);
+  font-size: 13px;
+  padding: 7px 12px;
+}
+
+.disclosure span,
+.resultStatus,
+.sectionHeading > span {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+}
+
+.rankings,
+/*
+ * 网格子项即使 min-width: 0，仍可能按自身 max-content（内容 + 内边距）
+ * 定宽而溢出轨道。显式 width: 100% 把它钉回轨道宽度。
+ */
+.pageStack > * {
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.panel {
+  min-width: 0;
+}
+
+.panel {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  padding: 22px;
+}
+
+.sectionHeading {
+  align-items: flex-end;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.sectionHeading h3 {
+  font-size: 22px;
+  letter-spacing: -0.03em;
+  margin-top: 5px;
+}
+
+.sectionHeading > strong {
+  color: var(--hq-brand-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rankingGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rankingCard {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  min-width: 0;
+  overflow: hidden;
+  padding: 18px;
+}
+
+.rankingCard header {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+}
+
+.rankingCard header > span {
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.rankingCard header small,
+.rankingCard li > span,
+.metricStack small,
+.riskStack small,
+.etfRow a small {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+}
+
+.rankingCard ol {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.rankingCard li {
+  align-items: center;
+  border-top: 1px solid var(--hq-border-default);
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  min-height: 52px;
+}
+
+.rankingCard li > span {
+  color: var(--hq-brand-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rankingCard a,
+/*
+ * 列表里的链接必须自己撑满 44px 触控高度。
+ * 靠父行的 padding 撑出来的高度不算——命中区仍然只有文字那 21px。
+ */
+.etfRow a {
+  align-items: center;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: var(--hq-touch-web-minimum);
+  min-width: 0;
+  text-decoration: none;
+}
+
+.rankingCard a {
+  align-items: center;
+  display: flex;
+  min-height: var(--hq-touch-web-minimum);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rankingCard a:hover,
+.rankingCard a:focus-visible,
+.etfRow a:hover strong,
+.etfRow a:focus-visible strong {
+  color: var(--hq-brand-primary);
+  outline: none;
+}
+
+.rankingCard li > strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.localSearch {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.localSearch > span {
+  color: var(--hq-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.localSearch input {
+  background: var(--hq-surface-canvas);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-pill);
+  color: var(--hq-text-primary);
+  font: inherit;
+  min-height: 44px;
+  padding: 9px 16px;
+  width: 100%;
+}
+
+.localSearch input:focus-visible,
+.filterGroup button:focus-visible,
+.filterGroup button:hover {
+  border-color: var(--hq-brand-primary);
+  box-shadow: var(--hq-shadow-focus);
+  outline: 2px solid transparent;
+}
+
+/*
+ * 隐式网格列按 max-content 定宽，会被内部那排不换行的筛选按钮撑破，
+ * 且会一路传导到 .panel。显式声明 minmax(0, 1fr) 把轨道钉死在容器宽度。
+ */
+.filterStack {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.filterGroup {
+  align-items: flex-start;
+  border: 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 70px minmax(0, 1fr);
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.filterGroup legend {
+  color: var(--hq-text-secondary);
+  float: left;
+  font-size: 13px;
+  font-weight: 750;
+  padding-top: 12px;
+}
+
+.filterGroup > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filterGroup button {
+  background: var(--hq-surface-canvas);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 999px;
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  min-height: 44px;
+  padding: 9px 15px;
+}
+
+.filterGroup button[aria-pressed="true"] {
+  background: var(--hq-brand-primary);
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-brand-on-primary);
+}
+
+.resultStatus {
+  border-top: 1px solid var(--hq-border-default);
+  margin-top: 18px;
+  padding: 14px 0 10px;
+}
+
+.etfTable {
+  border-top: 1px solid var(--hq-border-default);
+  min-width: 0;
+}
+
+.tableHeader,
+.etfRow {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns:
+    minmax(190px, 1.45fr) minmax(100px, 0.75fr) minmax(70px, 0.5fr)
+    minmax(78px, 0.55fr) minmax(96px, 0.7fr) minmax(92px, 0.65fr);
+}
+
+.tableHeader {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+  min-height: 42px;
+}
+
+.etfRow {
+  border-top: 1px solid var(--hq-border-default);
+  min-height: 78px;
+  padding: 10px 0;
+}
+
+.etfRow a,
+.metricStack,
+.riskStack {
+  display: grid;
+  gap: 4px;
+}
+
+.etfRow a strong {
+  overflow-wrap: anywhere;
+}
+
+.miniTrend {
+  height: 34px;
+  width: 112px;
+}
+
+.up,
+.upStroke {
+  color: var(--hq-market-up-text);
+}
+
+.down,
+.downStroke {
+  color: var(--hq-market-down-text);
+}
+
+.mono,
+.up,
+.down,
+.metricStack strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 用 *Text 变体，不用图表原色——原色对白底只有 3.73:1。 */
+.riskStack small {
+  color: var(--hq-market-warning-text);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.emptyState {
+  border: 1px dashed var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: 8px;
+  min-height: 190px;
+  padding: 32px;
+  place-content: center;
+  text-align: center;
+}
+
+.emptyState p {
+  color: var(--hq-text-secondary);
+  line-height: 1.65;
+}
+
+.unavailableBar {
+  align-items: center;
+  background: var(--hq-surface-inverse);
+  border-radius: var(--hq-radius-card);
+  color: var(--hq-text-inverse);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 18px;
+}
+
+.unavailableBar > div {
+  display: grid;
+  gap: 4px;
+  margin-right: auto;
+}
+
+/* 深色反相面上的次级文字用 inverse-muted；浅底的 tertiary 在这里只有 3.26:1。 */
+.unavailableBar span {
+  color: var(--hq-text-inverse-muted);
+  font-size: var(--hq-type-size-caption);
+}
+
+.unavailableBar button {
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-inverse-muted);
+  font: inherit;
+  min-height: 44px;
+  padding: 9px 14px;
+}
+
+.detail {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  padding-bottom: 36px;
+  width: 100%;
+}
+
+.backLink {
+  align-items: center;
+  color: var(--hq-brand-primary);
+  display: inline-flex;
+  font-weight: 700;
+  min-height: 44px;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.detailHero {
+  align-items: flex-end;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 28px;
+}
+
+.detailHero h2 {
+  font-size: clamp(28px, 5vw, 44px);
+  letter-spacing: -0.05em;
+  line-height: 1.08;
+  margin: 10px 0;
+}
+
+.detailHero p:last-child {
+  color: var(--hq-text-secondary);
+  font-size: 13px;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.badges span {
+  background: var(--hq-surface-subtle);
+  border-radius: 999px;
+  color: var(--hq-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
+.badges span:first-child {
+  background: var(--hq-brand-primary);
+  color: var(--hq-brand-on-primary);
+}
+
+.quoteSummary {
+  align-items: flex-end;
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.quoteSummary > strong {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(38px, 7vw, 64px);
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+
+.quoteSummary > span {
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: 750;
+}
+
+.detailActions {
+  align-items: center;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 14px 16px;
+}
+
+.detailActions > span {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+  margin-right: auto;
+}
+
+.detailActions button {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 999px;
+  color: var(--hq-text-primary);
+  font: inherit;
+  min-height: 44px;
+  padding: 9px 14px;
+}
+
+.detailActions button:not(:disabled) {
+  cursor: pointer;
+}
+
+.detailActions button:not(:disabled):focus-visible,
+.detailActions button:not(:disabled):hover {
+  border-color: var(--hq-brand-primary);
+  box-shadow: var(--hq-shadow-focus);
+  outline: 2px solid transparent;
+}
+
+.detailActions button[aria-pressed="true"] {
+  background: var(--hq-brand-primary);
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-brand-on-primary);
+}
+
+.detailActions button:disabled {
+  color: var(--hq-text-tertiary);
+  cursor: not-allowed;
+}
+
+.detailPanel {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  min-width: 0;
+  padding: 22px;
+}
+
+.detailPanel > h3 {
+  font-size: 21px;
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+}
+
+.detailChart {
+  background:
+    linear-gradient(var(--hq-border-default) 1px, transparent 1px) 0 0 / 100%
+      50%,
+    linear-gradient(90deg, var(--hq-border-default) 1px, transparent 1px) 0 0 /
+      25% 100%;
+  color: var(--hq-brand-primary);
+  height: clamp(180px, 32vw, 320px);
+  width: 100%;
+}
+
+.detailChart line {
+  stroke: var(--hq-border-default);
+  stroke-width: 1;
+}
+
+.metricsGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+
+.metricsGrid div {
+  background: var(--hq-surface-subtle);
+  border-radius: var(--hq-radius-control);
+  display: grid;
+  gap: 6px;
+  min-height: 82px;
+  padding: 14px;
+}
+
+.metricsGrid dt {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+}
+
+.metricsGrid dd {
+  font-variant-numeric: tabular-nums;
+  font-size: 18px;
+  font-weight: 750;
+  margin: 0;
+}
+
+.detailGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+}
+
+.holdingsList,
+.exposureList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.holdingsList li {
+  align-items: center;
+  border-top: 1px solid var(--hq-border-default);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
+  min-height: 48px;
+}
+
+.holdingsList li > span {
+  color: var(--hq-brand-primary);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.holdingsList li > small {
+  color: var(--hq-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.holdingsList li > strong:last-child {
+  font-variant-numeric: tabular-nums;
+}
+
+.exposureList {
+  display: grid;
+  gap: 18px;
+}
+
+.exposureList li {
+  display: grid;
+  gap: 8px;
+}
+
+.exposureList li > div {
+  display: flex;
+  font-size: 13px;
+  justify-content: space-between;
+}
+
+.exposureList li > span {
+  background: var(--hq-surface-subtle);
+  border-radius: 999px;
+  height: 9px;
+  overflow: hidden;
+}
+
+.exposureList i {
+  background: var(--hq-brand-primary);
+  display: block;
+  height: 100%;
+}
+
+.relatedNews {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.relatedNews a {
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: inherit;
+  display: grid;
+  gap: 8px;
+  min-height: 110px;
+  padding: 15px;
+  text-decoration: none;
+}
+
+.relatedNews a:hover,
+.relatedNews a:focus-visible {
+  border-color: var(--hq-brand-primary);
+  box-shadow: var(--hq-shadow-focus);
+  outline: 2px solid transparent;
+}
+
+.relatedNews span,
+.relatedNews small {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+}
+
+.relatedNews small {
+  color: var(--hq-brand-primary);
+  font-weight: 700;
+}
+
+.riskNotice {
+  background: var(--hq-surface-subtle);
+  border-left: 4px solid var(--hq-market-warning);
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+}
+
+.riskNotice p {
+  color: var(--hq-text-secondary);
+  line-height: 1.65;
+}
+
+@media (max-width: 900px) {
+  .rankingGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .tableHeader {
+    display: none;
+  }
+
+  .etfRow {
+    grid-template-columns: minmax(180px, 1fr) auto auto;
+  }
+
+  .etfRow > :nth-child(2),
+  .etfRow > :nth-child(5),
+  .etfRow > :nth-child(6) {
+    display: none;
+  }
+
+  .metricsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .hero {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .disclosure {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .panel {
+    border-left: 0;
+    border-radius: 0;
+    border-right: 0;
+    margin-inline: -16px;
+    padding: 18px 16px;
+  }
+
+  .sectionHeading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /*
+   * 必须是 minmax(0, 1fr) 而不是 1fr。
+   * 1fr 等价于 minmax(auto, 1fr)，auto 的最小值是 min-content ——
+   * 也就是那排 flex: 0 0 auto 按钮的总宽，会把轨道直接撑破，
+   * 子元素上的 max-width: 100% 因此约束不住它。
+   */
+  .filterGroup {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filterGroup legend {
+    padding-top: 0;
+  }
+
+  .filterGroup > div {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .filterGroup button {
+    flex: 0 0 auto;
+  }
+
+  .etfRow {
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .etfRow > :nth-child(3) {
+    display: none;
+  }
+
+  .unavailableBar {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .detailHero {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .quoteSummary {
+    align-items: baseline;
+    grid-auto-flow: column;
+    text-align: left;
+  }
+
+  .detailActions {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .detailPanel {
+    padding: 18px 16px;
+  }
+
+  .metricsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .holdingsList li {
+    gap: 6px;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+  }
+
+  .holdingsList li > small {
+    display: none;
+  }
+
+  .relatedNews {
+    grid-template-columns: 1fr;
+  }
+}

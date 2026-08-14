@@ -23,6 +23,14 @@ export type ProfileSessionState = Readonly<{
   preferences: Readonly<{
     reducedMotion: boolean;
     showSocialStats: boolean;
+    /*
+     * 发帖时给本地图片盖上作者名。
+     *
+     * 图片从不上传服务器（发帖栏写明「仅本地预览，不上传网络」），
+     * 所以水印也在浏览器里画——开关打开后预览图上确实会出现水印，
+     * 不是一个打开了什么也不发生的开关。
+     */
+    watermarkImages: boolean;
   }>;
   profile: SyntheticProfile;
   status: string | null;
@@ -37,6 +45,7 @@ export type ProfileSessionAction =
   | Readonly<{ type: "reset-profile" }>
   | Readonly<{ enabled: boolean; type: "set-reduced-motion" }>
   | Readonly<{ type: "set-social-stats-visibility"; visible: boolean }>
+  | Readonly<{ enabled: boolean; type: "set-image-watermark" }>
   | Readonly<{ type: "clear-feedback" }>;
 
 export type ProfileInput = Readonly<{ bio: string; displayName: string }>;
@@ -57,7 +66,12 @@ export const validateProfileInput = (
 
 export const createProfileSessionState = (): ProfileSessionState => ({
   errors: {},
-  preferences: { reducedMotion: false, showSocialStats: true },
+  preferences: {
+    reducedMotion: false,
+    showSocialStats: true,
+    // 默认不加：水印是用户主动要的，不该替他决定往自己的图上盖字。
+    watermarkImages: false,
+  },
   profile: { ...syntheticProfileFixture },
   status: null,
 });
@@ -85,6 +99,16 @@ export const profileSessionReducer = (
       status: action.enabled
         ? "已为本次会话减少界面动效。"
         : "已恢复本次会话的标准动效。",
+    };
+  }
+
+  if (action.type === "set-image-watermark") {
+    return {
+      ...state,
+      preferences: { ...state.preferences, watermarkImages: action.enabled },
+      status: action.enabled
+        ? "发帖时将在本地图片右下角加上你的昵称。"
+        : "发帖时不再给本地图片加水印。",
     };
   }
 
@@ -124,6 +148,7 @@ export type ProfileSessionContextValue = Readonly<{
   profile: SyntheticProfile;
   resetProfile: () => void;
   saveProfile: (input: ProfileInput) => ProfileValidationErrors;
+  setImageWatermark: (enabled: boolean) => void;
   setReducedMotion: (enabled: boolean) => void;
   setSocialStatsVisibility: (visible: boolean) => void;
   status: string | null;
@@ -160,10 +185,14 @@ export function ProfileSessionProvider({
   const setSocialStatsVisibility = useCallback((visible: boolean) => {
     dispatch({ type: "set-social-stats-visibility", visible });
   }, []);
+  const setImageWatermark = useCallback((enabled: boolean) => {
+    dispatch({ enabled, type: "set-image-watermark" });
+  }, []);
   const value = useMemo(
     () => ({
       clearFeedback,
       errors: state.errors,
+      setImageWatermark,
       preferences: state.preferences,
       profile: state.profile,
       resetProfile,
@@ -176,6 +205,7 @@ export function ProfileSessionProvider({
       clearFeedback,
       resetProfile,
       saveProfile,
+      setImageWatermark,
       setReducedMotion,
       setSocialStatsVisibility,
       state,
@@ -193,6 +223,17 @@ export function ProfileSessionProvider({
     </ProfileSessionContext.Provider>
   );
 }
+
+/*
+ * 偏好的「可选」读法。
+ *
+ * 设置页必须在 Provider 里，读不到就是接错了，该抛错。
+ * 但发帖框只是想知道「要不要加水印」——它在别的上下文里也会被渲染
+ * （比如只挂发帖组件的组件测试）。为一个可有可无的偏好把发帖整个搞崩，
+ * 代价和收益完全不成比例，所以这里读不到就按默认值走。
+ */
+export const useOptionalProfileSession =
+  (): ProfileSessionContextValue | null => useContext(ProfileSessionContext);
 
 export const useProfileSession = (): ProfileSessionContextValue => {
   const value = useContext(ProfileSessionContext);

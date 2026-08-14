@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import InstrumentPage from "../../../src/app/instruments/[listingId]/page";
+import InstrumentLayout from "../../../src/app/instruments/[listingId]/layout";
 import HomePage from "../../../src/app/page";
 import SearchPage from "../../../src/app/search/page";
 import WatchlistPage from "../../../src/app/watchlist/page";
@@ -31,35 +31,50 @@ describe("D0 Web runtime state injection", () => {
       }),
     );
 
-    expect(markup).toContain("正在加载演示数据");
+    expect(markup).toContain("正在加载");
     expect(markup).not.toContain("合成市场的第一份观察");
   });
 
-  it("renders a browser-addressable error state on search", async () => {
+  it("says the upstream is down instead of saying there are no matches", async () => {
+    /*
+     * 这条用例原先断言 ?fixture_state=error 会渲染一句「演示搜索暂时不可用」。
+     * 那是给 D0 夹具搜索准备的模拟错误——而那套搜索搜「茅台」一条都搜不到，
+     * 搜出来的是虚构的「星海智造」，点进去 404。现在这一页走的是真实的证券
+     * 代码表，失败状态也就跟着变成真的：上游没答应就说取不到。
+     *
+     * 「没有找到」和「取不到」必须分开。混为一谈，用户会把上游故障读成
+     * 「这只股票不存在」，然后再也不搜了。
+     */
+    vi.stubGlobal("fetch", async () => new Response("", { status: 502 }));
+
     const markup = renderToStaticMarkup(
       await SearchPage({
-        searchParams: Promise.resolve({
-          fixture_state: "error",
-          q: "SYN001",
-        }),
+        searchParams: Promise.resolve({ q: "茅台" }),
       }),
     );
 
-    expect(markup).toContain("演示搜索暂时不可用");
-    expect(markup).toMatch(/role="alert"[\s\S]*重试/u);
-    expect(markup).not.toContain('class="search-results"');
+    expect(markup).toContain("暂时取不到");
+    expect(markup).not.toContain("没有找到匹配的标的");
   });
 
-  it("renders a browser-addressable empty state on instrument detail", async () => {
-    const markup = renderToStaticMarkup(
-      await InstrumentPage({
+  it("404s an instrument this site cannot price", async () => {
+    /*
+     * 这条用例原先验的是 ?fixture_state=empty 那个演示空态。它模拟的是
+     * 样本标的的空数据，而样本标的已经没有了——真实行情取不到时由取数层
+     * 如实反映，不需要模拟一个。
+     *
+     * 现在验的是它的替代行为：认不出来的代码就是 404，不是
+     * 「暂无演示标的详情」——后者会让人以为过几天再来就有了。
+     *
+     * 校验在 layout 里、不在 page 里——notFound() 落到 loading 边界之下
+     * 会用 200 送出 404 页面。所以这条对 layout 断言。
+     */
+    await expect(
+      InstrumentLayout({
+        children: null,
         params: Promise.resolve({ listingId: "listing_syn_0001" }),
-        searchParams: Promise.resolve({ fixture_state: "empty" }),
       }),
-    );
-
-    expect(markup).toContain("暂无演示标的详情");
-    expect(markup).not.toContain('class="instrument-detail"');
+    ).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/u);
   });
 
   it("renders a browser-addressable error state on watchlist", async () => {

@@ -101,7 +101,7 @@ export function FinanceStateNotice({
     >
       <h2>{heading}</h2>
       {message !== undefined && <p>{message}</p>}
-      <p>不会使用合成财经信息补位。</p>
+      <p>不会使用样本内容补位。</p>
     </section>
   );
 }

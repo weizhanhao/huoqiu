@@ -1,0 +1,466 @@
+/*
+ * 视频 / 达人 / 私募三个频道共用的版式。
+ *
+ * 沿用全站规则：描边分层不用阴影、蓝色只做链接与选中、
+ * 数字走 tabular-nums、列表项自己撑满 44px 触控高度。
+ */
+
+.page {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  min-width: 0;
+}
+
+/* 网格子项必须显式钉回轨道宽度，否则会按自身 max-content 撑破容器。 */
+.page > * {
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.hero {
+  align-items: baseline;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2) var(--hq-spacing-4);
+  justify-content: space-between;
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+}
+
+.hero h2 {
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  letter-spacing: var(--hq-type-tracking-tight);
+  line-height: var(--hq-type-line-height-compact);
+}
+
+.kicker {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-medium);
+}
+
+.heroNote {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-snug);
+  max-width: 52ch;
+}
+
+/* 筛选条：可横向滚动，但滚动发生在自己容器内，页面不横向滚。 */
+/*
+ * 换行，不横滚。
+ *
+ * 这里原本是「横向滚动 + 隐藏滚动条」，为当初那几个四字筛选项
+ * （股票多头、市场中性）设计的。私募改成按机构类型筛选之后，选项变成
+ * 「私募股权、创业投资基金管理人」这种长度，最后一项直接被切在屏幕外，
+ * 而滚动条又是藏起来的——看不出右边还有东西，也就不会去滚。
+ */
+.filters {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2);
+  max-width: 100%;
+  padding-bottom: var(--hq-spacing-1);
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar {
+  display: none;
+}
+
+.filters button {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
+}
+
+.filters button:hover {
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
+}
+
+/*
+ * 到头的翻页按钮、以及没有关键词时的「清除」。
+ *
+ * 它们用 aria-disabled 而不是 disabled——disabled 会让浏览器把焦点收走，
+ * 键盘用户按一下就丢焦点。但既然还能聚焦，就得让人看出来它按不动，
+ * 否则只是个点了没反应的按钮。
+ */
+.filters button[aria-disabled="true"] {
+  color: var(--hq-text-tertiary);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.filters button[aria-disabled="true"]:hover {
+  border-color: var(--hq-border-default);
+  color: var(--hq-text-tertiary);
+}
+
+/* 选中态用描边 + 字重，不用整块实心色。 */
+.filters button[aria-pressed="true"] {
+  background: var(--hq-brand-subtle);
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.panel {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  overflow: hidden;
+}
+
+/*
+ * 登记信息表比行情表宽。
+ *
+ * 全站表格的 min-width 是 640px，那是给「代码 + 三四个数字」排的。这里六列
+ * 里有「私募股权、创业投资基金管理人」这种十几个字的整词，挤在 640px 里会
+ * 从字中间断开——「上海\n市」「已备案基\n金」。不改全站那条（另外九张表
+ * 靠它），只把这一张放宽，窄屏时由外层容器横向滚动。
+ */
+.registryTable {
+  min-width: 900px;
+}
+
+.panelHeading {
+  align-items: baseline;
+  border-bottom: 1px solid var(--hq-border-subtle);
+  display: flex;
+  gap: var(--hq-spacing-3);
+  justify-content: space-between;
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+}
+
+.panelHeading h3 {
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.panelHeading span {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.rows {
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rows > li {
+  border-bottom: 1px solid var(--hq-border-subtle);
+  min-width: 0;
+}
+
+.rows > li:last-child {
+  border-bottom: 0;
+}
+
+/* ---------- 视频 ---------- */
+
+.videoRow {
+  align-items: center;
+  color: var(--hq-text-primary);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  /* 封面本身是 210×154，96px 太窄，看不清是什么画面。 */
+  grid-template-columns: 132px minmax(0, 1fr);
+  min-height: var(--hq-touch-web-minimum);
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+  text-decoration: none;
+}
+
+.videoRow:hover {
+  background: var(--hq-surface-canvas);
+}
+
+/*
+ * 没有封面时的空位。比例跟真封面一致，否则有图没图两种行高，
+ * 列表滚起来会一跳一跳。
+ */
+.thumbnail {
+  aspect-ratio: 210 / 154;
+  background: var(--hq-surface-sunken);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-chip);
+  display: block;
+}
+
+/*
+ * 真封面。
+ *
+ * width/height 属性给的是原图尺寸（210×154），用来占位防跳；这里再用
+ * width:100% 把它收进 132px 的那一列——不收的话图片会按 210px 画出来，
+ * 直接压在右边的标题上，标题左半截被盖住。
+ */
+.cover {
+  aspect-ratio: 210 / 154;
+  background: var(--hq-surface-sunken);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-chip);
+  display: block;
+  height: auto;
+  object-fit: cover;
+  width: 100%;
+}
+
+/*
+ * 封面右下角那枚时长角标的样式删掉了：上游不公开视频时长，之前显示的
+ * 「5:42」是编的。样式留着只会诱人再把它填回去。
+ */
+
+.videoBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.videoBody strong {
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-semibold);
+  line-height: var(--hq-type-line-height-compact);
+}
+
+.videoBody p {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-snug);
+  overflow: hidden;
+}
+
+.videoMeta {
+  color: var(--hq-text-tertiary);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  gap: var(--hq-spacing-2);
+}
+
+/* ---------- 达人 ---------- */
+
+.creatorRow {
+  align-items: center;
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: 20px 36px minmax(0, 1fr) auto;
+  min-height: 56px;
+  padding: var(--hq-spacing-2) var(--hq-spacing-4);
+}
+
+.rank {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.rows > li:nth-child(-n + 3) .rank {
+  color: var(--hq-market-up-text);
+}
+
+.avatar {
+  align-items: center;
+  background: var(--hq-brand-subtle);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 50%;
+  color: var(--hq-text-link);
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-bold);
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.creatorBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.creatorBody strong {
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.creatorBody p {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-snug);
+  overflow: hidden;
+}
+
+.creatorStats {
+  color: var(--hq-text-tertiary);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  gap: var(--hq-spacing-2);
+}
+
+/* 关注按钮：描边幽灵。榜单里每行一个，实心会盖过作者信息本身。 */
+.followButton {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-strong);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
+  white-space: nowrap;
+}
+
+.followButton:hover {
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
+}
+
+/* 已关注是完成态，要更安静而不是更响。 */
+.followButton[aria-pressed="true"] {
+  background: var(--hq-surface-canvas);
+  border-color: var(--hq-border-default);
+  color: var(--hq-text-tertiary);
+}
+
+/* ---------- 私募 ---------- */
+
+.fundRow {
+  align-items: center;
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: minmax(0, 1fr) 88px 88px 56px;
+  min-height: 56px;
+  padding: var(--hq-spacing-2) var(--hq-spacing-4);
+}
+
+.fundHead {
+  background: var(--hq-surface-canvas);
+  border-bottom: 1px solid var(--hq-border-default);
+  color: var(--hq-text-tertiary);
+  display: grid;
+  font-size: var(--hq-type-size-caption);
+  gap: var(--hq-spacing-3);
+  grid-template-columns: minmax(0, 1fr) 88px 88px 56px;
+  min-height: 34px;
+  padding: var(--hq-spacing-2) var(--hq-spacing-4);
+}
+
+.fundHead > span:not(:first-child) {
+  text-align: right;
+}
+
+.fundBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fundBody strong {
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.fundBody span {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.metric {
+  font-size: var(--hq-type-size-data);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-semibold);
+  text-align: right;
+}
+
+.risk {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  text-align: right;
+}
+
+/* ---------- 受限能力说明 ---------- */
+
+.restricted {
+  align-items: center;
+  background: var(--hq-market-warning-subtle);
+  border: 1px solid var(--hq-market-warning);
+  border-radius: var(--hq-radius-card);
+  color: var(--hq-market-warning-text);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2) var(--hq-spacing-3);
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+}
+
+.restricted strong {
+  font-size: var(--hq-type-size-label-compact);
+}
+
+.restricted span {
+  font-size: var(--hq-type-size-caption);
+}
+
+.restricted button {
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: var(--hq-radius-control);
+  color: inherit;
+  font: inherit;
+  font-size: var(--hq-type-size-caption);
+  margin-left: auto;
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-3);
+}
+
+.empty {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-label-compact);
+  padding: var(--hq-spacing-8) var(--hq-spacing-4);
+  text-align: center;
+}
+
+@media (max-width: 620px) {
+  .videoRow {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+
+  .fundRow,
+  .fundHead {
+    grid-template-columns: minmax(0, 1fr) 72px 64px;
+  }
+
+  .fundRow > .risk,
+  .fundHead > span:last-child {
+    display: none;
+  }
+
+  .creatorRow {
+    grid-template-columns: 20px 36px minmax(0, 1fr);
+    row-gap: var(--hq-spacing-2);
+  }
+
+  .followButton {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+}

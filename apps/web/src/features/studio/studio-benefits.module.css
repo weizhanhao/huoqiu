@@ -1,0 +1,56 @@
+/*
+ * 创作者权益。
+ *
+ * 条件列表是这一页的主体：左边写条件、右边写状态，中间用点线牵起来，
+ * 长短不一的条件文字也能一眼对上它的状态。
+ */
+.wrap {
+  display: grid;
+  gap: var(--hq-spacing-4);
+}
+
+.conditions {
+  display: grid;
+  gap: var(--hq-spacing-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.condition {
+  align-items: baseline;
+  display: flex;
+  font-size: var(--hq-type-size-body-compact);
+  gap: var(--hq-spacing-2);
+  justify-content: space-between;
+}
+
+.met {
+  color: var(--hq-brand-primary);
+}
+
+.unmet {
+  color: var(--hq-text-tertiary);
+}
+
+/*
+ * 申请按钮一律禁用。
+ *
+ * 看得见但按不动，配合下面那句说明，比藏起来诚实——用户知道有这件事，
+ * 也知道现在为什么不能做。
+ */
+.apply {
+  background: var(--hq-brand-subtle);
+  border: 1px solid transparent;
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-brand-primary);
+  font-size: var(--hq-type-size-body-compact);
+  justify-self: start;
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-5);
+}
+
+.apply:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

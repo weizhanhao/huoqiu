@@ -6,44 +6,43 @@
   width: 100%;
 }
 
+/* 页头与全站其他区块头一致：白底描边、20px 标题，不用色块和巨型字号。 */
 .hero,
 .portfolioHero {
-  align-items: flex-end;
-  background:
-    radial-gradient(circle at 88% 10%, rgb(255 91 63 / 18%), transparent 28%),
-    var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  align-items: baseline;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: flex;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2) var(--hq-spacing-4);
   justify-content: space-between;
-  overflow: hidden;
-  padding: 28px;
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
 }
 
 .hero h2,
 .portfolioHero h2 {
-  font-size: clamp(30px, 5vw, 48px);
-  letter-spacing: -0.05em;
-  line-height: 1;
-  margin: 8px 0 12px;
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  letter-spacing: var(--hq-type-tracking-tight);
+  line-height: var(--hq-type-line-height-compact);
+  margin: 0;
 }
 
 .hero p:last-child,
 .portfolioHero p:last-child {
-  color: var(--hq-text-secondary);
-  line-height: 1.7;
-  max-width: 620px;
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-snug);
+  max-width: 52ch;
 }
 
+/* 区块小标签。去掉全大写 + 0.12em 字距的英文横幅腔调。 */
 .kicker,
 .filterLabel {
-  color: var(--hq-brand-primary);
-  font-family: var(--hq-type-family-mono);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-medium);
 }
 
 .disclosures {
@@ -54,13 +53,20 @@
   text-align: right;
 }
 
+/*
+ * 合规标识用警示色描边芯片，跟顶栏那个统一。
+ * 原来是实心蓝药丸——蓝色在这套设计里是链接色，
+ * 用它做标识会读成「可点击」。
+ */
 .disclosures strong,
 .disclosureBar strong {
-  background: var(--hq-brand-primary);
-  border-radius: 999px;
-  color: var(--hq-brand-on-primary);
-  font-size: 13px;
-  padding: 7px 12px;
+  background: var(--hq-market-warning-subtle);
+  border: 1px solid var(--hq-market-warning);
+  border-radius: var(--hq-radius-chip);
+  color: var(--hq-market-warning-text);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-medium);
+  padding: 3px var(--hq-spacing-2);
 }
 
 .disclosures span,
@@ -78,7 +84,7 @@
 .segmented button,
 .followButton {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: 999px;
   color: var(--hq-text-secondary);
   cursor: pointer;
@@ -98,11 +104,16 @@
   outline: 2px solid transparent;
 }
 
+/*
+ * 选中态用浅蓝底 + 品牌描边 + 加重字色，不用整块黑。
+ * 实心黑药丸在一页里出现好几组时，视觉重量会盖过它旁边的行情数字。
+ */
 .segmented button[aria-pressed="true"],
 .followButton[aria-pressed="true"] {
-  background: var(--hq-surface-inverse);
-  border-color: var(--hq-surface-inverse);
-  color: var(--hq-text-inverse);
+  background: var(--hq-brand-subtle);
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
+  font-weight: var(--hq-type-weight-semibold);
 }
 
 .sectionHeading,
@@ -114,13 +125,44 @@
   margin-bottom: 16px;
 }
 
+/*
+ * 区块标题行里的按钮（异动表的「暂停自动刷新」）。
+ *
+ * 不给样式的话只有 25px 高，够不到 44px 的触控目标；这一行还是
+ * align-items: flex-end，按钮会被压在底边。
+ */
+.sectionHeading button {
+  align-self: center;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
+}
+
+.sectionHeading button:hover {
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
+}
+
+.sectionHeading button[aria-pressed="true"] {
+  background: var(--hq-brand-subtle);
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
+}
+
 .sectionHeading h3,
 .rankingHeading h3,
 .panel > h3,
 .directionCard h3 {
-  font-size: 21px;
-  letter-spacing: -0.03em;
-  margin-top: 5px;
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-semibold);
+  margin-top: 0;
 }
 
 .sectionHeading > span,
@@ -137,7 +179,7 @@
 
 .indexCard {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: grid;
   gap: 6px;
@@ -152,7 +194,7 @@
 }
 
 .indexCard > strong {
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 22px;
 }
 
@@ -179,10 +221,49 @@
 
 .panel {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   min-width: 0;
   padding: 20px;
+}
+
+/*
+ * 取数状态与口径说明。
+ * 「正在读取」「取不到」「这个数是沪深两市合计」都用它，
+ * 三者都是解释性文字，不该和数据本身一样醒目。
+ */
+.resultStatus {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  margin: var(--hq-spacing-2) 0 0;
+  text-align: start;
+}
+
+/* 涨跌家数那三个数：横排、等宽，读的时候能直接比大小。 */
+.facts {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: var(--hq-spacing-3) 0 0;
+}
+
+.fact {
+  border: 1px solid var(--hq-border-subtle);
+  border-radius: var(--hq-radius-control);
+  display: grid;
+  gap: var(--hq-spacing-1);
+  padding: var(--hq-spacing-3);
+}
+
+.fact dt {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.fact dd {
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-bold);
+  margin: 0;
 }
 
 .breadthBar {
@@ -225,7 +306,7 @@
 }
 
 .breadthLegend dd {
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 18px;
   font-weight: 700;
   margin: 0;
@@ -234,6 +315,97 @@
 .conceptList,
 .movementList,
 .portfolioList,
+/*
+ * 模拟调仓面板。
+ *
+ * 状态行常驻（合计百分比与错误提示共用一行），出错时不会把下方的配置列表
+ * 顶下去。
+ */
+.rebalanceHint {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-body);
+}
+
+.rebalanceForm {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-3);
+}
+
+.rebalanceForm label {
+  display: grid;
+  gap: 4px;
+}
+
+.rebalanceForm label span {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.rebalanceForm select,
+.rebalanceForm input {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-2);
+}
+
+.rebalanceForm input {
+  width: 7em;
+}
+
+.rebalanceForm button {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-strong);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-link);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
+}
+
+.rebalanceStatus {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  min-height: 18px;
+}
+
+.rebalanceAllocation {
+  display: grid;
+  gap: var(--hq-spacing-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rebalanceAllocation li {
+  align-items: center;
+  border-bottom: 1px solid var(--hq-border-subtle);
+  display: flex;
+  font-size: var(--hq-type-size-label-compact);
+  gap: var(--hq-spacing-3);
+  justify-content: space-between;
+  min-height: 32px;
+}
+
+.rebalanceAllocation small {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.rebalanceAllocation strong {
+  font-variant-numeric: tabular-nums;
+}
+
 .timeline {
   list-style: none;
   margin: 14px 0 0;
@@ -242,7 +414,7 @@
 
 .conceptList li {
   align-items: center;
-  border-top: 1px solid var(--hq-surface-divider);
+  border-top: 1px solid var(--hq-border-default);
   display: flex;
   gap: 10px;
   min-height: 45px;
@@ -251,12 +423,12 @@
 .conceptList li > span,
 .rankNumber {
   color: var(--hq-brand-primary);
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
 }
 
 .conceptList .conceptValue {
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   margin-left: auto;
 }
@@ -270,7 +442,7 @@
 }
 
 .movementList li {
-  border-left: 2px solid var(--hq-surface-divider);
+  border-left: 2px solid var(--hq-border-default);
   display: grid;
   gap: 10px;
   grid-template-columns: 46px 1fr;
@@ -281,17 +453,17 @@
 
 .movementList time {
   color: var(--hq-brand-primary);
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
 }
 
 .rankingList {
-  border-top: 1px solid var(--hq-surface-divider);
+  border-top: 1px solid var(--hq-border-default);
 }
 
 .rankingRow {
   align-items: center;
-  border-bottom: 1px solid var(--hq-surface-divider);
+  border-bottom: 1px solid var(--hq-border-default);
   display: grid;
   gap: 14px;
   grid-template-columns: 24px minmax(140px, 1fr) auto auto auto;
@@ -321,8 +493,10 @@
 .rankingRow a,
 .portfolioList a,
 .dataTable a {
+  align-content: center;
   display: grid;
   gap: 3px;
+  min-height: var(--hq-touch-web-minimum);
 }
 
 .rankingRow small,
@@ -332,9 +506,10 @@
   font-size: 11px;
 }
 
+/* 触控目标不能为了密度让步：38px 在触屏上不达标。 */
 .rankingRow button,
 .dataTable button {
-  min-height: 38px;
+  min-height: var(--hq-touch-web-minimum);
   white-space: nowrap;
 }
 
@@ -358,14 +533,16 @@
 }
 
 .backLink {
-  display: inline-block;
-  font-size: 13px;
-  margin-bottom: 14px;
+  align-items: center;
+  display: inline-flex;
+  font-size: var(--hq-type-size-label-compact);
+  margin-bottom: var(--hq-spacing-2);
+  min-height: var(--hq-touch-web-minimum);
 }
 
 .filterPanel {
   background: var(--hq-surface-subtle);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: grid;
   gap: 16px;
@@ -396,16 +573,18 @@
 
 .dataTable th,
 .dataTable td {
-  border-bottom: 1px solid var(--hq-surface-divider);
+  border-bottom: 1px solid var(--hq-border-default);
   padding: 13px 10px;
   text-align: left;
 }
 
+/* 表头是分隔带不是内容：小字号、次级色、凹陷底，跟数据行拉开。 */
 .dataTable thead th {
+  background: var(--hq-surface-canvas);
+  border-bottom: 1px solid var(--hq-border-default);
   color: var(--hq-text-tertiary);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-medium);
 }
 
 .portfolioSummary {
@@ -430,7 +609,7 @@
 }
 
 .portfolioSummary article > strong {
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 26px;
 }
 
@@ -447,7 +626,7 @@
   background:
     linear-gradient(135deg, rgb(255 91 63 / 12%), transparent 52%),
     var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: flex;
   justify-content: space-between;
@@ -478,7 +657,7 @@
 }
 
 .directionGauge strong {
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 25px;
 }
 
@@ -489,7 +668,7 @@
 
 .portfolioList li {
   align-items: center;
-  border-top: 1px solid var(--hq-surface-divider);
+  border-top: 1px solid var(--hq-border-default);
   display: grid;
   gap: 16px;
   grid-template-columns: 28px minmax(180px, 1fr) auto auto;
@@ -539,7 +718,7 @@
 }
 
 .portfolioCurve line {
-  stroke: var(--hq-surface-divider);
+  stroke: var(--hq-border-default);
   stroke-width: 0.4;
 }
 
@@ -578,12 +757,12 @@
 
 .timeline time {
   color: var(--hq-text-tertiary);
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
 
 .timeline div {
-  border-left: 1px solid var(--hq-surface-divider);
+  border-left: 1px solid var(--hq-border-default);
   min-height: 68px;
   padding: 0 0 20px 17px;
 }
@@ -604,7 +783,7 @@
 .quotePanel {
   align-items: center;
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: grid;
   gap: 22px;
@@ -629,7 +808,7 @@
 }
 
 .quoteValue strong {
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 30px;
 }
 
@@ -721,5 +900,228 @@
 
   .panel {
     padding: 16px;
+  }
+}
+
+/* 创建组合表单 */
+
+.createForm {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  margin-top: var(--hq-spacing-3);
+}
+
+.createField {
+  display: grid;
+  gap: var(--hq-spacing-1);
+}
+
+.createField span {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.createField input {
+  background: var(--hq-surface-sunken);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-3);
+  width: 100%;
+}
+
+.pickGrid {
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-1);
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  margin: 0;
+  padding: var(--hq-spacing-3);
+}
+
+.pickGrid legend {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-semibold);
+  padding: 0 var(--hq-spacing-1);
+}
+
+/*
+ * 原生 checkbox 默认 13px 见方，触屏够不着，而把它本身放大到 44px 又很丑。
+ * 做法：让 input 透明铺满整个 label，命中区就是整行（≥44px）；
+ * 视觉方块用 ::before 画，选中态由 :checked 兄弟选择器驱动。
+ */
+.pickItem input[type="checkbox"] {
+  cursor: pointer;
+  height: 100%;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.pickItem::before {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-strong);
+  border-radius: 4px;
+  content: "";
+  flex: 0 0 18px;
+  height: 18px;
+}
+
+.pickItem:has(input:checked)::before {
+  background: var(--hq-brand-primary);
+  border-color: var(--hq-brand-primary);
+  box-shadow: inset 0 0 0 3px var(--hq-surface-base);
+}
+
+.pickItem:has(input:focus-visible)::before {
+  box-shadow: var(--hq-shadow-focus);
+}
+
+.pickItem {
+  align-items: center;
+  position: relative;
+  border-radius: var(--hq-radius-control);
+  cursor: pointer;
+  display: flex;
+  gap: var(--hq-spacing-2);
+  min-height: var(--hq-touch-web-minimum);
+  min-width: 0;
+  padding: 0 var(--hq-spacing-2);
+}
+
+.pickItem:hover {
+  background: var(--hq-surface-canvas);
+}
+
+.pickItem span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.pickItem strong {
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-medium);
+}
+
+.pickItem small {
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.createSubmit {
+  background: var(--hq-brand-primary);
+  border: 1px solid var(--hq-brand-primary);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-brand-on-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-semibold);
+  justify-self: start;
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-5);
+}
+
+.createError {
+  color: var(--hq-market-warning-text);
+  font-size: var(--hq-type-size-caption);
+  margin-top: var(--hq-spacing-2);
+}
+
+.createNotice {
+  color: var(--hq-market-down-text);
+  font-size: var(--hq-type-size-caption);
+  margin-top: var(--hq-spacing-2);
+}
+
+/* 业绩归因 */
+
+.attributionNote {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  margin-bottom: var(--hq-spacing-3);
+}
+
+.attributionList {
+  display: grid;
+  gap: var(--hq-spacing-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.attributionList li {
+  align-items: center;
+  border-bottom: 1px solid var(--hq-border-subtle);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: minmax(0, 1fr) 92px 76px;
+  min-height: 44px;
+}
+
+.attributionList li:last-child {
+  border-bottom: 0;
+}
+
+.attributionName {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.attributionName strong {
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-medium);
+}
+
+.attributionName small {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 条形只是贡献大小的相对示意，颜色沿用红涨绿跌。 */
+.attributionBar {
+  background: var(--hq-surface-sunken);
+  border-radius: var(--hq-radius-pill);
+  display: block;
+  height: 6px;
+  overflow: hidden;
+}
+
+.attributionBar > span {
+  display: block;
+  height: 100%;
+}
+
+.attributionBar[data-direction="up"] > span {
+  background: var(--hq-market-up);
+}
+
+.attributionBar[data-direction="down"] > span {
+  background: var(--hq-market-down);
+}
+
+.attributionList li > strong:last-child {
+  font-size: var(--hq-type-size-data);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@media (max-width: 620px) {
+  .attributionList li {
+    grid-template-columns: minmax(0, 1fr) 72px;
+  }
+
+  .attributionBar {
+    display: none;
   }
 }

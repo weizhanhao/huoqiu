@@ -14,8 +14,13 @@
 }
 
 .quickActions a {
+  align-items: center;
   color: var(--hq-brand-primary);
+  display: inline-flex;
   font-size: 13px;
+  justify-content: center;
+  /* 两字链接（「搜索」）天然只有 30px 宽，补到 44px 见方。 */
+  min-width: var(--hq-touch-web-minimum);
   font-weight: var(--hq-type-weight-semibold);
   min-height: var(--hq-touch-web-minimum);
   padding: 12px 2px;
@@ -38,7 +43,7 @@
 .chartPanel,
 .detailPanel {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   box-shadow: var(--hq-shadow-card);
   min-width: 0;
@@ -78,14 +83,12 @@
   font-size: 12px;
 }
 
+/* 区块小标签。去掉全大写 + 0.11em 字距的英文横幅腔调。 */
 .kicker {
-  color: var(--hq-brand-primary);
-  font-family: var(--hq-type-family-mono);
-  font-size: 11px;
-  font-weight: var(--hq-type-weight-bold);
-  letter-spacing: 0.11em;
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-medium);
   margin: 0;
-  text-transform: uppercase;
 }
 
 .quoteValue {
@@ -96,14 +99,14 @@
 }
 
 .quoteValue strong {
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: clamp(32px, 5vw, 52px);
   letter-spacing: -0.05em;
   line-height: 1;
 }
 
 .quoteValue > span {
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-weight: var(--hq-type-weight-bold);
 }
 
@@ -116,7 +119,7 @@
 }
 
 .quoteStats {
-  border-top: 1px solid var(--hq-surface-divider);
+  border-top: 1px solid var(--hq-border-default);
   display: grid;
   gap: 14px;
   grid-column: 1 / -1;
@@ -137,7 +140,7 @@
 }
 
 .quoteStats dd {
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 14px;
   font-weight: var(--hq-type-weight-semibold);
   margin: 0;
@@ -179,7 +182,7 @@
 }
 
 .periodControls {
-  border-bottom: 1px solid var(--hq-surface-divider);
+  border-bottom: 1px solid var(--hq-border-default);
   margin-top: 15px;
   overflow-x: auto;
   scrollbar-width: thin;
@@ -253,7 +256,7 @@
 }
 
 .chartGrid line {
-  stroke: var(--hq-surface-divider);
+  stroke: var(--hq-border-default);
   stroke-width: 0.35;
 }
 
@@ -302,7 +305,7 @@
 }
 
 .detailTabs {
-  border-bottom: 1px solid var(--hq-surface-divider);
+  border-bottom: 1px solid var(--hq-border-default);
   overflow-x: auto;
   padding: 0 16px;
 }
@@ -353,7 +356,7 @@
 
 .postCard,
 .newsList article {
-  border-top: 1px solid var(--hq-surface-divider);
+  border-top: 1px solid var(--hq-border-default);
   padding: 18px 0;
 }
 
@@ -389,7 +392,7 @@
 }
 
 .postCard header button {
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-pill);
   min-width: 72px;
   padding: 6px 12px;
@@ -453,7 +456,7 @@
 
 .dataTable th,
 .dataTable td {
-  border-bottom: 1px solid var(--hq-surface-divider);
+  border-bottom: 1px solid var(--hq-border-default);
   padding: 14px 10px;
   text-align: left;
 }
@@ -476,7 +479,7 @@
 
 .announcementList li {
   align-items: center;
-  border-bottom: 1px solid var(--hq-surface-divider);
+  border-bottom: 1px solid var(--hq-border-default);
   display: grid;
   gap: 12px;
   grid-template-columns: 100px minmax(0, 1fr) auto;
@@ -503,7 +506,7 @@
 
 .etfGroups a {
   align-items: center;
-  border-top: 1px solid var(--hq-surface-divider);
+  border-top: 1px solid var(--hq-border-default);
   color: inherit;
   display: grid;
   gap: 12px;
@@ -520,7 +523,7 @@
 
 .etfGroups small {
   color: var(--hq-text-tertiary);
-  font-family: var(--hq-type-family-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .statusNotice {
@@ -556,7 +559,7 @@
 .bottomActions {
   align-items: center;
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   bottom: 12px;
   box-shadow: var(--hq-shadow-floating);
@@ -666,5 +669,291 @@
 
   .bottomActions {
     bottom: 74px;
+  }
+}
+
+/* 标的资料（F10）面板 */
+
+.profilePanel {
+  display: grid;
+  gap: var(--hq-spacing-5);
+  min-width: 0;
+}
+
+.profilePanel h4 {
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-semibold);
+  margin-bottom: var(--hq-spacing-2);
+}
+
+.profileBusiness {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-label-compact);
+  line-height: var(--hq-type-line-height-body);
+  margin-bottom: var(--hq-spacing-3);
+  max-width: 68ch;
+}
+
+.profileFacts {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin: 0;
+}
+
+.profileFacts div {
+  border-top: 1px solid var(--hq-border-subtle);
+  min-width: 0;
+  padding-top: var(--hq-spacing-2);
+}
+
+.profileFacts dt {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.profileFacts dd {
+  font-size: var(--hq-type-size-label-compact);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-semibold);
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.profileNotice {
+  background: var(--hq-market-warning-subtle);
+  border: 1px solid var(--hq-market-warning);
+  border-radius: var(--hq-radius-card);
+  color: var(--hq-market-warning-text);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-snug);
+  padding: var(--hq-spacing-2) var(--hq-spacing-3);
+}
+
+/* 讨论区的会话内评论 */
+
+.sessionComments {
+  border-top: 1px solid var(--hq-border-subtle);
+  display: grid;
+  gap: var(--hq-spacing-2);
+  list-style: none;
+  margin: var(--hq-spacing-3) 0 0;
+  padding: var(--hq-spacing-3) 0 0;
+}
+
+.sessionComments li {
+  background: var(--hq-surface-canvas);
+  border-radius: var(--hq-radius-control);
+  padding: var(--hq-spacing-2) var(--hq-spacing-3);
+}
+
+.sessionComments strong {
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.sessionComments p {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-label-compact);
+  line-height: var(--hq-type-line-height-snug);
+  margin-top: 2px;
+}
+
+.commentComposer {
+  display: grid;
+  gap: var(--hq-spacing-2);
+  margin-top: var(--hq-spacing-3);
+}
+
+.commentComposer textarea {
+  background: var(--hq-surface-sunken);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: 72px;
+  padding: var(--hq-spacing-2) var(--hq-spacing-3);
+  resize: vertical;
+  width: 100%;
+}
+
+.commentComposer button {
+  background: var(--hq-brand-primary);
+  border: 1px solid var(--hq-brand-primary);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-brand-on-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-semibold);
+  justify-self: start;
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
+}
+
+/* 分页控件 */
+
+.pager {
+  align-items: center;
+  border-top: 1px solid var(--hq-border-subtle);
+  display: flex;
+  gap: var(--hq-spacing-3);
+  justify-content: center;
+  margin-top: var(--hq-spacing-3);
+  padding-top: var(--hq-spacing-3);
+}
+
+.pager button {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-strong);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
+}
+
+.pager button:hover:not(:disabled) {
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
+}
+
+.pager button:disabled {
+  color: var(--hq-text-disabled);
+  cursor: default;
+}
+
+.pager span {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 个股讨论区的就地发布。
+ * 状态位常驻整行，出现提示时不会把下方讨论列表顶下去。
+ */
+.discussionComposer {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2);
+}
+
+.discussionComposer input {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  flex: 1 1 12em;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: 34px;
+  min-width: 0;
+  padding: 0 var(--hq-spacing-3);
+}
+
+.discussionComposer button {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-strong);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-link);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: 34px;
+  padding: 0 var(--hq-spacing-4);
+}
+
+.discussionStatus {
+  color: var(--hq-text-tertiary);
+  flex-basis: 100%;
+  font-size: var(--hq-type-size-caption);
+  min-height: 16px;
+}
+
+.discussionLogin {
+  align-items: center;
+  color: var(--hq-text-link);
+  display: inline-flex;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: 34px;
+  text-decoration: none;
+}
+
+/*
+ * 这只标的下的讨论。
+ * 讨论区此前只有发帖框，说出去的话在这一页上再也看不到。
+ */
+.discussionList {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  list-style: none;
+  margin: var(--hq-spacing-3) 0 0;
+  padding: 0;
+}
+
+.discussionList > li {
+  border-top: 1px solid var(--hq-border-subtle);
+  display: grid;
+  gap: var(--hq-spacing-1);
+  padding-top: var(--hq-spacing-3);
+}
+
+.discussionMeta {
+  align-items: baseline;
+  color: var(--hq-text-tertiary);
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  gap: var(--hq-spacing-2);
+  margin: 0;
+}
+
+.discussionMeta a {
+  color: var(--hq-text-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.discussionBody {
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-body);
+  margin: 0;
+  /* 长代码和无空格的长串不该把整块撑出横向滚动。 */
+  overflow-wrap: anywhere;
+}
+
+.discussionLink {
+  color: var(--hq-text-link);
+  font-size: var(--hq-type-size-caption);
+  justify-self: start;
+  text-decoration: none;
+}
+
+.discussionEmpty {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-label-compact);
+  margin: var(--hq-spacing-3) 0 0;
+}
+
+/*
+ * 移动端触控下限。上面为桌面密度写的 34px 会盖过 globals 里那条
+ * :where() 兜底规则（优先级为 0），所以在移动断点内单独抬回 44px。
+ */
+@media (max-width: 720px) {
+  .discussionComposer input,
+  .discussionComposer button,
+  .discussionLogin,
+  .discussionLink {
+    min-height: var(--hq-touch-web-minimum);
+  }
+
+  /* 链接要靠 flex 才能让 min-height 真的作用在可点区域上。 */
+  .discussionLink {
+    align-items: center;
+    display: inline-flex;
   }
 }

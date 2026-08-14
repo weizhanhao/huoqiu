@@ -1,0 +1,118 @@
+/*
+ * 图表区。
+ *
+ * 十二个周期排一行，窄屏横向滚动而不是折成两行——折行会把下面的图往下推，
+ * 切一次周期整页跳一次。
+ */
+.panel {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-4);
+}
+
+/*
+ * 十二个周期排一行。
+ *
+ * scrollbar-gutter：这一行会不会溢出取决于容器宽度，而容器宽度随视口变。
+ * 溢出与否翻转时，横向滚动条那条带出现/消失，会把下面的图整体推动十几
+ * 像素——切一次周期，横竖两个方向各抖一下。
+ */
+.tabs {
+  border-bottom: 1px solid var(--hq-border-subtle);
+  display: flex;
+  gap: var(--hq-spacing-1);
+  overflow-x: auto;
+  padding-bottom: var(--hq-spacing-2);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+/*
+ * 每个页签按**加粗后**的宽度占位。
+ *
+ * 当前项加粗，中文加粗后变宽，而 .tab 是 flex-shrink: 0——切一次周期，
+ * 哪个变粗变了，后面所有页签就横向挪一下。用一个隐藏的加粗副本把宽度
+ * 撑到最大值，选中与否宽度都不再变。
+ */
+.tab::after {
+  content: attr(data-label);
+  display: block;
+  font-weight: var(--hq-type-weight-semibold);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.tab {
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  flex-shrink: 0;
+  font-size: var(--hq-type-size-caption);
+  padding: var(--hq-spacing-1) var(--hq-spacing-3);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  background: var(--hq-surface-sunken);
+  color: var(--hq-text-primary);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 1px;
+}
+
+/*
+ * 当前周期。
+ *
+ * 只靠颜色区分对色觉障碍不够，所以同时加粗并给一块底色——
+ * 两个通道说同一件事。
+ */
+.tab[aria-current="page"] {
+  background: var(--hq-brand-subtle);
+  color: var(--hq-brand-primary);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tab {
+    transition: background-color var(--hq-motion-duration-fast)
+      var(--hq-motion-ease-out);
+  }
+}
+
+/*
+ * 图与右侧盘口并排。
+ *
+ * 盘口那一列固定宽度：它是十档价量，宽度由内容定死，让图去吃剩下的空间。
+ * 窄屏改成上下排——并排会把图压到看不清蜡烛。
+ */
+.body {
+  display: grid;
+  gap: var(--hq-spacing-4);
+  grid-template-columns: minmax(0, 1fr) 168px;
+}
+
+.chartColumn {
+  display: grid;
+  gap: var(--hq-spacing-2);
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 来源说明：压低但必须看得见——它是这张图的出处，不是装饰。 */
+.source {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-body);
+  margin: 0;
+}

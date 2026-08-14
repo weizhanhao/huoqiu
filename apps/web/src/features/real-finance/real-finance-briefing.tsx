@@ -4,6 +4,8 @@ import type {
   FinancePublicRecordViewModel,
   FinancePublicViewModel,
 } from "./finance-public-view-model";
+import { LiveNewsFeed } from "./live-news-feed";
+import { MarketAnnouncementsFeed } from "./market-announcements-feed";
 import styles from "./real-finance.module.css";
 import {
   canDisplayFinanceRecords,
@@ -55,10 +57,32 @@ export function RealFinanceBriefing({ model }: RealFinanceBriefingProperties) {
       lang="zh-CN"
     >
       <header className={styles.hero}>
-        <p>7×24 · 官方申报、公开新闻线索与宏观发布</p>
-        <h1>最新 20 条真实来源记录</h1>
+        <p>7×24 · 实时快讯与官方申报</p>
+        <h1>7×24 快讯</h1>
         <p>按绝对时间排序，仅链接到原始来源</p>
       </header>
+
+      {/*
+        实时快讯在前，官方申报在后。
+        这一页原先只有下面那份申报快照——真数据，但更新得慢，最新一条常常
+        是两天前的，而栏目名叫 7×24。快讯自己取自己刷，不挂在那份快照上。
+      */}
+      <LiveNewsFeed />
+
+      {/*
+        A 股公告。
+        这一块顶掉了下面那份 SEC 快照的位置：那是美股申报，而这是雪球复刻站，
+        「官方申报」栏目列美股本身就不对题；何况它还得靠一个需要 SEC 可联系
+        身份的脚本刷新，最新一条常常停在两天前。巨潮不需要身份，是分钟级的。
+      */}
+      <MarketAnnouncementsFeed />
+
+      <div className={styles.sectionHeading}>
+        <h2>境外申报存档</h2>
+        <span className={styles.muted}>
+          SEC EDGAR 原件快照 · 由采集任务定期刷新，不是实时
+        </span>
+      </div>
 
       <FinanceStateNotice message={model.statusMessage} state={model.state} />
 

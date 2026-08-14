@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { ThemeToggle } from "../theme/theme-toggle";
 import {
   useEffect,
   useRef,
@@ -17,6 +19,7 @@ import {
 } from "./profile-fixtures";
 import styles from "./profile-settings.module.css";
 import { useProfileSession } from "./profile-session";
+import { useAccountSession } from "../account/account-session";
 
 const unavailableSettings = [
   {
@@ -39,20 +42,22 @@ const unavailableSettings = [
     id: "brokerage-account",
     label: "证券账户",
   },
-  {
-    description: "模拟交易尚未接入，不会记录委托或收益。",
-    id: "paper-trading",
-    label: "模拟交易",
-  },
+  /*
+   * 「模拟交易」原本在这份不可用清单里，和证券开户、基金申购并排。
+   * 但模拟盘不碰真实资金、不下真实委托，不需要牌照——它已经在组合详情页
+   * 实现（模拟调仓），继续标为不可用是错的，所以从这里移除。
+   */
 ] as const;
 
 function ProfileContentTabs() {
   const [activeTab, setActiveTab] = useState<ProfileTab>("activity");
-  const tabRefs = useRef<Record<ProfileTab, HTMLButtonElement | null>>({
-    activity: null,
-    favorites: null,
-    following: null,
-  });
+  // 从 profileTabs 派生，加标签时不会再漏掉某一项。
+  const tabRefs = useRef<Record<ProfileTab, HTMLButtonElement | null>>(
+    Object.fromEntries(profileTabs.map((tab) => [tab, null])) as Record<
+      ProfileTab,
+      HTMLButtonElement | null
+    >,
+  );
 
   const activateTab = (tab: ProfileTab) => {
     setActiveTab(tab);
@@ -68,10 +73,13 @@ function ProfileContentTabs() {
 
     switch (event.key) {
       case "ArrowLeft":
-        nextTab = profileTabs[(currentIndex - 1 + profileTabs.length) % 3];
+        nextTab =
+          profileTabs[
+            (currentIndex - 1 + profileTabs.length) % profileTabs.length
+          ];
         break;
       case "ArrowRight":
-        nextTab = profileTabs[(currentIndex + 1) % 3];
+        nextTab = profileTabs[(currentIndex + 1) % profileTabs.length];
         break;
       case "End":
         nextTab = profileTabs.at(-1);
@@ -208,15 +216,18 @@ export function ProfilePageExperience() {
       data-testid="profile-page"
     >
       <header className={styles.profileHero}>
-        <p className={styles.heroKicker}>
-          FIXED SYNTHETIC IDENTITY / SESSION ONLY
-        </p>
+        <p className={styles.heroKicker}>演示身份 · 仅本次会话</p>
         <span aria-hidden="true" className={styles.avatar}>
           {profile.avatarInitials}
         </span>
         <div className={styles.profileIdentity}>
-          <p className={styles.identityLabel}>固定合成身份</p>
-          <h2 id="profile-heading">{profile.displayName}</h2>
+          <p className={styles.identityLabel}>固定样本身份</p>
+          {/*
+            这一页整页没有 h1——读屏按 1 键跳不到主标题，只能一路 Tab。
+            设置页的 h1 由 settings/layout.tsx 的 SettingsHeading 给，
+            这一页没有那层布局，所以主标题自己就该是 h1。
+          */}
+          <h1 id="profile-heading">{profile.displayName}</h1>
           <p className={styles.handle}>{profile.handle}</p>
           <p className={styles.bio}>{profile.bio || "暂未填写简介"}</p>
         </div>
@@ -260,7 +271,7 @@ export function ProfilePageExperience() {
       <aside aria-label="资料数据说明" className={styles.disclosure}>
         <span aria-hidden="true">演</span>
         <div>
-          <strong>演示数据 / 合成数据 · 不构成投资建议</strong>
+          <strong>样本数据 · 非实时 · 不构成投资建议</strong>
           <p>资料变更只在当前客户端路由会话保留；刷新后恢复固定 fixture。</p>
         </div>
       </aside>
@@ -273,7 +284,7 @@ export function ProfilePageExperience() {
         >
           <div className={styles.editorHeading}>
             <div>
-              <p className={styles.sectionLabel}>SESSION PROFILE</p>
+              <p className={styles.sectionLabel}>会话资料</p>
               <h3>编辑个人资料</h3>
             </div>
             <span>保存后可在设置页继续查看</span>
@@ -357,11 +368,88 @@ export function ProfilePageExperience() {
   );
 }
 
+/**
+ * 设置页顶部的身份与统计，取自当前登录账号。
+ *
+ * 三个数字都来自服务端算好的真实计数（发帖数、粉丝数、关注数），不在这里
+ * 二次统计——本地再数一遍只会数到本次会话看到过的那几条。
+ */
+function SessionIdentity() {
+  const { account, loading } = useAccountSession();
+
+  /*
+   * 会话还在读取时不要说「未登录」。
+   *
+   * 原先只判断 account === null，于是首屏水合期间已登录的人也会先看到
+   * 「未登录，登录后这里显示你的资料」——读屏念完这句、用户去点那个登录
+   * 链接，而他其实早就登录了；随后这块内容还会无声换掉。
+   */
+  if (loading) {
+    return (
+      <section
+        aria-labelledby="settings-profile-heading"
+        className={styles.sessionSummary}
+      >
+        <div className={styles.sessionIdentity}>
+          <p className={styles.sectionLabel}>当前账号</p>
+          <h3 id="settings-profile-heading">正在读取账号……</h3>
+        </div>
+      </section>
+    );
+  }
+
+  if (account === null) {
+    return (
+      <section
+        aria-labelledby="settings-profile-heading"
+        className={styles.sessionSummary}
+      >
+        <div className={styles.sessionIdentity}>
+          <p className={styles.sectionLabel}>当前账号</p>
+          <h3 id="settings-profile-heading">未登录</h3>
+          <span>
+            <Link href="/login">登录</Link>后这里显示你的资料与数据。
+          </span>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      aria-labelledby="settings-profile-heading"
+      className={styles.sessionSummary}
+    >
+      <div className={styles.sessionIdentity}>
+        <p className={styles.sectionLabel}>当前账号</p>
+        <h3 id="settings-profile-heading">{account.displayName}</h3>
+        {/* 注册日期取 createdAt 的日期部分，不另做时区换算。 */}
+        <span>注册于 {account.createdAt.slice(0, 10)}</span>
+      </div>
+      <dl aria-label="当前账号统计" className={styles.summaryStats}>
+        <div>
+          <dt>发帖</dt>
+          <dd>{account.postCount}</dd>
+        </div>
+        <div>
+          <dt>粉丝</dt>
+          <dd>{account.followerCount}</dd>
+        </div>
+        <div>
+          <dt>关注</dt>
+          <dd>{account.followingCount}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
 export function SettingsPageExperience() {
   const {
     preferences,
     profile,
     setReducedMotion,
+    setImageWatermark,
     setSocialStatsVisibility,
     status,
   } = useProfileSession();
@@ -373,50 +461,46 @@ export function SettingsPageExperience() {
       data-testid="settings-page"
     >
       <header className={styles.settingsHero}>
-        <p className={styles.heroKicker}>
-          SESSION PREFERENCES / SYNTHETIC ACCOUNT
-        </p>
+        {/*
+          这两句原先写的是「演示账号」「本次浏览会话中的演示资料」。
+          下面那块资料现在取的是真实登录账号，屏蔽名单也真的存在账号下——
+          同一页里，上面说是演示，下面说已接真实账号，自己打自己的脸。
+        */}
+        <p className={styles.heroKicker}>账号与偏好</p>
         <div className={styles.settingsHeroCopy}>
           <h2 id="settings-heading">设置</h2>
-          <p>仅管理本次浏览会话中的演示资料与显示偏好。</p>
+          <p>管理你的账号资料、屏蔽名单与本机显示偏好。</p>
         </div>
         <Link className={styles.inverseLink} href={`/users/${profile.userId}`}>
           返回用户主页
         </Link>
       </header>
 
+      {/*
+        这段说明必须跟着实现走。
+        原文是「本页不连接 API、数据库或真实账户；刷新后恢复固定 fixture」——
+        而下面的屏蔽名单恰恰连真实接口、真实落盘。不改这句，页面就在自己
+        打自己的脸，而且是往「更假」的方向误导。
+      */}
       <aside aria-label="设置数据说明" className={styles.disclosure}>
-        <span aria-hidden="true">演</span>
+        <span aria-hidden="true">说</span>
         <div>
-          <strong>演示环境 · 不采集个人信息</strong>
-          <p>本页不连接 API、数据库或真实账户；刷新后恢复固定 fixture。</p>
+          <strong>部分设置已接真实账号</strong>
+          <p>
+            屏蔽名单保存在你的账号下，换设备仍然生效；显示偏好等其余项仍只作用于本次浏览会话。
+          </p>
         </div>
       </aside>
 
-      <section
-        aria-labelledby="settings-profile-heading"
-        className={styles.sessionSummary}
-      >
-        <div className={styles.sessionIdentity}>
-          <p className={styles.sectionLabel}>当前会话资料</p>
-          <h3 id="settings-profile-heading">{profile.displayName}</h3>
-          <span>{profile.handle}</span>
-        </div>
-        <dl aria-label="当前会话统计" className={styles.summaryStats}>
-          <div>
-            <dt>动态</dt>
-            <dd>{profile.stats.posts}</dd>
-          </div>
-          <div>
-            <dt>收藏</dt>
-            <dd>{profile.stats.favorites}</dd>
-          </div>
-          <div>
-            <dt>关注</dt>
-            <dd>{profile.stats.following}</dd>
-          </div>
-        </dl>
-      </section>
+      {/*
+        这一块此前显示的是一份写死的身份：「火球演示用户 @huoqiu_demo」，
+        动态 12、收藏 38、关注 24。跟谁登录了毫无关系——真实账号打开设置页
+        看到的也是这一套，而且没有任何地方说明它是假的（旁边那条说明讲的是
+        「哪些设置已接真实账号」，不是这块资料）。
+
+        现在取真实账号；没登录就说没登录，不拿一个虚构用户顶上。
+      */}
+      <SessionIdentity />
 
       <section
         aria-labelledby="display-preferences-heading"
@@ -429,10 +513,21 @@ export function SettingsPageExperience() {
           </div>
           <span className={styles.fixturePill}>会话级</span>
         </div>
+        {/*
+          主题选择是这一区里唯一会写入浏览器存储的项，所以它自己说明这一点。
+          持久化本身放在 features/theme 里，本文件不直接接触存储。
+        */}
+        <div className={styles.preferenceRow}>
+          <span>
+            <strong>配色主题</strong>
+            <small>浅色与深色都已适配；选择会保存在本机浏览器。</small>
+          </span>
+          <ThemeToggle />
+        </div>
         <div className={styles.preferenceRow}>
           <span>
             <strong>减少界面动效</strong>
-            <small>停用本演示站点内非必要的动画与过渡。</small>
+            <small>停用本站内非必要的动画与过渡。</small>
           </span>
           <button
             aria-checked={preferences.reducedMotion}
@@ -463,6 +558,25 @@ export function SettingsPageExperience() {
             {preferences.showSocialStats ? "已显示" : "已隐藏"}
           </button>
         </div>
+        <div className={styles.preferenceRow}>
+          <span>
+            <strong>为本地图片加水印</strong>
+            <small>
+              发帖选图后，在图片右下角写上你的昵称。图片始终只在本机预览，
+              水印也在本机绘制，不会上传网络。
+            </small>
+          </span>
+          <button
+            aria-checked={preferences.watermarkImages}
+            aria-label="为本地图片加水印"
+            className={styles.switchControl}
+            onClick={() => setImageWatermark(!preferences.watermarkImages)}
+            role="switch"
+            type="button"
+          >
+            {preferences.watermarkImages ? "已开启" : "未开启"}
+          </button>
+        </div>
         {status ? (
           <p aria-live="polite" className={styles.statusMessage}>
             {status}
@@ -477,7 +591,7 @@ export function SettingsPageExperience() {
           </span>
           <span>
             <strong>消息中心</strong>
-            <small>查看回复、提及、赞与系统演示消息</small>
+            <small>查看回复、提及、赞与系统消息</small>
           </span>
           <span aria-hidden="true">→</span>
         </Link>
@@ -487,7 +601,7 @@ export function SettingsPageExperience() {
           </span>
           <span>
             <strong>自选设置</strong>
-            <small>管理当前会话中的合成自选标的</small>
+            <small>自选列表只在本次会话保留，行情是实时的</small>
           </span>
           <span aria-hidden="true">→</span>
         </Link>
@@ -497,7 +611,31 @@ export function SettingsPageExperience() {
           </span>
           <span>
             <strong>组合设置</strong>
-            <small>查看合成组合、榜单与调仓记录</small>
+            <small>查看你的组合、公开榜单与调仓记录</small>
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+        {/*
+          收藏与模拟交易在窄屏上够不到：侧栏在 390px 下隐藏，底栏固定五项。
+          这一组入口在移动端可达（我的 → 设置），所以把这两条补在这里。
+        */}
+        <Link href="/bookmarks">
+          <span className={styles.productIcon} aria-hidden="true">
+            藏
+          </span>
+          <span>
+            <strong>收藏</strong>
+            <small>你收藏过的帖子，只有你自己看得到</small>
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+        <Link href="/trade">
+          <span className={styles.productIcon} aria-hidden="true">
+            拟
+          </span>
+          <span>
+            <strong>模拟交易</strong>
+            <small>用真实行情记虚拟买卖，不涉及真实资金</small>
           </span>
           <span aria-hidden="true">→</span>
         </Link>

@@ -1,0 +1,251 @@
+/*
+ * 标的详情分区页的双栏骨架：左栏是分区导航，右栏是分区内容。
+ *
+ * 窄屏不做「把导航塞进抽屉」这种事——三十项分区在手机上折成一列继续可读，
+ * 比藏进一个需要先发现的按钮后面更直接。
+ */
+.layout {
+  display: grid;
+  gap: var(--hq-spacing-4);
+}
+
+@media (min-width: 900px) {
+  .layout {
+    align-items: start;
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+}
+
+.aside {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  padding: var(--hq-spacing-3);
+}
+
+.content {
+  display: grid;
+  gap: var(--hq-spacing-4);
+  min-width: 0;
+}
+
+.card {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-4);
+}
+
+.heading {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  gap: var(--hq-spacing-2);
+}
+
+.heading small {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-regular);
+}
+
+.cardTitle {
+  align-items: baseline;
+  display: flex;
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+  gap: var(--hq-spacing-2);
+}
+
+.count {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--hq-type-weight-regular);
+}
+
+/*
+ * 宽表在窄屏自己横向滚动。
+ *
+ * 少了这一层，一张四列的表会把整个 body 撑出横向滚动条——那时候滚动的
+ * 是整个页面，导航和正文跟着一起跑偏。
+ */
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: var(--hq-type-size-body-compact);
+  min-width: 100%;
+  white-space: nowrap;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--hq-border-subtle);
+  padding: var(--hq-spacing-2) var(--hq-spacing-3);
+  text-align: left;
+}
+
+.table thead th {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-regular);
+}
+
+.table tbody th {
+  color: var(--hq-text-primary);
+  font-weight: var(--hq-type-weight-medium);
+}
+
+.table tbody td {
+  color: var(--hq-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr:last-child th,
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/*
+ * 财务报表的数值列右对齐。
+ *
+ * 左对齐时「3.99 亿」和「-88,766,486」的小数点不在一条线上，读表要靠数位数。
+ * 数字列表本来就该按位对齐——这不是装饰，是可读性。
+ */
+.numeric {
+  text-align: right;
+}
+
+.table th.numeric,
+.table td.numeric {
+  text-align: right;
+}
+
+/*
+ * 买卖两向的配色。
+ *
+ * 用全站的涨跌变量，不写死红绿：设置里可以把配色调成绿涨红跌，
+ * 这里写死的话，那位用户看到的买卖方向恰好是反的。
+ */
+.numericUp {
+  color: var(--hq-market-up-text);
+}
+
+.numericDown {
+  color: var(--hq-market-down-text);
+}
+
+/*
+ * 分价表的条形。
+ *
+ * 宽度由行内样式给出——它是数据本身，不是主题的一部分。
+ * 高度固定，避免这一列把行高撑得忽高忽低。
+ */
+.bar {
+  background: var(--hq-market-up);
+  border-radius: var(--hq-radius-control);
+  display: block;
+  height: 8px;
+  min-width: 2px;
+  opacity: 0.55;
+}
+
+/*
+ * 公告列表。
+ *
+ * 用列表而不是表格：公告是「一条一条」的，不是「行 × 列」的——
+ * 标题长度差异很大，塞进表格单元格会被压成一条挤不下的窄柱。
+ */
+.noticeList {
+  display: grid;
+  gap: var(--hq-spacing-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notice {
+  border-bottom: 1px solid var(--hq-border-subtle);
+  display: grid;
+  gap: 2px;
+  padding: var(--hq-spacing-2) 0;
+}
+
+.notice:last-child {
+  border-bottom: 0;
+}
+
+.noticeTitle {
+  align-items: center;
+  color: var(--hq-text-primary);
+  display: flex;
+  font-size: var(--hq-type-size-body-compact);
+  line-height: var(--hq-type-line-height-snug);
+  /* 公告标题是主要点击目标，给足触控高度。 */
+  min-height: var(--hq-touch-web-minimum);
+  text-decoration: none;
+}
+
+.noticeTitle:hover {
+  color: var(--hq-text-link-hover);
+  text-decoration: underline;
+}
+
+.noticeTitle:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}
+
+.noticeMeta {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 资料是「名称—值」的成对信息，用定义列表而不是拿 div 堆一个假表格。 */
+.facts {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin: 0;
+}
+
+.fact {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fact dt {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.fact dd {
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-body-compact);
+  line-height: var(--hq-type-line-height-snug);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.prose {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-body-compact);
+  line-height: var(--hq-type-line-height-body);
+  white-space: pre-wrap;
+}
+
+.disclosure {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-body);
+}

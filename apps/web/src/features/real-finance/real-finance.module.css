@@ -12,15 +12,23 @@
   min-width: 0;
 }
 
+/*
+ * 首页真实财经区块头。
+ * 原来是一整块蓝色渐变，在 1440 宽下吃掉约 110px、在 390 宽下更多，
+ * 却只承载一个标题和一行来源说明。改成与站内其他区块头一致的
+ * 「白底 + 描边」，靠字重和字号建立层级，不靠色块。
+ */
 .homeSummaryHeading {
-  align-items: flex-end;
-  background: linear-gradient(125deg, #0b3157 0%, #126cc4 100%);
+  align-items: baseline;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
-  color: #fff;
+  color: var(--hq-text-primary);
   display: flex;
-  gap: var(--hq-spacing-4);
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2) var(--hq-spacing-4);
   justify-content: space-between;
-  padding: var(--hq-spacing-5);
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
 }
 
 .homeSummaryHeading > div {
@@ -30,26 +38,36 @@
 
 .homeSummaryHeading p,
 .homeSummaryHeading span {
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--hq-text-tertiary);
   font-size: var(--hq-type-size-caption);
 }
 
 .homeSummaryHeading h2 {
   font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  letter-spacing: var(--hq-type-tracking-tight);
 }
 
+/* 次级入口：描边幽灵按钮，不跟侧栏那个唯一的实心主按钮抢。 */
 .homeSummaryHeading > a {
   align-items: center;
-  background: #fff;
-  border-radius: var(--hq-radius-pill);
-  color: #0b4f91;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-strong);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
   display: inline-flex;
   flex: 0 0 auto;
-  font-weight: var(--hq-type-weight-semibold);
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-medium);
   justify-content: center;
   min-height: var(--hq-touch-web-minimum);
-  padding: var(--hq-spacing-2) var(--hq-spacing-4);
+  padding: 0 var(--hq-spacing-4);
   text-decoration: none;
+}
+
+.homeSummaryHeading > a:hover {
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
 }
 
 .homeSummaryGrid {
@@ -60,7 +78,7 @@
 
 .homeSummaryCard {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: grid;
   gap: var(--hq-spacing-2);
@@ -108,44 +126,46 @@
   text-decoration: underline;
 }
 
+/*
+ * 页面级标题区。原来是渐变蓝 + 最大 44px 的巨型标题，
+ * 一屏里最响的东西是装饰，不是数据。
+ * 现在退回白底描边，标题降到 20px——页面标题不需要跟行情数字抢。
+ */
 .hero {
-  background:
-    radial-gradient(
-      circle at 92% 10%,
-      rgba(255, 255, 255, 0.2),
-      transparent 28%
-    ),
-    linear-gradient(130deg, #1168ce 0%, #2387ee 62%, #61a8f6 100%);
+  align-items: baseline;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
-  color: #fff;
-  display: grid;
-  gap: var(--hq-spacing-3);
-  overflow: hidden;
-  padding: clamp(var(--hq-spacing-5), 4vw, var(--hq-spacing-8));
+  color: var(--hq-text-primary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2) var(--hq-spacing-4);
+  justify-content: space-between;
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
 }
 
 .hero p {
-  color: rgba(255, 255, 255, 0.86);
-  font-size: var(--hq-type-size-label);
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
 }
 
 .hero h1 {
-  font-size: clamp(28px, 4vw, 44px);
-  letter-spacing: -0.04em;
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  letter-spacing: var(--hq-type-tracking-tight);
 }
 
 .sectionPanel {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
-  box-shadow: var(--hq-shadow-card);
   min-width: 0;
-  padding: clamp(var(--hq-spacing-4), 3vw, var(--hq-spacing-6));
+  padding: var(--hq-spacing-4);
 }
 
 .stateNotice {
-  background: rgba(32, 128, 225, 0.08);
-  border: 1px solid rgba(32, 128, 225, 0.18);
+  background: var(--hq-brand-subtle);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: grid;
   gap: var(--hq-spacing-2);
@@ -174,7 +194,7 @@
 
 .filterPanel {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: grid;
   gap: var(--hq-spacing-4);
@@ -219,7 +239,7 @@
 .filterField select,
 .filterField input,
 .expandButton {
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   font: inherit;
   min-height: var(--hq-touch-web-minimum);
 }
@@ -284,6 +304,37 @@
   font-size: var(--hq-type-size-title);
 }
 
+/*
+ * 区块标题行里的按钮（快讯的「暂停自动刷新」）。
+ *
+ * 不给它样式的话只有 25px 高——够不到 44px 的触控目标，手指按不准；
+ * 这一行还是 flex + align-items: flex-end，按钮会被压在底边。
+ */
+.sectionHeading button {
+  align-self: center;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: var(--hq-type-size-label-compact);
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
+}
+
+.sectionHeading button:hover {
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
+}
+
+.sectionHeading button[aria-pressed="true"] {
+  background: var(--hq-brand-subtle);
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
+}
+
 .sectionHeading p,
 .recordSectionHeading p,
 .muted,
@@ -308,7 +359,7 @@
 .recordActions a,
 .recordSourceAction {
   align-items: center;
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-pill);
   color: var(--hq-text-link);
   display: inline-flex;
@@ -349,7 +400,7 @@
 }
 
 .timelineList li {
-  border-left: 2px solid var(--hq-surface-divider);
+  border-left: 2px solid var(--hq-border-default);
   display: grid;
   gap: var(--hq-spacing-2);
   margin-left: var(--hq-spacing-2);
@@ -395,7 +446,7 @@
 
 .detailPanel {
   background: var(--hq-surface-base);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   box-shadow: var(--hq-shadow-card);
   display: grid;
@@ -414,7 +465,7 @@
 }
 
 .detailHeader {
-  border-bottom: 1px solid var(--hq-surface-divider);
+  border-bottom: 1px solid var(--hq-border-default);
   display: grid;
   gap: var(--hq-spacing-3);
   padding-bottom: var(--hq-spacing-5);
@@ -455,7 +506,7 @@
 
 .detailFooter {
   align-items: center;
-  border-top: 1px solid var(--hq-surface-divider);
+  border-top: 1px solid var(--hq-border-default);
   display: flex;
   gap: var(--hq-spacing-4);
   justify-content: space-between;
@@ -496,7 +547,7 @@
 
 .outboundLink.unavailableLink {
   background: var(--hq-surface-subtle);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
 }
 
 .sourceGrid {
@@ -507,7 +558,7 @@
 
 .sourceCard {
   background: var(--hq-surface-subtle);
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: grid;
   gap: var(--hq-spacing-3);
@@ -549,7 +600,7 @@
 }
 
 .status-unavailable {
-  background: var(--hq-surface-divider);
+  background: var(--hq-border-default);
   color: var(--hq-text-secondary);
 }
 
@@ -605,7 +656,7 @@
 }
 
 .recordCard {
-  border: 1px solid var(--hq-surface-divider);
+  border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: grid;
   gap: var(--hq-spacing-3);
@@ -668,7 +719,7 @@
 }
 
 .attribution {
-  border-top: 1px solid var(--hq-surface-divider);
+  border-top: 1px solid var(--hq-border-default);
   font-size: var(--hq-type-size-caption);
   overflow-wrap: anywhere;
   padding-top: var(--hq-spacing-3);

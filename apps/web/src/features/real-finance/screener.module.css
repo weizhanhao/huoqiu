@@ -1,0 +1,176 @@
+.page {
+  display: grid;
+  gap: var(--hq-spacing-4);
+}
+
+.header {
+  display: grid;
+  gap: var(--hq-spacing-2);
+}
+
+.header h1 {
+  font-size: var(--hq-type-size-headline);
+  font-weight: var(--hq-type-weight-bold);
+  letter-spacing: var(--hq-type-tracking-tight);
+}
+
+.lead {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-body-compact);
+  line-height: var(--hq-type-line-height-body);
+  max-width: 62ch;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-2);
+}
+
+/*
+ * 筛选项是链接而不是按钮——它们改变的是地址，
+ * 所以中键新标签页打开、复制链接都应当照常可用。
+ */
+.chip {
+  align-items: center;
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-pill);
+  color: var(--hq-text-secondary);
+  display: inline-flex;
+  font-size: var(--hq-type-size-body-compact);
+  justify-content: center;
+  min-height: var(--hq-touch-web-minimum);
+  padding: 0 var(--hq-spacing-4);
+  text-decoration: none;
+  transition:
+    background-color var(--hq-motion-duration-fast) var(--hq-motion-ease-out),
+    border-color var(--hq-motion-duration-fast) var(--hq-motion-ease-out);
+}
+
+.chip:hover {
+  background: var(--hq-surface-sunken);
+  border-color: var(--hq-border-strong);
+  color: var(--hq-text-primary);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}
+
+.chipActive {
+  background: var(--hq-brand-subtle);
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-brand-primary);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+/* 到头的翻页项：看得见但明确不可用，而不是悄悄消失让布局跳一下。 */
+.chipDisabled {
+  color: var(--hq-text-disabled);
+  cursor: default;
+}
+
+.card {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  padding: var(--hq-spacing-3);
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: var(--hq-type-size-body-compact);
+  min-width: 100%;
+  white-space: nowrap;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--hq-border-subtle);
+  padding: var(--hq-spacing-2) var(--hq-spacing-3);
+  text-align: left;
+}
+
+.table thead th {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-regular);
+}
+
+.table tbody tr:last-child th,
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 数值列按位对齐，否则读表要靠数位数。 */
+.numeric {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.table th.numeric,
+.table td.numeric {
+  text-align: right;
+}
+
+.symbol {
+  align-items: center;
+  color: var(--hq-text-primary);
+  display: flex;
+  min-height: var(--hq-touch-web-minimum);
+  text-decoration: none;
+}
+
+.symbol:hover {
+  color: var(--hq-text-link-hover);
+  text-decoration: underline;
+}
+
+.symbol:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}
+
+/*
+ * 涨跌颜色走用户在「股票设置」里选的配色令牌，不硬编码红绿——
+ * 那一页允许把涨跌配色对调，这里写死就会和用户的选择相反。
+ */
+.up {
+  color: var(--hq-market-up-text);
+}
+
+.down {
+  color: var(--hq-market-down-text);
+}
+
+.pager {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-3);
+}
+
+.pageInfo {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-body-compact);
+  line-height: var(--hq-type-line-height-body);
+  padding: var(--hq-spacing-4);
+}
+
+.disclosure {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-body);
+}

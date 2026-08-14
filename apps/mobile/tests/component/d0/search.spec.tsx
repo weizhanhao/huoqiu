@@ -25,9 +25,9 @@ describe("D0 mobile instrument search", () => {
   it.each([
     "SYN001",
     "syn001",
-    "合成示例一号",
-    "hechengshiliyihao",
-    "hechengshili",
+    "星海智造",
+    "xinghaizhizao",
+    "xinghai",
     "合成一号",
     "synthetic one",
   ])("finds listing_syn_0001 using %s", (query) => {
@@ -45,7 +45,7 @@ describe("D0 mobile instrument search", () => {
       <InstrumentSearch fixture={fixture} query="NOT-FOUND" state="normal" />,
     );
 
-    expect(result).toContain("合成示例一号");
+    expect(result).toContain("星海智造");
     expect(result).toContain("SYN001");
     expect(result).toContain("listing_syn_0001");
     expect(empty).toContain("没有找到匹配的演示标的");
@@ -81,7 +81,7 @@ describe("D0 mobile instrument search", () => {
     const submittedMarkup = renderToStaticMarkup(renderSearch());
     expect(submittedMarkup).toContain("已提交：SYN001");
     expect(submittedMarkup).toContain("搜索结果");
-    expect(submittedMarkup).toContain("合成示例一号");
+    expect(submittedMarkup).toContain("星海智造");
   });
 });
 
