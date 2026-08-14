@@ -100,6 +100,23 @@ export function StudioMetrics({
 export function StudioPostMetrics() {
   const { state } = useStudioData();
 
+  /*
+   * 未登录要说「请登录」，不能说「取不到」。
+   *
+   * 这一处此前把 anonymous 和 failed 合成一句「数据暂时取不到」——对着一个
+   * 只是还没登录的人说系统坏了。上面的 StudioMetrics 一直是分开的，
+   * 只有这里漏了，两个页面因此对同一件事给出两种说法。
+   */
+  if (state.kind === "anonymous") {
+    return (
+      <section className={styles.card}>
+        <p className="page-state-message">
+          <Link href="/login">登录</Link>后可以看到自己的数据。
+        </p>
+      </section>
+    );
+  }
+
   if (state.kind !== "ready") {
     return (
       <section className={styles.card}>
