@@ -15,8 +15,25 @@ const PASSWORD_PATTERN = /^[\x21-\x7e]{1,512}$/u;
 const PORT_PATTERN = /^[1-9]\d{3,4}$/u;
 const LOCAL_APP_ENVIRONMENTS = new Set(["local", "development", "test"]);
 const LOOPBACK_HOST = "127.0.0.1";
+/*
+ * 传给 Next 子进程的环境变量白名单。
+ *
+ * 除了这几项基础的，还必须带上运行期要用的四个 HUOQIU_*：
+ *
+ * - HUOQIU_SESSION_SECRET 不传，session.ts 的 secret() 直接返回 null，
+ *   sessionsAvailable() 为 false——站点跑得起来、页面也正常，但**谁都登不进去**。
+ *   这一条在界面上看不出原因，只表现为登录没反应。
+ * - 三个目录不传就落在 cwd 下（apps/web/.runtime、apps/web/.huoqiu-store）。
+ *   部署时那是代码目录，重新发一版就把账号、帖子和委托流水一起抹掉了。
+ *
+ * 其余变量一律不透传：子进程拿到的东西越少，越不会依赖启动它的那个 shell。
+ */
 const FORWARDED_CHILD_ENVIRONMENT = [
   "HOME",
+  "HUOQIU_FINANCE_SNAPSHOT_DIRECTORY",
+  "HUOQIU_MARKET_CACHE_DIRECTORY",
+  "HUOQIU_SESSION_SECRET",
+  "HUOQIU_SOCIAL_STORE_DIRECTORY",
   "LANG",
   "LC_ALL",
   "TEMP",
