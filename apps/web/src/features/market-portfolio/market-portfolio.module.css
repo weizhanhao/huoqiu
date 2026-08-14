@@ -20,6 +20,7 @@
   padding: var(--hq-spacing-3) var(--hq-spacing-4);
 }
 
+.hero h1,
 .hero h2,
 .portfolioHero h2 {
   font-size: var(--hq-type-size-title);
@@ -61,7 +62,11 @@
 .disclosures strong,
 .disclosureBar strong {
   background: var(--hq-market-warning-subtle);
-  border: 1px solid var(--hq-market-warning);
+  /*
+   * 不描边。「延时」是数据口径注解，不是警报——高饱和橙描边把它抬到了
+   * 和标题同级的视觉重量。去掉之后靠暖色底仍然认得出来。
+   */
+  border: 0;
   border-radius: var(--hq-radius-chip);
   color: var(--hq-market-warning-text);
   font-size: var(--hq-type-size-caption);
@@ -83,36 +88,66 @@
 
 .segmented button,
 .followButton {
-  background: var(--hq-surface-base);
-  border: 1px solid var(--hq-border-default);
-  border-radius: 999px;
-  color: var(--hq-text-secondary);
+  /*
+   * 未选中态只是文字，不画框。
+   *
+   * 这里原先是「与所在卡片同色的底 + 一圈灰描边」——底色和卡片一模一样，
+   * 于是这个控件在视觉上只剩那圈线，字面意义上的线框。未选中项本来就不该
+   * 占据视觉重量。
+   */
+  background: transparent;
+  border: 1px solid transparent;
+  /*
+   * 6px 方角，和右栏那组 chip 统一。
+   *
+   * 同一个「涨幅榜／跌幅榜」控件此前在正文区是 999px 全圆胶囊、在右栏是
+   * 6px 方片，同屏可见两种形态。而令牌注释本身就写着「金融界面要收敛」——
+   * 全圆胶囊配 44px 高度显得像玩具按钮。
+   */
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-tertiary);
   cursor: pointer;
   font: inherit;
-  font-size: 14px;
-  font-weight: 650;
+  font-size: var(--hq-type-size-body-compact);
+  /*
+   * 字重回到令牌档位。原先是硬编码的 650——比选中态的 600 还重，层级是反的；
+   * 而且 650 不在字重体系里，中文字体下会触发合成加粗，笔画糊成一团。
+   */
+  font-weight: var(--hq-type-weight-medium);
   min-height: 44px;
   padding: 9px 17px;
 }
 
+/*
+ * hover 只动面，不动线。
+ *
+ * 这两个状态原先共用一条规则：鼠标划过就炸出一圈 3px 不透明亮蓝——那是
+ * 焦点环，是给键盘用户看的，鼠标用户根本不该看到它。全站最刺眼的单一动作。
+ */
 .segmented button:hover,
+.followButton:hover {
+  background: var(--hq-surface-selected);
+  color: var(--hq-text-primary);
+}
+
 .segmented button:focus-visible,
-.followButton:hover,
 .followButton:focus-visible {
-  border-color: var(--hq-brand-primary);
   box-shadow: var(--hq-shadow-focus);
   outline: 2px solid transparent;
 }
 
 /*
- * 选中态用浅蓝底 + 品牌描边 + 加重字色，不用整块黑。
- * 实心黑药丸在一页里出现好几组时，视觉重量会盖过它旁边的行情数字。
+ * 选中态：柔和填充 + 字色加深，不描边。
+ *
+ * 原先是「浅蓝底 + 品牌色描边」——描边的亮度远高于填充，形成「亮线圈黑块」
+ * 的强对比轮廓。实心黑药丸也不行：一页里出现好几组时，视觉重量会盖过旁边的
+ * 行情数字。填充加字重就够表达「选中」了。
  */
 .segmented button[aria-pressed="true"],
 .followButton[aria-pressed="true"] {
-  background: var(--hq-brand-subtle);
-  border-color: var(--hq-brand-primary);
-  color: var(--hq-text-link);
+  background: var(--hq-surface-selected);
+  border-color: transparent;
+  color: var(--hq-text-primary);
   font-weight: var(--hq-type-weight-semibold);
 }
 
@@ -146,14 +181,15 @@
 }
 
 .sectionHeading button:hover {
-  border-color: var(--hq-brand-primary);
-  color: var(--hq-text-link);
+  /* hover 时描边跳成品牌色是一次颜色跳变，比亮度变化刺眼得多。 */
+  background: var(--hq-surface-selected);
+  color: var(--hq-text-primary);
 }
 
 .sectionHeading button[aria-pressed="true"] {
-  background: var(--hq-brand-subtle);
-  border-color: var(--hq-brand-primary);
-  color: var(--hq-text-link);
+  background: var(--hq-surface-selected);
+  border-color: transparent;
+  color: var(--hq-text-primary);
 }
 
 .sectionHeading h3,
@@ -846,6 +882,7 @@
     padding: 20px;
   }
 
+  .hero h1,
   .hero h2,
   .portfolioHero h2 {
     font-size: 34px;

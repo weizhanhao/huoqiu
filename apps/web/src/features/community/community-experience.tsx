@@ -89,7 +89,6 @@ function CommunityAuthorSpotlight() {
           <p className={styles.eyebrow}>栏目作者</p>
           <h3 id="synthetic-authors-heading">达人观察席</h3>
         </div>
-        <span>固定资料 · 不连接真实人物</span>
       </header>
       <div className={styles.authorGrid}>
         {communityAuthors.slice(0, 4).map((author) => (
@@ -106,7 +105,7 @@ function CommunityAuthorSpotlight() {
             <p>{author.bio}</p>
             <div className={styles.authorStats}>
               <span>{formatCommunityCount(author.followers)} 位读者</span>
-              <span>{author.notes} 篇固定笔记</span>
+              <span>{author.notes} 篇笔记</span>
             </div>
           </article>
         ))}

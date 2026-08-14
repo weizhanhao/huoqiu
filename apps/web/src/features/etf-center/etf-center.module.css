@@ -18,6 +18,8 @@
   padding: var(--hq-spacing-3) var(--hq-spacing-4);
 }
 
+/* JSX 里渲染的是 h1，只写 h2 的话这条规则一次都匹配不上。 */
+.hero h1,
 .hero h2 {
   font-size: var(--hq-type-size-title);
   font-weight: var(--hq-type-weight-semibold);
@@ -270,7 +272,7 @@
   cursor: pointer;
   font: inherit;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: var(--hq-type-weight-medium);
   min-height: 44px;
   padding: 9px 15px;
 }
@@ -474,7 +476,8 @@
 .quoteSummary > strong {
   font-variant-numeric: tabular-nums;
   font-size: clamp(38px, 7vw, 64px);
-  letter-spacing: -0.06em;
+  /* 纯数字收紧是合理的排印手法，但 -0.06 过头；配合 tabular-nums 已足够。 */
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 

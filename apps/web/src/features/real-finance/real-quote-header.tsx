@@ -79,7 +79,6 @@ export function RealQuoteHeader({
           <span>{formatPercent(changePercent)}</span>
         </div>
       </div>
-
     </section>
   );
 }

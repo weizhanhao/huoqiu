@@ -229,8 +229,8 @@ function RevenueCard({ data }: Readonly<{ data: CompanyOps }>) {
       ))}
       {periods.length > 1 ? (
         <p className={styles.disclosure}>
-          上表为最新一期（{latest}）的主营构成。上游同时给出了{" "}
-          {periods.length} 个报告期的数据，本页只呈现最新一期，
+          上表为最新一期（{latest}）的主营构成。上游同时给出了 {periods.length}{" "}
+          个报告期的数据，本页只呈现最新一期，
           以免不同年份的口径混在一起被误读。
         </p>
       ) : null}

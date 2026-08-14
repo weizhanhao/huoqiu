@@ -280,9 +280,7 @@ export function IntradayChart({
      * 半天行情和任何有缺失分钟的标的上必现。
      */
     const targetSlot =
-      plotWidth === 0
-        ? 0
-        : ((viewX - PADDING_LEFT) / plotWidth) * totalSlots;
+      plotWidth === 0 ? 0 : ((viewX - PADDING_LEFT) / plotWidth) * totalSlots;
 
     let nearest = 0;
     let best = Number.POSITIVE_INFINITY;
@@ -398,7 +396,9 @@ export function IntradayChart({
             const reference = points[index - 1]?.price ?? base;
             return (
               <line
-                className={point.price >= reference ? styles.volUp : styles.volDown}
+                className={
+                  point.price >= reference ? styles.volUp : styles.volDown
+                }
                 key={`${point.time}-${String(index)}`}
                 x1={xOf(index)}
                 x2={xOf(index)}
@@ -460,7 +460,11 @@ export function IntradayChart({
             <text
               key={tick.label}
               textAnchor={
-                index === 0 ? "start" : index === all.length - 1 ? "end" : "middle"
+                index === 0
+                  ? "start"
+                  : index === all.length - 1
+                    ? "end"
+                    : "middle"
               }
               x={xOfSlot(tick.slot)}
               y={VIEW_HEIGHT - 4}

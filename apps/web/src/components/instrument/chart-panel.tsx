@@ -75,45 +75,50 @@ export function ChartPanel({
       */}
       <div className={styles.body}>
         <div className={styles.chartColumn}>
-      {series === null ? (
-        <p className="page-state-message">
-          这个周期的行情暂时取不到，请稍后再试。
-        </p>
-      ) : series.kind === "line" ? (
-        <IntradayChart
-          market={
-            symbol.startsWith("hk") ? "hk" : symbol.startsWith("us") ? "us" : "cn"
-          }
-          period={period}
-          points={series.points}
-          previousClose={series.previousClose}
-          symbol={symbol}
-        />
-      ) : (
-        <KlineChart
-          bars={series.bars.map((bar) => ({
-            close: bar.close,
-            date: bar.date,
-            high: bar.high,
-            low: bar.low,
-            open: bar.open,
-            volume: bar.volumeShares,
-          }))}
-          market=""
-          name=""
-          periodLabel={
-            CHART_PERIODS.find((entry) => entry.id === period)?.label ?? "日线"
-          }
-          refreshPeriod={period}
-          sourceLabel={SOURCE_NOTE}
-          symbol={symbol}
-        />
-      )}
+          {series === null ? (
+            <p className="page-state-message">
+              这个周期的行情暂时取不到，请稍后再试。
+            </p>
+          ) : series.kind === "line" ? (
+            <IntradayChart
+              market={
+                symbol.startsWith("hk")
+                  ? "hk"
+                  : symbol.startsWith("us")
+                    ? "us"
+                    : "cn"
+              }
+              period={period}
+              points={series.points}
+              previousClose={series.previousClose}
+              symbol={symbol}
+            />
+          ) : (
+            <KlineChart
+              bars={series.bars.map((bar) => ({
+                close: bar.close,
+                date: bar.date,
+                high: bar.high,
+                low: bar.low,
+                open: bar.open,
+                volume: bar.volumeShares,
+              }))}
+              market=""
+              name=""
+              periodLabel={
+                CHART_PERIODS.find((entry) => entry.id === period)?.label ??
+                "日线"
+              }
+              refreshPeriod={period}
+              sourceLabel={SOURCE_NOTE}
+              symbol={symbol}
+            />
+          )}
 
-      {/* 折线那条路径的图组件不带来源行，这里补上——两条路都要有。 */}
-      {series?.kind === "line" ? (
-        <p className={styles.source}>{SOURCE_NOTE}</p>
-      ) : null}
+          {/* 折线那条路径的图组件不带来源行，这里补上——两条路都要有。 */}
+          {series?.kind === "line" ? (
+            <p className={styles.source}>{SOURCE_NOTE}</p>
+          ) : null}
         </div>
 
         <ChartSide quote={quote} tape={tape} />

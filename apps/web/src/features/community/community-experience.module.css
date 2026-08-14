@@ -49,7 +49,11 @@
 .detail h2,
 .publisher h2 {
   font-size: clamp(1.4rem, 3vw, 2rem);
-  letter-spacing: -0.03em;
+  /*
+   * 中文标题不收字距。负字距是为拉丁文大字号设计的收紧手段；方块字本身
+   * 已是紧密排布，再收 -0.03em 会让笔画相互侵入。
+   */
+  letter-spacing: normal;
 }
 
 .channels,
@@ -441,7 +445,7 @@
   align-items: center;
   color: var(--hq-brand-primary);
   display: inline-flex;
-  font-weight: 650;
+  font-weight: var(--hq-type-weight-medium);
   min-height: 44px;
   text-decoration: none;
 }
@@ -838,4 +842,22 @@
   height: 16px;
   justify-content: center;
   width: 16px;
+}
+
+/*
+ * 昵称是身份标识，不是行动召唤。
+ *
+ * 它此前吃到全局的链接样式：蓝色 + 下划线，在一屏十几张卡片里像十几个
+ * 待办按钮。改成与正文同色、不带线，只有 hover 时才表现出可点性——
+ * 它自成一块，不需要从周围文字里被认出来，所以不涉及 WCAG 1.4.1。
+ */
+.cardAuthorCopy strong a,
+.cardAuthorCopy a {
+  color: var(--hq-text-primary);
+  text-decoration: none;
+}
+
+.cardAuthorCopy strong a:hover,
+.cardAuthorCopy a:hover {
+  color: var(--hq-text-link);
 }

@@ -121,12 +121,16 @@ export function RealMarketRankings({
     <div className={styles.pageStack}>
       <header className={styles.hero}>
         <div>
-          <p className={styles.kicker}>榜单</p>
+          {/*
+            这里原先是 kicker「榜单」+ 标题 + 一段说明。kicker 在重复左栏
+            导航已经高亮的那一项；那段说明则是在回答一个没人问过的问题
+            （「排序由谁完成」），反而让人怀疑排序有猫腻。
+            表格第一列的名次已经说明了一切。
+          */}
           <h1>涨跌榜</h1>
           <p>
             {marketLabel}
-            {directionLabel}前 {ROWS} 名。排序由数据源完成，
-            因此这是全市场排名，不是本页内部的顺序。
+            {directionLabel}前 {ROWS} 名
           </p>
         </div>
         <div className={styles.disclosures}>
@@ -181,9 +185,7 @@ export function RealMarketRankings({
         ) : null}
 
         {state.kind === "failed" ? (
-          <p className={styles.resultStatus}>
-            榜单暂时取不到。本页不使用样本数据代替真实行情。
-          </p>
+          <p className={styles.resultStatus}>榜单暂时取不到。</p>
         ) : null}
 
         {state.kind === "ready" ? (
@@ -212,12 +214,25 @@ export function RealMarketRankings({
                         港美股与北交所没有站内详情页。照样给链接的话，
                         每一行都点得进去、每一次都是空页。
                       */}
+                      {/*
+                        名称与代码要放进同一个容器里。
+                        原先 <small> 是 <a> 的兄弟节点，而「名称在上、代码在下」
+                        那条堆叠规则只认 a 与 .watchlist-cell 里面的 strong 与 small
+                        ——一条都匹配不上，于是代码以小一号的字紧贴在名字后面，
+                        渲染成「网宿科技300017」「Artius II Acquisition Inc RtAACBR」，
+                        看起来像排版坏了。自选页一直是嵌套写法，这里对齐它。
+                      */}
                       {row.href === null ? (
-                        <span>{row.name}</span>
+                        <span className="watchlist-cell">
+                          <strong>{row.name}</strong>
+                          <small>{row.code}</small>
+                        </span>
                       ) : (
-                        <Link href={row.href}>{row.name}</Link>
+                        <Link href={row.href}>
+                          <strong>{row.name}</strong>
+                          <small>{row.code}</small>
+                        </Link>
                       )}
-                      <small>{row.code}</small>
                     </th>
                     <td className="watchlist-numeric">
                       {formatPrice(row.last)}

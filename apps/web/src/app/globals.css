@@ -45,10 +45,39 @@ html {
 
 body {
   font-size: var(--hq-type-size-body-compact);
-  line-height: var(--hq-type-line-height-snug);
+  /*
+   * 中文没有字母的上下伸部来自然撑开行距，1.4 在方块字下比拉丁文更压抑。
+   * 1.6 是中文正文的舒适下限。密集表格另行收紧，见 .watchlist-table 等。
+   */
+  line-height: var(--hq-type-line-height-body);
   margin: 0;
   min-width: 320px;
   overflow-x: clip;
+}
+
+/*
+ * 标题的兜底层级。
+ *
+ * 组件里写的是 `.hero h2`，而 JSX 渲染的是 <h1>——选择器一个都匹配不上，
+ * 于是全站标题一路回落到浏览器默认的 2em/bold（实测 30px/700）。700 是
+ * PingFang SC 常用字重里最重的一档，中文方块字在这个重量下笔画会糊成一团，
+ * 正是「标题僵硬」的直接来源。
+ */
+h1 {
+  font-size: var(--hq-type-size-headline);
+  font-weight: var(--hq-type-weight-semibold);
+  line-height: var(--hq-type-line-height-snug);
+}
+
+h2 {
+  font-size: var(--hq-type-size-title);
+  font-weight: var(--hq-type-weight-semibold);
+  line-height: var(--hq-type-line-height-snug);
+}
+
+h3 {
+  font-size: var(--hq-type-size-body);
+  font-weight: var(--hq-type-weight-medium);
 }
 
 p,
@@ -59,17 +88,67 @@ h4 {
   margin: 0;
 }
 
+/*
+ * 状态之间要有过渡。
+ *
+ * 全站原先只有 14 条 transition，颜色、边框、底色的 hover 变化全是 0ms 硬切。
+ * 「柔和」在交互层面就是状态之间有过渡；140ms 的缓动不会让密集的行情界面
+ * 变慢，但能消掉所有硬切。reduced-motion 的兜底在文件末尾已有。
+ */
+a,
+button,
+[role="button"],
+summary,
+input,
+select,
+textarea {
+  transition:
+    color var(--hq-motion-duration-fast) var(--hq-motion-ease-out),
+    background-color var(--hq-motion-duration-fast) var(--hq-motion-ease-out),
+    border-color var(--hq-motion-duration-fast) var(--hq-motion-ease-out),
+    box-shadow var(--hq-motion-duration-fast) var(--hq-motion-ease-out);
+}
+
+/*
+ * 链接保留下划线，但削到极淡。
+ *
+ * 一开始的做法是全局去掉下划线、只在 hover 时才出现——页面确实干净了，
+ * 但 axe 立刻报出 link-in-text-block：夹在文字中间的链接只剩颜色可辨，
+ * 而实测对比只有 1.13:1（WCAG 1.4.1 要求 3:1）。色觉障碍者根本认不出
+ * 哪几个字能点。
+ *
+ * 按容器逐个列举（p a、li a……）也治不干净：漏掉的 <span> 里照样有。
+ * 所以反过来——默认保留这条线索，只是把它削到几乎看不见；真正独立成块的
+ * 链接（导航项、卡片标题、昵称）自己声明 text-decoration: none，站内本来
+ * 就有几十处这样的声明。
+ */
 a {
   color: var(--hq-text-link);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, currentcolor 30%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  text-decoration-color: currentcolor;
 }
 
 a:hover {
   color: var(--hq-text-link-hover);
 }
 
+/*
+ * 焦点环留一圈间隙。
+ *
+ * 原先是 3px 实色紧贴控件边框，两条线粘成一道 4px 粗带。垫一圈底色再上环，
+ * 视觉上柔和得多；2px + 间隙对底面仍有约 7:1 的对比，不牺牲 WCAG 2.4.11。
+ */
 :focus-visible {
   border-radius: var(--hq-radius-control);
-  box-shadow: var(--hq-shadow-focus);
+  box-shadow:
+    0 0 0 2px var(--hq-surface-base),
+    var(--hq-shadow-focus);
   outline: 2px solid transparent;
 }
 
@@ -594,6 +673,10 @@ select:disabled {
 }
 
 /* 合规标识：必须看得见，但不该比行情数字还响。 */
+/*
+ * 环境标识不描边：它固定在顶栏右上，是全站出现频率最高的硬色块。
+ * 去掉描边后整条顶栏的边缘噪音明显下降，靠暖色底仍然认得出来。
+ */
 .demo-data-badge {
   background: var(--hq-market-warning-subtle);
   border: 1px solid var(--hq-market-warning);
@@ -1121,8 +1204,14 @@ a.fund-row:hover strong:first-child {
   margin-top: 2px;
 }
 
+/*
+ * 汇率卡只是「类别不同」，不是「被选中」或「需要点击」。
+ * 原先用品牌色描边圈住整张卡，是首屏最抢眼的一处硬边；改用底色差区分，
+ * 也符合「蓝色是链接色、不是填充色」这条硬规则。
+ */
 .index-card-fx {
-  border-color: var(--hq-brand-primary);
+  background: var(--hq-surface-subtle);
+  border-color: var(--hq-border-subtle);
 }
 
 @media (max-width: 1000px) {
@@ -1991,13 +2080,33 @@ a.fund-row:hover strong:first-child {
  *
  * 给可点的加一条浅下划线：非颜色的线索，而且不破坏原来的排版对齐。
  * 不可点的那几行（.watchlist-cell）保持无下划线，正好成为区分。
+ *
+ * 这条线保留，但削到最淡：原先它和文字同色、贴得很近，三十行叠在一起就是
+ * 三十条硬线。把颜色调到近乎透明、并把间距拉开，线索还在，形态不再抢眼；
+ * hover 时才恢复成实色，明确回应「这一条真的能点」。
+ */
+/*
+ * 线索落在名称上，不落在代码上。
+ *
+ * 名称与代码堆成两行之后，挂在 <a> 上的下划线会画到整个行盒的最后一行——
+ * 也就是代码底下，而股票名反而没有线。可点的是这一整块，但读者认的是名称，
+ * 所以把线索移到名称那一行。
  */
 .watchlist-table a {
   color: var(--hq-text-primary);
   display: inline-block;
+  text-decoration: none;
+}
+
+.watchlist-table a strong {
   text-decoration: underline;
-  text-decoration-color: var(--hq-border-strong);
-  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in oklch, currentcolor 22%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+}
+
+.watchlist-table a:hover strong {
+  text-decoration-color: currentcolor;
 }
 
 .watchlist-table a:hover,

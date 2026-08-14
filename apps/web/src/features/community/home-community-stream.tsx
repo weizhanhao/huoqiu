@@ -13,9 +13,7 @@ export function HomeCommunityStream() {
     >
       <header className={styles.streamHeading}>
         <div>
-          <p className={styles.eyebrow}>社区内容</p>
           <h2 id="home-community-heading">社区热帖与长文</h2>
-          <p>栏目记录与用户内容，均为本地数据，不含真实财经资讯。</p>
         </div>
         <Link className={styles.streamLink} href="/community">
           浏览完整社区

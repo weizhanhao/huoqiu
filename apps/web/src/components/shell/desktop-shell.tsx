@@ -62,9 +62,6 @@ export function DesktopShell({
             「刷新后重置」，是在让他白改一遍。真正只活在本次会话里的
             只剩自选清单。
           */}
-          <p className="session-disclosure">
-            自选刷新后重置；账号、帖子与组合跟随账号保存
-          </p>
         </aside>
 
         <main className="d0-main">

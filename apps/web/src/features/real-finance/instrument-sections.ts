@@ -102,7 +102,7 @@ export const instrumentSectionGroups: readonly InstrumentSectionGroup[] = [
       { label: "利润表", slug: "income", status: "ready" },
       { label: "资产负债表", slug: "balance", status: "ready" },
       { label: "现金流量表", slug: "cashflow", status: "ready" },
-            {
+      {
         /*
          * 所有者权益变动表没有稳定的免费结构化接口。
          * 雪球这一项本身也是跳站外，我们同样给法定披露源的真实地址，
@@ -114,7 +114,7 @@ export const instrumentSectionGroups: readonly InstrumentSectionGroup[] = [
         slug: "equity-change",
         status: "external",
       },
-            {
+      {
         /*
          * 选股器是跨标的的，不是这只股票的一个分区——
          * 所以它指向站内的独立页面，而不是 /instruments/<code>/screener。

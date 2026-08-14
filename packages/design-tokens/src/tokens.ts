@@ -32,6 +32,17 @@ export const tokens = {
     base: "#FFFFFF",
     /** 强调区块的浅蓝底 */
     subtle: "#F0F5FC",
+    /*
+     * 选中态的柔和填充。
+     *
+     * 选中此前一律用「品牌色描边」表达——亮蓝硬边圈住一块深底，形成
+     * 「亮线圈黑块」的强对比轮廓，那正是界面显硬的主因之一。
+     *
+     * 这是一档**面色**而不是品牌色，所以可以整块铺开而不违反「蓝色是
+     * 链接色、不是填充色」这条硬规则。与主文字色对比 16:1，选中项的
+     * 文字可以直接用主文字色，不必再上蓝。
+     */
+    selected: "#E8EFF8",
     /** 浮层：弹窗、下拉、吸顶栏 */
     raised: "#FFFFFF",
     /** 凹陷区：输入框、代码块、进度槽 */
@@ -117,7 +128,7 @@ export const tokens = {
      * 正确写法），这道 box-shadow 是普通模式下唯一的焦点指示：看不清它，
      * 键盘用户就不知道自己在哪。
      */
-    focus: "0 0 0 3px #0967C7",
+    focus: "0 0 0 2px #0967C7",
   },
   type: {
     family: {
@@ -201,6 +212,8 @@ export const darkTokens = {
     canvas: "#0C1116",
     base: "#141A21",
     subtle: "#16222F",
+    /* 相对 base 亮约 +8：明确高于底面，又远低于 brand.primary。 */
+    selected: "#212D3A",
     raised: "#1B222B",
     sunken: "#080C10",
     overlay: "#1B222B",
@@ -244,7 +257,7 @@ export const darkTokens = {
     raised: "0 4px 12px rgba(0, 0, 0, 0.5)",
     floating: "0 12px 32px rgba(0, 0, 0, 0.6)",
     /* 同理，深色主题下也要不透明。 */
-    focus: "0 0 0 3px #6BB0F7",
+    focus: "0 0 0 2px #6BB0F7",
   },
 } as const;
 

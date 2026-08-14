@@ -54,10 +54,8 @@ export default async function HomePage({ searchParams }: HomePageProperties) {
         <>
           <section className="feed-intro" aria-labelledby="feed-heading">
             <div>
-              <p className="card-kicker">社区</p>
               <h2 id="feed-heading">社区内容</h2>
             </div>
-            <p>这一区是社区内容与样本行情，与上方的真实财经来源相互独立。</p>
           </section>
           <D0Feed
             /*
@@ -80,10 +78,8 @@ export default async function HomePage({ searchParams }: HomePageProperties) {
         <section aria-labelledby="feed-heading">
           <div className="feed-intro">
             <div>
-              <p className="card-kicker">社区</p>
               <h2 id="feed-heading">社区内容</h2>
             </div>
-            <p>该分区与真实财经快照相互独立。</p>
           </div>
           <PageState state="error" errorMessage={fixtureResult.message} />
         </section>

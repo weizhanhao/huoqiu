@@ -54,11 +54,20 @@ describe("web shell", () => {
       }
     }
 
-    expect(markup).toContain("真实财经来源");
+    /*
+     * 区块名从「真实财经来源」改成了「监管披露与宏观数据」——用内容本身
+     * 命名，而不是用「数据是不是真的」这种系统内部视角命名。断言的意图没变：
+     * 这一区必须存在，且与社区内容分开。
+     */
+    expect(markup).toContain("监管披露与宏观数据");
     expect(markup).toContain("真实财经快照尚未生成");
     // 标题改名为「社区内容」，它仍然是「社区区与真实财经区分离」的标记。
     expect(markup).toContain("社区内容");
-    expect(markup).toContain("本地受保护预览");
+    /*
+     * 环境标识收敛成了「预览环境」。「本地受保护」描述的是部署配置，
+     * 而它出现在顶栏最显眼的位置、每一页都在——读者只需要知道这不是正式环境。
+     */
+    expect(markup).toContain("预览环境");
     expect(markup).not.toContain("当前使用演示数据和合成数据");
     expect(markup).not.toContain("星海智造完成日内数据更新");
   });

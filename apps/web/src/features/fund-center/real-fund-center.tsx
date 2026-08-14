@@ -143,7 +143,7 @@ export function RealFundCenter({
     >
       <header className={styles.hero}>
         <div>
-          <p className={styles.kicker}>基金中心</p>
+          {/* kicker 原先与标题字面完全相同，是模板被机械套用的结果。 */}
           <h1 id="fund-center-heading">基金中心</h1>
           <p>
             按公开排行浏览真实公募基金。
@@ -162,10 +162,13 @@ export function RealFundCenter({
         </div>
       </header>
 
-      <section aria-labelledby="fund-list-heading" className={styles.panel} tabIndex={-1}>
+      <section
+        aria-labelledby="fund-list-heading"
+        className={styles.panel}
+        tabIndex={-1}
+      >
         <div className={styles.sectionHeading}>
           <div>
-            <p className={styles.kicker}>FUND RANKING</p>
             <h2 id="fund-list-heading">基金排行</h2>
           </div>
           {state.kind === "ready" && state.total !== null ? (
@@ -174,11 +177,7 @@ export function RealFundCenter({
         </div>
 
         <div className={styles.filters}>
-          <div
-            aria-label="基金分类"
-            className={styles.segmented}
-            role="group"
-          >
+          <div aria-label="基金分类" className={styles.segmented} role="group">
             {CATEGORIES.map((item) => (
               <button
                 aria-pressed={category === item.id}
@@ -226,9 +225,7 @@ export function RealFundCenter({
         </p>
 
         {state.kind === "loading" ? (
-          <p className={styles.resultStatus}>
-            正在读取基金列表……
-          </p>
+          <p className={styles.resultStatus}>正在读取基金列表……</p>
         ) : null}
 
         {state.kind === "failed" ? (

@@ -10,9 +10,9 @@ export function DemoDataBadge({
   return (
     <span
       className="demo-data-badge"
-      aria-label={environment ? "本地受保护预览环境" : "固定离线样本数据"}
+      aria-label={environment ? "预览环境环境" : "固定离线样本数据"}
     >
-      {environment ? "本地受保护预览" : "样本数据 · 非实时"}
+      {environment ? "预览环境" : "样本数据 · 非实时"}
     </span>
   );
 }

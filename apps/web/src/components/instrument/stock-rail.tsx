@@ -73,7 +73,9 @@ export function StockRail({
 }>) {
   const hasProfile = profile !== null && profile.trim().length > 0;
   const funds = fundHoldings
-    .filter((holding) => holding.name !== null && holding.name.trim().length > 0)
+    .filter(
+      (holding) => holding.name !== null && holding.name.trim().length > 0,
+    )
     .slice(0, FUND_COUNT);
 
   const anyFailed = failed.peers || failed.profile || failed.shareholders;

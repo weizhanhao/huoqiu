@@ -17,7 +17,8 @@ import type { ReactNode } from "react";
  */
 
 /** 沪深六位、港股五位、美股字母代码（点号在站内地址里写成下划线）。 */
-const LISTING_PATTERN = /^(?:(?:sh|sz)\d{6}|hk\d{1,5}|us[a-z][a-z0-9_]{0,9})$/iu;
+const LISTING_PATTERN =
+  /^(?:(?:sh|sz)\d{6}|hk\d{1,5}|us[a-z][a-z0-9_]{0,9})$/iu;
 
 export const isListingSymbol = (symbol: string): boolean =>
   LISTING_PATTERN.test(symbol);

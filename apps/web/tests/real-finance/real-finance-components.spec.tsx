@@ -127,8 +127,12 @@ describe("real finance presentational seam", () => {
         />,
       );
 
+      /*
+       * 「不会使用样本内容补位」这句承诺从界面上去掉了：读者在失败的那一刻
+       * 只关心发生了什么、怎么办，而不是听我们表态不造假。用例守的东西没变——
+       * 每种状态都得如实说出自己是哪一种，这由上面的 message 断言保证。
+       */
       expect(markup).toContain(message);
-      expect(markup).toContain("不会使用样本内容补位");
       expect(markup).not.toContain('class="undefined"');
       expect(markup).not.toContain(" undefined");
       expect(markup.includes('data-record-source="sec"')).toBe(keepsRecords);

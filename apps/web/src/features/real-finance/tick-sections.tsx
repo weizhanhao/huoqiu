@@ -211,9 +211,7 @@ export function BlockOrdersSection({
         </h2>
         <ScrollableTable className={styles.tableScroll} label="资金流">
           <table className={styles.table}>
-            <caption className={styles.disclosure}>
-              当日各档资金净流入
-            </caption>
+            <caption className={styles.disclosure}>当日各档资金净流入</caption>
             <thead>
               <tr>
                 <th scope="col">档位</th>
@@ -231,7 +229,9 @@ export function BlockOrdersSection({
                   <th scope="row">{tier.label}</th>
                   <td
                     className={`${styles.numeric} ${
-                      tier.netAmount >= 0 ? styles.numericUp : styles.numericDown
+                      tier.netAmount >= 0
+                        ? styles.numericUp
+                        : styles.numericDown
                     }`}
                   >
                     {formatWan(tier.netAmount)}

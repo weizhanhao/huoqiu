@@ -312,9 +312,7 @@ function InsiderTradesSection({ data }: Readonly<{ data: InsiderTrades }>) {
             orDash(trade.position),
             orDash(trade.relation),
             trade.shares === null ? "—" : trade.shares < 0 ? "减持" : "增持",
-            formatShares(
-              trade.shares === null ? null : Math.abs(trade.shares),
-            ),
+            formatShares(trade.shares === null ? null : Math.abs(trade.shares)),
             trade.averagePrice === null
               ? "—"
               : `${trade.averagePrice.toString()} 元`,

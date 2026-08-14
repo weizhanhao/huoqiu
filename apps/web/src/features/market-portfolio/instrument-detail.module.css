@@ -72,7 +72,8 @@
 
 .identity h2 {
   font-size: clamp(30px, 5vw, 48px);
-  letter-spacing: -0.05em;
+  /* 这是中文股票名，不是拉丁大标题——不收字距。 */
+  letter-spacing: normal;
   line-height: 1;
   margin: 8px 0 10px;
 }

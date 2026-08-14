@@ -49,7 +49,9 @@ const buildFacts = (profile: CompanyProfile): readonly Fact[] => {
     {
       label: "员工人数",
       value:
-        profile.employees === null ? null : `${profile.employees.toString()} 人`,
+        profile.employees === null
+          ? null
+          : `${profile.employees.toString()} 人`,
     },
     {
       label: "发行价格",
@@ -60,7 +62,8 @@ const buildFacts = (profile: CompanyProfile): readonly Fact[] => {
     },
     {
       label: "募集资金",
-      value: profile.raisedFunds === null ? null : formatYi(profile.raisedFunds),
+      value:
+        profile.raisedFunds === null ? null : formatYi(profile.raisedFunds),
     },
     { label: "联系电话", value: profile.phone },
     { label: "公司网址", value: profile.website },

@@ -89,7 +89,10 @@ function OrderBookRows({
   );
 }
 
-function TickRow({ base, tick }: Readonly<{ base: number | null; tick: Tick }>) {
+function TickRow({
+  base,
+  tick,
+}: Readonly<{ base: number | null; tick: Tick }>) {
   const sideClass =
     tick.side === "buy"
       ? styles.up

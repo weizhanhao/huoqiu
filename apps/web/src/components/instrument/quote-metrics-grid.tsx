@@ -105,11 +105,23 @@ export function QuoteMetricsGrid({
     tone: Tone;
     value: string;
   }>[] = [
-    { label: "最高", tone: against(metrics.high, base), value: price(metrics.high) },
-    { label: "今开", tone: against(metrics.open, base), value: price(metrics.open) },
+    {
+      label: "最高",
+      tone: against(metrics.high, base),
+      value: price(metrics.high),
+    },
+    {
+      label: "今开",
+      tone: against(metrics.open, base),
+      value: price(metrics.open),
+    },
     { label: "涨停", tone: "up", value: price(metrics.limitUp) },
     { label: "成交量", tone: "flat", value: scaled(metrics.volumeShares) },
-    { label: "最低", tone: against(metrics.low, base), value: price(metrics.low) },
+    {
+      label: "最低",
+      tone: against(metrics.low, base),
+      value: price(metrics.low),
+    },
     { label: "昨收", tone: "flat", value: price(metrics.previousClose) },
     { label: "跌停", tone: "down", value: price(metrics.limitDown) },
     { label: "成交额", tone: "flat", value: scaled(metrics.amount) },

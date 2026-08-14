@@ -14,9 +14,7 @@ import styles from "./skeleton.module.css";
  *     动 width 会让骨架自己制造抖动——本来是来消除抖动的。
  */
 
-export function SkeletonLine({
-  width = "100%",
-}: Readonly<{ width?: string }>) {
+export function SkeletonLine({ width = "100%" }: Readonly<{ width?: string }>) {
   return <span className={styles.line} style={{ width }} />;
 }
 

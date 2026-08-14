@@ -33,7 +33,12 @@ describe("D0 Web seed session", () => {
      * 重置」，是在让他白改一遍。真正只活在本次会话里的只剩自选。
      */
     expect(markup).not.toContain("本地会话数据，刷新后重置");
-    expect(markup).toContain("自选刷新后重置");
+    /*
+     * 这条说明原先挂在侧栏底部，于是**每一页**都在讲一件只跟自选页有关的事，
+     * 是全站曝光量最大的一条工程说明。现在它回到自选页本身（见
+     * watchlist-panel），外壳不再重复。
+     */
+    expect(markup).not.toContain("自选刷新后重置");
     expect(markup).toContain("基金");
     expect(markup).toContain("组合");
     expect(markup).toContain("消息");

@@ -196,9 +196,7 @@ export function RealMarketOverview() {
       ) : null}
 
       {state.kind === "failed" ? (
-        <p className={styles.resultStatus}>
-          行情概览暂时取不到。本页不使用样本数据代替真实行情。
-        </p>
+        <p className={styles.resultStatus}>行情概览暂时取不到。</p>
       ) : null}
 
       {overview === null ? null : (

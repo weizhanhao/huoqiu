@@ -113,82 +113,82 @@ export function RealInstrumentDetail({
 }>) {
   const stats = summarize(series.bars);
 
-
   return (
     <LiveInstrumentProvider symbol={series.symbol}>
-    <div className={styles.page}>
-      {quote === null ? null : (
-        <RealQuoteHeader quote={quote} />
-      )}
-      {metrics === null ? null : <QuoteMetricsGrid metrics={metrics} />}
-      <ChartPanel
-        period={period}
-        quote={quote}
-        series={chartSeries}
-        symbol={series.symbol}
-        tape={tape}
-      />
+      <div className={styles.page}>
+        {quote === null ? null : <RealQuoteHeader quote={quote} />}
+        {metrics === null ? null : <QuoteMetricsGrid metrics={metrics} />}
+        <ChartPanel
+          period={period}
+          quote={quote}
+          series={chartSeries}
+          symbol={series.symbol}
+          tape={tape}
+        />
 
-      {stats === null ? null : (
-        <section className={styles.card} aria-labelledby="range-stats-heading">
-          <h2 id="range-stats-heading">
-            区间统计
-            <small>
-              {stats.firstDate} 至 {stats.lastDate} · {series.bars.length}{" "}
-              个交易日
-            </small>
-          </h2>
-          <dl className={styles.stats}>
-            <div>
-              <dt>区间最高</dt>
-              <dd>{formatPrice(stats.highest)}</dd>
-            </div>
-            <div>
-              <dt>区间最低</dt>
-              <dd>{formatPrice(stats.lowest)}</dd>
-            </div>
-            <div>
-              <dt>区间振幅</dt>
-              <dd>{formatPrice(stats.amplitudePct)}%</dd>
-            </div>
-            <div>
-              <dt>上涨 / 下跌交易日</dt>
-              <dd>
-                {stats.upDays} / {stats.downDays}
-              </dd>
-            </div>
-            <div>
-              <dt>日均成交量</dt>
-              <dd>{formatVolume(stats.averageVolume)}</dd>
-            </div>
-          </dl>
-          {/*
+        {stats === null ? null : (
+          <section
+            className={styles.card}
+            aria-labelledby="range-stats-heading"
+          >
+            <h2 id="range-stats-heading">
+              区间统计
+              <small>
+                {stats.firstDate} 至 {stats.lastDate} · {series.bars.length}{" "}
+                个交易日
+              </small>
+            </h2>
+            <dl className={styles.stats}>
+              <div>
+                <dt>区间最高</dt>
+                <dd>{formatPrice(stats.highest)}</dd>
+              </div>
+              <div>
+                <dt>区间最低</dt>
+                <dd>{formatPrice(stats.lowest)}</dd>
+              </div>
+              <div>
+                <dt>区间振幅</dt>
+                <dd>{formatPrice(stats.amplitudePct)}%</dd>
+              </div>
+              <div>
+                <dt>上涨 / 下跌交易日</dt>
+                <dd>
+                  {stats.upDays} / {stats.downDays}
+                </dd>
+              </div>
+              <div>
+                <dt>日均成交量</dt>
+                <dd>{formatVolume(stats.averageVolume)}</dd>
+              </div>
+            </dl>
+            {/*
             这段说明必须留着：数据是真的，但它是抓取时点的日线快照，不是实时
             行情，也不构成投资建议。社区内容已经是真人真账号了，行情不是，
             这个区别不该靠含糊措辞抹平。
           */}
-          <p className={styles.disclosure}>
-            以上数字均由上述日线数据直接计算得出。数据抓取于{" "}
-            {fetchedAt.slice(0, 10)}
-            ，为日线快照而非实时行情，不提供投资建议或交易能力。
-          </p>
-        </section>
-      )}
+            <p className={styles.disclosure}>
+              以上数字均由上述日线数据直接计算得出。数据抓取于{" "}
+              {fetchedAt.slice(0, 10)}
+              ，为日线快照而非实时行情，不提供投资建议或交易能力。
+            </p>
+          </section>
+        )}
 
-      <section className={styles.card} aria-labelledby="discussion-heading">
-        <h2 id="discussion-heading">讨论</h2>
-        <InstrumentDiscussionComposer
-          name={series.name}
-          nextPath={`/instruments/${series.symbol}`}
-          symbol={series.symbol}
-        />
-        {/*
+        <section className={styles.card} aria-labelledby="discussion-heading">
+          <h2 id="discussion-heading">讨论</h2>
+          <InstrumentDiscussionComposer
+            name={series.name}
+            nextPath={`/instruments/${series.symbol}`}
+            symbol={series.symbol}
+          />
+          {/*
           发帖框下面要能看见已经说过的话。此前这里只有一个输入框：
           发出去的内容在这一页上再也看不到，别人说了什么更无从得知。
         */}
-        <InstrumentDiscussionList symbol={series.symbol} />
-      </section>
-    </div>
+          <InstrumentDiscussionList symbol={series.symbol} />
+        </section>
+      </div>
     </LiveInstrumentProvider>
   );
 }

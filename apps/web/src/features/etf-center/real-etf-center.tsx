@@ -144,7 +144,11 @@ export function RealEtfCenter({
         </div>
       </header>
 
-      <section aria-labelledby="etf-list-heading" className={styles.panel} tabIndex={-1}>
+      <section
+        aria-labelledby="etf-list-heading"
+        className={styles.panel}
+        tabIndex={-1}
+      >
         <div className={styles.sectionHeading}>
           <h2 id="etf-list-heading">ETF 列表</h2>
           {state.kind === "ready" && state.total !== null ? (
@@ -183,9 +187,7 @@ export function RealEtfCenter({
         </p>
 
         {state.kind === "loading" ? (
-          <p className={styles.resultStatus}>
-            正在读取 ETF 列表……
-          </p>
+          <p className={styles.resultStatus}>正在读取 ETF 列表……</p>
         ) : null}
 
         {state.kind === "failed" ? (

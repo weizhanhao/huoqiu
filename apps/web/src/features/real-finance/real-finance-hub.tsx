@@ -177,7 +177,7 @@ export function RealFinanceHub({ model }: RealFinanceHubProperties) {
             role="status"
           >
             <h2>没有符合条件的真实记录</h2>
-            <p>请调整来源、类型或关键词。不会使用样本内容补位。</p>
+            <p>请调整来源、类型或关键词。</p>
           </section>
         )}
 

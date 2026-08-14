@@ -180,9 +180,7 @@ export function WatchlistQuotes({
           说清楚是取不到，而不是显示一列空白价格——
           空白会被读成「这些标的没有行情」。
         */}
-        <p className="watchlist-hint">
-          行情暂时取不到，稍后再试。本表不使用样本数据代替真实行情。
-        </p>
+        <p className="watchlist-hint">行情暂时取不到，稍后再试。本表</p>
         <button onClick={() => void load()} type="button">
           重试
         </button>
