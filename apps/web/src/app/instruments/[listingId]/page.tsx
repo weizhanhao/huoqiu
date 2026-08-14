@@ -9,7 +9,6 @@ import {
 } from "../../../server/chart-series.server";
 import { loadQuoteMetrics } from "../../../server/quote-metrics.server";
 import { loadTickDetails } from "../../../server/tick-details.server";
-import { loadKlineSnapshot } from "../../../features/real-finance/kline.server";
 
 /*
  * 行情页。
@@ -42,14 +41,19 @@ type InstrumentPageProperties = Readonly<{
 }>;
 
 /*
- * 只预生成快照里的那几个。
+ * 每次请求实时渲染。
  *
- * 沪深五千多只股票不可能全量预生成，其余按需渲染即可。
+ * 这里原先是 generateStaticParams：从本地 K 线快照取代码逐个预渲染，
+ * 「其余按需渲染」。但「按需」那条路走的是静态渲染路径，而这一页要读
+ * 实时行情——于是快照里没有的代码全部 500（网关对外是 502）。
+ *
+ * 更糟的是那份快照在 .runtime/ 下，不随代码提交。新机器上它不存在，
+ * generateStaticParams 返回空数组，结果是**每一只股票都打不开**。
+ * 本机开发看不到：开发时抓过快照，里面正好有在测的那几只。
+ *
+ * 这一页渲染的是每几秒就变的行情，静态生成它在原理上就是错的。
  */
-export const generateStaticParams = () =>
-  (loadKlineSnapshot()?.series ?? []).map((series) => ({
-    listingId: series.symbol,
-  }));
+export const dynamic = "force-dynamic";
 
 /*
  * 分享元数据。

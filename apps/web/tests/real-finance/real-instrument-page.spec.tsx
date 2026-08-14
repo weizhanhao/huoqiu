@@ -6,7 +6,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import InstrumentLayout from "../../src/app/instruments/[listingId]/layout";
-import InstrumentPage from "../../src/app/instruments/[listingId]/page";
+import InstrumentPage, {
+  dynamic as instrumentPageDynamic,
+} from "../../src/app/instruments/[listingId]/page";
 import WatchlistPage from "../../src/app/watchlist/page";
 import { loadKlineSnapshot } from "../../src/features/real-finance/kline.server";
 import { createPost, registerAccount } from "../../src/server/social-store";
@@ -119,10 +121,9 @@ describe("real instrument detail route", () => {
      * 地址，从地址栏上分不出哪个是真的。现在只剩真实标的。
      */
     for (const listingId of ["listing_syn_0001", "listing_syn_0002"]) {
-      await expect(
-        renderInstrument(listingId),
-        listingId,
-      ).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/u);
+      await expect(renderInstrument(listingId), listingId).rejects.toThrow(
+        /NEXT_HTTP_ERROR_FALLBACK;404/u,
+      );
     }
   });
 });
@@ -195,5 +196,39 @@ describe("the discussion under a real instrument reads back", () => {
 
     // 空白一块会让人以为没加载出来，而不是「还没有人说过」。
     expect(markup).toContain("还没有人讨论过这只标的");
+  });
+});
+
+describe("the instrument route renders on demand, not from a prebuilt list", () => {
+  it("is force-dynamic", () => {
+    /*
+     * 这条路由此前靠 generateStaticParams 从本地 K 线快照里取代码，逐个
+     * 预渲染。后果是：**快照里没有的代码，点进去是 502**。
+     *
+     * 那个快照在 .runtime/ 下，不随代码提交。装到一台新机器上时它根本
+     * 不存在，generateStaticParams 返回空数组——一个个股页都没预渲染，
+     * 于是全站每一只股票都打不开。本机开发看不到，因为开发时抓过快照，
+     * 里面正好有在测的那几只。
+     *
+     * 部署到服务器才暴露出来，日志里是 DYNAMIC_SERVER_USAGE：页面走静态
+     * 渲染路径，却要读实时行情。
+     *
+     * 这一页渲染的本来就是每几秒就变的实时行情，静态生成它在原理上就是
+     * 错的。force-dynamic 是这条路由唯一正确的形态。
+     */
+    expect(instrumentPageDynamic).toBe("force-dynamic");
+  });
+
+  it("does not prebuild a fixed set of symbols", async () => {
+    /*
+     * 配合上一条：只要还导出 generateStaticParams，就说明有人试图回到
+     * 预渲染那条路。搜索能搜出来的代码有几千个，预渲染永远追不上。
+     */
+    const module_ =
+      (await import("../../src/app/instruments/[listingId]/page")) as Record<
+        string,
+        unknown
+      >;
+    expect(module_.generateStaticParams).toBeUndefined();
   });
 });
