@@ -1,7 +1,6 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { GlobalSearchBox } from "./global-search-box";
+import { SiteTopbar } from "./site-topbar";
 import { InstrumentNav } from "../../features/real-finance/instrument-nav";
 import { isCompanyListing } from "../../features/real-finance/instrument-sections";
 import styles from "./stock-shell.module.css";
@@ -57,15 +56,7 @@ export function StockShell({
 
   return (
     <div className={styles.shell}>
-      <header className={styles.topbar}>
-        <Link className={styles.brand} href="/" aria-label="火球首页">
-          <span aria-hidden="true" className={styles.brandMark}>
-            火
-          </span>
-          <span className={styles.brandWord}>火球</span>
-        </Link>
-        <GlobalSearchBox />
-      </header>
+      <SiteTopbar />
 
       {/*
         版面模式只由标的类型决定，不由数据取没取到决定。

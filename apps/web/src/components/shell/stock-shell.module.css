@@ -11,55 +11,6 @@
 }
 
 /*
- * 顶栏。
- *
- * 只保留「回得去」和「搜得了」两件事。社区壳那条顶栏还挂着消息、发布、
- * 设置和环境标记——在个股页上，那些都是让人离开这只股票的入口。
- */
-.topbar {
-  align-items: center;
-  background: var(--hq-surface-raised);
-  border-bottom: 1px solid var(--hq-border-default);
-  display: flex;
-  gap: var(--hq-spacing-5);
-  padding: var(--hq-spacing-3) var(--hq-spacing-5);
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
-
-.brand {
-  align-items: center;
-  color: var(--hq-text-primary);
-  display: flex;
-  flex-shrink: 0;
-  gap: var(--hq-spacing-2);
-  text-decoration: none;
-}
-
-.brandMark {
-  align-items: center;
-  background: var(--hq-brand-primary);
-  border-radius: var(--hq-radius-control);
-  color: var(--hq-brand-on-primary);
-  display: flex;
-  font-weight: var(--hq-type-weight-semibold);
-  height: 28px;
-  justify-content: center;
-  width: 28px;
-}
-
-.brandWord {
-  font-size: var(--hq-type-size-label);
-  font-weight: var(--hq-type-weight-semibold);
-}
-
-.brand:focus-visible {
-  outline: 2px solid var(--hq-border-focus);
-  outline-offset: 3px;
-}
-
-/*
  * 正文区：分区导航 / 正文 / 公司资料，三列。
  *
  * 三个 class 合并成一个 + 修饰符。此前是 .layout / .layoutWithRail /
