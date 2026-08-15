@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function PrivateFundsPage() {
   return (
-    <DesktopShell activeChannel="privateFunds" requiresD0Fixture={false}>
+    <DesktopShell requiresD0Fixture={false}>
       <PrivateFundsHub />
     </DesktopShell>
   );

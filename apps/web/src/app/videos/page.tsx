@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function VideosPage() {
   return (
-    <DesktopShell activeChannel="videos" requiresD0Fixture={false}>
+    <DesktopShell requiresD0Fixture={false}>
       <VideosHub />
     </DesktopShell>
   );

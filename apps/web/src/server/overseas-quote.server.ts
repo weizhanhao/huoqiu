@@ -282,8 +282,16 @@ export const toInstrumentQuote = (
   snapshot: OverseasSnapshot | null,
 ): InstrumentQuote | null => {
   if (snapshot === null) return null;
-  const { amount, high, last, low, open, previousClose, tradedAtSeconds, volume } =
-    snapshot.quote;
+  const {
+    amount,
+    high,
+    last,
+    low,
+    open,
+    previousClose,
+    tradedAtSeconds,
+    volume,
+  } = snapshot.quote;
   if (
     amount === null ||
     high === null ||
@@ -332,7 +340,12 @@ export const loadOverseasSnapshot = async (
    */
   const candidates =
     parsed.market === "hk"
-      ? [{ barKey: `hk${parsed.code}`, secid: `${String(HK_MARKET)}.${parsed.code}` }]
+      ? [
+          {
+            barKey: `hk${parsed.code}`,
+            secid: `${String(HK_MARKET)}.${parsed.code}`,
+          },
+        ]
       : US_EXCHANGES.map((exchange) => ({
           /*
            * 下划线换回点号。同一只股票两边写法不一样：伯克希尔 B 股在东财

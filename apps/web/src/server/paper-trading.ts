@@ -79,8 +79,7 @@ export type RecordOrderInput = Readonly<{
 }>;
 
 export type RecordOrderResult =
-  | Readonly<{ error: string }>
-  | Readonly<{ order: Order }>;
+  Readonly<{ error: string }> | Readonly<{ order: Order }>;
 
 /**
  * 某个账号当前的持仓，由委托流水推导。
@@ -140,16 +139,14 @@ export const listOrders = (accountId: string): readonly Order[] =>
      * 而这一层的规则不接受「声明了不用」。显式列一遍还有个好处：以后往
      * StoredOrder 上加内部字段，不会顺着剩余解构漏出去。
      */
-    .map(
-      (stored): Order => ({
-        at: stored.at,
-        id: stored.id,
-        price: stored.price,
-        shares: stored.shares,
-        side: stored.side,
-        symbol: stored.symbol,
-      }),
-    )
+    .map((stored): Order => ({
+      at: stored.at,
+      id: stored.id,
+      price: stored.price,
+      shares: stored.shares,
+      side: stored.side,
+      symbol: stored.symbol,
+    }))
     .toSorted((left, right) => right.at.localeCompare(left.at));
 
 /**

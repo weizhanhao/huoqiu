@@ -27,7 +27,7 @@ export default async function NewsPage({ searchParams }: NewsPageProperties) {
   });
 
   return (
-    <DesktopShell activeChannel="news">
+    <DesktopShell>
       <RealFinanceHub model={model} />
     </DesktopShell>
   );

@@ -176,7 +176,8 @@ export const loadEtfList = async ({
        * 站内认不认这个代码，以 classifySymbol 为准。认不出来还照样给链接的话，
        * 每一行都点得进去、每一次都是空页——先许诺再落空，比不给链接更糟。
        */
-      href: classifySymbol(symbol) === "other" ? null : `/instruments/${symbol}`,
+      href:
+        classifySymbol(symbol) === "other" ? null : `/instruments/${symbol}`,
       last: numeric(row.f2),
       name,
       prevClose: numeric(row.f18),

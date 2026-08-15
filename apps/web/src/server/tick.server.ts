@@ -182,7 +182,9 @@ export const parseTick = (raw: string): Tick | null => {
  *
  * 价格降序——高价在上，与盘口的读法一致。
  */
-export const priceLevelsOf = (ticks: readonly Tick[]): readonly PriceLevel[] => {
+export const priceLevelsOf = (
+  ticks: readonly Tick[],
+): readonly PriceLevel[] => {
   const byPrice = new Map<number, { buy: number; sell: number }>();
   for (const tick of ticks) {
     const bucket = byPrice.get(tick.price) ?? { buy: 0, sell: 0 };

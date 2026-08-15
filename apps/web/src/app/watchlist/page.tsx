@@ -56,7 +56,7 @@ export default async function WatchlistPage({
   const state = normalizeD0FixtureState((await searchParams).fixture_state);
 
   return (
-    <DesktopShell activeChannel="watchlist" fixtureResult={fixtureResult}>
+    <DesktopShell fixtureResult={fixtureResult}>
       {/*
         面板不再吃 D0 夹具：可加自选的代码只剩真实代码，那份夹具在这里
         一次也不会被查到，却会整份塞进这一页的载荷。

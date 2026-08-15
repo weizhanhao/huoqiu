@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DesktopShell } from "../../../src/components/shell/desktop-shell";
 
-const channelMarkup = (activeChannel: "briefing" | "news"): string => {
+/* 频道选中态由地址决定，所以这里设定地址而不是传参。 */
+const channelMarkup = (pathname: string): string => {
+  currentPathname = pathname;
   const shellMarkup = renderToStaticMarkup(
-    <DesktopShell activeChannel={activeChannel}>
+    <DesktopShell>
       <p>页面内容</p>
     </DesktopShell>,
   );
@@ -53,8 +55,8 @@ vi.mock("next/navigation", () => ({
 
 describe("combined profile and finance navigation", () => {
   it("gives 7x24 and news distinct deep links with exactly one current channel", () => {
-    const briefingChannels = channelMarkup("briefing");
-    const newsChannels = channelMarkup("news");
+    const briefingChannels = channelMarkup("/7x24");
+    const newsChannels = channelMarkup("/news");
 
     expect(briefingChannels).toContain(
       '<a aria-current="page" href="/7x24">7x24</a>',

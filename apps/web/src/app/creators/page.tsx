@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function CreatorsPage() {
   return (
-    <DesktopShell activeChannel="creators" requiresD0Fixture={false}>
+    <DesktopShell requiresD0Fixture={false}>
       <CreatorsHub />
     </DesktopShell>
   );

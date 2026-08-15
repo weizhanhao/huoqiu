@@ -8,14 +8,13 @@ import { RailHotBoard } from "./rail-hot-board";
 import { RailHotFunds } from "./rail-hot-funds";
 import { RailHotPosts } from "./rail-hot-posts";
 import { PageState } from "../system/page-state";
-import { type ActiveChannel, ChannelNavigation } from "./channel-navigation";
+import { ChannelNavigation } from "./channel-navigation";
 import { MobileBottomNavigation } from "./mobile-bottom-navigation";
 import { SidebarNavigation } from "./sidebar-navigation";
 import { SiteTopbar } from "./site-topbar";
 import { PublishDialog } from "../../features/publish/publish-dialog";
 
 type DesktopShellProperties = Readonly<{
-  activeChannel?: ActiveChannel | undefined;
   activeUtility?: "notifications" | "profile" | "settings" | undefined;
   children: ReactNode;
   fixtureResult?: D0FixtureLoadResult;
@@ -23,7 +22,6 @@ type DesktopShellProperties = Readonly<{
 }>;
 
 export function DesktopShell({
-  activeChannel,
   activeUtility,
   children,
   fixtureResult = loadD0Fixture(),
@@ -72,7 +70,7 @@ export function DesktopShell({
             从任意页面点进这三页，内容会整体上跳一下，跳完还"恢复正常"，
             正是那种说不出哪里不对的劣质感。导航条的存在与否不该随页面变。
           */}
-          <ChannelNavigation activeChannel={activeChannel} />
+          <ChannelNavigation />
           {!requiresD0Fixture || fixtureResult.status === "ready" ? (
             children
           ) : (

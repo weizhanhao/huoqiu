@@ -23,7 +23,7 @@ import {
   useWatchlistGroups,
   watchlistSortOptions,
 } from "../../stores/watchlist-groups";
-import { WatchlistQuotes } from "./watchlist-quotes";
+import { useWatchlistQuotes, WatchlistQuotes } from "./watchlist-quotes";
 import { PageState } from "../system/page-state";
 import { WatchlistToggle } from "./watchlist-toggle";
 
@@ -106,17 +106,29 @@ export function WatchlistPanel({
    *
    * 现在成员资格只看自选，报价取不到就按站内惯例显示「—」，而不是把整行抹掉。
    */
-  const entries = listingIds.map<WatchlistEntry>(
-    (listingId) =>
-      realEntries.find((candidate) => candidate.listingId === listingId) ?? {
-        changePct: "—",
-        listingId,
-        market: "—",
-        name: listingId.toUpperCase(),
-        price: "—",
-        symbol: listingId,
-      },
-  );
+  /*
+   * 名称与价格取自同一份实时报价——上面那张表用的就是它。
+   * 各取各的会出现「上面有数、下面全是横杠」，正是此前的样子。
+   */
+  const quotes = useWatchlistQuotes(listingIds);
+  const entries = listingIds.map<WatchlistEntry>((listingId) => {
+    const snapshot = realEntries.find(
+      (candidate) => candidate.listingId === listingId,
+    );
+    const live = quotes.get(listingId);
+    return {
+      changePct:
+        live?.changePercent != null
+          ? live.changePercent.toFixed(2)
+          : (snapshot?.changePct ?? "—"),
+      listingId,
+      market: snapshot?.market ?? "—",
+      name: live?.name ?? snapshot?.name ?? listingId.toUpperCase(),
+      price:
+        live?.last != null ? live.last.toFixed(2) : (snapshot?.price ?? "—"),
+      symbol: listingId,
+    };
+  });
 
   const visible = entries.filter(
     (entry) =>
@@ -300,8 +312,18 @@ export function WatchlistPanel({
             </thead>
             <tbody>
               {sorted.map((entry) => {
-                const isUp = !entry.changePct.startsWith("-");
-                const prefix = isUp ? "+" : "";
+                /*
+                 * 没有数据时不上色、不加正负号。原先一律按「非负即涨」处理，
+                 * 于是取不到价的行显示成红色的「+—%」——既像是涨了，又不成话。
+                 */
+                const hasChange = entry.changePct !== "—";
+                const isUp = hasChange && !entry.changePct.startsWith("-");
+                const prefix = hasChange && isUp ? "+" : "";
+                const toneClass = hasChange
+                  ? isUp
+                    ? "market-up"
+                    : "market-down"
+                  : "";
                 return (
                   <tr key={entry.listingId}>
                     <th scope="row">
@@ -314,12 +336,9 @@ export function WatchlistPanel({
                     </th>
                     {columnSet === "quote" ? (
                       <>
-                        <td className={isUp ? "market-up" : "market-down"}>
-                          {entry.price}
-                        </td>
-                        <td className={isUp ? "market-up" : "market-down"}>
-                          {prefix}
-                          {entry.changePct}%
+                        <td className={toneClass}>{entry.price}</td>
+                        <td className={toneClass}>
+                          {hasChange ? `${prefix}${entry.changePct}%` : "—"}
                         </td>
                       </>
                     ) : (

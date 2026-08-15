@@ -49,13 +49,31 @@ export function SidebarAccount({
         </div>
       </Link>
 
+      {/*
+        关注与粉丝要点得进去。
+        这三个计数原先是纯文字——站内明明已经有 /users/<id>/following 与
+        /followers 两页，用户点上去却毫无反应，只能以为是坏了。
+        未登录时没有 id 可指，保持纯文字。
+      */}
       <p className="sidebar-stats">
-        <span>
-          关注 <strong>{stat(account?.followingCount ?? 0)}</strong>
-        </span>
-        <span>
-          粉丝 <strong>{stat(account?.followerCount ?? 0)}</strong>
-        </span>
+        {account === null ? (
+          <span>
+            关注 <strong>{stat(0)}</strong>
+          </span>
+        ) : (
+          <Link href={`/users/${account.id}/following`}>
+            关注 <strong>{stat(account.followingCount)}</strong>
+          </Link>
+        )}
+        {account === null ? (
+          <span>
+            粉丝 <strong>{stat(0)}</strong>
+          </span>
+        ) : (
+          <Link href={`/users/${account.id}/followers`}>
+            粉丝 <strong>{stat(account.followerCount)}</strong>
+          </Link>
+        )}
         <span>
           帖子 <strong>{stat(account?.postCount ?? 0)}</strong>
         </span>

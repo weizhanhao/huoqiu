@@ -315,7 +315,11 @@ export const loadInstrumentSnapshot = async (
   if (!SYMBOL_PATTERN.test(symbol)) return null;
 
   const cached = readCache(symbol);
-  if (!skipCache && cached !== null && isFresh(cached.fetchedAt, QUOTE_TTL_MS)) {
+  if (
+    !skipCache &&
+    cached !== null &&
+    isFresh(cached.fetchedAt, QUOTE_TTL_MS)
+  ) {
     return cached;
   }
 

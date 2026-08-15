@@ -17,7 +17,7 @@ export default async function BriefingPage() {
   });
 
   return (
-    <DesktopShell activeChannel="briefing">
+    <DesktopShell>
       <RealFinanceBriefing model={model} />
     </DesktopShell>
   );

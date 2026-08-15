@@ -28,7 +28,7 @@ export default async function NewsDetailPage({
   });
 
   return (
-    <DesktopShell activeChannel="news">
+    <DesktopShell>
       <RealFinanceDetail model={model} />
     </DesktopShell>
   );

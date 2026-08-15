@@ -32,11 +32,7 @@ export default async function HomePage({ searchParams }: HomePageProperties) {
   const state = normalizeD0FixtureState(parameters.fixture_state);
 
   return (
-    <DesktopShell
-      activeChannel="home"
-      fixtureResult={fixtureResult}
-      requiresD0Fixture={false}
-    >
+    <DesktopShell fixtureResult={fixtureResult} requiresD0Fixture={false}>
       {/*
         视觉隐藏的页面标题。这一页的可见标题在跨路由共用的组件里，
         提成 h1 会连带改掉别的页面；而没有 h1 时，靠标题导航的人

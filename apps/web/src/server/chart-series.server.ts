@@ -245,8 +245,7 @@ const readMinuteRows = (rows: readonly unknown[]): readonly LinePoint[] => {
    * 拿 20 倍当分界，中间那一大片空档不会误判。
    */
   const tail = parsed.at(-1) as (typeof parsed)[number];
-  const impliedPrice =
-    tail.volume > 0 ? tail.amount / tail.volume : tail.price;
+  const impliedPrice = tail.volume > 0 ? tail.amount / tail.volume : tail.price;
   const countsLots =
     tail.price > 0 && impliedPrice / tail.price > LOT_DETECTION_RATIO;
   const toShares = (volume: number): number =>

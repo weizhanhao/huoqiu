@@ -19,7 +19,7 @@ import { classifySymbol, type SymbolCategory } from "../../lib/symbol-category";
  * 看起来像功能坏了，而不是像「你还没关注这一类」。
  */
 
-type Quote = Readonly<{
+export type Quote = Readonly<{
   changeAmount: number | null;
   changePercent: number | null;
   last: number | null;
@@ -87,6 +87,43 @@ const fetchQuotes = async (key: string): Promise<FetchState> => {
     return { kind: "failed" };
   }
 };
+
+/*
+ * 自选行情。
+ *
+ * 同一页上有两张自选表：这张按行情列排，下面那张带分组与移出操作。两张都要
+ * 显示名称与最新价，取数只该有一份——各取各的会出现「上面有数、下面是横杠」。
+ */
+export function useWatchlistQuotes(
+  symbols: readonly string[],
+): ReadonlyMap<string, Quote> {
+  const key = useMemo(() => symbols.join(","), [symbols]);
+  const [state, setState] = useState<FetchState>({ kind: "idle" });
+
+  useEffect(() => {
+    if (key.length === 0) {
+      return undefined;
+    }
+    let cancelled = false;
+    void (async () => {
+      const next = await fetchQuotes(key);
+      if (!cancelled) setState(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+
+  return useMemo(
+    () =>
+      new Map(
+        state.kind === "ready"
+          ? state.quotes.map((quote) => [quote.symbol, quote])
+          : [],
+      ),
+    [state],
+  );
+}
 
 export function WatchlistQuotes({
   symbols,

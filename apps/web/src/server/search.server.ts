@@ -164,7 +164,8 @@ export const searchInstruments = async (
        * 链接——照样给的话，每一条搜索结果都点得进去、每一次都是空页。
        */
       href: symbol === null ? null : `/instruments/${symbol}`,
-      kind: typeof row.SecurityTypeName === "string" ? row.SecurityTypeName : "",
+      kind:
+        typeof row.SecurityTypeName === "string" ? row.SecurityTypeName : "",
       name,
       symbol,
     });

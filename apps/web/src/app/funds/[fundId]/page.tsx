@@ -48,7 +48,7 @@ export default async function FundDetailPage({
   if (fund === null) notFound();
 
   return (
-    <DesktopShell activeChannel="funds">
+    <DesktopShell>
       <RealFundDetail fund={fund} />
     </DesktopShell>
   );

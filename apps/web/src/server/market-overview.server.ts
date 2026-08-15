@@ -150,7 +150,9 @@ const fetchJson = async (url: string): Promise<unknown> => {
  * 只处理数组的话，返回对象的那些请求会得到一份空列表——
  * 而页面上看起来就像今天没有板块在涨跌。
  */
-export const rowsOf = (payload: unknown): readonly Record<string, unknown>[] => {
+export const rowsOf = (
+  payload: unknown,
+): readonly Record<string, unknown>[] => {
   if (typeof payload !== "object" || payload === null) return [];
   const data = (payload as Record<string, unknown>).data;
   if (typeof data !== "object" || data === null) return [];
@@ -261,7 +263,9 @@ export const loadMarketOverview = async (): Promise<MarketOverview | null> => {
       last: numeric(row.f2),
       // 名字用上游给的，取不到才回落到本地写的那个。
       name:
-        typeof row.f14 === "string" && row.f14.length > 0 ? row.f14 : entry.name,
+        typeof row.f14 === "string" && row.f14.length > 0
+          ? row.f14
+          : entry.name,
       symbol: entry.symbol,
     });
   }

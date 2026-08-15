@@ -1,10 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { activeNavHref } from "./active-nav";
 
 /**
  * 全局频道栏。
  *
- * `yaoqiu.md` 要求每个按钮必须真实可操作，或明确标注暂未开放。
- * 这里 11 个频道全部指向真实路由，不再有占位项。
+ * 12 个频道全部指向真实路由，不再有占位项。
+ *
+ * 当前项由地址决定，不由页面传参。原先 /community/[channel] 这一条路由
+ * 写死了——不管点进哪个频道，点亮的都是「热门」。
+ * 用户点「关注」，页签却跳到「热门」上，正是这么来的。
  */
 export type ActiveChannel =
   | "briefing"
@@ -41,18 +49,21 @@ const channels: readonly Channel[] = [
   { href: "/topics", id: "topics", label: "话题" },
 ];
 
-type ChannelNavigationProperties = Readonly<{
-  activeChannel?: ActiveChannel | undefined;
-}>;
+const CHANNEL_HREFS = channels.map((channel) => channel.href);
 
-export function ChannelNavigation({
-  activeChannel,
-}: ChannelNavigationProperties) {
+export function ChannelNavigation() {
+  /*
+   * /community 与 /community/follow 都会匹配到，取最长的那条——
+   * 否则站在关注页上点亮的是热门。没有路由上下文时返回 null（静态渲染、
+   * 测试里单独渲染都是）。
+   */
+  const active = activeNavHref(usePathname() ?? "", CHANNEL_HREFS);
+
   return (
     <nav className="channel-tabs" aria-label="全局频道">
       {channels.map((channel) => (
         <Link
-          aria-current={activeChannel === channel.id ? "page" : undefined}
+          aria-current={active === channel.href ? "page" : undefined}
           href={channel.href}
           key={channel.id}
         >

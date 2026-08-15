@@ -90,8 +90,7 @@ export type CreatePortfolioInput = Readonly<{
 }>;
 
 export type CreatePortfolioResult =
-  | Readonly<{ error: string }>
-  | Readonly<{ portfolio: Portfolio }>;
+  Readonly<{ error: string }> | Readonly<{ portfolio: Portfolio }>;
 
 /**
  * 建一个组合。

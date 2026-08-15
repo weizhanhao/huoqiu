@@ -53,7 +53,7 @@ export default async function CommunityChannelPage({
   }
 
   return (
-    <DesktopShell activeChannel="community" requiresD0Fixture={false}>
+    <DesktopShell requiresD0Fixture={false}>
       <CommunityFeed initialChannel={initialChannel} />
     </DesktopShell>
   );

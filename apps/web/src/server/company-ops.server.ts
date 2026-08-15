@@ -626,7 +626,9 @@ export const loadAnnouncements = async (
      * 股东大会是从全量公告里筛出来的，所以得多要一些回来，
      * 否则一页 30 条里可能一条股东大会都没有。
      */
-    page_size: String(scope === "meetings" ? MEETING_SCAN_COUNT : ANNOUNCE_COUNT),
+    page_size: String(
+      scope === "meetings" ? MEETING_SCAN_COUNT : ANNOUNCE_COUNT,
+    ),
     stock_list: code,
   });
   if (scope === "periodic") query.set("f_node", "1");

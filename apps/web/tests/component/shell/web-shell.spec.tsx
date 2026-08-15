@@ -21,12 +21,14 @@ const renderShell = (): string =>
     </DesktopShell>,
   );
 
-const renderActiveShell = (activeChannel: "home" | "watchlist"): string =>
-  renderToStaticMarkup(
-    <DesktopShell activeChannel={activeChannel}>
+const renderActiveShell = (pathname: string): string => {
+  currentPathname = pathname;
+  return renderToStaticMarkup(
+    <DesktopShell>
       <p>页面内容</p>
     </DesktopShell>,
   );
+};
 
 const renderNotificationShell = (): string => {
   currentPathname = "/notifications";
@@ -104,11 +106,11 @@ describe("financial community web shell", () => {
   it("marks only the active real channel as the current page", () => {
     const homeChannels =
       /<nav class="channel-tabs"[^>]*>([\s\S]*?)<\/nav>/u.exec(
-        renderActiveShell("home"),
+        renderActiveShell("/"),
       )?.[1];
     const watchlistChannels =
       /<nav class="channel-tabs"[^>]*>([\s\S]*?)<\/nav>/u.exec(
-        renderActiveShell("watchlist"),
+        renderActiveShell("/watchlist"),
       )?.[1];
 
     expect(homeChannels).toMatch(/<a aria-current="page" href="\/">首页<\/a>/u);

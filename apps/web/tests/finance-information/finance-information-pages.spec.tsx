@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import BriefingPage from "../../src/app/7x24/page";
 import NewsDetailPage from "../../src/app/news/[newsId]/page";
@@ -25,6 +25,16 @@ afterEach(async () => {
       .map((directory) => rm(directory, { recursive: true, force: true })),
   );
 });
+
+/*
+ * 频道选中态由地址决定（见 src/components/shell/active-nav.ts），
+ * 所以这里设定地址而不是往壳里传参数——原先 /community/[channel] 写死了
+ * activeChannel="community"，点「关注」页签却亮在「热门」上。
+ */
+let currentPathname = "/";
+vi.mock("next/navigation", () => ({
+  usePathname: () => currentPathname,
+}));
 
 describe("finance information routes", () => {
   it("renders an honest real-source news state without synthetic fallback", async () => {
@@ -100,10 +110,13 @@ describe("finance information routes", () => {
 
   it("keeps briefing and news on distinct current global channels", async () => {
     await useEmptyFinanceRuntime();
+    currentPathname = "/7x24";
     const briefingMarkup = renderToStaticMarkup(await BriefingPage());
+    currentPathname = "/news";
     const newsMarkup = renderToStaticMarkup(
       await NewsPage({ searchParams: Promise.resolve({}) }),
     );
+    currentPathname = "/news/company_syn_starport_orders";
     const detailMarkup = renderToStaticMarkup(
       await NewsDetailPage({
         params: Promise.resolve({ newsId: "company_syn_starport_orders" }),

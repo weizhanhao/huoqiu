@@ -38,7 +38,7 @@ const renderHarness = async () => {
   createRoot(root).render(
     <>
       <style dangerouslySetInnerHTML={{ __html: cssVariables }} />
-      <DesktopShell activeChannel="community">{surface}</DesktopShell>
+      <DesktopShell>{surface}</DesktopShell>
     </>,
   );
 };

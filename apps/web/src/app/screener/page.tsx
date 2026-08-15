@@ -229,7 +229,6 @@ export default async function ScreenerPage({
               {page > 1
                 ? "这一页没有内容：可能已经翻过了最后一页，也可能是数据源暂时取不到。"
                 : "行情数据暂时取不到，稍后再试。"}
-              
             </p>
             {page > 1 ? (
               <Link className={styles.chip} href={linkTo(current, { page: 1 })}>

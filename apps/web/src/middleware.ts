@@ -437,10 +437,7 @@ async function readBoundedBody(request: NextRequest): Promise<BodyReadResult> {
       return failedBodyRead(request);
     }
     const contentLength = Number(rawContentLength);
-    if (
-      !Number.isSafeInteger(contentLength) ||
-      contentLength > limit
-    ) {
+    if (!Number.isSafeInteger(contentLength) || contentLength > limit) {
       return failedBodyRead(request);
     }
   }

@@ -615,10 +615,9 @@ const parseExecutiveTable = (
   html: string,
   id: string,
 ): readonly ExecutiveMember[] | null => {
-  const table = new RegExp(
-    `<table[^>]*id="${id}"[\\s\\S]*?</table>`,
-    "u",
-  ).exec(html);
+  const table = new RegExp(`<table[^>]*id="${id}"[\\s\\S]*?</table>`, "u").exec(
+    html,
+  );
   if (table === null) return null;
 
   const members: ExecutiveMember[] = [];
