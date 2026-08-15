@@ -85,7 +85,6 @@ export function RealFinanceHub({ model }: RealFinanceHubProperties) {
       lang="zh-CN"
     >
       <header className={styles.hero}>
-        <p>真实来源 · 可追溯 · 不使用样本内容补位</p>
         <h1>财经资讯</h1>
         {model.generatedAt !== null && (
           <p>
@@ -97,16 +96,22 @@ export function RealFinanceHub({ model }: RealFinanceHubProperties) {
         )}
       </header>
 
-      <section
-        aria-labelledby="real-finance-sources-heading"
-        className={styles.sectionPanel}
-      >
-        <div className={styles.sectionHeading}>
-          <h2 id="real-finance-sources-heading">来源运行状态</h2>
-          <p>状态与记录数量均来自注入的公共快照</p>
-        </div>
-        <SourceHealthGrid sources={model.sources} />
-      </section>
+      {/*
+        来源状态只在真有来源异常时才露面。
+        一切正常时它是一张空卡片，占着首屏还在讲系统内部的事——读者不需要
+        知道我们有几个采集器、它们各自是什么状态。
+      */}
+      {model.sources.some((source) => source.status !== "healthy") && (
+        <section
+          aria-labelledby="real-finance-sources-heading"
+          className={styles.sectionPanel}
+        >
+          <div className={styles.sectionHeading}>
+            <h2 id="real-finance-sources-heading">来源状态</h2>
+          </div>
+          <SourceHealthGrid sources={model.sources} />
+        </section>
+      )}
 
       <FinanceStateNotice message={model.statusMessage} state={model.state} />
 

@@ -85,7 +85,9 @@ describe("reading the tape", () => {
     // 上游是从早到晚给的，看盘要的是最近几笔。
     stub(() => body(["13:45:52,1339.19,11,8,1", "13:46:13,1338.88,12,3,2"]));
 
-    expect((await loadTickDetails("sh600519"))?.ticks[0]?.time).toBe("13:46:13");
+    expect((await loadTickDetails("sh600519"))?.ticks[0]?.time).toBe(
+      "13:46:13",
+    );
   });
 
   it("falls back to the delayed source when the main one throws", async () => {

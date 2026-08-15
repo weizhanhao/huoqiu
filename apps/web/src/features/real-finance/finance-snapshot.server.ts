@@ -301,7 +301,7 @@ const terminalModel = (
   selectedRecordId,
   statusMessage:
     state === "missing"
-      ? "真实财经采集任务尚未生成公共快照。"
+      ? "稍后再来看看。"
       : "当前与上一份真实财经快照均未通过完整性校验。",
   sources: [],
   records: [],

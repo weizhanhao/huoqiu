@@ -237,8 +237,7 @@ describe("social API refuses to act as somebody else", () => {
 describe("the locked tabs on a profile stay locked", () => {
   const getRequest = (token?: string): Request =>
     new Request("https://example.test/api/social/profile", {
-      headers:
-        token === undefined ? {} : { authorization: `Bearer ${token}` },
+      headers: token === undefined ? {} : { authorization: `Bearer ${token}` },
     });
 
   it("refuses a visitor who is holding nothing but a public profile id", async () => {

@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { isWatchableSymbol } from "../lib/watchlist-symbol";
+
 export type D0WatchlistState = Readonly<{
   listingIds: readonly string[];
 }>;
@@ -95,7 +97,17 @@ export function D0WatchlistProvider({
   );
   const add = useCallback(
     (listingId: string) => {
-      if (knownListingIdSet.has(listingId)) {
+      /*
+       * 判据是「这个代码站内开得出页面吗」，不是「在不在那份名单里」。
+       *
+       * 名单原先取自本地 K 线快照——只有 8 条，而且住在 .runtime/ 下、不随
+       * 代码提交。装到服务器上快照不存在、名单为空，于是每一只股票的加自选
+       * 都点不动，还不报错。个股页现在按需现取，沪深港美都开得出来。
+       *
+       * 显式名单保留：夹具标的（listing_syn_*）不是真实代码，形状判定认不出
+       * 它们，但测试与演示页面仍要能加。
+       */
+      if (isWatchableSymbol(listingId) || knownListingIdSet.has(listingId)) {
         dispatch({ type: "add", listingId });
       }
     },

@@ -27,7 +27,7 @@ export const financeKindLabels = {
 
 const publicStateLabels = {
   ready: null,
-  missing: "真实财经快照尚未生成",
+  missing: "暂时没有资讯",
   invalid: "真实财经快照校验失败",
   empty: "当前真实来源暂无可公开记录",
   degraded: "部分真实来源暂时不可用",

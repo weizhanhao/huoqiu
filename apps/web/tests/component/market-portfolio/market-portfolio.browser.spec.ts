@@ -91,7 +91,6 @@ const requiredControl = async (locator: ReturnType<Page["getByTestId"]>) => {
   return locator;
 };
 
-
 /*
  * 这个 harness 此前还挂着行情看板、涨跌榜与虚构标的详情三块样本界面，
  * 相应有七条用例点它们的市场页签、涨跌榜页签与详情页签。

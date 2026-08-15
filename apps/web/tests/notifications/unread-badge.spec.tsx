@@ -17,17 +17,15 @@ import { describe, expect, it } from "vitest";
 
 describe("the unread badge before any real data arrives", () => {
   it("counts nothing when nobody has done anything to you", async () => {
-    const { initialNotificationUnreadCount } = await import(
-      "../../src/features/notifications/notification-state"
-    );
+    const { initialNotificationUnreadCount } =
+      await import("../../src/features/notifications/notification-state");
 
     expect(initialNotificationUnreadCount).toBe(0);
   });
 
   it("ships no invented notifications as the default state", async () => {
-    const { createNotificationState, notificationUnreadCounts } = await import(
-      "../../src/features/notifications/notification-state"
-    );
+    const { createNotificationState, notificationUnreadCounts } =
+      await import("../../src/features/notifications/notification-state");
 
     const state = createNotificationState();
     const counts = notificationUnreadCounts(state);

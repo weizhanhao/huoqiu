@@ -219,10 +219,12 @@ describe("money flow comes from the official endpoint", () => {
   };
 
   it("maps each tier onto the number the page renders", async () => {
-    vi.stubGlobal("fetch", async () =>
-      new Response(JSON.stringify({ data: { diff: [FLOW_ROW] } }), {
-        status: 200,
-      }),
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(JSON.stringify({ data: { diff: [FLOW_ROW] } }), {
+          status: 200,
+        }),
     );
 
     const flow = await loadMoneyFlow("sh600519");
@@ -243,10 +245,12 @@ describe("money flow comes from the official endpoint", () => {
   });
 
   it("has the four tiers net out to zero", async () => {
-    vi.stubGlobal("fetch", async () =>
-      new Response(JSON.stringify({ data: { diff: [FLOW_ROW] } }), {
-        status: 200,
-      }),
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(JSON.stringify({ data: { diff: [FLOW_ROW] } }), {
+          status: 200,
+        }),
     );
 
     const flow = await loadMoneyFlow("sh600519");
@@ -263,10 +267,12 @@ describe("money flow comes from the official endpoint", () => {
   });
 
   it("returns nothing rather than a table of zeros", async () => {
-    vi.stubGlobal("fetch", async () =>
-      new Response(JSON.stringify({ data: { diff: [{ f12: "600519" }] } }), {
-        status: 200,
-      }),
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(JSON.stringify({ data: { diff: [{ f12: "600519" }] } }), {
+          status: 200,
+        }),
     );
 
     // 一档都没取到就是没取到，不给一张四行全零的表——那读起来像「今天没有资金流」。

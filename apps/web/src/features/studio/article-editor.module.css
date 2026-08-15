@@ -10,9 +10,13 @@
   border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   display: grid;
-  gap: var(--hq-spacing-4);
-  min-height: 60dvh;
-  padding: var(--hq-spacing-5);
+  /*
+   * 节奏按「写作区 → 设置 → 操作」三段拉开，段内紧、段间松。
+   * 原先整卡一个 gap，标题、正文、分享范围、按钮四块等距排开，读起来
+   * 没有主次。
+   */
+  gap: var(--hq-spacing-5);
+  padding: var(--hq-spacing-6) var(--hq-spacing-5);
 }
 
 .title {
@@ -23,7 +27,12 @@
   color: var(--hq-text-primary);
   font-size: var(--hq-type-size-title);
   font-weight: var(--hq-type-weight-semibold);
-  padding: var(--hq-spacing-2) 0;
+  padding: var(--hq-spacing-2) 0 var(--hq-spacing-3);
+}
+
+.title::placeholder,
+.body::placeholder {
+  color: var(--hq-text-tertiary);
 }
 
 .title:focus-visible,
@@ -38,15 +47,27 @@
   color: var(--hq-text-primary);
   font-size: var(--hq-type-size-body);
   line-height: var(--hq-type-line-height-body);
-  min-height: 40dvh;
+  /*
+   * 原先是 40dvh（实测 400px）。一进来就是一大片空白，像页面没加载完；
+   * 写长了它自己会长（resize 与滚动都在），不必先占住半屏。
+   */
+  min-height: 220px;
   padding: 0;
   resize: vertical;
 }
 
+/*
+ * 分享范围与两个按钮是同一件事的两半（发之前定范围、然后发），
+ * 排成一行：左边设置、右边操作。原先上下两块各占一行，中间隔着一段空，
+ * 视线要来回跑。
+ */
 .settings {
+  align-items: center;
   border-top: 1px solid var(--hq-border-subtle);
-  display: grid;
-  gap: var(--hq-spacing-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hq-spacing-4);
+  justify-content: space-between;
   padding-top: var(--hq-spacing-4);
 }
 
@@ -62,8 +83,25 @@
   white-space: nowrap;
 }
 
+/*
+ * 原生下拉在深色下会带浏览器自己的箭头，形态和站内控件对不上，
+ * 看着像嵌进来的外来件。这里自己画一个：清掉原生外观，用背景图放箭头，
+ * 右侧留出它的位置。
+ */
 .field select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--hq-text-tertiary) 50%),
+    linear-gradient(135deg, var(--hq-text-tertiary) 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) center,
+    calc(100% - 12px) center;
+  background-repeat: no-repeat;
+  background-size:
+    5px 5px,
+    5px 5px;
   max-width: 200px;
+  padding-right: var(--hq-spacing-8);
 }
 
 .actions {

@@ -35,8 +35,12 @@ describe("finance information routes", () => {
 
     expect(markup).toContain("财经资讯");
     expect(markup).toContain('data-testid="real-finance-hub"');
-    expect(markup).toContain("真实财经采集任务尚未生成公共快照");
-    expect(markup).toContain("不使用样本内容补位");
+    expect(markup).toContain("稍后再来看看");
+    /*
+     * 「不使用样本内容补位」这句自证从界面上去掉了——这是个 MVP，不是演示系统，
+     * 不必逐句解释自己的数据治理。这条用例真正守的是下一行：没有真实数据时
+     * 绝不拿合成内容顶替。
+     */
     expect(markup).not.toContain("星港制造合成订单样本保持韧性");
   });
 
@@ -74,7 +78,7 @@ describe("finance information routes", () => {
      */
     expect(markup).toContain("上市公司公告");
     expect(markup).toContain("境外申报存档");
-    expect(markup).toContain("真实财经采集任务尚未生成公共快照");
+    expect(markup).toContain("稍后再来看看");
     expect(markup).not.toContain("7×24 合成快讯");
     expect(markup).not.toContain("brief_syn_afternoon_pulse");
   });
@@ -89,7 +93,7 @@ describe("finance information routes", () => {
 
     expect(markup).toContain('data-testid="real-finance-detail"');
     expect(markup).toContain("财经记录详情");
-    expect(markup).toContain("真实财经采集任务尚未生成公共快照");
+    expect(markup).toContain("稍后再来看看");
     expect(markup).not.toContain("company_syn_starport_orders");
     expect(markup).not.toContain("星港制造合成订单样本保持韧性");
   });

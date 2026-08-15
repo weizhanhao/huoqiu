@@ -109,7 +109,7 @@ describe("real finance presentational seam", () => {
 
   it("keeps missing, invalid, empty, degraded, and stale states honest", () => {
     const expectedStates = [
-      ["missing", "真实财经快照尚未生成", false],
+      ["missing", "暂时没有资讯", false],
       ["invalid", "真实财经快照校验失败", false],
       ["empty", "当前真实来源暂无可公开记录", false],
       ["degraded", "部分真实来源暂时不可用", true],

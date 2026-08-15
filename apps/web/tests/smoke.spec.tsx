@@ -32,7 +32,7 @@ describe("web shell", () => {
 
   it("separates real-source finance from synthetic community content", async () => {
     /*
-     * 这条用例过去直接断言「真实财经快照尚未生成」，等于把「快照不存在」
+     * 这条用例过去直接断言「暂时没有资讯」，等于把「快照不存在」
      * 当成产品的固定状态——真的跑了采集脚本之后它就会失败，而失败的原因
      * 恰恰是功能做成了。
      *
@@ -60,7 +60,7 @@ describe("web shell", () => {
      * 这一区必须存在，且与社区内容分开。
      */
     expect(markup).toContain("监管披露与宏观数据");
-    expect(markup).toContain("真实财经快照尚未生成");
+    expect(markup).toContain("暂时没有资讯");
     // 标题改名为「社区内容」，它仍然是「社区区与真实财经区分离」的标记。
     expect(markup).toContain("社区内容");
     /*

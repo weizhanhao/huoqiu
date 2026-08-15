@@ -55,7 +55,9 @@ const resolves = (
         parts.length >= catchAll &&
         route
           .slice(0, catchAll)
-          .every((segment, index) => segmentMatches(segment, parts[index] ?? ""))
+          .every((segment, index) =>
+            segmentMatches(segment, parts[index] ?? ""),
+          )
       );
     }
     return (

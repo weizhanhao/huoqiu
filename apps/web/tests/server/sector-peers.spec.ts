@@ -30,7 +30,9 @@ const quoteBody = (overrides: Readonly<Record<string, unknown>> = {}): string =>
     rc: 0,
   });
 
-const peersBody = (rows: readonly Readonly<Record<string, unknown>>[]): string =>
+const peersBody = (
+  rows: readonly Readonly<Record<string, unknown>>[],
+): string =>
   JSON.stringify({ data: { diff: rows, total: rows.length }, rc: 0 });
 
 const PEERS = [

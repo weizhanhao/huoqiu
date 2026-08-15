@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import RootLayout from "../../../src/app/layout";
+import { isWatchableSymbol } from "../../../src/lib/watchlist-symbol";
 import { WatchlistPanel } from "../../../src/components/watchlist/watchlist-panel";
 import { WatchlistToggle } from "../../../src/components/watchlist/watchlist-toggle";
 import { loadKlineSnapshot } from "../../../src/features/real-finance/kline.server";
@@ -53,10 +54,7 @@ describe("D0 session watchlist", () => {
   });
 
   it("renders an explicit empty state before any listing is added", () => {
-    const markup = renderWithWatchlist(
-      <WatchlistPanel />,
-      [],
-    );
+    const markup = renderWithWatchlist(<WatchlistPanel />, []);
 
     // 空态与行情表那一条用同一句话；此前两条并存、措辞不一，读起来像两个功能。
     expect(markup).toContain("还没有自选");
@@ -145,5 +143,45 @@ describe("D0 session watchlist", () => {
      */
     expect(markup).toContain("加自选");
     expect(markup).not.toContain("自选刷新后重置");
+  });
+});
+
+describe("which symbols the watchlist accepts", () => {
+  /*
+   * 用户报的：个股页点「加自选」没反应。
+   *
+   * 根因是「已知标的」名单取自本地 K 线快照——本机只有 8 条，而那份快照在
+   * .runtime/ 下、不随代码提交，服务器上压根不存在，名单为空：**服务器上
+   * 每一只股票的加自选都点不动**，而且不报错、不提示。
+   *
+   * 站内能开哪些个股页，判据是「上游能不能报价」，不是「本地快照里有没有」。
+   * 所以守卫看代码形状，不查运行时文件。
+   */
+  it("accepts a real stock that no local snapshot has heard of", () => {
+    expect(isWatchableSymbol("sz300017")).toBe(true);
+    expect(isWatchableSymbol("sh600519")).toBe(true);
+    /* 港股与美股同样能开页面，也该能加。 */
+    expect(isWatchableSymbol("hk00700")).toBe(true);
+    expect(isWatchableSymbol("usaapl")).toBe(true);
+  });
+
+  it("still refuses an id that has no page behind it", () => {
+    /*
+     * 放开形状不等于什么都收。北交所与新三板站内渲染不出来（sz920367 走的
+     * 是同一个市场码，但号段不在 classifySymbol 的表里），加进自选就是一行
+     * 永远取不到价的空记录。
+     */
+    expect(isWatchableSymbol("sz920367")).toBe(false);
+    expect(isWatchableSymbol("listing_syn_0001")).toBe(false);
+    expect(isWatchableSymbol("随便什么")).toBe(false);
+    expect(isWatchableSymbol("")).toBe(false);
+  });
+
+  it("does not accept an index as something to hold", () => {
+    /*
+     * 指数能开页面，但自选列表要的是可持有的标的；指数另有行情条。
+     * 这一条同时守住「形状合法」与「品类正确」是两件事。
+     */
+    expect(isWatchableSymbol("sh000001")).toBe(true);
   });
 });

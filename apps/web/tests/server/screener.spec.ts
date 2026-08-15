@@ -38,10 +38,7 @@ const ROW = {
 let directory = "";
 let requested = "";
 
-const stubUpstream = (
-  diff: readonly unknown[] | null,
-  total = 5549,
-): void => {
+const stubUpstream = (diff: readonly unknown[] | null, total = 5549): void => {
   vi.stubGlobal("fetch", async (input: string | URL) => {
     requested = String(input);
     if (diff === null) return new Response("", { status: 500 });

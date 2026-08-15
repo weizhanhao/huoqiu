@@ -221,9 +221,7 @@ describe("profile and settings in a real Chrome DOM", () => {
      * /instruments/listing_syn_0001——那只虚构标的早就删了，点进去 404。
      * 现在指向一只真股票。这一条测的是键盘换页签，名字换了照样成立。
      */
-    expect(await profile.getByText("贵州茅台").isVisible()).toBe(
-      true,
-    );
+    expect(await profile.getByText("贵州茅台").isVisible()).toBe(true);
 
     // 页签顺序：动态 → 收藏 → 关注 → 粉丝。「粉丝」是后加的，
     // 所以 End 现在落在粉丝而不是关注。

@@ -51,7 +51,9 @@ describe("who a request is counted against", () => {
      * 全部归进同一个键，仍然有一个总闸，而不是彻底不限。
      */
     expect(clientKeyOf(requestFrom(null))).not.toBeNull();
-    expect(clientKeyOf(requestFrom("   "))).toBe(clientKeyOf(requestFrom(null)));
+    expect(clientKeyOf(requestFrom("   "))).toBe(
+      clientKeyOf(requestFrom(null)),
+    );
   });
 });
 
@@ -59,7 +61,10 @@ describe("throttling the outbound calls", () => {
   it("lets a normal amount of browsing through", () => {
     const request = requestFrom("203.0.113.7");
     for (let index = 0; index < UPSTREAM_LIMIT; index++) {
-      expect(throttleUpstream(request), `第 ${String(index + 1)} 次`).toBeNull();
+      expect(
+        throttleUpstream(request),
+        `第 ${String(index + 1)} 次`,
+      ).toBeNull();
     }
   });
 

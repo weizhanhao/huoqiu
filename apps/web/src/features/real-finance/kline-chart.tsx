@@ -209,9 +209,7 @@ export function KlineChart({
   if (bars.length < 2) {
     return (
       <section className={styles.chartCard} aria-label={`${name} 日K线`}>
-        <p className={styles.empty}>
-          该标的的真实行情快照尚未生成，暂不显示 K 线。
-        </p>
+        <p className={styles.empty}>暂无 K 线数据。</p>
       </section>
     );
   }

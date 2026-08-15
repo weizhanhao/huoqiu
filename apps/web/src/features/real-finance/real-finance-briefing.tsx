@@ -79,9 +79,7 @@ export function RealFinanceBriefing({ model }: RealFinanceBriefingProperties) {
 
       <div className={styles.sectionHeading}>
         <h2>境外申报存档</h2>
-        <span className={styles.muted}>
-          SEC EDGAR 原件快照 · 由采集任务定期刷新，不是实时
-        </span>
+        <span className={styles.muted}>SEC EDGAR · 定期更新</span>
       </div>
 
       <FinanceStateNotice message={model.statusMessage} state={model.state} />

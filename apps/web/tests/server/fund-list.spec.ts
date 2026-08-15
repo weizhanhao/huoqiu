@@ -37,7 +37,9 @@ const ROW = [
 const bodyOf = (...rows: readonly string[]): string =>
   `var rankData = {datas:[${rows
     .map((row) => `"${row}"`)
-    .join(",")}],allRecords:5217,pageIndex:1,pageNum:20,allPages:261,allNum:5217};`;
+    .join(
+      ",",
+    )}],allRecords:5217,pageIndex:1,pageNum:20,allPages:261,allNum:5217};`;
 
 let requested = "";
 

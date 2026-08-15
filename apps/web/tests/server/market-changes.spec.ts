@@ -51,7 +51,15 @@ describe("the timestamp is an unpadded integer", () => {
   });
 
   it("refuses what is not a time", () => {
-    for (const value of [-1, 1.5, 995_959, 246_000, "145654", null, undefined]) {
+    for (const value of [
+      -1,
+      1.5,
+      995_959,
+      246_000,
+      "145654",
+      null,
+      undefined,
+    ]) {
       expect(timeOfDay(value), String(value)).toBeNull();
     }
   });

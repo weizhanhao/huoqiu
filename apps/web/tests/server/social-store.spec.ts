@@ -282,7 +282,11 @@ describe("posts that belong to one instrument", () => {
 
   it("does not mistake a longer code for this one", () => {
     const zhang = register("sym-b@example.com", "张远");
-    for (const body of ["$sh6005$ 短的", "$sh600519x$ 长的", "sh600519 没有美元号"]) {
+    for (const body of [
+      "$sh6005$ 短的",
+      "$sh600519x$ 长的",
+      "sh600519 没有美元号",
+    ]) {
       const result = createPost({
         accountId: zhang.id,
         body,

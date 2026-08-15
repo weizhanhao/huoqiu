@@ -23,7 +23,10 @@ const profilePage = fileURLToPath(
 );
 
 const lockedTabs = fileURLToPath(
-  new URL("../../src/features/account/locked-profile-tabs.tsx", import.meta.url),
+  new URL(
+    "../../src/features/account/locked-profile-tabs.tsx",
+    import.meta.url,
+  ),
 );
 
 describe("a locked profile tab never reaches the server-rendered HTML", () => {

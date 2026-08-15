@@ -50,8 +50,10 @@ const quoteBody = (overrides: Readonly<Record<string, unknown>> = {}): string =>
   });
 
 /** 腾讯回的是 JSONP：`k={...}`，没有结尾分号。 */
-const klineBody = (key: string, rows: Readonly<Record<string, unknown>>): string =>
-  `k=${JSON.stringify({ code: 0, data: { [key]: rows }, msg: "" })}`;
+const klineBody = (
+  key: string,
+  rows: Readonly<Record<string, unknown>>,
+): string => `k=${JSON.stringify({ code: 0, data: { [key]: rows }, msg: "" })}`;
 
 /** 港股行 9 列，第 7 个是个空对象；美股行 6 列。前 6 列一致。 */
 const HK_ROW = [
@@ -115,7 +117,9 @@ describe("reading the symbol", () => {
 describe("loading a Hong Kong quote", () => {
   it("asks eastmoney for the 116 market and reads the quote", async () => {
     stubUpstream((url) =>
-      url.includes("gtimg") ? klineBody("hk00700", { qfqday: [] }) : quoteBody(),
+      url.includes("gtimg")
+        ? klineBody("hk00700", { qfqday: [] })
+        : quoteBody(),
     );
 
     const snapshot = await loadOverseasSnapshot("hk00700");
@@ -168,7 +172,14 @@ describe("loading a US quote", () => {
       if (url.includes("usJPM.N")) {
         return klineBody("usJPM.N", {
           qfqday: [
-            ["2026-08-13", "360.05", "362.04", "363.12", "358.60", "4576473.00"],
+            [
+              "2026-08-13",
+              "360.05",
+              "362.04",
+              "363.12",
+              "358.60",
+              "4576473.00",
+            ],
           ],
         });
       }
@@ -200,7 +211,14 @@ describe("loading a US quote", () => {
       if (url.includes("usBRK.B.N")) {
         return klineBody("usBRK.B.N", {
           qfqday: [
-            ["2026-08-13", "528.76", "516.38", "530.30", "515.65", "4718562.00"],
+            [
+              "2026-08-13",
+              "528.76",
+              "516.38",
+              "530.30",
+              "515.65",
+              "4718562.00",
+            ],
           ],
         });
       }
@@ -358,7 +376,9 @@ describe("handing the quote to the detail page", () => {
 describe("when upstream has nothing", () => {
   it("returns nothing rather than an empty shell", async () => {
     stubUpstream((url) =>
-      url.includes("gtimg") ? klineBody("hk00700", { qfqday: [] }) : JSON.stringify({ data: null, rc: 0 }),
+      url.includes("gtimg")
+        ? klineBody("hk00700", { qfqday: [] })
+        : JSON.stringify({ data: null, rc: 0 }),
     );
     expect(await loadOverseasSnapshot("hk00700")).toBeNull();
 
