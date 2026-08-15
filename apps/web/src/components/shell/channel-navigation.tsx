@@ -21,7 +21,6 @@ export type ActiveChannel =
   | "etfs"
   | "follow"
   | "funds"
-  | "home"
   | "news"
   | "privateFunds"
   | "topics"
@@ -31,8 +30,12 @@ export type ActiveChannel =
 type Channel = Readonly<{ href: string; id: ActiveChannel; label: string }>;
 
 const channels: readonly Channel[] = [
-  { href: "/", id: "home", label: "首页" },
-  { href: "/community/follow", id: "follow", label: "关注" },
+  /*
+   * 没有「首页」这一档：根路径就是关注流。
+   * 原先首页与关注是两个页签，而首页塞的是编辑部栏目 + 财经区块，
+   * 和「关注」各讲各的，用户进站第一眼看到的不是他关注的人。
+   */
+  { href: "/", id: "follow", label: "关注" },
   { href: "/community", id: "community", label: "热门" },
   { href: "/7x24", id: "briefing", label: "7x24" },
   { href: "/watchlist", id: "watchlist", label: "自选" },

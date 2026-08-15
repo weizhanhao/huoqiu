@@ -51,7 +51,7 @@ const headingsOf = (markup: string): readonly string[] =>
   );
 
 const ROUTES: readonly (readonly [string, () => Promise<ReactNode>])[] = [
-  ["/", async () => HomePage({ searchParams: Promise.resolve({}) })],
+  ["/", async () => HomePage()],
   ["/community", async () => CommunityPage()],
   ["/creators", async () => CreatorsPage()],
   ["/markets", async () => MarketsPage()],

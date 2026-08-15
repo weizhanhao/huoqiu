@@ -28,7 +28,8 @@ const ITEMS: readonly Readonly<{
    */
   match: readonly string[];
 }>[] = [
-  { href: "/", icon: "⌂", label: "首页", match: ["/"] },
+  /* 根路径是关注流，站内没有「首页」这一档。 */
+  { href: "/", icon: "⌂", label: "关注", match: ["/"] },
   { href: "/watchlist", icon: "☆", label: "自选", match: ["/watchlist"] },
   { href: "/markets", icon: "⌁", label: "行情", match: ["/markets"] },
   { href: "/portfolios", icon: "◫", label: "组合", match: ["/portfolios"] },

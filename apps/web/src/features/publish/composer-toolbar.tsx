@@ -208,8 +208,14 @@ export function ComposerToolbar({
         </Link>
       </div>
 
+      {/*
+        这个 input 藏在「图片」按钮后面，点按钮才打开选择器。
+        但藏起来不等于不存在：读屏软件的表单元素列表照样列出它，
+        念出来是一个没有名字的「文件选择」。名字得自己给。
+      */}
       <input
         accept="image/png,image/jpeg,image/gif,image/webp"
+        aria-label="选择要上传的图片"
         className={styles.file}
         onChange={(event) => {
           const file = event.target.files?.[0];

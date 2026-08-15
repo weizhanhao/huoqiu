@@ -60,8 +60,8 @@ describe("financial community web shell", () => {
   it("provides every global channel with a route or an explicit unavailable control", () => {
     const markup = renderShell();
 
+    /* 频道条不再有「首页」：根路径这一档就是「关注」。 */
     for (const channel of [
-      "首页",
       "关注",
       "热门",
       "7x24",
@@ -87,7 +87,6 @@ describe("financial community web shell", () => {
     expect(channelNav).toBeDefined();
     for (const href of [
       "/",
-      "/community/follow",
       "/community",
       "/7x24",
       "/watchlist",
@@ -113,7 +112,8 @@ describe("financial community web shell", () => {
         renderActiveShell("/watchlist"),
       )?.[1];
 
-    expect(homeChannels).toMatch(/<a aria-current="page" href="\/">首页<\/a>/u);
+    /* 根路径这一档就是「关注」——站内没有独立的首页。 */
+    expect(homeChannels).toMatch(/<a aria-current="page" href="\/">关注<\/a>/u);
     expect(homeChannels).not.toMatch(/aria-current="page" href="\/watchlist"/u);
     expect(watchlistChannels).toMatch(
       /<a aria-current="page" href="\/watchlist">自选<\/a>/u,
@@ -152,7 +152,8 @@ describe("financial community web shell", () => {
     expect(markup).toContain(">设置<");
     expect(markup).toContain('aria-label="移动端主导航"');
 
-    for (const item of ["首页", "自选", "行情", "组合", "我的"]) {
+    /* 底部第一格是「关注」——站内没有首页这一档。 */
+    for (const item of ["关注", "自选", "行情", "组合", "我的"]) {
       expect(markup).toContain(`>${item}<`);
     }
 

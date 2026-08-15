@@ -1,0 +1,128 @@
+/*
+ * 关注流。
+ *
+ * 单独一份样式，不搭合成社区那张表。那张表是给编辑部栏目卡写的——头像、
+ * 徽标、媒体占位、观察席，跟这里没关系；而借用它的类名还有个更实际的问题：
+ * 类名一旦在那边改掉或删掉，这边拿到的是 undefined，元素不报错、只是没样式。
+ */
+
+.stream {
+  display: grid;
+  gap: var(--hq-spacing-3);
+  margin-top: var(--hq-spacing-5);
+}
+
+.card {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  padding: var(--hq-spacing-5);
+}
+
+.author {
+  align-items: center;
+  display: flex;
+  gap: var(--hq-spacing-3);
+  justify-content: space-between;
+}
+
+/*
+ * 头像和昵称是同一个点击目标。
+ *
+ * 拆成两个的话，昵称那一行只有 30px 高——手指点不准，读屏也要念两遍
+ * 同一个人。合起来正好越过 44px 的下限，也就不必给昵称硬塞一圈内边距
+ * 把它撑成一个奇怪的方块。
+ */
+.identity {
+  align-items: center;
+  border-radius: var(--hq-radius-control);
+  color: inherit;
+  display: flex;
+  gap: var(--hq-spacing-3);
+  min-height: 44px;
+  min-width: 44px;
+  padding-right: var(--hq-spacing-2);
+  text-decoration: none;
+  transition: background var(--hq-motion-duration-fast)
+    var(--hq-motion-ease-out);
+}
+
+.identity:hover {
+  background: var(--hq-surface-subtle);
+}
+
+.identity strong {
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.identity:hover strong {
+  color: var(--hq-text-link);
+}
+
+.avatar {
+  align-items: center;
+  background: linear-gradient(
+    145deg,
+    var(--hq-brand-subtle),
+    var(--hq-surface-base)
+  );
+  border: 1px solid var(--hq-border-subtle);
+  border-radius: 50%;
+  color: var(--hq-brand-primary);
+  display: inline-flex;
+  flex: 0 0 44px;
+  font-weight: 700;
+  height: 44px;
+  justify-content: center;
+}
+
+.time {
+  color: var(--hq-text-secondary);
+  font-size: 0.8rem;
+  /* 时间跟着卡片走，不跟着昵称走——它不是这个人的一部分。 */
+  white-space: nowrap;
+}
+
+.title {
+  font-size: 1.1rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.title a {
+  color: var(--hq-text-primary);
+  display: block;
+  padding-block: var(--hq-spacing-1);
+  text-decoration: none;
+}
+
+.title a:hover {
+  color: var(--hq-text-link);
+}
+
+/*
+ * 正文整块可点。短帖没有标题可点，把正文本身当入口——
+ * 否则整张卡片只有昵称一个能点的地方，看到一半想看全文却无处可点。
+ */
+.bodyLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.bodyLink:hover {
+  color: var(--hq-text-primary);
+}
+
+.body {
+  color: var(--hq-text-secondary);
+  line-height: 1.7;
+  margin: 0;
+  /* 长文只露前几行，点标题看全文。 */
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}

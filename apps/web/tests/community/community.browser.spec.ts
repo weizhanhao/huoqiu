@@ -157,19 +157,26 @@ describe("dense synthetic community in a real Chrome DOM", () => {
     expect(browserErrors).toEqual([]);
   });
 
-  it("renders a long, media-rich home stream with no external resource", async () => {
+  it("renders the followed-people stream and nothing else on the home route", async () => {
+    /*
+     * 根路径只列关注对象发的内容。
+     *
+     * 这条用例原先量的是首页那条社区流——八张编辑部卡片、媒体占位、
+     * 三屏高。那条流已经删了：用户要的是「这个关注只显示关注人发的内容」。
+     * 现在量的是关注流本身：关注的人发的都在，自己发的不在（那在个人主页），
+     * 并且这一页仍然不许请求任何站外资源。
+     */
     resourceUrls = [];
-    await page.goto(`${baseUrl}/`);
-    const stream = page.getByTestId("home-community-stream");
+    await page.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
+    const stream = page.getByTestId("follow-stream");
 
-    expect(
-      await page.locator(".d0-main .feed-list .feed-card").count(),
-    ).toBeGreaterThan(0);
-    expect(await stream.getByTestId("community-feed-card").count()).toBe(8);
-    expect(await stream.getByText("本地媒体占位").count()).toBeGreaterThan(1);
-    expect(
-      await page.evaluate(() => document.documentElement.scrollHeight),
-    ).toBeGreaterThan(844 * 3);
+    /* 夹具里 8 条，第 8 条是自己发的，只应出现前 7 条。 */
+    expect(await stream.locator("article").count()).toBe(7);
+    expect(await stream.getByText("关注内容 7").count()).toBe(1);
+    expect(await stream.getByText("关注内容 8").count()).toBe(0);
+    /* 社区那整套版面不能再出现在这一页。 */
+    expect(await page.getByTestId("community-feed-card").count()).toBe(0);
+    expect(await page.getByText("达人观察席").count()).toBe(0);
     expect(resourceUrls.every((url) => new URL(url).origin === baseUrl)).toBe(
       true,
     );
@@ -239,24 +246,27 @@ describe("dense synthetic community in a real Chrome DOM", () => {
        */
       await page.goto(`${baseUrl}${pathname}`, { waitUntil: "networkidle" });
       const controls = page.locator(
-        '[data-testid^="community"] button, [data-testid^="community"] a, [data-testid^="community"] input, [data-testid^="community"] textarea, [data-testid="home-community-stream"] a',
+        '[data-testid^="community"] button, [data-testid^="community"] a, [data-testid^="community"] input, [data-testid^="community"] textarea, [data-testid="follow-stream"] a',
       );
       const sizes = await controls.evaluateAll((elements) =>
         elements
           .filter((element) => element.getClientRects().length > 0)
           .map((element) => {
             const bounds = element.getBoundingClientRect();
-            return { height: bounds.height, width: bounds.width };
+            return {
+              height: bounds.height,
+              /* 报出是谁不够大。只报数字的话，得回头一个个手点才知道改哪。 */
+              label: `${element.tagName.toLowerCase()}.${element.className || "-"}: ${(element.textContent ?? "").trim().slice(0, 24)}`,
+              width: bounds.width,
+            };
           }),
       );
 
       expect(sizes.length).toBeGreaterThan(0);
-      expect(
-        Math.min(...sizes.map(({ height }) => height)),
-      ).toBeGreaterThanOrEqual(44);
-      expect(
-        Math.min(...sizes.map(({ width }) => width)),
-      ).toBeGreaterThanOrEqual(44);
+      const tooSmall = sizes.filter(
+        ({ height, width }) => height < 44 || width < 44,
+      );
+      expect(tooSmall.map(({ label }) => label)).toEqual([]);
     }
 
     await page.goto(`${baseUrl}/community/posts/post_syn_0001`);

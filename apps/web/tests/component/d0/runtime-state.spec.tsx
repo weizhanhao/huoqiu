@@ -2,7 +2,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import InstrumentLayout from "../../../src/app/instruments/[listingId]/layout";
-import HomePage from "../../../src/app/page";
 import SearchPage from "../../../src/app/search/page";
 import WatchlistPage from "../../../src/app/watchlist/page";
 import {
@@ -24,15 +23,26 @@ describe("D0 Web runtime state injection", () => {
     expect(normalizeD0FixtureState(value)).toBe(expected);
   });
 
-  it("renders a browser-addressable loading state on the feed", async () => {
+  it("renders a browser-addressable loading state", async () => {
+    /*
+     * 这条用例原先量的是首页那条夹具信息流。首页已经换成关注流——内容来自
+     * 登录用户真实的关注关系，没有 fixture_state 这一档，也就没有可以从
+     * 地址栏拨出来的加载态。
+     *
+     * ?fixture_state= 现在只剩自选一处还在用，用例跟着搬过去。守的东西没变：
+     * 加载中要说「正在加载」，且此时不能先把表格渲染出来。
+     */
+    const page = await WatchlistPage({
+      searchParams: Promise.resolve({ fixture_state: "loading" }),
+    });
     const markup = renderToStaticMarkup(
-      await HomePage({
-        searchParams: Promise.resolve({ fixture_state: "loading" }),
-      }),
+      <D0WatchlistProvider knownListingIds={["listing_syn_0001"]}>
+        {page}
+      </D0WatchlistProvider>,
     );
 
     expect(markup).toContain("正在加载");
-    expect(markup).not.toContain("合成市场的第一份观察");
+    expect(markup).not.toContain('class="watchlist-table-wrap"');
   });
 
   it("says the upstream is down instead of saying there are no matches", async () => {

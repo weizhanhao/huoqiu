@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { DesktopShell } from "../../../components/shell/desktop-shell";
+import { FollowFeed } from "../../../features/community/follow-feed";
 import { CommunityFeed } from "../../../features/community/community-experience";
 import type { CommunityChannel } from "../../../features/community/community-state";
 
@@ -54,7 +55,16 @@ export default async function CommunityChannelPage({
 
   return (
     <DesktopShell requiresD0Fixture={false}>
-      <CommunityFeed initialChannel={initialChannel} />
+      {/*
+        关注只列关注对象发的内容，不套热门那整套版面。
+        两者渲染同一个组件——/community/follow 与根路径是同一件事，
+        分别实现迟早会长歪。
+      */}
+      {initialChannel === "关注" ? (
+        <FollowFeed />
+      ) : (
+        <CommunityFeed initialChannel={initialChannel} />
+      )}
     </DesktopShell>
   );
 }

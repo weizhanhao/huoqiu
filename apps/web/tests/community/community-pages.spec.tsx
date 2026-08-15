@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import CommunityPage from "../../src/app/community/page";
 import PostDetailPage from "../../src/app/community/posts/post_syn_0001/page";
 import PublishPage from "../../src/app/publish/page";
-import { HomeCommunityStream } from "../../src/features/community/home-community-stream";
 import {
   communityAuthors,
   communityFeedCards,
@@ -17,38 +16,29 @@ import {
 } from "../../src/features/community/community-fixtures";
 
 describe("community routes", () => {
-  it("keeps the home community stream in a server-safe, small fixture boundary", () => {
+  it("keeps the home route on followed people only", () => {
+    /*
+     * 根路径是关注流。
+     *
+     * 这条用例原先守的是「首页那条社区流的夹具边界要小、要能在服务端渲染」——
+     * 那条流已经不存在了：首页塞着编辑部栏目卡和财经区块，唯独没有关注的人
+     * 写了什么，用户的原话是「这个关注只显示关注人发的内容」。
+     *
+     * 现在守的是新的边界：这一页只能长出关注流，不能再把社区那整套版面
+     * 搬回来。用读源码的方式守，是因为「多渲染了一块」在快照里不报错，
+     * 只表现为页面又变长了。
+     */
     const homePageSource = readFileSync(
       fileURLToPath(new URL("../../src/app/page.tsx", import.meta.url)),
       "utf8",
     );
-    const homeStreamSource = readFileSync(
-      fileURLToPath(
-        new URL(
-          "../../src/features/community/home-community-stream.tsx",
-          import.meta.url,
-        ),
-      ),
-      "utf8",
-    );
-    const homeFixtureSource = readFileSync(
-      fileURLToPath(
-        new URL(
-          "../../src/features/community/home-community-fixtures.ts",
-          import.meta.url,
-        ),
-      ),
-      "utf8",
-    );
 
     expect(homePageSource).toContain(
-      'from "../features/community/home-community-stream"',
+      'from "../features/community/follow-feed"',
     );
     expect(homePageSource).not.toContain("community-experience");
-    expect(homeStreamSource).not.toContain('"use client"');
-    expect(homeStreamSource).not.toContain('from "./community-experience"');
-    expect(homeFixtureSource).not.toContain("community-fixtures");
-    expect(homeFixtureSource).not.toContain("communityFeedCards");
+    expect(homePageSource).not.toContain("home-community-stream");
+    expect(homePageSource).not.toContain("real-finance");
   });
 
   it("renders all six synthetic feed channels and a recognizable card type", () => {
@@ -70,7 +60,6 @@ describe("community routes", () => {
 
   it("renders a scrollable social feed with author context, media, and engagement", () => {
     const communityMarkup = renderToStaticMarkup(<CommunityPage />);
-    const homeMarkup = renderToStaticMarkup(<HomeCommunityStream />);
 
     expect(
       communityMarkup.match(/data-testid="community-feed-card"/gu),
@@ -85,12 +74,6 @@ describe("community routes", () => {
      * 注册用户自己发布的帖子。断言意图不变：非用户内容必须带可见标识。
      */
     expect(communityMarkup).toContain("栏目");
-
-    expect(
-      homeMarkup.match(/data-testid="community-feed-card"/gu),
-    ).toHaveLength(8);
-    expect(homeMarkup).toContain("社区热帖与长文");
-    expect(homeMarkup).toContain("浏览完整社区");
   });
 
   it("provides synthetic cards for every required recognizable type", () => {
