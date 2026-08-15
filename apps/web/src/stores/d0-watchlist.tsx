@@ -5,11 +5,41 @@ import {
   useCallback,
   useContext,
   useMemo,
-  useReducer,
   type ReactNode,
 } from "react";
 
+import {
+  readBrowserStore,
+  useBrowserStore,
+  writeBrowserStore,
+} from "../lib/browser-store";
 import { isWatchableSymbol } from "../lib/watchlist-symbol";
+
+/*
+ * 自选存进浏览器，不再只活在内存里。
+ *
+ * 原先它是纯内存态：刷新一次、或者从个股页整页跳到自选页，加过的东西就没了。
+ * 用户加完自选、走到自选页，看到的是「还没有自选」——他没做错任何事。
+ *
+ * 存在浏览器里而不是账号里，是因为这一层本来就是「未登录也能用」的；
+ * 登录后的跨设备同步是另一件事，需要服务端的自选表。
+ */
+const STORAGE_KEY = "huoqiu.watchlist.v1";
+
+const parseStored = (raw: string | null): readonly string[] => {
+  if (raw === null) return EMPTY_IDS;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === "string")
+      : EMPTY_IDS;
+  } catch {
+    return EMPTY_IDS;
+  }
+};
+
+/* 模块级常量：每次返回新数组会让存储快照的比对判定为「变了」。 */
+const EMPTY_IDS: readonly string[] = [];
 
 export type D0WatchlistState = Readonly<{
   listingIds: readonly string[];
@@ -82,14 +112,31 @@ type D0WatchlistProviderProperties = Readonly<{
   initialListingIds?: readonly string[];
 }>;
 
+/*
+ * 下一份清单由既有的 reducer 算出来——它是纯函数，规则（去重、顺序、
+ * 重置）只写一遍，存储这一层只负责读写。
+ */
+const current = (): D0WatchlistState => ({
+  listingIds: parseStored(readBrowserStore(STORAGE_KEY)),
+});
+
+const write = (next: D0WatchlistState): void => {
+  writeBrowserStore(STORAGE_KEY, JSON.stringify(next.listingIds));
+};
+
 export function D0WatchlistProvider({
   children,
   knownListingIds,
   initialListingIds = d0WatchlistInitialState.listingIds,
 }: D0WatchlistProviderProperties) {
-  const [state, dispatch] = useReducer(
-    d0WatchlistReducer,
-    createD0WatchlistState(initialListingIds, knownListingIds),
+  const stored = useBrowserStore(STORAGE_KEY, parseStored, EMPTY_IDS);
+  /*
+   * 服务端与首帧拿到的是空列表（存储只有浏览器有），水合之后换成真实清单——
+   * useBrowserStore 的服务端快照就是为这件事准备的，中间不经过多余的一帧。
+   */
+  const state = useMemo(
+    () => ({ listingIds: stored.length > 0 ? stored : initialListingIds }),
+    [initialListingIds, stored],
   );
   const knownListingIdSet = useMemo(
     () => new Set(knownListingIds),
@@ -108,20 +155,20 @@ export function D0WatchlistProvider({
        * 它们，但测试与演示页面仍要能加。
        */
       if (isWatchableSymbol(listingId) || knownListingIdSet.has(listingId)) {
-        dispatch({ type: "add", listingId });
+        write(d0WatchlistReducer(current(), { type: "add", listingId }));
       }
     },
     [knownListingIdSet],
   );
   const remove = useCallback((listingId: string) => {
-    dispatch({ type: "remove", listingId });
+    write(d0WatchlistReducer(current(), { type: "remove", listingId }));
   }, []);
   const has = useCallback(
     (listingId: string) => state.listingIds.includes(listingId),
     [state.listingIds],
   );
   const reset = useCallback(() => {
-    dispatch({ type: "reset" });
+    write(d0WatchlistInitialState);
   }, []);
   const value = useMemo(
     () => ({ listingIds: state.listingIds, add, remove, has, reset }),
