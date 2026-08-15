@@ -113,7 +113,7 @@ describe("real finance presentational UI in Chrome", () => {
     await hub.getByRole("searchbox", { name: "关键词" }).fill("");
     await hub.getByRole("button", { name: "展开 GDELT 全部 14 条" }).click();
     expect(await hub.locator('[data-record-source="gdelt"]').count()).toBe(14);
-    expect(await hub.getByText("已筛选 14 条真实记录").count()).toBe(1);
+    expect(await hub.getByText("共 14 条记录").count()).toBe(1);
     expect(browserErrors).toEqual([]);
   });
 

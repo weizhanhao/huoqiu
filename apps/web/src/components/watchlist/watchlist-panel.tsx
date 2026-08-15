@@ -95,8 +95,27 @@ export function WatchlistPanel({
    * 会把整份夹具 JSON 塞进 /watchlist 的载荷，留着只会让下一个人以为
    * 它还有用。
    */
-  const entries = listingIds.flatMap<WatchlistEntry>((listingId) =>
-    realEntries.filter((candidate) => candidate.listingId === listingId),
+  /*
+   * 在不在自选里，由自选自己说了算。
+   *
+   * 这里原先是「拿 listingId 去 realEntries 里查，查不到就整行丢掉」——而
+   * realEntries 来自本地 K 线快照，只有 8 条，且不随代码提交。于是加进自选的
+   * 股票只要不在那 8 条里，这块面板就当它不存在，显示「还没有自选」；
+   * 而上面那张实时报价表里它明明在。服务器上快照根本没有，这块面板对任何
+   * 自选都会说空。
+   *
+   * 现在成员资格只看自选，报价取不到就按站内惯例显示「—」，而不是把整行抹掉。
+   */
+  const entries = listingIds.map<WatchlistEntry>(
+    (listingId) =>
+      realEntries.find((candidate) => candidate.listingId === listingId) ?? {
+        changePct: "—",
+        listingId,
+        market: "—",
+        name: listingId.toUpperCase(),
+        price: "—",
+        symbol: listingId,
+      },
   );
 
   const visible = entries.filter(

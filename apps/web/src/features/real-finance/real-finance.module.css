@@ -205,18 +205,29 @@
   font-size: var(--hq-type-size-title);
 }
 
+/*
+ * 三组筛选顶端对齐，不是底端。
+ *
+ * 原先是 align-items: end——来源那组的胶囊换行后变成两行，另外两组只有一行，
+ * 底对齐的结果是「来源」的标签被顶到最上面、另外两个标签浮在半空，三条标签
+ * 各在各的高度上。顶端对齐后三组标签在同一条线上，哪一组换行都不影响另外两组。
+ */
 .filterGrid {
-  align-items: end;
+  align-items: start;
   display: grid;
-  gap: var(--hq-spacing-4);
-  grid-template-columns: minmax(0, 1.5fr) minmax(150px, 0.6fr) minmax(
-      190px,
-      0.9fr
-    );
+  gap: var(--hq-spacing-5) var(--hq-spacing-4);
+  /*
+   * 来源独占一行，类型与关键词并排在下。
+   *
+   * 来源的数量是会变的（现在四个，以后可能五个），把它和另外两组挤在一行里
+   * 就得靠列宽去凑——凑得再准，加一个来源又会换行，留下一段空档。
+   */
+  grid-template-columns: minmax(150px, 0.4fr) minmax(190px, 0.6fr);
 }
 
 .sourceFilters {
   border: 0;
+  grid-column: 1 / -1;
   margin: 0;
   min-width: 0;
   padding: 0;
@@ -244,19 +255,34 @@
   min-height: var(--hq-touch-web-minimum);
 }
 
+/*
+ * 收敛成和站内其他筛选控件一样的形态。
+ *
+ * 原先是 999px 全圆胶囊 + 大内边距，四个来源就占掉两行；而右边两组控件是
+ * 6px 方角。同一排筛选里两种形状，看着像两个页面拼起来的。
+ */
 .sourceFilters button {
-  background: var(--hq-surface-subtle);
-  border-radius: var(--hq-radius-pill);
-  color: var(--hq-text-secondary);
+  background: transparent;
+  border-color: transparent;
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-tertiary);
   cursor: pointer;
-  min-width: var(--hq-touch-web-minimum);
-  padding: var(--hq-spacing-2) var(--hq-spacing-4);
+  font-size: var(--hq-type-size-body-compact);
+  min-width: 0;
+  padding: 0 var(--hq-spacing-3);
 }
 
+.sourceFilters button:hover {
+  background: var(--hq-surface-selected);
+  color: var(--hq-text-primary);
+}
+
+/* 选中态与全站统一：柔和填充，不用实心亮蓝整块压过来。 */
 .sourceFilters button[aria-pressed="true"] {
-  background: var(--hq-brand-primary);
-  border-color: var(--hq-brand-primary);
-  color: var(--hq-brand-on-primary);
+  background: var(--hq-surface-selected);
+  border-color: transparent;
+  color: var(--hq-text-primary);
+  font-weight: var(--hq-type-weight-semibold);
 }
 
 .filterField {
@@ -270,7 +296,8 @@
   border-radius: var(--hq-radius-control);
   color: var(--hq-text-primary);
   min-width: 0;
-  padding: var(--hq-spacing-2) var(--hq-spacing-3);
+  /* 与来源那排按钮同高，三组控件的下沿才在一条线上。 */
+  padding: 0 var(--hq-spacing-3);
   width: 100%;
 }
 

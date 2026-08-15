@@ -120,7 +120,7 @@ export function RealFinanceHub({ model }: RealFinanceHubProperties) {
           aria-labelledby="real-finance-filters-heading"
           className={styles.filterPanel}
         >
-          <h2 id="real-finance-filters-heading">筛选真实记录</h2>
+          <h2 id="real-finance-filters-heading">筛选</h2>
           <div className={styles.filterGrid}>
             <fieldset className={styles.sourceFilters}>
               <legend>来源</legend>
@@ -169,7 +169,7 @@ export function RealFinanceHub({ model }: RealFinanceHubProperties) {
             </label>
           </div>
           <p aria-live="polite" className={styles.filterResult} role="status">
-            已筛选 {filteredRecords.length} 条真实记录
+            共 {filteredRecords.length} 条记录
           </p>
         </section>
       )}
