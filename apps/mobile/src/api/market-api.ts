@@ -108,6 +108,30 @@ export const fetchPublicPortfolios = async (): Promise<
   return { kind: "ok", value: result.value.portfolios ?? [] };
 };
 
+/* followed 是「操作之后应处于的状态」，不是「当前状态」。 */
+export const setPortfolioFollowed = async (
+  token: string,
+  portfolioId: string,
+  followed: boolean,
+): Promise<ApiResult<PortfolioSets>> =>
+  request<PortfolioSets>("/api/social/portfolios", {
+    body: { followed, portfolio: portfolioId },
+    method: "POST",
+    token,
+  });
+
+export const createPortfolio = async (
+  token: string,
+  name: string,
+  summary: string,
+  holdings: readonly Readonly<{ symbol: string; weight: number }>[],
+): Promise<ApiResult<unknown>> =>
+  request("/api/social/portfolios", {
+    body: { holdings, name, summary },
+    method: "POST",
+    token,
+  });
+
 export const fetchPortfolios = async (
   token: string,
 ): Promise<ApiResult<PortfolioSets>> =>

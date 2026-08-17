@@ -22,7 +22,6 @@ import {
 } from "../../src/components/markets/portfolio-screen";
 import { WatchlistScreen as WatchlistView } from "../../src/components/markets/watchlist-screen";
 import { SegmentHeader } from "../../src/components/shell/segment-header";
-import { useComingSoon } from "../../src/components/system/coming-soon";
 import { useRemote } from "../../src/hooks/use-remote";
 import { useAccountSession } from "../../src/session/account-session";
 
@@ -95,7 +94,6 @@ type WatchlistData = Readonly<{
 export default function WatchlistScreen() {
   const router = useRouter();
   const { account, callAs } = useAccountSession();
-  const { show } = useComingSoon();
   const [segment, setSegment] = useState<Segment>("watchlist");
 
   const loadWatchlist = useCallback(async (): Promise<
@@ -132,12 +130,7 @@ export default function WatchlistScreen() {
                 {
                   glyph: "⊕",
                   label: "新建组合",
-                  onPress: () => {
-                    show(
-                      "新建组合",
-                      "在这里建一个自己的模拟组合、记录调仓。这一块还没做。",
-                    );
-                  },
+                  onPress: () => router.push("/portfolio/new"),
                 },
                 {
                   glyph: "⌕",

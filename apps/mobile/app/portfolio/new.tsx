@@ -1,0 +1,136 @@
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+
+import {
+  createPortfolio,
+  searchInstruments,
+  type SearchHit,
+} from "../../src/api/market-api";
+import {
+  PortfolioComposer,
+  type DraftHolding,
+} from "../../src/components/markets/portfolio-composer";
+import { useAccountSession } from "../../src/session/account-session";
+
+/*
+ * 新建组合。
+ *
+ * 「新建组合」这个按钮此前点了只弹一句「这一块还没做」，而服务端的建组合接口
+ * 一直在那儿。
+ */
+
+const DEBOUNCE_MS = 250;
+
+export default function NewPortfolioRoute() {
+  const router = useRouter();
+  const { callAs } = useAccountSession();
+
+  const [name, setName] = useState("");
+  const [summary, setSummary] = useState("");
+  const [holdings, setHoldings] = useState<readonly DraftHolding[]>([]);
+  const [picking, setPicking] = useState(false);
+  const [query, setQuery] = useState("");
+  const [settled, setSettled] = useState<
+    Readonly<{ hits: readonly SearchHit[]; query: string }>
+  >({ hits: [], query: "" });
+  const [failure, setFailure] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const needle = query.trim();
+
+  useEffect(() => {
+    if (needle.length === 0) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void (async () => {
+        const result = await searchInstruments(needle);
+        /* 迟到的响应丢掉：先发的后到会把新结果盖回旧的。 */
+        if (cancelled) return;
+        setSettled({
+          hits: result.kind === "ok" ? result.value : [],
+          query: needle,
+        });
+      })();
+    }, DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [needle]);
+
+  const submit = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+    const result = await callAs((token) =>
+      createPortfolio(
+        token,
+        name.trim(),
+        summary.trim(),
+        holdings.map((holding) => ({
+          symbol: holding.symbol,
+          weight: Number.parseFloat(holding.weight),
+        })),
+      ),
+    );
+    setSaving(false);
+    if (result.kind === "ok") {
+      router.back();
+      return;
+    }
+    setFailure(result.message);
+  }, [callAs, holdings, name, router, saving, summary]);
+
+  return (
+    <PortfolioComposer
+      failure={failure}
+      holdings={holdings}
+      name={name}
+      onChangeName={setName}
+      onChangeQuery={setQuery}
+      onChangeSummary={setSummary}
+      onChangeWeight={(symbol, weight) => {
+        setHoldings((previous) =>
+          previous.map((holding) =>
+            holding.symbol === symbol ? { ...holding, weight } : holding,
+          ),
+        );
+      }}
+      onClose={() => {
+        router.back();
+      }}
+      onPick={(hit) => {
+        if (hit.symbol === null) return;
+        const symbol = hit.symbol;
+        setHoldings((previous) =>
+          /*
+           * 同一只只能加一次——服务端会以「重复出现」整条退回，而那时用户已经
+           * 填完了十项，得自己去找是哪一只重了。
+           */
+          previous.some((holding) => holding.symbol === symbol)
+            ? previous
+            : [...previous, { name: hit.name, symbol, weight: "" }],
+        );
+        setPicking(false);
+        setQuery("");
+      }}
+      onRemove={(symbol) => {
+        setHoldings((previous) =>
+          previous.filter((holding) => holding.symbol !== symbol),
+        );
+      }}
+      onSubmit={() => {
+        void submit();
+      }}
+      onTogglePicker={() => {
+        setPicking((previous) => !previous);
+      }}
+      picking={picking}
+      query={query}
+      results={
+        needle.length === 0 || settled.query !== needle ? null : settled.hits
+      }
+      saving={saving}
+      summary={summary}
+    />
+  );
+}
