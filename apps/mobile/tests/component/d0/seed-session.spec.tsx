@@ -27,8 +27,8 @@ describe("D0 mobile seed and navigation", () => {
     expect(d0RuntimeRoutes.tabs).toEqual([
       { href: "/home", label: "火球" },
       { href: "/watchlist", label: "自选" },
-      { href: "/markets", label: "行情" },
-      { href: "/portfolios", label: "组合" },
+      { href: "/fund", label: "基金" },
+      { href: "/private-fund", label: "私募" },
       { href: "/profile", label: "我的" },
     ]);
     expect(d0RuntimeRoutes.stack).toEqual([
@@ -39,15 +39,18 @@ describe("D0 mobile seed and navigation", () => {
       { href: "/settings", label: "设置" },
     ]);
 
+    /*
+     * 禁的是「暗示我们有资质」的词，不是这两个板块本身。
+     *
+     * 基金和私募现在是正式页签——用户明确要求保留这个形态，只是不涉及交易。
+     * 它们在这里是浏览入口：基金看的是公开净值，私募看的是中基协公示的
+     * 管理人，都不卖东西。
+     *
+     * 真正不能出现的是开户、认购、交易这类动作词：它们要牌照，一旦出现在
+     * 导航里，用户就会以为点进去能办，而我们办不了。
+     */
     const runtimeSurface = JSON.stringify(d0RuntimeRoutes);
-    for (const forbidden of [
-      "基金",
-      "私募",
-      "策略研究",
-      "开户",
-      "认购",
-      "交易",
-    ]) {
+    for (const forbidden of ["策略研究", "开户", "认购", "交易"]) {
       expect(runtimeSurface).not.toContain(forbidden);
     }
   });

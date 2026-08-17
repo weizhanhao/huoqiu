@@ -21,8 +21,8 @@ describe("mobile five-tab route registry", () => {
     expect(d0RuntimeRoutes.tabs).toEqual([
       { href: "/home", label: "火球" },
       { href: "/watchlist", label: "自选" },
-      { href: "/markets", label: "行情" },
-      { href: "/portfolios", label: "组合" },
+      { href: "/fund", label: "基金" },
+      { href: "/private-fund", label: "私募" },
       { href: "/profile", label: "我的" },
     ]);
   });
@@ -65,8 +65,8 @@ describe("mobile five-tab route registry", () => {
     expect(readRegisteredNames(tabLayout, "Tabs")).toEqual([
       "home",
       "watchlist",
-      "markets",
-      "portfolios",
+      "fund",
+      "private-fund",
       "profile",
     ]);
     expect(readRegisteredNames(rootLayout, "Stack")).toEqual(

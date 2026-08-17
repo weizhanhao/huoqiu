@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import {
   Children,
   isValidElement,
@@ -10,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { HomeFeed } from "../src/components/d0/home-feed";
 import { ScreenHeader } from "../src/components/d0/screen-header";
 import { loadD0Fixture } from "../src/lib/d0-fixture";
+import { d0RuntimeRoutes } from "../src/navigation/d0-routes";
 
 const forbiddenProductLanguage = ["雪球", "开户", "认购", "交易下单"];
 
@@ -201,5 +206,32 @@ describe("mobile shell", () => {
 
   it.each(forbiddenProductLanguage)("does not expose %s", (language) => {
     expect(renderShell()).not.toContain(language);
+  });
+});
+
+describe("product naming across navigation surfaces", () => {
+  /*
+   * 上面那条禁用词断言只覆盖信息流的渲染结果，漏掉了导航文案——底部页签的
+   * 标题一度被写成参考图里的「雪球」，而它是别人的产品名，却一条用例都没拦住。
+   *
+   * 导航文案不经渲染就能读到（路由表是常量，页签布局是源码），所以这里直接
+   * 按文本查。查的是「用户看得见的地方」，注释里为解释参考图而提到它是允许的。
+   */
+  it("never puts another product's name in navigation", () => {
+    const mobileRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+    const surfaces = [
+      JSON.stringify(d0RuntimeRoutes),
+      readFileSync(join(mobileRoot, "app/(tabs)/_layout.tsx"), "utf8")
+        .split("\n")
+        .filter((line) => /title:|tabBarAccessibilityLabel:/u.test(line))
+        .join("\n"),
+    ];
+
+    for (const surface of surfaces) {
+      for (const forbidden of forbiddenProductLanguage) {
+        expect(surface).not.toContain(forbidden);
+      }
+      expect(surface).toContain("火球");
+    }
   });
 });

@@ -94,6 +94,60 @@ export const fetchPortfolios = async (
 ): Promise<ApiResult<PortfolioSets>> =>
   request<PortfolioSets>("/api/social/portfolios", { method: "GET", token });
 
+/*
+ * 基金与私募都复用网页版现成的接口，不另建一套。
+ *
+ * 分类与排序的取值来自服务端 fund-list.server.ts 的 CATEGORY_FILTERS / SORT_KEYS，
+ * 传错会被整体拒绝并回「分类或排序不正确」——所以这里用联合类型钉住，
+ * 而不是让调用方传裸字符串。
+ */
+export type FundCategory = "bond" | "hybrid" | "index" | "qdii" | "stock";
+export type FundSort = "day" | "oneYear" | "threeYear" | "yearToDate";
+
+export type FundRow = Readonly<{
+  category: string;
+  code: string;
+  dayPct: number;
+  name: string;
+  nav: number;
+  /** YYYY-MM-DD。净值是按日披露的，没有比日更细的粒度。 */
+  navDate: string;
+  oneYearPct: number;
+}>;
+
+export type PrivateFundManager = Readonly<{
+  /** 中基协公示页地址。私募这类信息必须能追回原始出处。 */
+  disclosureUrl: string;
+  /** YYYY-MM-DD。 */
+  establishedOn: string;
+  fundCount: number;
+  investType: string;
+  legalPerson: string;
+  name: string;
+}>;
+
+export const fetchFundList = async (
+  category: FundCategory,
+  sort: FundSort,
+): Promise<ApiResult<readonly FundRow[]>> => {
+  const result = await request<Readonly<{ rows?: readonly FundRow[] }>>(
+    `/api/funds/list?category=${category}&sort=${sort}`,
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.rows ?? [] };
+};
+
+export const fetchPrivateFundManagers = async (): Promise<
+  ApiResult<readonly PrivateFundManager[]>
+> => {
+  const result = await request<
+    Readonly<{ managers?: readonly PrivateFundManager[] }>
+  >("/api/private-funds", { method: "GET", token: null });
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.managers ?? [] };
+};
+
 type WatchlistResponse = Readonly<{ symbols?: readonly string[] }>;
 
 const readSymbols = (
