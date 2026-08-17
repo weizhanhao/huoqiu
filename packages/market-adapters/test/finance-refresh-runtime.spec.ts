@@ -23,11 +23,11 @@ const jobFor = (
   }) as FinanceIngestionJob;
 
 class CapturingTimer implements FinanceRefreshTimer {
-  readonly scheduled: Array<{
+  readonly scheduled: {
     callback: () => void;
     delayMilliseconds: number;
     handle: object;
-  }> = [];
+  }[] = [];
 
   clear(handle: object): void {
     const index = this.scheduled.findIndex(
