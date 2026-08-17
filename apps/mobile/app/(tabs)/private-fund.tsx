@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
   Pressable,
@@ -25,6 +26,7 @@ import { appTouchMinimum } from "../../src/styles/app-touch";
  * 原页核对——这比印一堆看不见的收益数字有用。
  */
 export default function PrivateFundScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { show } = useComingSoon();
   const { failure, loading, refresh, value } = useRemote(
@@ -37,7 +39,7 @@ export default function PrivateFundScreen() {
 
   return (
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       refreshControl={
         <RefreshControl onRefresh={refresh} refreshing={loading} />
       }

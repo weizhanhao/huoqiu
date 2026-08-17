@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { appTouchMinimum } from "../../styles/app-touch";
@@ -31,8 +32,19 @@ export function AppHeader({
   onOpenPublish,
   onOpenSearch,
 }: AppHeaderProperties) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.root} testID="app-header">
+    /*
+     * 蓝色头部要让开状态栏。
+     *
+     * 此前是死的 paddingTop: 6——在灵动岛机型上，搜索框上半截和右边那三个圆
+     * 按钮有一半盖在状态栏区域里，点不到。
+     */
+    <View
+      style={[styles.root, { paddingTop: insets.top + 6 }]}
+      testID="app-header"
+    >
       <Pressable
         accessibilityLabel="搜索"
         accessibilityRole="button"
@@ -101,7 +113,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     paddingBottom: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingTop: 6,
   },
   search: {

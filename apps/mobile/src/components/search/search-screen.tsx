@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Pressable,
   ScrollView,
@@ -94,12 +95,13 @@ export function SearchScreen({
   resultsFailure,
   searching,
 }: SearchScreenProperties) {
+  const insets = useSafeAreaInsets();
   const signColor = useSignColor();
   const typing = query.trim().length > 0;
 
   return (
     <View style={styles.screen} testID="search-screen">
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <Pressable
           accessibilityLabel="返回"
           accessibilityRole="button"
@@ -448,6 +450,6 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingBottom: 8,
     paddingHorizontal: 8,
-    paddingTop: 52,
+    paddingTop: 8,
   },
 });

@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { PublicPortfolio, Quote } from "../../api/market-api";
@@ -39,12 +40,13 @@ export function PortfolioDetailScreen({
   portfolio,
   quotes,
 }: PortfolioDetailScreenProperties) {
+  const insets = useSafeAreaInsets();
   const signColor = useSignColor();
   const holdings = portfolio?.holdings ?? [];
 
   return (
     <View style={styles.screen} testID="portfolio-detail-screen">
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <Pressable
           accessibilityLabel="返回"
           accessibilityRole="button"
@@ -286,7 +288,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingBottom: 8,
     paddingHorizontal: 8,
-    paddingTop: 52,
+    paddingTop: 8,
   },
   weight: {
     color: tokens.text.secondary,

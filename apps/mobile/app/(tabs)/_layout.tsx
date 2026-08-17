@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Tabs } from "expo-router";
 import { Text } from "react-native";
 
@@ -18,12 +19,14 @@ import { appTouchMinimum } from "../../src/styles/app-touch";
 type IconProperties = Readonly<{ color: string; glyph: string }>;
 
 const TabIcon = ({ color, glyph }: IconProperties) => (
-  <Text aria-hidden style={{ color, fontSize: 18 }}>
+  <Text aria-hidden style={{ color, fontSize: 24 }}>
     {glyph}
   </Text>
 );
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -31,12 +34,17 @@ export default function TabLayout() {
         tabBarActiveTintColor: tokens.brand.primary,
         tabBarInactiveTintColor: tokens.text.tertiary,
         tabBarItemStyle: { minHeight: appTouchMinimum },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+        /* 参考图实测：图标 24、标签 10。 */
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
         tabBarStyle: {
           backgroundColor: tokens.surface.base,
           borderTopColor: tokens.surface.divider,
-          minHeight: appTouchMinimum + 16,
-          paddingBottom: 8,
+          /*
+           * 底部横条会压在页签文字上。全面屏上这个值是 34，旧机型是 0——
+           * 写死一个数只能对一种机型。
+           */
+          minHeight: appTouchMinimum + 16 + insets.bottom,
+          paddingBottom: insets.bottom + 8,
           paddingTop: 8,
         },
       }}

@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { appTouchMinimum } from "../../styles/app-touch";
@@ -31,8 +32,10 @@ export function SegmentHeader<Id extends string>({
   onSelect,
   segments,
 }: SegmentHeaderProperties<Id>) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.root} testID="segment-header">
+    <View style={[styles.root, { paddingTop: insets.top + 4 }]} testID="segment-header">
       <View style={styles.segments}>
         {segments.map(({ id, label }) => (
           <Pressable
@@ -86,8 +89,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: tokens.surface.base,
     flexDirection: "row",
-    paddingHorizontal: 14,
-    paddingVertical: 4,
+    paddingBottom: 4,
+    paddingHorizontal: 16,
   },
   segment: {
     justifyContent: "center",

@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Pressable,
   ScrollView,
@@ -114,6 +115,7 @@ export function ComposeScreen({
   topics,
   uploading,
 }: ComposeScreenProperties) {
+  const insets = useSafeAreaInsets();
   /*
    * 长文必须填标题。
    *
@@ -128,7 +130,7 @@ export function ComposeScreen({
 
   return (
     <View style={styles.screen} testID="compose-screen">
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <Pressable
           accessibilityLabel="关闭"
           accessibilityRole="button"
@@ -571,7 +573,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingBottom: 8,
     paddingHorizontal: 8,
-    paddingTop: 52,
+    paddingTop: 8,
   },
   visibility: {
     alignSelf: "flex-start",

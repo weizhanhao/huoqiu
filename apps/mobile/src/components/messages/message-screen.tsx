@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { Notification } from "../../api/social-api";
@@ -59,6 +60,7 @@ export function MessageScreen({
   onSelectCategory,
   signedIn,
 }: MessageScreenProperties) {
+  const insets = useSafeAreaInsets();
   const all = notifications ?? [];
   const shown = all.filter((entry) => entry.category === category);
   const countOf = (id: MessageCategory): number =>
@@ -66,7 +68,7 @@ export function MessageScreen({
 
   return (
     <View style={styles.screen} testID="message-screen">
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <Pressable
           accessibilityLabel="返回"
           accessibilityRole="button"
@@ -300,6 +302,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingBottom: 8,
     paddingHorizontal: 8,
-    paddingTop: 52,
+    paddingTop: 8,
   },
 });

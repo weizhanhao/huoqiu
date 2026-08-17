@@ -5,6 +5,7 @@ import {
 import type { MentionAccount } from "@huoqiu/domain/social/post-body";
 import { tokens } from "@huoqiu/native-ui";
 import { useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Pressable,
   ScrollView,
@@ -106,6 +107,7 @@ export function PostDetailScreen({
   sending,
   topics,
 }: PostDetailScreenProperties) {
+  const insets = useSafeAreaInsets();
   const [expanded, setExpanded] = useState<readonly string[]>([]);
 
   const list = comments ?? [];
@@ -115,7 +117,7 @@ export function PostDetailScreen({
 
   return (
     <View style={styles.screen} testID="post-detail-screen">
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <Pressable
           accessibilityLabel="返回"
           accessibilityRole="button"
@@ -591,6 +593,6 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingBottom: 8,
     paddingHorizontal: 8,
-    paddingTop: 52,
+    paddingTop: 8,
   },
 });

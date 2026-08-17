@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -131,6 +132,7 @@ export function SettingsScreen({
   saving,
   section,
 }: SettingsScreenProperties) {
+  const insets = useSafeAreaInsets();
   const soon = (label: string, detail: string) => () => {
     onShowNotice(label, detail);
   };
@@ -141,7 +143,7 @@ export function SettingsScreen({
 
   return (
     <View style={styles.screen} testID="settings-screen">
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <Pressable
           accessibilityLabel="返回"
           accessibilityRole="button"
@@ -472,6 +474,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingBottom: 8,
     paddingHorizontal: 8,
-    paddingTop: 52,
+    paddingTop: 8,
   },
 });

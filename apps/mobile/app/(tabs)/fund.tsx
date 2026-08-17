@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -50,6 +51,7 @@ const sorts = [
 ] as const satisfies readonly Readonly<{ id: FundSort; label: string }>[];
 
 export default function FundScreen() {
+  const insets = useSafeAreaInsets();
   const signColor = useSignColor();
   const router = useRouter();
   const { show } = useComingSoon();
@@ -68,7 +70,7 @@ export default function FundScreen() {
 
   return (
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       refreshControl={
         <RefreshControl onRefresh={refresh} refreshing={loading} />
       }

@@ -1,4 +1,5 @@
 import { tokens } from "@huoqiu/native-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type {
@@ -115,12 +116,13 @@ export function InstrumentScreen({
   tab,
   watchlisted,
 }: InstrumentScreenProperties) {
+  const insets = useSafeAreaInsets();
   const signColor = useSignColor();
   const color = signColor(quote?.changePercent ?? 0);
 
   return (
     <View style={styles.screen} testID="instrument-screen">
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <Pressable
           accessibilityLabel="返回"
           accessibilityRole="button"
@@ -344,7 +346,10 @@ export function InstrumentScreen({
         </Text>
       </ScrollView>
 
-      <View style={styles.bottomBar}>
+      {/* 底部横条会盖住这一排，所以要把安全区加进去。 */}
+      <View
+        style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}
+      >
         <View style={styles.bottomQuote}>
           <Text style={[styles.bottomLast, { color }]}>
             {quote === null ? "—" : quote.last.toFixed(2)}
@@ -404,7 +409,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     flexDirection: "row",
     gap: 6,
-    paddingBottom: 20,
     paddingHorizontal: 12,
     paddingTop: 6,
   },
