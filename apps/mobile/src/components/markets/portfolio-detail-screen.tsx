@@ -25,8 +25,10 @@ export type PortfolioDetailScreenProperties = Readonly<{
   onBack: () => void;
   onOpenInstrument: (symbol: string) => void;
   onToggleFollow: () => void;
-  /** null 表示还没取到，或这个 id 不存在。 */
+  /** null 表示还没取到，或这个 id 不存在——由 loaded 区分。 */
   portfolio: PublicPortfolio | null;
+  /** 组合榜已经取回来了。为 true 而 portfolio 仍是 null，就是这条不存在。 */
+  loaded: boolean;
   quotes: ReadonlyMap<string, Quote>;
 }>;
 
@@ -34,6 +36,7 @@ export function PortfolioDetailScreen({
   dayReturn,
   failure,
   following,
+  loaded,
   onBack,
   onOpenInstrument,
   onToggleFollow,
@@ -81,7 +84,11 @@ export function PortfolioDetailScreen({
 
         {portfolio === null ? (
           <Text style={styles.empty}>
-            {failure === null ? "正在读取组合……" : "这个组合打不开。"}
+            {failure !== null
+              ? "这个组合打不开。"
+              : loaded
+                ? "这个组合不在了。"
+                : "正在读取组合……"}
           </Text>
         ) : (
           <>

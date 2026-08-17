@@ -40,6 +40,7 @@ const render = (
       dayReturn={1.2}
       failure={null}
       following={false}
+      loaded
       onBack={vi.fn()}
       onOpenInstrument={vi.fn()}
       onToggleFollow={vi.fn()}
@@ -98,10 +99,12 @@ describe("portfolio detail", () => {
   });
 
   it("tells a missing portfolio apart from one still loading", () => {
-    const loading = render({ portfolio: null });
+    const loading = render({ loaded: false, portfolio: null });
+    const gone = render({ loaded: true, portfolio: null });
     const broken = render({ failure: "连不上服务器。", portfolio: null });
 
     expect(loading).toContain("正在读取组合");
+    expect(gone).toContain("不在了");
     expect(broken).toContain("连不上服务器");
   });
 });

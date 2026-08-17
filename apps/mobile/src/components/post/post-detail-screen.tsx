@@ -69,9 +69,11 @@ export type PostDetailScreenProperties = Readonly<{
   onToggleBookmark: () => void;
   onToggleFollow: () => void;
   onToggleLike: () => void;
-  /** null 表示帖子还没取到，或这个 id 不存在。 */
+  /** null 表示帖子还没取到，或这个 id 不存在——由 postLoaded 区分。 */
   post: SocialPost | null;
   postFailure: string | null;
+  /** 帖子列表已经取回来了。为 true 而 post 仍是 null，就是这条不存在。 */
+  postLoaded: boolean;
   replyTo: PostComment | null;
   sending: boolean;
   topics: readonly string[];
@@ -103,6 +105,7 @@ export function PostDetailScreen({
   onToggleLike,
   post,
   postFailure,
+  postLoaded,
   replyTo,
   sending,
   topics,
@@ -150,9 +153,20 @@ export function PostDetailScreen({
           </View>
         )}
 
+        {/*
+          三种情况要分开。
+          
+          此前只分了「有没有失败」：帖子被删掉、或转回草稿之后，取数是成功的，
+          列表里就是没有这条——界面于是永远停在「正在读取这条内容……」，
+          转不完。
+        */}
         {post === null ? (
           <Text style={styles.empty}>
-            {postFailure === null ? "正在读取这条内容……" : "这条内容打不开了。"}
+            {postFailure !== null
+              ? "这条内容打不开了。"
+              : postLoaded
+                ? "这条内容不在了。可能已被作者删除。"
+                : "正在读取这条内容……"}
           </Text>
         ) : (
           <View style={styles.article}>

@@ -149,13 +149,16 @@ export default function PostDetailRoute() {
       }}
       onToggleFollow={() => {
         if (post === null) return;
-        void toggleFollow(post.authorId);
+        void toggleFollow(post.authorId).then((message) => {
+          if (message !== null) show("关注没成功", message);
+        });
       }}
       onToggleLike={() => {
         void toggleLike();
       }}
       post={post}
       postFailure={posts.failure}
+      postLoaded={posts.value !== null}
       replyTo={replyTo}
       sending={sending}
       topics={topics.value ?? []}

@@ -74,10 +74,21 @@ describe("post body", () => {
     expect(markup).not.toContain("[图片]");
   });
 
-  it("lists an uploaded image as an explicit attachment line", () => {
+  it("renders an uploaded image as an image, not as its URL", () => {
+    /*
+     * 这条此前断的是「印出一行 [图片] + 地址」。选图、压缩、上传整条链路都是
+     * 通的，只有最后一步没做，于是读者看到的是一串内网地址——而用例把那个
+     * 状态当成了正确行为守着。
+     */
     const markup = render("![](/api/social/uploads/abc.png)");
 
-    expect(markup).toContain("[图片]");
-    expect(markup).toContain("/api/social/uploads/abc.png");
+    /*
+     * 断的是「有没有画出图片元素」，不是标记里有没有那个地址：
+     * react-native-web 把 Image 渲染成带背景图的 div，地址由样式带上，
+     * 静态标记里根本不出现。
+     */
+    expect(markup).toContain("帖子配图");
+    expect(markup).not.toContain("[图片]");
+    expect(markup).not.toContain("/api/social/uploads/abc.png");
   });
 });

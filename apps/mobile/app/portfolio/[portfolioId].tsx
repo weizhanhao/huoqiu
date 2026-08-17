@@ -93,6 +93,7 @@ export default function PortfolioDetailRoute() {
       failure={detail.failure}
       /* 自己建的组合不给关注按钮：关注自己没有意义，服务端也不会记。 */
       following={account === null || isMine ? null : followed}
+      loaded={detail.value !== null}
       onBack={createD0BackHandler(router, "/watchlist")}
       onOpenInstrument={(symbol) => {
         router.push({

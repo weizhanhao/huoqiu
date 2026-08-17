@@ -3,7 +3,7 @@ import {
   type MentionAccount,
 } from "@huoqiu/domain/social/post-body";
 import { tokens } from "@huoqiu/native-ui";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { apiUrl } from "../../api/config";
 
@@ -114,12 +114,25 @@ export function PostBody({
         );
       })}
 
+      {/*
+        真把图画出来。
+        
+        这里此前印的是一行 [图片] http://172.29.98.11/api/...——选图、压缩、
+        上传整条链路都通了，只差最后这一步，而读者看到的是一串内网地址。
+        
+        比例写 4:3 而不是等图回来再量：不定高的话，图片一到位整篇正文会往下
+        跳一次，正在读的人会丢失位置。
+      */}
       {images.map((segment, index) => {
         if (segment.kind !== "image") return null;
         return (
-          <Text key={`image-${String(index)}`} style={styles.imageNote}>
-            [图片] {apiUrl(segment.src)}
-          </Text>
+          <Image
+            accessibilityLabel="帖子配图"
+            key={`image-${String(index)}`}
+            resizeMode="cover"
+            source={{ uri: apiUrl(segment.src) }}
+            style={styles.image}
+          />
         );
       })}
     </View>
@@ -131,9 +144,11 @@ const styles = StyleSheet.create({
     color: tokens.text.link,
     fontWeight: "600",
   },
-  imageNote: {
-    color: tokens.text.tertiary,
-    fontSize: 12.5,
+  image: {
+    aspectRatio: 4 / 3,
+    backgroundColor: tokens.surface.canvas,
+    borderRadius: 8,
+    width: "100%",
   },
   link: {
     color: tokens.text.link,

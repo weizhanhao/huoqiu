@@ -3,6 +3,7 @@ import { useCallback } from "react";
 
 import { fetchUserProfile } from "../../src/api/social-api";
 import { UserScreen } from "../../src/components/user/user-screen";
+import { useComingSoon } from "../../src/components/system/coming-soon";
 import { useRemote } from "../../src/hooks/use-remote";
 import { createD0BackHandler } from "../../src/navigation/back-or-home";
 import { useAccountSession } from "../../src/session/account-session";
@@ -15,6 +16,7 @@ import { useAccountSession } from "../../src/session/account-session";
  */
 export default function UserProfileRoute() {
   const router = useRouter();
+  const { show } = useComingSoon();
   const { account, following, toggleFollow } = useAccountSession();
   const parameters = useLocalSearchParams<{ accountId?: string | string[] }>();
 
@@ -40,7 +42,15 @@ export default function UserProfileRoute() {
         router.push({ params: { postId }, pathname: "/post/[postId]" });
       }}
       onToggleFollow={() => {
-        void toggleFollow(accountId);
+        /*
+         * 接住失败原因。
+         *
+         * 此前这里把返回值丢了：令牌过期时按钮纹丝不动、没有任何提示，
+         * 用户会以为 App 卡了，然后反复点。
+         */
+        void toggleFollow(accountId).then((message) => {
+          if (message !== null) show("关注没成功", message);
+        });
       }}
       profile={profile.value}
     />

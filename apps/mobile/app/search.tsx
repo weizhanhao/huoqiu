@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Linking } from "react-native";
+import { Keyboard, Linking } from "react-native";
 
 import {
   fetchChart,
@@ -144,9 +144,11 @@ export default function SearchRoute() {
       }}
       onSubmit={() => {
         /*
-         * 联想随输入自动出，「搜索」这个按钮只用来收起键盘。再发一次一模一样
-         * 的请求，除了多一次上游调用，什么都不会变。
+         * 联想随输入自动出，再发一次一模一样的请求什么都不会变。这个按钮真正
+         * 该做的是收键盘——此前它是个空函数体，而它是这一屏视觉权重最高的
+         * 可点元素：按下去毫无反应。
          */
+        Keyboard.dismiss();
       }}
       query={query}
       results={needle.length === 0 || settled.query === "" ? null : settled.hits}

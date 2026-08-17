@@ -61,6 +61,7 @@ const render = (
       onToggleLike={vi.fn()}
       post={post}
       postFailure={null}
+      postLoaded
       replyTo={null}
       sending={false}
       topics={[]}
@@ -142,5 +143,18 @@ describe("post detail", () => {
 
     expect(markup).toContain("回复 @甲");
     expect(markup).toContain("取消");
+  });
+  it("tells a deleted post apart from one still loading", () => {
+    /*
+     * 帖子被删掉、或转回草稿之后，取数是成功的，列表里就是没有这条。此前这
+     * 两种情况共用一句「正在读取这条内容……」——从消息点进一条已删的帖子，
+     * 看到的是一个永远转不完的加载态。
+     */
+    const loading = render({ post: null, postLoaded: false });
+    const gone = render({ post: null, postLoaded: true });
+
+    expect(loading).toContain("正在读取");
+    expect(gone).toContain("不在了");
+    expect(gone).not.toContain("正在读取");
   });
 });

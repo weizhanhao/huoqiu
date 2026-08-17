@@ -221,7 +221,9 @@ export default function HomeScreen() {
       }}
       onShowNotice={show}
       onToggleFollow={(authorId) => {
-        void toggleFollow(authorId);
+        void toggleFollow(authorId).then((message) => {
+          if (message !== null) show("关注没成功", message);
+        });
       }}
       posts={shown}
       signedIn={account !== null}

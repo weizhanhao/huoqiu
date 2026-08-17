@@ -161,6 +161,15 @@ export function SearchScreen({
               「搜不到」和「还在搜」要分开说。混成一句，网慢时每次输入都像是
               「没有这只股票」，用户会换个词重搜，然后一直搜不到。
             */}
+            {/*
+              「正在搜」此前从头到尾没画出来：这个文件顶上写着「搜不到和还在搜
+              要分开说」，而分开之后只说了一半——用户输入时看到的是上一次的
+              结果静止不动，没有任何正在搜的迹象。
+            */}
+            {searching ? (
+              <Text style={styles.empty}>正在搜「{query.trim()}」……</Text>
+            ) : null}
+
             {results !== null && results.length === 0 && !searching ? (
               <Text style={styles.empty}>
                 没有匹配「{query.trim()}」的标的。
