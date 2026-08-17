@@ -292,3 +292,87 @@ export const publishPost = async (
     method: "POST",
     token,
   });
+
+/*
+ * 设置。
+ *
+ * 三项都存在账号下，换台设备仍然是自己选的那套：谁能评论我、哪些通知不要、
+ * 涨跌用什么颜色。未登录时服务端回默认档而不是 401，所以读这条不需要令牌。
+ */
+export type CommentPolicy =
+  | "everyone"
+  | "followers"
+  | "followers-3d"
+  | "following"
+  | "off";
+
+export type MarketColorMode = "green-up" | "red-up";
+
+export type NotificationCategory =
+  | "follows"
+  | "likes"
+  | "mentions"
+  | "replies"
+  | "system";
+
+export type PrivacySettings = Readonly<{
+  commentPolicy: CommentPolicy;
+  marketColors: MarketColorMode;
+  mutedCategories: readonly NotificationCategory[];
+}>;
+
+export const fetchPrivacy = async (
+  token: string | null,
+): Promise<ApiResult<PrivacySettings>> =>
+  request<PrivacySettings>("/api/social/privacy", { method: "GET", token });
+
+/* 三项各自独立提交：只带其中一项的请求不该被当成「把另外两项设成空」。 */
+export const savePrivacy = async (
+  token: string,
+  patch: Partial<PrivacySettings>,
+): Promise<ApiResult<unknown>> =>
+  request("/api/social/privacy", {
+    body: {
+      ...(patch.commentPolicy === undefined
+        ? {}
+        : { commentPolicy: patch.commentPolicy }),
+      ...(patch.marketColors === undefined
+        ? {}
+        : { marketColors: patch.marketColors }),
+      ...(patch.mutedCategories === undefined
+        ? {}
+        : { mutedCategories: patch.mutedCategories }),
+    },
+    method: "POST",
+    token,
+  });
+
+export const changePassword = async (
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<ApiResult<unknown>> =>
+  request("/api/social/password", {
+    body: {
+      confirm_password: newPassword,
+      current_password: currentPassword,
+      new_password: newPassword,
+    },
+    method: "POST",
+    token,
+  });
+
+export const saveProfile = async (
+  token: string,
+  patch: Readonly<{ bio?: string; displayName?: string }>,
+): Promise<ApiResult<unknown>> =>
+  request("/api/social/profile", {
+    body: {
+      ...(patch.bio === undefined ? {} : { bio: patch.bio }),
+      ...(patch.displayName === undefined
+        ? {}
+        : { display_name: patch.displayName }),
+    },
+    method: "POST",
+    token,
+  });

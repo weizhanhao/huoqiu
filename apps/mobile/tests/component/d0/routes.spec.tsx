@@ -54,7 +54,6 @@ vi.mock("react", async (importOriginal) => {
 });
 
 import PortfolioDetailScreen from "../../../app/portfolio/[portfolioId]";
-import SettingsScreen from "../../../app/settings";
 
 const readProperties = (element: ReactElement) =>
   element.props as Readonly<{
@@ -156,15 +155,16 @@ describe("D0 mobile route behavior", () => {
    * 新行为由 tests/component/messages/ 下的用例接手。
    */
 
-  it("keeps session settings state and returns a fresh deep link to profile", () => {
-    const settings = readProperties(SettingsScreen() as ReactElement);
-
-    expect(settings.density).toBe("comfortable");
-    settings.onSelectDensity?.("compact");
-    expect(mocks.stateSetters[0]).toHaveBeenCalledWith("compact");
-    settings.onBack?.();
-    expect(mocks.router.replace).toHaveBeenCalledWith("/profile");
-  });
+  /*
+   * 设置页也从这里去掉了。
+   *
+   * 这条断的是一个叫「密度」的本地开关：只活在内存里，退出去再进来回到默认
+   * 值，而它本来也没影响任何东西。现在这一页改成三项真设置——评论权限、
+   * 消息通知、涨跌配色，都存在账号下，读写走 /api/social/privacy，没有可断的
+   * 本地 useState。
+   *
+   * 新行为由 tests/component/settings/ 下的用例接手。
+   */
 
   /*
    * 首页从这张表里去掉了。
