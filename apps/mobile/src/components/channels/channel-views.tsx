@@ -6,7 +6,8 @@ import type { MentionAccount } from "@huoqiu/domain/social/post-body";
 import type { HotRow, NewsItem, VideoItem } from "../../api/market-api";
 import type { AccountSummary, SocialPost } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
-import { signColor, signedPercent } from "../../styles/market-sign";
+import { useSignColor } from "../../styles/market-colors";
+import { signedPercent } from "../../styles/market-sign";
 import { PostCard } from "../feed/post-card";
 
 /*
@@ -128,6 +129,7 @@ export function HotChannel({
   onOpenNews,
   topics,
 }: HotChannelProperties) {
+  const signColor = useSignColor();
   return (
     <View style={styles.stream}>
       <View style={styles.block}>
@@ -260,6 +262,8 @@ export function WatchlistChannel({
   signedIn: boolean;
   symbols: readonly string[];
 }>) {
+  const signColor = useSignColor();
+
   return (
     <View style={styles.stream}>
       <View style={styles.block}>

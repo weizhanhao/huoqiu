@@ -13,7 +13,8 @@ import type {
   PortfolioSets,
   PublicPortfolio,
 } from "../../api/market-api";
-import { signColor, signedPercent } from "../../styles/market-sign";
+import { useSignColor } from "../../styles/market-colors";
+import { signedPercent } from "../../styles/market-sign";
 
 /*
  * 组合。
@@ -46,16 +47,33 @@ export type PortfolioScreenProperties = Readonly<{
 
 const Section = ({
   empty,
+  onOpen,
   rows,
   title,
-}: Readonly<{ empty: string; rows: readonly Portfolio[]; title: string }>) => (
+}: Readonly<{
+  empty: string;
+  onOpen: (portfolioId: string) => void;
+  rows: readonly Portfolio[];
+  title: string;
+}>) => (
   <>
     <Text style={styles.sectionHeading}>{title}</Text>
     {rows.length === 0 ? (
       <Text style={styles.empty}>{empty}</Text>
     ) : (
+      /*
+        卡片此前是 View，点不动：好不容易建成一个组合，在「我建的」里看到它，
+        想看持仓却只能回擂台榜里翻找自己那一条。
+      */
       rows.map((portfolio) => (
-        <View key={portfolio.id} style={styles.card}>
+        <Pressable
+          accessibilityRole="button"
+          key={portfolio.id}
+          onPress={() => {
+            onOpen(portfolio.id);
+          }}
+          style={styles.card}
+        >
           <Text style={styles.name}>{portfolio.name}</Text>
           {/*
             持仓只报只数，不在这一页算收益。没有成本价就算不出真实收益，
@@ -66,7 +84,7 @@ const Section = ({
               ? "暂无持仓"
               : `${String(portfolio.holdings.length)} 只持仓`}
           </Text>
-        </View>
+        </Pressable>
       ))
     )}
   </>
@@ -82,6 +100,7 @@ export function PortfolioScreen({
   sets,
   signedIn,
 }: PortfolioScreenProperties) {
+  const signColor = useSignColor();
   return (
     <ScrollView
       contentContainerStyle={styles.content}
@@ -165,12 +184,14 @@ export function PortfolioScreen({
       {signedIn && sets !== null ? (
         <>
           <Section
-            empty="还没有建过组合。在网页版可以新建。"
+            empty="还没有建过组合。点右上角的「新建组合」就能建一个。"
+            onOpen={onOpenPortfolio}
             rows={sets.created}
             title="我建的"
           />
           <Section
-            empty="还没有关注任何组合。"
+            empty="还没有关注任何组合。在上面的擂台榜里点进一个，可以关注。"
+            onOpen={onOpenPortfolio}
             rows={sets.followed}
             title="我关注的"
           />

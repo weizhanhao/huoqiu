@@ -19,9 +19,9 @@ import { EntryGrid } from "../../src/components/shell/entry-grid";
 import { useComingSoon } from "../../src/components/system/coming-soon";
 import { useRemote } from "../../src/hooks/use-remote";
 import { appTouchMinimum } from "../../src/styles/app-touch";
+import { useSignColor } from "../../src/styles/market-colors";
 import {
   fixedOrMissing,
-  signColor,
   signedPercent,
 } from "../../src/styles/market-sign";
 
@@ -50,6 +50,7 @@ const sorts = [
 ] as const satisfies readonly Readonly<{ id: FundSort; label: string }>[];
 
 export default function FundScreen() {
+  const signColor = useSignColor();
   const router = useRouter();
   const { show } = useComingSoon();
   const [category, setCategory] = useState<FundCategory>("index");

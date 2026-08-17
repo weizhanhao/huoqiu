@@ -155,6 +155,12 @@ export default function WatchlistScreen() {
         <WatchlistView
           failure={watchlist.failure ?? watchlist.value?.quoteFailure ?? null}
           loading={watchlist.loading}
+          onOpenInstrument={(symbol) => {
+            router.push({
+              params: { listingId: symbol },
+              pathname: "/instrument/[listingId]",
+            });
+          }}
           onRefresh={watchlist.refresh}
           quotes={watchlist.value?.quotes ?? []}
           signedIn={account !== null}
@@ -166,6 +172,15 @@ export default function WatchlistScreen() {
         <MarketScreen
           failure={overview.failure}
           loading={overview.loading}
+          onOpenInstrument={(href) => {
+            /* 服务端给的是站内地址 /instruments/<code>，取末段做参数。 */
+            const listingId = href.split("/").pop() ?? href;
+            if (listingId.length === 0) return;
+            router.push({
+              params: { listingId },
+              pathname: "/instrument/[listingId]",
+            });
+          }}
           onRefresh={overview.refresh}
           overview={overview.value}
         />

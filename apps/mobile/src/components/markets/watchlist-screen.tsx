@@ -1,5 +1,6 @@
 import { tokens } from "@huoqiu/native-ui";
 import {
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -8,11 +9,8 @@ import {
 } from "react-native";
 
 import type { Quote } from "../../api/market-api";
-import {
-  signColor,
-  signedAmount,
-  signedPercent,
-} from "../../styles/market-sign";
+import { useSignColor } from "../../styles/market-colors";
+import { signedAmount, signedPercent } from "../../styles/market-sign";
 
 /*
  * 自选。
@@ -24,6 +22,7 @@ import {
 export type WatchlistScreenProperties = Readonly<{
   failure: string | null;
   loading: boolean;
+  onOpenInstrument: (symbol: string) => void;
   onRefresh: () => void;
   quotes: readonly Quote[];
   signedIn: boolean;
@@ -34,11 +33,13 @@ export type WatchlistScreenProperties = Readonly<{
 export function WatchlistScreen({
   failure,
   loading,
+  onOpenInstrument,
   onRefresh,
   quotes,
   signedIn,
   symbols,
 }: WatchlistScreenProperties) {
+  const signColor = useSignColor();
   const bySymbol = new Map(quotes.map((quote) => [quote.symbol, quote]));
 
   return (
@@ -69,15 +70,28 @@ export function WatchlistScreen({
       {signedIn && symbols.length === 0 && failure === null ? (
         <View style={styles.notice}>
           <Text style={styles.noticeText}>
-            还没有自选。在网页版或个股页点「加自选」，这里就会出现。
+            还没有自选。搜一只票、点进去按「加自选」，这里就会出现。
           </Text>
         </View>
       ) : null}
 
+      {/*
+        整行可点进个股页。
+        
+        这一行此前是 View：自选是核心页签，加进来的票在这儿列着，却一只都点
+        不进去——用户只能回搜索里再搜一遍。
+      */}
       {symbols.map((symbol) => {
         const quote = bySymbol.get(symbol);
         return (
-          <View key={symbol} style={styles.row}>
+          <Pressable
+            accessibilityRole="button"
+            key={symbol}
+            onPress={() => {
+              onOpenInstrument(symbol);
+            }}
+            style={styles.row}
+          >
             <View style={styles.rowMain}>
               {/*
                 取不到价时显示代码而不是留空：至少让人知道这一行是哪只票，
@@ -109,7 +123,7 @@ export function WatchlistScreen({
                 </Text>
               </View>
             )}
-          </View>
+          </Pressable>
         );
       })}
 

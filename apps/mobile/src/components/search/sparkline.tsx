@@ -1,7 +1,7 @@
 import { tokens } from "@huoqiu/native-ui";
 import { StyleSheet, View } from "react-native";
 
-import { signColor } from "../../styles/market-sign";
+import { useSignColor } from "../../styles/market-colors";
 import { boundsOf, ratio } from "../instrument/chart-bounds";
 
 /*
@@ -40,6 +40,7 @@ export function Sparkline({
   prices,
   width = 74,
 }: SparklineProperties) {
+  const signColor = useSignColor();
   const points = thin(prices);
   if (points.length < 2) {
     /*

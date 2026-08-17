@@ -21,6 +21,7 @@ const overview: MarketOverview = {
       changePercent: 5.01,
       code: "BK1152",
       declining: 1,
+      leaderHref: "/instruments/sz002436",
       leaderName: "兴森科技",
       name: "先进封装",
     },
@@ -46,6 +47,8 @@ const overview: MarketOverview = {
       changePercent: 10.69,
       code: "BK1510",
       declining: 0,
+      /* 上游没给领涨股时是 null——那一行就不该能点。 */
+      leaderHref: null,
       leaderName: "天山生物",
       name: "其他养殖",
     },
@@ -67,6 +70,7 @@ describe("market screen", () => {
       <MarketScreen
         failure={null}
         loading={false}
+        onOpenInstrument={vi.fn()}
         onRefresh={vi.fn()}
         overview={overview}
       />,
@@ -90,6 +94,7 @@ describe("market screen", () => {
       <MarketScreen
         failure={null}
         loading={false}
+        onOpenInstrument={vi.fn()}
         onRefresh={vi.fn()}
         overview={overview}
       />,
@@ -104,6 +109,7 @@ describe("market screen", () => {
       <MarketScreen
         failure="连不上服务器。确认手机和服务在同一个网络里。"
         loading={false}
+        onOpenInstrument={vi.fn()}
         onRefresh={vi.fn()}
         overview={null}
       />,
@@ -120,6 +126,7 @@ describe("watchlist screen", () => {
       <WatchlistScreen
         failure={null}
         loading={false}
+        onOpenInstrument={vi.fn()}
         onRefresh={vi.fn()}
         quotes={[quote("sh600519", "贵州茅台", -3.64)]}
         signedIn
@@ -140,6 +147,7 @@ describe("watchlist screen", () => {
       <WatchlistScreen
         failure={null}
         loading={false}
+        onOpenInstrument={vi.fn()}
         onRefresh={vi.fn()}
         quotes={[]}
         signedIn
@@ -156,6 +164,7 @@ describe("watchlist screen", () => {
       <WatchlistScreen
         failure={null}
         loading={false}
+        onOpenInstrument={vi.fn()}
         onRefresh={vi.fn()}
         quotes={[]}
         signedIn={false}
@@ -172,6 +181,7 @@ describe("watchlist screen", () => {
       <WatchlistScreen
         failure="连不上服务器。确认手机和服务在同一个网络里。"
         loading={false}
+        onOpenInstrument={vi.fn()}
         onRefresh={vi.fn()}
         quotes={[]}
         signedIn

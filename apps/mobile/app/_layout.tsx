@@ -1,25 +1,36 @@
 import { Stack } from "expo-router";
 import Head from "expo-router/head";
+import { StatusBar } from "expo-status-bar";
+import type { ReactNode } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { loadD0Fixture } from "../src/lib/d0-fixture";
 import { ComingSoonProvider } from "../src/components/system/coming-soon";
 import { AccountSessionProvider } from "../src/session/account-session";
-import { D0WatchlistProvider } from "../src/stores/d0-watchlist";
+import { useAccountSession } from "../src/session/account-session";
+import { MarketColorProvider } from "../src/styles/market-colors";
+
+/*
+ * 涨跌配色要在会话之内取，所以单独一层。
+ *
+ * 直接写在 RootLayout 里读不到 useAccountSession——那时 Provider 还没挂上。
+ */
+function WithMarketColors({ children }: Readonly<{ children: ReactNode }>) {
+  const { marketColors } = useAccountSession();
+  return (
+    <MarketColorProvider mode={marketColors}>{children}</MarketColorProvider>
+  );
+}
 
 export default function RootLayout() {
-  const fixtureResult = loadD0Fixture();
-  const knownListingIds =
-    fixtureResult.status === "ready"
-      ? fixtureResult.data.instruments.map(
-          (instrument) => instrument.listing_id,
-        )
-      : [];
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        {/*
+          顶栏是品牌蓝的实心块，系统默认的深色状态栏文字压在上面看不清。
+          明确要浅色。
+        */}
+        <StatusBar style="light" />
         {/*
           账号会话包在最外面：底下每个页签都要知道「现在是谁」，
           而页签之间来回切时这份状态不能重置。
@@ -30,7 +41,7 @@ export default function RootLayout() {
         */}
         <ComingSoonProvider>
           <AccountSessionProvider>
-            <D0WatchlistProvider knownListingIds={knownListingIds}>
+            <WithMarketColors>
               <Head>
                 <title>火球</title>
               </Head>
@@ -43,7 +54,7 @@ export default function RootLayout() {
                 <Stack.Screen name="messages" />
                 <Stack.Screen name="settings" />
               </Stack>
-            </D0WatchlistProvider>
+            </WithMarketColors>
           </AccountSessionProvider>
         </ComingSoonProvider>
       </SafeAreaProvider>

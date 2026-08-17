@@ -1,5 +1,6 @@
 import { tokens } from "@huoqiu/native-ui";
 import {
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -8,7 +9,8 @@ import {
 } from "react-native";
 
 import type { MarketOverview, Sector } from "../../api/market-api";
-import { signColor, signedPercent } from "../../styles/market-sign";
+import { useSignColor } from "../../styles/market-colors";
+import { fixedOrMissing, signedPercent } from "../../styles/market-sign";
 
 /*
  * 行情。
@@ -20,14 +22,33 @@ import { signColor, signedPercent } from "../../styles/market-sign";
 export type MarketScreenProperties = Readonly<{
   failure: string | null;
   loading: boolean;
+  onOpenInstrument: (href: string) => void;
   onRefresh: () => void;
   overview: MarketOverview | null;
 }>;
 
-const SectorRows = ({ rows }: Readonly<{ rows: readonly Sector[] }>) => (
+const SectorRows = ({
+  onOpen,
+  rows,
+}: Readonly<{
+  onOpen: (code: string) => void;
+  rows: readonly Sector[];
+}>) => {
+  const signColor = useSignColor();
+
+  return (
   <View style={styles.card}>
     {rows.slice(0, 8).map((sector) => (
-      <View key={sector.code} style={styles.row}>
+      <Pressable
+        accessibilityRole="button"
+        /* 上游没给领涨股、或它站内渲染不出来时，这一行没有可去的地方。 */
+        disabled={sector.leaderHref === null}
+        key={sector.code}
+        onPress={() => {
+          if (sector.leaderHref !== null) onOpen(sector.leaderHref);
+        }}
+        style={styles.row}
+      >
         <View style={styles.rowMain}>
           <Text style={styles.rowName}>{sector.name}</Text>
           {/*
@@ -35,8 +56,9 @@ const SectorRows = ({ rows }: Readonly<{ rows: readonly Sector[] }>) => (
             一定是「谁带起来的」。
           */}
           <Text style={styles.rowNote}>
-            领涨 {sector.leaderName} · {sector.advancing} 涨 / {sector.declining}{" "}
-            跌
+            {sector.leaderName === null
+              ? `${String(sector.advancing)} 涨 / ${String(sector.declining)} 跌`
+              : `领涨 ${sector.leaderName} · ${String(sector.advancing)} 涨 / ${String(sector.declining)} 跌`}
           </Text>
         </View>
         <Text
@@ -44,17 +66,20 @@ const SectorRows = ({ rows }: Readonly<{ rows: readonly Sector[] }>) => (
         >
           {signedPercent(sector.changePercent)}
         </Text>
-      </View>
+      </Pressable>
     ))}
   </View>
-);
+  );
+};
 
 export function MarketScreen({
   failure,
   loading,
+  onOpenInstrument,
   onRefresh,
   overview,
 }: MarketScreenProperties) {
+  const signColor = useSignColor();
   return (
     <ScrollView
       contentContainerStyle={styles.content}
@@ -90,7 +115,14 @@ export function MarketScreen({
         <>
           <View style={styles.indexGrid}>
             {overview.indexes.slice(0, 6).map((index) => (
-              <View key={index.symbol} style={styles.indexCard}>
+              <Pressable
+                accessibilityRole="button"
+                key={index.symbol}
+                onPress={() => {
+                  onOpenInstrument(index.symbol);
+                }}
+                style={styles.indexCard}
+              >
                 <Text style={styles.indexName}>{index.name}</Text>
                 <Text
                   style={[
@@ -98,7 +130,7 @@ export function MarketScreen({
                     { color: signColor(index.changePercent) },
                   ]}
                 >
-                  {index.last.toFixed(2)}
+                  {fixedOrMissing(index.last, 2)}
                 </Text>
                 <Text
                   style={[
@@ -108,29 +140,34 @@ export function MarketScreen({
                 >
                   {signedPercent(index.changePercent)}
                 </Text>
-              </View>
+              </Pressable>
             ))}
           </View>
 
-          <View style={styles.breadth}>
-            <Text style={[styles.breadthCell, { color: tokens.market.upText }]}>
-              {overview.breadth.advancing} 涨
-            </Text>
-            <Text style={styles.breadthCell}>
-              {overview.breadth.unchanged} 平
-            </Text>
-            <Text
-              style={[styles.breadthCell, { color: tokens.market.downText }]}
-            >
-              {overview.breadth.declining} 跌
-            </Text>
-          </View>
+          {/* 上游没给涨跌家数时整块不画——那不是「零家上涨」。 */}
+          {overview.breadth === null ? null : (
+            <View style={styles.breadth}>
+              <Text
+                style={[styles.breadthCell, { color: tokens.market.upText }]}
+              >
+                {overview.breadth.advancing} 涨
+              </Text>
+              <Text style={styles.breadthCell}>
+                {overview.breadth.unchanged} 平
+              </Text>
+              <Text
+                style={[styles.breadthCell, { color: tokens.market.downText }]}
+              >
+                {overview.breadth.declining} 跌
+              </Text>
+            </View>
+          )}
 
           <Text style={styles.sectionHeading}>行业板块</Text>
-          <SectorRows rows={overview.industries} />
+          <SectorRows onOpen={onOpenInstrument} rows={overview.industries} />
 
           <Text style={styles.sectionHeading}>概念板块</Text>
-          <SectorRows rows={overview.concepts} />
+          <SectorRows onOpen={onOpenInstrument} rows={overview.concepts} />
 
           <Text style={styles.disclosure}>
             数据来自公开行情接口 · 不构成投资建议

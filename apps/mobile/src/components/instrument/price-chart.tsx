@@ -2,7 +2,8 @@ import { tokens } from "@huoqiu/native-ui";
 import { StyleSheet, Text, View } from "react-native";
 
 import type { ChartSeries } from "../../api/market-api";
-import { signColor, signedPercent } from "../../styles/market-sign";
+import { useSignColor } from "../../styles/market-colors";
+import { signedPercent } from "../../styles/market-sign";
 import { boundsOf, ratio } from "./chart-bounds";
 
 /*
@@ -35,6 +36,8 @@ export function PriceChart({
   previousClose,
   series,
 }: PriceChartProperties) {
+  const signColor = useSignColor();
+
   if (failure !== null) {
     return (
       <View style={styles.placeholder}>

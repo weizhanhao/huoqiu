@@ -9,8 +9,8 @@ import { request, type ApiResult } from "./request";
  */
 
 export type IndexQuote = Readonly<{
-  changePercent: number;
-  last: number;
+  changePercent: number | null;
+  last: number | null;
   name: string;
   symbol: string;
 }>;
@@ -23,15 +23,18 @@ export type Breadth = Readonly<{
 
 export type Sector = Readonly<{
   advancing: number;
-  changePercent: number;
+  changePercent: number | null;
   code: string;
   declining: number;
-  leaderName: string;
+  /** 领涨股的站内地址。上游没给、或站内渲染不出来时为 null。 */
+  leaderHref: string | null;
+  leaderName: string | null;
   name: string;
 }>;
 
 export type MarketOverview = Readonly<{
-  breadth: Breadth;
+  /** 上游没给涨跌家数时为 null——那不是「零家上涨」。 */
+  breadth: Breadth | null;
   concepts: readonly Sector[];
   /** 上游是延时行情。界面上要标出来，不能让人当成逐笔实时。 */
   delayed: boolean;

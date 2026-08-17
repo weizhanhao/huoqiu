@@ -10,11 +10,8 @@ import type {
 } from "../../api/market-api";
 import type { SocialPost } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
-import {
-  signColor,
-  signedAmount,
-  signedPercent,
-} from "../../styles/market-sign";
+import { useSignColor } from "../../styles/market-colors";
+import { signedAmount, signedPercent } from "../../styles/market-sign";
 import { PriceChart } from "./price-chart";
 
 /*
@@ -118,6 +115,7 @@ export function InstrumentScreen({
   tab,
   watchlisted,
 }: InstrumentScreenProperties) {
+  const signColor = useSignColor();
   const color = signColor(quote?.changePercent ?? 0);
 
   return (

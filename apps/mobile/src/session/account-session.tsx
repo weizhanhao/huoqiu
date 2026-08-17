@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import {
+  fetchPrivacy,
   fetchSession,
   login as loginRequest,
   publishPost,
@@ -17,6 +18,7 @@ import {
   setFollowing as setFollowingRequest,
   type AccountSummary,
   type ApiResult,
+  type MarketColorMode,
   type SessionSnapshot,
   type SocialPost,
 } from "../api/social-api";
@@ -78,6 +80,13 @@ type AccountSessionValue = Readonly<{
   following: readonly string[];
   likedPostIds: readonly string[];
   loading: boolean;
+  /*
+   * 涨跌配色。
+   *
+   * 放在会话里而不是设置页本地：它要影响每一个显示涨跌的页面，而设置页只是
+   * 改它的地方。此前它只存在设置页自己的状态里，选完打了勾，行情一点没变。
+   */
+  marketColors: MarketColorMode;
   login: (email: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
   posts: readonly SocialPost[];
@@ -101,6 +110,7 @@ export function AccountSessionProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
   const [token, setToken] = useState<string | null>(null);
+  const [marketColors, setMarketColors] = useState<MarketColorMode>("red-up");
   const [state, setState] = useState<SessionState>({
     failure: null,
     loading: true,
@@ -108,6 +118,14 @@ export function AccountSessionProvider({
   });
 
   const load = useCallback(async (current: string | null) => {
+    /*
+     * 顺带取一次配色。未登录时服务端回默认档而不是 401，所以这一条不用等
+     * 登录，也不必单独处理失败——取不到就沿用上一次的值。
+     */
+    void fetchPrivacy(current).then((privacy) => {
+      if (privacy.kind === "ok") setMarketColors(privacy.value.marketColors);
+    });
+
     const result = await fetchSession(current);
     if (result.kind === "ok") {
       setState({ failure: null, loading: false, snapshot: result.value });
@@ -240,6 +258,7 @@ export function AccountSessionProvider({
       following: state.snapshot.following,
       likedPostIds: state.snapshot.likedPostIds,
       loading: state.loading,
+      marketColors,
       login,
       logout,
       posts: state.snapshot.posts,
@@ -252,6 +271,7 @@ export function AccountSessionProvider({
       callAs,
       login,
       logout,
+      marketColors,
       publish,
       refresh,
       register,

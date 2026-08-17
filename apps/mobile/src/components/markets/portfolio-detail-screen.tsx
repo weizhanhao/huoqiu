@@ -3,7 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { PublicPortfolio, Quote } from "../../api/market-api";
 import { appTouchMinimum } from "../../styles/app-touch";
-import { signColor, signedPercent } from "../../styles/market-sign";
+import { useSignColor } from "../../styles/market-colors";
+import { signedPercent } from "../../styles/market-sign";
 
 /*
  * 组合详情。
@@ -38,6 +39,7 @@ export function PortfolioDetailScreen({
   portfolio,
   quotes,
 }: PortfolioDetailScreenProperties) {
+  const signColor = useSignColor();
   const holdings = portfolio?.holdings ?? [];
 
   return (

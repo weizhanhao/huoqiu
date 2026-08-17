@@ -23,11 +23,22 @@ import { tokens } from "@huoqiu/native-ui";
  */
 export const MISSING = "—";
 
-export const signColor = (changePercent: number | null): string => {
-  if (changePercent === null) return tokens.text.secondary;
-  if (changePercent > 0) return tokens.market.upText;
-  if (changePercent < 0) return tokens.market.downText;
-  return tokens.text.secondary;
+/*
+ * 红涨绿跌是 A 股默认，但用户可以在设置里换成绿涨红跌。
+ *
+ * 别直接调这个函数——调 useSignColor()，它会把当前账号选的那档带进来。
+ * 直接调等于永远按默认档上色，而那正是「设置里改了但界面不变」的来源。
+ */
+export const signColorFor = (
+  mode: "green-up" | "red-up",
+  changePercent: number | null,
+): string => {
+  if (changePercent === null || changePercent === 0) {
+    return tokens.text.secondary;
+  }
+  const rising = changePercent > 0;
+  const useUpColor = mode === "red-up" ? rising : !rising;
+  return useUpColor ? tokens.market.upText : tokens.market.downText;
 };
 
 /*
