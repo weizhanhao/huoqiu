@@ -13,12 +13,27 @@
 .bar {
   align-items: center;
   display: flex;
+  /*
+   * 窄屏要换行。
+   *
+   * 这一行本来是不换行的 flex：六个 44px 的图标按钮 +「长文」+ 存草稿 +
+   * 发布，最窄也要 500 多像素。在 390px 的手机上排不下又不换行，于是
+   * 「存草稿」和「发布」被顶到屏幕外——发不了帖，而且整页跟着横向滚动。
+   *
+   * 换行之后两个动作按钮落到第二行，够得着；宽屏上一行仍然排得下，
+   * 观感不变。
+   */
+  flex-wrap: wrap;
   gap: var(--hq-spacing-2);
 }
 
 .icons {
   display: flex;
+  /* 图标多于一行时也要能折下来，而不是把整条工具栏撑宽。 */
+  flex: 1 1 auto;
+  flex-wrap: wrap;
   gap: var(--hq-spacing-1);
+  min-width: 0;
 }
 
 /*

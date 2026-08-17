@@ -54,6 +54,18 @@ const EMPTY_SNAPSHOT: SessionSnapshot = {
 type AccountSessionValue = Readonly<{
   account: AccountSummary | null;
   accounts: readonly AccountSummary[];
+  /*
+   * 以当前身份发一次请求。
+   *
+   * 交出的是「能以我的身份问一次」的能力，不是令牌本身——令牌散给的组件
+   * 越多，被写进日志、拼进地址、随手转发的机会就越多。
+   *
+   * 没登录时不发请求，直接回 rejected：让每个调用点各自判断「有没有令牌」，
+   * 迟早有一处忘了判，然后带着 null 打过去，拿回一个 401 当成服务端故障。
+   */
+  callAs: <T>(
+    call: (token: string) => Promise<ApiResult<T>>,
+  ) => Promise<ApiResult<T>>;
   failure: string | null;
   following: readonly string[];
   loading: boolean;
@@ -197,10 +209,23 @@ export function AccountSessionProvider({
     await load(token);
   }, [load, token]);
 
+  const callAs = useCallback(
+    async <T,>(
+      call: (issued: string) => Promise<ApiResult<T>>,
+    ): Promise<ApiResult<T>> => {
+      if (token === null) {
+        return { kind: "rejected", message: "请先登录。" };
+      }
+      return call(token);
+    },
+    [token],
+  );
+
   const value = useMemo<AccountSessionValue>(
     () => ({
       account: state.snapshot.account,
       accounts: state.snapshot.accounts,
+      callAs,
       failure: state.failure,
       following: state.snapshot.following,
       loading: state.loading,
@@ -213,6 +238,7 @@ export function AccountSessionProvider({
       toggleFollow,
     }),
     [
+      callAs,
       login,
       logout,
       publish,

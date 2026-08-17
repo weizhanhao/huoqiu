@@ -55,9 +55,6 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-import MarketsScreen from "../../../app/(tabs)/markets";
-import PortfoliosScreen from "../../../app/(tabs)/portfolios";
-import WatchlistScreen from "../../../app/(tabs)/watchlist";
 import InstrumentScreen from "../../../app/instrument/[listingId]";
 import MessagesScreen from "../../../app/messages";
 import PortfolioDetailScreen from "../../../app/portfolio/[portfolioId]";
@@ -145,37 +142,16 @@ describe("D0 mobile route behavior", () => {
     expect(mocks.stateSetters[2]).toHaveBeenCalledWith("SYN001");
   });
 
-  it("keeps market region state and preserves search and instrument deep links", () => {
-    const market = readProperties(MarketsScreen() as ReactElement);
-
-    expect(market.selectedRegion).toBe("a");
-    market.onSelectRegion?.("us");
-    expect(mocks.stateSetters[0]).toHaveBeenCalledWith("us");
-
-    market.onSearch?.();
-    expect(mocks.router.push).toHaveBeenCalledWith("/search");
-    market.onOpenInstrument?.("listing_syn_0001");
-    expect(mocks.router.push).toHaveBeenCalledWith({
-      params: { listingId: "listing_syn_0001" },
-      pathname: "/instrument/[listingId]",
-    });
-  });
-
-  it("keeps portfolio period state and opens the real synthetic detail route", () => {
-    const portfolios = readProperties(PortfoliosScreen() as ReactElement);
-
-    expect(portfolios.selectedPeriod).toBe("day");
-    portfolios.onSelectPeriod?.("year");
-    expect(mocks.stateSetters[0]).toHaveBeenCalledWith("year");
-
-    portfolios.onSearch?.();
-    expect(mocks.router.push).toHaveBeenCalledWith("/search");
-    portfolios.onOpenPortfolio?.("portfolio_syn_0001");
-    expect(mocks.router.push).toHaveBeenCalledWith({
-      params: { portfolioId: "portfolio_syn_0001" },
-      pathname: "/portfolio/[portfolioId]",
-    });
-  });
+  /*
+   * 行情与组合两条用例已随它们守的东西一起去掉。
+   *
+   * 两页原先读的是 getMarketSnapshot(region) / getPortfolioHub(period)——写死的
+   * 合成快照，切「沪深/港股/美股」「日/周/年」只是在几组假数字之间来回换，
+   * 用例断的正是那个本地 useState。现在两页拉的是真实接口：行情是公开行情源，
+   * 组合是这个账号自己建的和关注的，没有可切换的本地档位可断。
+   *
+   * 新行为由 tests/component/markets/ 下的用例接手。
+   */
 
   it("resolves a portfolio deep link and returns fresh entry to portfolios", () => {
     mocks.localSearchParameters = { portfolioId: "portfolio_syn_0001" };
@@ -228,8 +204,11 @@ describe("D0 mobile route behavior", () => {
    * 真实的关注流，失败原因是网络或服务端，恢复方式是下拉刷新，不是重新解析
    * 一份本地 JSON。留在表里只会让它去证明一个不存在的分支。
    */
+  /*
+   * 自选也从这张表里去掉了：它不再读夹具，名单来自账号、行情按名单现取，
+   * 失败原因是网络或服务端，恢复方式是下拉刷新，不是重新解析本地 JSON。
+   */
   it.each([
-    ["watchlist", WatchlistScreen, false],
     ["search", SearchScreen, true],
     ["instrument detail", InstrumentScreen, true],
   ] as const)(

@@ -113,15 +113,69 @@ describe("dense synthetic community in a real Chrome DOM", () => {
         "/community/posts/post_syn_0001",
       ]) {
         browserErrors = [];
-        await page.goto(`${baseUrl}${pathname}`);
+        /*
+         * 等到网络静默再量。
+         *
+         * Vite 的 CSS 模块是 JS 执行后才注入 <style> 的，默认的 load 时机
+         * 可能落在注入之前——那时量到的是无样式内容的宽度，报出来是
+         * 「533 ≠ 390」，看着像视口没设上，其实是样式还没到。
+         *
+         * 同一个文件里 44px 那条门禁早就因为这个原因改成了 networkidle，
+         * 这里当时漏了：满负载跑全量用例时那个窗口被拉长，就会偶发。
+         * 偶尔通过的门禁等于没有门禁——它既会假报警，也会在真的溢出时
+         * 凑巧放行。
+         */
+        await page.goto(`${baseUrl}${pathname}`, { waitUntil: "networkidle" });
+        /*
+         * 等 globals.css 真的应用了再量。
+         *
+         * Vite 里样式是模块求值之后由 JS 插进 <style> 的，networkidle 也可能
+         * 落在插入之前——那时量到的是无样式布局：指数条按四列不换行铺开，
+         * 在 390px 上是 533，整页看着像溢出。满负载跑全量用例时这个窗口被
+         * 拉长，于是「单独跑过、一起跑挂」。
+         *
+         * 这里等的是一条与被断言内容无关的规则（外壳布局），不是等
+         * 「溢出消失」——后者会把真的溢出一并等没了，门禁就永远不会响。
+         */
+        await page.waitForFunction(() =>
+          [...document.styleSheets].some((sheet) => {
+            try {
+              return [...sheet.cssRules].some((rule) =>
+                rule.cssText.includes(".d0-app-shell"),
+              );
+            } catch {
+              /* 跨源样式表读不到规则，跳过即可。 */
+              return false;
+            }
+          }),
+        );
         const geometry = await page.evaluate(() => ({
           body: document.body.scrollWidth,
           document: document.documentElement.scrollWidth,
+          /*
+           * 报出是谁把页面撑宽的。只报数字的话，每次都得从头查一遍。
+           *
+           * 判据是「自己装不下，又不裁切」——横向滚动容器（频道条那种）
+           * 的子元素本来就会伸到视口之外，那是设计如此，按位置去筛会把
+           * 它们全部误报成溢出，真正的元凶反而被挤出列表。
+           */
+          offenders: [...document.querySelectorAll("body *")]
+            .filter((element) => {
+              if (element.scrollWidth <= element.clientWidth) return false;
+              return getComputedStyle(element).overflowX === "visible";
+            })
+            .slice(0, 5)
+            .map(
+              (element) =>
+                `${element.tagName.toLowerCase()}.${String(element.className || "-").slice(0, 40)}@${String(element.scrollWidth)}`,
+            ),
           viewport: window.innerWidth,
         }));
-        expect(geometry).toEqual({
+        expect({ ...geometry, pathname }).toEqual({
           body: width,
           document: width,
+          offenders: [],
+          pathname,
           viewport: width,
         });
 

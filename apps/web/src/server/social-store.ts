@@ -133,6 +133,22 @@ export type Bookmark = Readonly<{
   postId: string;
 }>;
 
+/*
+ * 自选。
+ *
+ * 此前自选只活在浏览器的 localStorage 里：换台设备就没了，手机上加的网页上
+ * 看不到，反过来也一样。而自选恰恰是最该跟着人走的东西——在手机上把一只票
+ * 加进自选，回到电脑前打开却没有，用户会认为这个功能是坏的。
+ *
+ * 存代码而不是存 listing id：代码（sh600519）是全站唯一那份标识，行情、
+ * 搜索、个股页都用它。
+ */
+export type WatchlistEntry = Readonly<{
+  accountId: string;
+  createdAt: string;
+  symbol: string;
+}>;
+
 export type Comment = Readonly<{
   authorId: string;
   body: string;
@@ -212,6 +228,7 @@ interface Store {
   posts: Post[];
   preferences: Preference[];
   views: PostView[];
+  watchlist: WatchlistEntry[];
 }
 
 const storeDirectory = (): string =>
@@ -239,6 +256,8 @@ const readStore = (): Store => {
       preferences: Array.isArray(parsed.preferences) ? parsed.preferences : [],
       // 浏览计数是后加的，早于它写入的快照没有这个键。
       views: Array.isArray(parsed.views) ? parsed.views : [],
+      // 自选同理：在它之前写下的快照里没有这一项。
+      watchlist: Array.isArray(parsed.watchlist) ? parsed.watchlist : [],
     };
   } catch {
     // 文件不存在或损坏都退回空库：宁可从零开始，也不把半截数据当真。
@@ -253,6 +272,7 @@ const readStore = (): Store => {
       posts: [],
       preferences: [],
       views: [],
+      watchlist: [],
     };
   }
 };
@@ -1477,6 +1497,68 @@ export const listBookmarkedPostIds = (accountId: string): readonly string[] =>
   readStore()
     .bookmarks.filter((bookmark) => bookmark.accountId === accountId)
     .map((bookmark) => bookmark.postId);
+
+/*
+ * 自选上限。
+ *
+ * 不设上限的话，一次请求就能往库里塞进任意多条——文件存储会被撑爆，而且
+ * 每次取自选都要为它们批量拉行情。这个数字比任何人手动维护的自选都宽裕。
+ */
+const MAX_WATCHLIST = 300;
+
+export const setWatchlisted = (input: {
+  accountId: string;
+  now: string;
+  symbol: string;
+  watchlisted: boolean;
+}): { symbols: readonly string[] } | { error: string } => {
+  const store = readStore();
+  if (!store.accounts.some((account) => account.id === input.accountId)) {
+    return { error: "账号不存在，请先登录。" };
+  }
+
+  const others = store.watchlist.filter(
+    (entry) =>
+      entry.accountId !== input.accountId || entry.symbol !== input.symbol,
+  );
+
+  if (input.watchlisted) {
+    const mine = others.filter((entry) => entry.accountId === input.accountId);
+    if (mine.length >= MAX_WATCHLIST) {
+      return { error: `自选最多 ${String(MAX_WATCHLIST)} 只。` };
+    }
+    store.watchlist = [
+      ...others,
+      {
+        accountId: input.accountId,
+        createdAt: input.now,
+        symbol: input.symbol,
+      },
+    ];
+  } else {
+    store.watchlist = others;
+  }
+
+  writeStore(store);
+
+  return {
+    symbols: store.watchlist
+      .filter((entry) => entry.accountId === input.accountId)
+      .map((entry) => entry.symbol),
+  };
+};
+
+/*
+ * 当前账号的自选代码，按加入时间正序。
+ *
+ * 顺序要稳定：按加入先后排，用户看到的次序才和他添加的次序一致。依赖
+ * 文件里的物理顺序是不行的——删掉中间一条再加回来，它会跑到末尾。
+ */
+export const listWatchlistSymbols = (accountId: string): readonly string[] =>
+  readStore()
+    .watchlist.filter((entry) => entry.accountId === accountId)
+    .toSorted((left, right) => left.createdAt.localeCompare(right.createdAt))
+    .map((entry) => entry.symbol);
 
 /** 我收藏的帖子，最新在前；已被删除的原帖不会出现在结果里。 */
 export const listBookmarkedPosts = (

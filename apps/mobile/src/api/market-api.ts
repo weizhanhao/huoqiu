@@ -1,0 +1,134 @@
+import { request, type ApiResult } from "./request";
+
+/*
+ * 行情接口。
+ *
+ * 和网页版同一批路由（apps/web/src/app/api/market/*），数据来自公开行情源。
+ * 这些数字会被人拿去做判断，所以宁可如实说取不到，也不要拿上一次的值
+ * 冒充当前值。
+ */
+
+export type IndexQuote = Readonly<{
+  changePercent: number;
+  last: number;
+  name: string;
+  symbol: string;
+}>;
+
+export type Breadth = Readonly<{
+  advancing: number;
+  declining: number;
+  unchanged: number;
+}>;
+
+export type Sector = Readonly<{
+  advancing: number;
+  changePercent: number;
+  code: string;
+  declining: number;
+  leaderName: string;
+  name: string;
+}>;
+
+export type MarketOverview = Readonly<{
+  breadth: Breadth;
+  concepts: readonly Sector[];
+  /** 上游是延时行情。界面上要标出来，不能让人当成逐笔实时。 */
+  delayed: boolean;
+  indexes: readonly IndexQuote[];
+  industries: readonly Sector[];
+}>;
+
+export type Quote = Readonly<{
+  changeAmount: number;
+  changePercent: number;
+  last: number;
+  name: string;
+  symbol: string;
+  /** Unix 秒。上游给的就是这个粒度。 */
+  tradedAtSeconds: number;
+}>;
+
+export type Portfolio = Readonly<{
+  holdings?: readonly Readonly<{ symbol: string; weight: number }>[];
+  id: string;
+  name: string;
+}>;
+
+export type PortfolioSets = Readonly<{
+  created: readonly Portfolio[];
+  followed: readonly Portfolio[];
+}>;
+
+export const fetchMarketOverview = async (): Promise<
+  ApiResult<MarketOverview>
+> =>
+  request<MarketOverview>("/api/market/overview", {
+    method: "GET",
+    token: null,
+  });
+
+export const fetchQuotes = async (
+  symbols: readonly string[],
+): Promise<ApiResult<readonly Quote[]>> => {
+  /*
+   * 空列表不发请求。
+   *
+   * 拼一个空的 ?symbols= 打过去，服务端会正确地回空数组——但那是一次白跑的
+   * 往返，而「自选是空的」恰恰是新用户最常处于的状态，等于每次进这一页都
+   * 先卡一下网络，才告诉他一句「还没有自选」。
+   */
+  if (symbols.length === 0) return { kind: "ok", value: [] };
+
+  const query = encodeURIComponent(symbols.join(","));
+  const result = await request<Readonly<{ quotes?: readonly Quote[] }>>(
+    `/api/market/quotes?symbols=${query}`,
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.quotes ?? [] };
+};
+
+export const fetchPortfolios = async (
+  token: string,
+): Promise<ApiResult<PortfolioSets>> =>
+  request<PortfolioSets>("/api/social/portfolios", { method: "GET", token });
+
+type WatchlistResponse = Readonly<{ symbols?: readonly string[] }>;
+
+const readSymbols = (
+  result: ApiResult<WatchlistResponse>,
+): ApiResult<readonly string[]> =>
+  result.kind === "ok"
+    ? { kind: "ok", value: result.value.symbols ?? [] }
+    : result;
+
+/*
+ * 自选存在服务端，不是手机本地。
+ *
+ * 存本地的话，手机上加的自选网页上看不到，反过来也一样——而自选恰恰是最该
+ * 跟着人走的东西。这两个接口和网页版调的是同一个。
+ */
+export const fetchWatchlist = async (
+  token: string,
+): Promise<ApiResult<readonly string[]>> =>
+  readSymbols(
+    await request<WatchlistResponse>("/api/social/watchlist", {
+      method: "GET",
+      token,
+    }),
+  );
+
+/* watchlisted 是「操作之后应处于的状态」，不是「当前状态」。 */
+export const setWatchlisted = async (
+  token: string,
+  symbol: string,
+  watchlisted: boolean,
+): Promise<ApiResult<readonly string[]>> =>
+  readSymbols(
+    await request<WatchlistResponse>("/api/social/watchlist", {
+      body: { symbol, watchlisted },
+      method: "POST",
+      token,
+    }),
+  );

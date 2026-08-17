@@ -1,28 +1,22 @@
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { fetchMarketOverview } from "../../src/api/market-api";
+import { MarketScreen } from "../../src/components/markets/market-screen";
+import { useRemote } from "../../src/hooks/use-remote";
 
-import { MarketOverview } from "../../src/components/five-tab/market-overview";
-import {
-  getMarketSnapshot,
-  type MarketRegionId,
-} from "../../src/features/five-tab/synthetic-fixture";
-
+/*
+ * 行情。
+ *
+ * 这里原先渲染的是 getMarketSnapshot(region)——一份写死的合成快照，切「沪深/
+ * 港股/美股」只是在几组假数字之间来回换。现在拉的是公开行情源的真实数据。
+ */
 export default function MarketsScreen() {
-  const router = useRouter();
-  const [selectedRegion, setSelectedRegion] = useState<MarketRegionId>("a");
+  const { failure, loading, refresh, value } = useRemote(fetchMarketOverview);
 
   return (
-    <MarketOverview
-      onOpenInstrument={(listingId) =>
-        router.push({
-          pathname: "/instrument/[listingId]",
-          params: { listingId },
-        })
-      }
-      onSearch={() => router.push("/search")}
-      onSelectRegion={setSelectedRegion}
-      selectedRegion={selectedRegion}
-      snapshot={getMarketSnapshot(selectedRegion)}
+    <MarketScreen
+      failure={failure}
+      loading={loading}
+      onRefresh={refresh}
+      overview={value}
     />
   );
 }

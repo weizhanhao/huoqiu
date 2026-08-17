@@ -724,6 +724,17 @@ select:disabled {
   align-content: start;
   display: grid;
   gap: var(--hq-spacing-3);
+  /*
+   * 这一行是必须的，不是冗余。
+   *
+   * 没有列定义时，网格只有一条按 max-content 定尺的隐式列——它会跟着最宽的
+   * 那个子元素一起长，而子元素随后填满这条列，于是比主栏本身还宽，把整页
+   * 顶出视口。下面的 min-width: 0 只让容器能缩，管不住那条列。
+   *
+   * 在 390px 上表现为：顶部指数条量到 521，而主栏只有 366，整页可以左右晃。
+   * 触发它的碰巧是指数条，但任何宽子元素（表格、长代码块、图表）都会。
+   */
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
 }
 
@@ -1147,6 +1158,17 @@ a.fund-row:hover strong:first-child {
   gap: var(--hq-spacing-2);
   grid-template-columns: repeat(4, minmax(0, 1fr));
   min-width: 0;
+  /*
+   * 撑不下就自己横向滚，别把整页撑宽。
+   *
+   * 下面那条窄屏规则会把它收成两列，但那是「样式生效之后」的事——样式到达
+   * 之前是四列不换行，在 390px 上量到 533，整页跟着横向滚动。手机上页面
+   * 一旦能左右晃，每次纵向滑动都会带着内容歪，很难用。
+   *
+   * 滚动收在自己身上是这类宽内容的通则（表格、代码块、图表同理），也让这
+   * 一块不再依赖某条媒体查询是否已经应用。
+   */
+  overflow-x: auto;
 }
 
 .index-card {

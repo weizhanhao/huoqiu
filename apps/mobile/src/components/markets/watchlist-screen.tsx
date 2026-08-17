@@ -1,0 +1,197 @@
+import { tokens } from "@huoqiu/native-ui";
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+
+import type { Quote } from "../../api/market-api";
+import {
+  signColor,
+  signedAmount,
+  signedPercent,
+} from "../../styles/market-sign";
+
+/*
+ * 自选。
+ *
+ * 名单存在服务端（/api/social/watchlist），所以和网页版是同一份——手机上加的
+ * 自选，电脑上打开就在。行情按名单现取。
+ */
+
+export type WatchlistScreenProperties = Readonly<{
+  failure: string | null;
+  loading: boolean;
+  onRefresh: () => void;
+  quotes: readonly Quote[];
+  signedIn: boolean;
+  /** 名单本身。行情可能还没回来，但「有几只」应该立刻能说。 */
+  symbols: readonly string[];
+}>;
+
+export function WatchlistScreen({
+  failure,
+  loading,
+  onRefresh,
+  quotes,
+  signedIn,
+  symbols,
+}: WatchlistScreenProperties) {
+  const bySymbol = new Map(quotes.map((quote) => [quote.symbol, quote]));
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl onRefresh={onRefresh} refreshing={loading} />
+      }
+      style={styles.screen}
+      testID="watchlist-screen"
+    >
+      <Text style={styles.heading}>自选</Text>
+
+      {failure === null ? null : (
+        <View style={styles.notice}>
+          <Text style={styles.noticeText}>{failure}</Text>
+        </View>
+      )}
+
+      {signedIn ? null : (
+        <View style={styles.notice}>
+          <Text style={styles.noticeText}>
+            登录后这里会显示你的自选。自选存在账号上，和网页版是同一份。
+          </Text>
+        </View>
+      )}
+
+      {signedIn && symbols.length === 0 && failure === null ? (
+        <View style={styles.notice}>
+          <Text style={styles.noticeText}>
+            还没有自选。在网页版或个股页点「加自选」，这里就会出现。
+          </Text>
+        </View>
+      ) : null}
+
+      {symbols.map((symbol) => {
+        const quote = bySymbol.get(symbol);
+        return (
+          <View key={symbol} style={styles.row}>
+            <View style={styles.rowMain}>
+              {/*
+                取不到价时显示代码而不是留空：至少让人知道这一行是哪只票，
+                而不是对着一片空白猜。
+              */}
+              <Text style={styles.name}>{quote?.name ?? symbol}</Text>
+              <Text style={styles.symbol}>{symbol}</Text>
+            </View>
+            {quote === undefined ? (
+              <Text style={styles.pending}>取不到价</Text>
+            ) : (
+              <View style={styles.rowValues}>
+                <Text
+                  style={[
+                    styles.last,
+                    { color: signColor(quote.changePercent) },
+                  ]}
+                >
+                  {quote.last.toFixed(2)}
+                </Text>
+                <Text
+                  style={[
+                    styles.change,
+                    { color: signColor(quote.changePercent) },
+                  ]}
+                >
+                  {signedAmount(quote.changeAmount)}{" "}
+                  {signedPercent(quote.changePercent)}
+                </Text>
+              </View>
+            )}
+          </View>
+        );
+      })}
+
+      {symbols.length === 0 ? null : (
+        <Text style={styles.disclosure}>行情来自公开接口 · 不构成投资建议</Text>
+      )}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  change: {
+    fontSize: 13,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "600",
+  },
+  content: {
+    gap: 10,
+    padding: 16,
+    paddingBottom: 36,
+  },
+  disclosure: {
+    color: tokens.text.tertiary,
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: "center",
+  },
+  heading: {
+    color: tokens.text.primary,
+    fontSize: 22,
+    fontWeight: "700",
+  },
+  last: {
+    fontSize: 18,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "700",
+  },
+  name: {
+    color: tokens.text.primary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  notice: {
+    backgroundColor: tokens.surface.subtle,
+    borderRadius: 12,
+    padding: 16,
+  },
+  noticeText: {
+    color: tokens.text.secondary,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  pending: {
+    color: tokens.text.tertiary,
+    fontSize: 13,
+  },
+  row: {
+    alignItems: "center",
+    backgroundColor: tokens.surface.base,
+    borderColor: tokens.border.default,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 64,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  rowMain: {
+    flex: 1,
+    gap: 2,
+  },
+  rowValues: {
+    alignItems: "flex-end",
+    gap: 2,
+  },
+  screen: {
+    backgroundColor: tokens.surface.canvas,
+    flex: 1,
+  },
+  symbol: {
+    color: tokens.text.tertiary,
+    fontSize: 12.5,
+  },
+});

@@ -22,27 +22,23 @@ const expoModules = readJson<Readonly<Record<string, string>>>(
 );
 const lockfile = readFileSync(join(mobileRoot, "../../pnpm-lock.yaml"), "utf8");
 
+/*
+ * 这三个包的版本必须和 Expo 自己那份 bundledNativeModules.json 完全一致。
+ *
+ * 原生模块的版本一旦和 Expo Go 内置的对不上，App 会在启动时崩，报的是
+ * 原生层的符号找不到——看不出和 package.json 有任何关系。所以这里不写
+ * 「大概兼容」的范围，写死到具体版本，并且和 Expo 的清单对账。
+ *
+ * 版本档位跟着 SDK 走：SDK 54 是 2.28.0 / 4.1.1 / 0.5.1。升 SDK 时这三个
+ * 数字要一起改，改错了这条用例会拦住。
+ */
 const expectedNativeDependencies = {
-  "react-native-reanimated": "4.5.1",
-  "react-native-worklets": "0.10.1",
+  "react-native-gesture-handler": "2.28.0",
+  "react-native-reanimated": "4.1.1",
+  "react-native-worklets": "0.5.1",
 } as const;
 
 describe("Expo native dependency graph", () => {
-  it("pins react-native-gesture-handler exactly within the Expo SDK 57 range", () => {
-    expect(expoModules["react-native-gesture-handler"]).toBe("~2.32.0");
-    expect(manifest.dependencies?.["react-native-gesture-handler"]).toBe(
-      "2.32.0",
-    );
-
-    const installedManifest = readJson<PackageManifest>(
-      require.resolve("react-native-gesture-handler/package.json"),
-    );
-    expect(installedManifest.version).toBe("2.32.0");
-    expect(lockfile).toMatch(
-      /react-native-gesture-handler:\n\s+specifier: 2\.32\.0\n\s+version: 2\.32\.0(?:\(|\n)/u,
-    );
-  });
-
   it("locks every declared mobile workspace dependency for frozen installs", () => {
     const mobileImporter = lockfile
       .split("  apps/mobile:\n", 2)[1]
@@ -71,9 +67,10 @@ describe("Expo native dependency graph", () => {
   });
 
   it.each(Object.entries(expectedNativeDependencies))(
-    "declares Expo SDK 57 mapping for %s",
+    "matches the Expo SDK bundled native module pin for %s",
     (dependency, expectedVersion) => {
-      expect(expoModules[dependency]).toBe(expectedVersion);
+      /* Expo 的清单写的是 ~x.y.z，package.json 要钉到确切版本。 */
+      expect(expoModules[dependency]?.replace("~", "")).toBe(expectedVersion);
       expect(manifest.dependencies?.[dependency]).toBe(expectedVersion);
 
       const installedManifest = readJson<PackageManifest>(
