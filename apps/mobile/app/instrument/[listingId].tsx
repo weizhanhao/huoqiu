@@ -29,7 +29,7 @@ import { useAccountSession } from "../../src/session/account-session";
  */
 export default function InstrumentScreen() {
   const router = useRouter();
-  const { show } = useComingSoon();
+  const { fail, show } = useComingSoon();
   const { callAs } = useAccountSession();
   const parameters = useLocalSearchParams<{ listingId?: string | string[] }>();
   const onBack = createD0BackHandler(router);
@@ -78,8 +78,8 @@ export default function InstrumentScreen() {
       watchlist.refresh();
       return;
     }
-    show(watchlisted ? "移出自选没成功" : "加自选没成功", result.message);
-  }, [callAs, show, symbol, watchlist, watchlisted]);
+    fail(watchlisted ? "移出自选没成功" : "加自选没成功", result.message);
+  }, [callAs, fail, symbol, watchlist, watchlisted]);
 
   return (
     <InstrumentView

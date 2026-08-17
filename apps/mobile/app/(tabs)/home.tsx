@@ -78,7 +78,7 @@ const DEFAULT_CHANNELS: readonly ChannelId[] = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { show } = useComingSoon();
+  const { fail, inform, show } = useComingSoon();
   const {
     account,
     accounts,
@@ -192,12 +192,12 @@ export default function HomeScreen() {
       );
       if (result.kind === "ok") {
         watchlist.refresh();
-        show("已加自选", `${code} 已加进自选，在「自选」页签里能看到。`);
+        inform("已加自选", `${code} 已加进自选，在「自选」页签里能看到。`);
         return;
       }
-      show("加自选没成功", result.message);
+      fail("加自选没成功", result.message);
     },
-    [callAs, show, watchlist],
+    [callAs, fail, inform, watchlist],
   );
 
   const postFeed = (
@@ -222,7 +222,7 @@ export default function HomeScreen() {
       onShowNotice={show}
       onToggleFollow={(authorId) => {
         void toggleFollow(authorId).then((message) => {
-          if (message !== null) show("关注没成功", message);
+          if (message !== null) fail("关注没成功", message);
         });
       }}
       posts={shown}

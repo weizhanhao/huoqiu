@@ -29,7 +29,7 @@ import { useAccountSession } from "../../src/session/account-session";
  */
 export default function PostDetailRoute() {
   const router = useRouter();
-  const { show } = useComingSoon();
+  const { fail, inform } = useComingSoon();
   const {
     account,
     accounts,
@@ -75,8 +75,8 @@ export default function PostDetailRoute() {
       comments.refresh();
       return;
     }
-    show("没发出去", result.message);
-  }, [callAs, comments, draft, id, replyTo, sending, show]);
+    fail("没发出去", result.message);
+  }, [callAs, comments, draft, id, replyTo, sending, fail]);
 
   const toggleLike = useCallback(async () => {
     const result = await callAs((token) => setLiked(token, id, !liked));
@@ -86,8 +86,8 @@ export default function PostDetailRoute() {
       posts.refresh();
       return;
     }
-    show(liked ? "取消赞没成功" : "点赞没成功", result.message);
-  }, [callAs, id, liked, posts, refresh, show]);
+    fail(liked ? "取消赞没成功" : "点赞没成功", result.message);
+  }, [callAs, id, liked, posts, refresh, fail]);
 
   const toggleBookmark = useCallback(async () => {
     const result = await callAs((token) =>
@@ -97,22 +97,21 @@ export default function PostDetailRoute() {
       await refresh();
       return;
     }
-    show(bookmarked ? "取消收藏没成功" : "收藏没成功", result.message);
-  }, [bookmarked, callAs, id, refresh, show]);
+    fail(bookmarked ? "取消收藏没成功" : "收藏没成功", result.message);
+  }, [bookmarked, callAs, id, refresh, fail]);
 
   const addToWatchlist = useCallback(
     async (symbol: string, label: string) => {
       const result = await callAs((token) =>
         setWatchlisted(token, symbol, true),
       );
-      show(
-        result.kind === "ok" ? "已加自选" : "加自选没成功",
-        result.kind === "ok"
-          ? `${label} 已加进自选，在「自选」页签里能看到。`
-          : result.message,
-      );
+      if (result.kind === "ok") {
+        inform("已加自选", `${label} 已加进自选，在「自选」页签里能看到。`);
+        return;
+      }
+      fail("加自选没成功", result.message);
     },
-    [callAs, show],
+    [callAs, fail, inform],
   );
 
   return (
@@ -150,7 +149,7 @@ export default function PostDetailRoute() {
       onToggleFollow={() => {
         if (post === null) return;
         void toggleFollow(post.authorId).then((message) => {
-          if (message !== null) show("关注没成功", message);
+          if (message !== null) fail("关注没成功", message);
         });
       }}
       onToggleLike={() => {

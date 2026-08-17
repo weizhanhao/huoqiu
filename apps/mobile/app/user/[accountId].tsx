@@ -16,7 +16,7 @@ import { useAccountSession } from "../../src/session/account-session";
  */
 export default function UserProfileRoute() {
   const router = useRouter();
-  const { show } = useComingSoon();
+  const { fail } = useComingSoon();
   const { account, following, toggleFollow } = useAccountSession();
   const parameters = useLocalSearchParams<{ accountId?: string | string[] }>();
 
@@ -49,7 +49,7 @@ export default function UserProfileRoute() {
          * 用户会以为 App 卡了，然后反复点。
          */
         void toggleFollow(accountId).then((message) => {
-          if (message !== null) show("关注没成功", message);
+          if (message !== null) fail("关注没成功", message);
         });
       }}
       profile={profile.value}

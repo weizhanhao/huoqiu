@@ -35,7 +35,7 @@ const NO_QUOTES: ReadonlyMap<string, Quote> = new Map();
 
 export default function PortfolioDetailRoute() {
   const router = useRouter();
-  const { show } = useComingSoon();
+  const { fail } = useComingSoon();
   const { account, callAs } = useAccountSession();
   const parameters = useLocalSearchParams<{
     portfolioId?: string | string[];
@@ -112,7 +112,7 @@ export default function PortfolioDetailRoute() {
             detail.refresh();
             return;
           }
-          show(followed ? "取关没成功" : "关注没成功", result.message);
+          fail(followed ? "取关没成功" : "关注没成功", result.message);
         })();
       }}
       portfolio={portfolio}
