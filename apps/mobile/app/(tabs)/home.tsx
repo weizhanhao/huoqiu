@@ -13,7 +13,9 @@ import {
 import { fetchPublicPosts, fetchTopics } from "../../src/api/social-api";
 import {
   HotChannel,
+  NewsChannel,
   PostChannel,
+  StarChannel,
   VideoChannel,
   WatchlistChannel,
 } from "../../src/components/channels/channel-views";
@@ -232,10 +234,27 @@ export default function HomeScreen() {
           />
         ) : null}
 
+        {channel === "news" ? (
+          <NewsChannel
+            failure={news.failure}
+            news={news.value}
+            onOpen={(item) => {
+              void Linking.openURL(item.href);
+            }}
+          />
+        ) : null}
+
+        {channel === "star" ? (
+          <StarChannel
+            accounts={accounts}
+            onOpenUser={(accountId) => {
+              show("用户主页", `还没做这一页。账号 id：${accountId}`);
+            }}
+          />
+        ) : null}
+
         {channel === "recommend" ? postFeed("还没有人发过内容。") : null}
         {channel === "fund" ? postFeed("还没有基金相关的讨论。") : null}
-        {channel === "news" ? postFeed("还没有资讯相关的讨论。") : null}
-        {channel === "star" ? postFeed("还没有达人发过内容。") : null}
         {channel === "private" ? postFeed("还没有私募相关的讨论。") : null}
         {channel === "etf" ? postFeed("还没有 ETF 相关的讨论。") : null}
       </ScrollView>

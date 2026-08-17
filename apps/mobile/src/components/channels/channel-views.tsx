@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { MentionAccount } from "@huoqiu/domain/social/post-body";
 
 import type { HotRow, NewsItem, VideoItem } from "../../api/market-api";
-import type { SocialPost } from "../../api/social-api";
+import type { AccountSummary, SocialPost } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
 import { signColor, signedPercent } from "../../styles/market-sign";
 import { PostCard } from "../feed/post-card";
@@ -311,6 +311,119 @@ export function WatchlistChannel({
   );
 }
 
+/* ---------------------------------------------------------------- 资讯频道 */
+
+export function NewsChannel({
+  failure,
+  news,
+  onOpen,
+}: Readonly<{
+  failure: string | null;
+  news: readonly NewsItem[] | null;
+  onOpen: (item: NewsItem) => void;
+}>) {
+  if (failure !== null) return <Notice text={failure} />;
+  if (news === null || news.length === 0) {
+    return <Notice text="还没有取到资讯。" />;
+  }
+
+  /*
+   * 资讯频道放的是真实财经快讯，不是用户帖子。
+   *
+   * 参考图里这个频道混着 7X24 快讯与资讯稿；我们有真实的快讯源，就用它，
+   * 而不是把用户帖子按关键词猜成「资讯」——猜出来的分类看着像，其实是错的。
+   */
+  return (
+    <View style={styles.stream}>
+      {news.slice(0, 30).map((item) => (
+        <Pressable
+          accessibilityRole="button"
+          key={item.id}
+          onPress={() => {
+            onOpen(item);
+          }}
+          style={styles.newsCard}
+        >
+          <View style={styles.newsHead}>
+            <Text style={styles.newsBadge}>7X24 快讯</Text>
+            <Text style={styles.newsTime}>{item.publishedAt}</Text>
+          </View>
+          <Text style={styles.newsCardTitle}>{item.title}</Text>
+          <Text numberOfLines={4} style={styles.newsDigest}>
+            {item.digest}
+          </Text>
+          <Text style={styles.newsSource}>点击查看原文</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+/* ---------------------------------------------------------------- 达人频道 */
+
+export function StarChannel({
+  accounts,
+  onOpenUser,
+}: Readonly<{
+  accounts: readonly AccountSummary[];
+  onOpenUser: (accountId: string) => void;
+}>) {
+  /*
+   * 我们没有认证体系，所以「达人」按真实数据排：先看粉丝数，再看发帖数。
+   *
+   * 参考图里那是雪球的认证创作者。凭空造一个认证标记，等于给用户一个我们
+   * 根本没有做过的审核背书。
+   */
+  const ranked = [...accounts]
+    .filter((account) => account.postCount > 0)
+    .sort(
+      (left, right) =>
+        right.followerCount - left.followerCount ||
+        right.postCount - left.postCount,
+    )
+    .slice(0, 20);
+
+  if (ranked.length === 0) {
+    return <Notice text="还没有人发过内容，榜单是空的。" />;
+  }
+
+  return (
+    <View style={styles.stream}>
+      <View style={styles.block}>
+        <SectionTitle subtitle="按粉丝数、发帖数排" title="活跃作者" />
+        <Text style={styles.blockLede}>
+          本站没有认证体系，这里按真实数据排序，不代表任何背书。
+        </Text>
+      </View>
+      {ranked.map((account, index) => (
+        <Pressable
+          accessibilityRole="button"
+          key={account.id}
+          onPress={() => {
+            onOpenUser(account.id);
+          }}
+          style={styles.starRow}
+        >
+          <Text style={styles.starRank}>{index + 1}</Text>
+          <View style={styles.starAvatar}>
+            <Text style={styles.starAvatarText}>
+              {account.displayName.slice(0, 1)}
+            </Text>
+          </View>
+          <View style={styles.starMain}>
+            <Text numberOfLines={1} style={styles.starName}>
+              {account.displayName}
+            </Text>
+            <Text style={styles.starMeta}>
+              粉丝 {account.followerCount} · 帖子 {account.postCount}
+            </Text>
+          </View>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   block: {
     backgroundColor: tokens.surface.base,
@@ -346,6 +459,84 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontVariant: ["tabular-nums"],
     fontWeight: "700",
+  },
+  newsBadge: {
+    backgroundColor: tokens.market.warningSubtle,
+    borderRadius: 4,
+    color: tokens.market.warningText,
+    fontSize: 11,
+    fontWeight: "700",
+    overflow: "hidden",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  newsCard: {
+    backgroundColor: tokens.surface.base,
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  newsCardTitle: {
+    color: tokens.text.primary,
+    fontSize: 16.5,
+    fontWeight: "700",
+    lineHeight: 25,
+  },
+  newsDigest: {
+    color: tokens.text.secondary,
+    fontSize: 14.5,
+    lineHeight: 23,
+  },
+  newsHead: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  newsSource: {
+    color: tokens.text.link,
+    fontSize: 13,
+  },
+  starAvatar: {
+    alignItems: "center",
+    backgroundColor: tokens.brand.subtle,
+    borderRadius: 20,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  starAvatarText: {
+    color: tokens.brand.primary,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  starMain: {
+    flex: 1,
+    gap: 2,
+  },
+  starMeta: {
+    color: tokens.text.tertiary,
+    fontSize: 12.5,
+  },
+  starName: {
+    color: tokens.text.primary,
+    fontSize: 15.5,
+    fontWeight: "600",
+  },
+  starRank: {
+    color: tokens.text.tertiary,
+    fontSize: 14,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "700",
+    width: 20,
+  },
+  starRow: {
+    alignItems: "center",
+    backgroundColor: tokens.surface.base,
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 64,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   newsRow: {
     alignItems: "center",
