@@ -7,6 +7,7 @@
 .root {
   display: grid;
   gap: var(--hq-spacing-2);
+  min-width: 0;
   position: relative;
 }
 
@@ -25,6 +26,17 @@
    */
   flex-wrap: wrap;
   gap: var(--hq-spacing-2);
+}
+
+@media (max-width: 520px) {
+  .bar {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .bar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .icons {
@@ -117,7 +129,7 @@
 }
 
 .uploadError {
-  color: var(--hq-market-down-text);
+  color: var(--hq-feedback-danger);
   font-size: var(--hq-type-size-caption);
   margin: 0;
 }

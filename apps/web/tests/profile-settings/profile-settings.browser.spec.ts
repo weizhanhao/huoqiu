@@ -348,13 +348,20 @@ describe("profile and settings in a real Chrome DOM", () => {
     expect(Math.min(...profileHeights)).toBeGreaterThanOrEqual(44);
 
     await openSettingsFromProfile();
-    const settingsHeights = await page
+    const settingsControls = await page
       .getByTestId("settings-page")
       .locator("button, a")
       .evaluateAll((elements) =>
-        elements.map((element) => element.getBoundingClientRect().height),
+        elements.map((element) => ({
+          height: element.getBoundingClientRect().height,
+          label: element.textContent?.trim(),
+          tag: element.tagName,
+        })),
       );
-    expect(settingsHeights.length).toBeGreaterThan(0);
-    expect(Math.min(...settingsHeights)).toBeGreaterThanOrEqual(44);
+    expect(settingsControls.length).toBeGreaterThan(0);
+    expect(
+      Math.min(...settingsControls.map(({ height }) => height)),
+      JSON.stringify(settingsControls.filter(({ height }) => height < 44)),
+    ).toBeGreaterThanOrEqual(44);
   });
 });

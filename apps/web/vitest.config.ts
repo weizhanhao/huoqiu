@@ -23,6 +23,15 @@ export default mergeConfig(
       },
     },
     test: {
+      /*
+       * 启动 Vite 与 Chrome 要时间，满负载时 20 秒只够启动到一半，本来通过的
+       * 页面回归会随机死在 beforeAll。上面的串行已经拿掉了争抢，这一条是余量。
+       *
+       * 它原先写在 defineConfig 的根层。vitest 只认 test.hookTimeout，根层那个
+       * 键 Vite 不认识也不报错——于是那次「已经调大了」其实一秒都没生效，
+       * 而它看起来是修过的。
+       */
+      hookTimeout: 40_000,
       projects: [
         {
           extends: true,

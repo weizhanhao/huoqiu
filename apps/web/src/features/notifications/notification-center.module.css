@@ -132,7 +132,7 @@
 .filters button,
 .cardActions button,
 .empty button {
-  border-radius: 999px;
+  border-radius: var(--hq-radius-control);
   cursor: pointer;
   font: inherit;
   min-height: 44px;
@@ -200,14 +200,14 @@
 }
 
 .filters button[aria-pressed="true"] {
-  background: var(--hq-brand-subtle);
-  border-color: var(--hq-brand-primary);
-  color: var(--hq-text-link);
+  background: var(--hq-surface-selected);
+  border-color: var(--hq-border-strong);
+  color: var(--hq-text-primary);
   font-weight: var(--hq-type-weight-semibold);
 }
 
 .filters button[aria-pressed="true"] > strong {
-  color: var(--hq-text-link);
+  color: var(--hq-text-primary);
 }
 
 .filters button[aria-pressed="true"] > small {
@@ -263,9 +263,7 @@
 }
 
 .card.unread {
-  background:
-    linear-gradient(90deg, rgb(10 102 194 / 5%), transparent 26%),
-    var(--hq-surface-base);
+  background: var(--hq-surface-subtle);
 }
 
 .card.read {
@@ -292,11 +290,11 @@
 }
 
 .avatar.likes {
-  background: #8f2942;
+  background: var(--hq-feedback-danger);
 }
 
 .avatar.system {
-  background: #245331;
+  background: var(--hq-feedback-success);
 }
 
 .cardBody {
@@ -538,28 +536,5 @@
     align-items: start;
     flex-direction: column;
     gap: 5px;
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .card {
-    animation: notification-enter 260ms ease both;
-  }
-
-  .list > li:nth-child(2) .card {
-    animation-delay: 35ms;
-  }
-
-  .list > li:nth-child(3) .card {
-    animation-delay: 70ms;
-  }
-}
-
-@keyframes notification-enter {
-  from {
-    transform: translateY(5px);
-  }
-  to {
-    transform: translateY(0);
   }
 }

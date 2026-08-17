@@ -19,6 +19,17 @@ PREVIEW_PRODUCT_SHA=<40-character-approved-product-sha> \
 The start command fails closed if `.next/BUILD_ID` is absent or the stamp does
 not exactly match `PREVIEW_PRODUCT_SHA`.
 
+For an atomic service release, build and stamp the inactive candidate directory:
+
+```bash
+pnpm --filter @huoqiu/web build:release
+HUOQIU_NEXT_DIST_DIR=.next-release \
+PREVIEW_PRODUCT_SHA=<40-character-approved-product-sha> \
+  pnpm --filter @huoqiu/preview stamp:product
+```
+
+Only after both commands succeed should the completed candidate be activated.
+
 ## Start a temporary local preview
 
 ```bash

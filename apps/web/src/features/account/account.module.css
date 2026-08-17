@@ -97,11 +97,11 @@
 }
 
 .statusError {
-  color: var(--hq-market-down-text);
+  color: var(--hq-feedback-danger);
 }
 
 .statusOk {
-  color: var(--hq-market-up-text);
+  color: var(--hq-feedback-success);
 }
 
 .switchLine {
@@ -158,7 +158,7 @@
   align-items: center;
   background: var(--hq-surface-base);
   border: 1px solid var(--hq-border-strong);
-  border-radius: var(--hq-radius-pill);
+  border-radius: var(--hq-radius-control);
   color: var(--hq-text-link);
   display: inline-flex;
   font-size: var(--hq-type-size-label-compact);
@@ -176,11 +176,13 @@
 }
 
 .followButton[aria-pressed="true"] {
+  background: var(--hq-surface-selected);
+  border-color: var(--hq-border-strong);
   color: var(--hq-text-secondary);
 }
 
 .followError {
-  color: var(--hq-market-down-text);
+  color: var(--hq-feedback-danger);
   font-size: var(--hq-type-size-caption);
 }
 

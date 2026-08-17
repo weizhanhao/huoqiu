@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "next build --webpack",
+    "build:release": "node scripts/build-release.mjs",
     "dev": "next dev",
     "finance:fx": "node scripts/fetch-fx-rates.mjs",
     "finance:kline": "node scripts/fetch-kline.mjs",
