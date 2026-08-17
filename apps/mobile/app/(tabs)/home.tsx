@@ -136,7 +136,7 @@ export default function HomeScreen() {
         openInstrument(`/instruments/${symbol}`);
       }}
       onOpenPost={(postId) => {
-        show("帖子详情", `还没做这一页。帖子 id：${postId}`);
+        router.push({ params: { postId }, pathname: "/post/[postId]" });
       }}
       onShowNotice={show}
       onToggleFollow={(authorId) => {

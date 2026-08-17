@@ -57,6 +57,7 @@ export type InstrumentScreenProperties = Readonly<{
   onBack: () => void;
   onOpenAnnouncement: (item: Announcement) => void;
   onOpenEtf: (href: string) => void;
+  onOpenPost: (postId: string) => void;
   onSelectPeriod: (period: ChartPeriod) => void;
   onSelectTab: (tab: InstrumentTab) => void;
   onShowNotice: (title: string, detail: string) => void;
@@ -89,6 +90,7 @@ export function InstrumentScreen({
   onBack,
   onOpenAnnouncement,
   onOpenEtf,
+  onOpenPost,
   onSelectPeriod,
   onSelectTab,
   onShowNotice,
@@ -207,12 +209,19 @@ export function InstrumentScreen({
 
         {tab === "discussion" && discussions !== null
           ? discussions.map((post) => (
-              <View key={post.id} style={styles.row}>
+              <Pressable
+                accessibilityRole="button"
+                key={post.id}
+                onPress={() => {
+                  onOpenPost(post.id);
+                }}
+                style={styles.row}
+              >
                 <Text style={styles.rowTitle}>{post.authorName}</Text>
                 <Text numberOfLines={3} style={styles.rowBody}>
                   {post.body}
                 </Text>
-              </View>
+              </Pressable>
             ))
           : null}
 

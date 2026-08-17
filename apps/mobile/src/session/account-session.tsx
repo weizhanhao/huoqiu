@@ -55,6 +55,14 @@ type AccountSessionValue = Readonly<{
   account: AccountSummary | null;
   accounts: readonly AccountSummary[];
   /*
+   * 我赞过、收藏过哪些帖子。
+   *
+   * 必须从服务端快照来，不能由详情页自己在本地记：本地记的话，退出这一页
+   * 再进来就回到「没赞过」，而服务端明明记着——用户以为刚才那下没生效，
+   * 再点一次，正好把赞取消掉。
+   */
+  bookmarkedPostIds: readonly string[];
+  /*
    * 以当前身份发一次请求。
    *
    * 交出的是「能以我的身份问一次」的能力，不是令牌本身——令牌散给的组件
@@ -68,6 +76,7 @@ type AccountSessionValue = Readonly<{
   ) => Promise<ApiResult<T>>;
   failure: string | null;
   following: readonly string[];
+  likedPostIds: readonly string[];
   loading: boolean;
   login: (email: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
@@ -225,9 +234,11 @@ export function AccountSessionProvider({
     () => ({
       account: state.snapshot.account,
       accounts: state.snapshot.accounts,
+      bookmarkedPostIds: state.snapshot.bookmarkedPostIds,
       callAs,
       failure: state.failure,
       following: state.snapshot.following,
+      likedPostIds: state.snapshot.likedPostIds,
       loading: state.loading,
       login,
       logout,

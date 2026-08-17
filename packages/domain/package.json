@@ -8,6 +8,7 @@
     "./shared/decimal": "./src/shared/decimal.ts",
     "./shared/ids": "./src/shared/ids.ts",
     "./shared/time": "./src/shared/time.ts",
+    "./social/comment-tree": "./src/social/comment-tree.ts",
     "./social/post-body": "./src/social/post-body.ts"
   },
   "scripts": {

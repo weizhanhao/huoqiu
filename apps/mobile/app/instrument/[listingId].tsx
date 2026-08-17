@@ -101,6 +101,9 @@ export default function InstrumentScreen() {
           pathname: "/instrument/[listingId]",
         });
       }}
+      onOpenPost={(id) => {
+        router.push({ params: { postId: id }, pathname: "/post/[postId]" });
+      }}
       onSelectPeriod={setPeriod}
       onSelectTab={setTab}
       onShowNotice={show}

@@ -65,6 +65,73 @@ export const fetchPublicPosts = async (): Promise<
   return { kind: "ok", value: result.value.posts ?? [] };
 };
 
+/*
+ * 帖子下的评论。
+ *
+ * parentId 指向被回复的那条；顶层评论没有这个字段。服务端把评论存成一张平表，
+ * 树是详情页按 parentId 拼出来的——存成嵌套结构的话，「查看全部 8 条回复」
+ * 要么一次拉整棵树，要么就拉不动。
+ */
+export type PostComment = Readonly<{
+  authorId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+  id: string;
+  parentId?: string;
+  postId: string;
+}>;
+
+export const fetchComments = async (
+  postId: string,
+): Promise<ApiResult<readonly PostComment[]>> => {
+  const result = await request<Readonly<{ comments?: readonly PostComment[] }>>(
+    `/api/social/comments?post=${encodeURIComponent(postId)}`,
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.comments ?? [] };
+};
+
+export const publishComment = async (
+  token: string,
+  postId: string,
+  body: string,
+  parentId: string | null,
+): Promise<ApiResult<unknown>> =>
+  request("/api/social/comments", {
+    body: {
+      body,
+      post: postId,
+      ...(parentId === null ? {} : { parent: parentId }),
+    },
+    method: "POST",
+    token,
+  });
+
+/* liked / bookmarked 是「操作之后应处于的状态」，不是「当前状态」。 */
+export const setLiked = async (
+  token: string,
+  postId: string,
+  liked: boolean,
+): Promise<ApiResult<Readonly<{ likeCount: number }>>> =>
+  request("/api/social/likes", {
+    body: { liked, post: postId },
+    method: "POST",
+    token,
+  });
+
+export const setBookmarked = async (
+  token: string,
+  postId: string,
+  bookmarked: boolean,
+): Promise<ApiResult<Readonly<{ bookmarkCount: number }>>> =>
+  request("/api/social/bookmarks", {
+    body: { bookmarked, post: postId },
+    method: "POST",
+    token,
+  });
+
 export const fetchTopics = async (): Promise<ApiResult<readonly string[]>> => {
   const result = await request<Readonly<{ topics?: readonly string[] }>>(
     "/api/social/topics",

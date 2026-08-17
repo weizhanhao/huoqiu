@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  buildCommentTree,
+  replyTargetOf,
+} from "@huoqiu/domain/social/comment-tree";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
@@ -108,9 +112,15 @@ export function RealComments({ postId }: Readonly<{ postId: string }>) {
     }
   };
 
-  const topLevel = comments.filter(({ parentId }) => parentId === undefined);
-  const repliesOf = (id: string): readonly RealComment[] =>
-    comments.filter(({ parentId }) => parentId === id);
+  /*
+   * 评论树由共享包拼，不再在这里按「父就是顶层」过一遍。
+   *
+   * 原先那份只取 parentId 直接等于顶层 id 的：回复的回复既不在顶层，也不在
+   * 任何一条的回复里，整条从页面上消失，而上面的计数里还算着它——「共 8 条」
+   * 下面只数得出 7 条。手机端能回复回复之后，这种评论会真的出现。
+   */
+  const byId = new Map(comments.map((entry) => [entry.id, entry]));
+  const tree = buildCommentTree(comments);
 
   return (
     <section className={styles.detail} aria-labelledby="real-comments-heading">
@@ -160,7 +170,7 @@ export function RealComments({ postId }: Readonly<{ postId: string }>) {
       ) : null}
 
       <ol>
-        {topLevel.map((comment) => (
+        {tree.map(({ comment, replies }) => (
           <li className={styles.comment} key={comment.id}>
             <p>
               <Link href={`/users/${comment.authorId}`}>
@@ -215,20 +225,32 @@ export function RealComments({ postId }: Readonly<{ postId: string }>) {
             ) : null}
 
             <ol>
-              {repliesOf(comment.id).map((reply) => (
-                <li className={styles.reply} key={reply.id}>
-                  <p>
-                    <Link href={`/users/${reply.authorId}`}>
-                      {reply.authorName}
-                    </Link>
-                    <span className={styles.meta}>
-                      {" "}
-                      {formatTime(reply.createdAt)}
-                    </span>
-                  </p>
-                  <p>{reply.body}</p>
-                </li>
-              ))}
+              {replies.map((reply) => {
+                /* 两层结构下，「回复 @某某」是读者判断回复对象的唯一线索。 */
+                const target = replyTargetOf(reply, comment, byId);
+                return (
+                  <li className={styles.reply} key={reply.id}>
+                    <p>
+                      <Link href={`/users/${reply.authorId}`}>
+                        {reply.authorName}
+                      </Link>
+                      {target === null ? null : (
+                        <>
+                          {" 回复 "}
+                          <Link href={`/users/${target.authorId}`}>
+                            {target.authorName}
+                          </Link>
+                        </>
+                      )}
+                      <span className={styles.meta}>
+                        {" "}
+                        {formatTime(reply.createdAt)}
+                      </span>
+                    </p>
+                    <p>{reply.body}</p>
+                  </li>
+                );
+              })}
             </ol>
           </li>
         ))}
