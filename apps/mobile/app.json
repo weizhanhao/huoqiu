@@ -6,7 +6,15 @@
     "version": "0.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "选择相册里的图片，配到你发的帖子里。"
+        }
+      ]
+    ],
     "ios": {
       "bundleIdentifier": "com.huoqiu.alpha",
       "supportsTablet": true

@@ -38,7 +38,49 @@ const expectedNativeDependencies = {
   "react-native-worklets": "0.5.1",
 } as const;
 
+/*
+ * Expo 自己不在 bundledNativeModules.json 里——它就是那份清单的出处。除它以外，
+ * 凡是没写 workspace:* 的依赖都该能在清单里查到；查不到意味着 Expo Go 里没有
+ * 这个原生模块，装了也跑不起来。
+ */
+const notNativeModules = new Set(["expo"]);
+
+/** ~17.0.11 与 17.0.11 算同一档；只比到次版本，补丁号可以自由些。 */
+const majorMinor = (version: string): string =>
+  version
+    .replace(/^[~^]/u, "")
+    .split(".")
+    .slice(0, 2)
+    .join(".");
+
 describe("Expo native dependency graph", () => {
+  it("keeps every native dependency on the version this SDK's Expo Go ships", () => {
+    /*
+     * 装错档位是真会发生的：在这个 SDK 54 的工程里执行 pnpm add
+     * expo-image-picker，装来的是 57.0.10——npm 上的 latest 跟着最新 SDK 走。
+     * 装上之后本地什么都不报，手机上一开就崩，报的是原生层符号找不到，
+     * 看不出和 package.json 有任何关系。
+     *
+     * 三个 react-native-* 由下面那条钉到确切版本，这条管其余所有的。
+     */
+    for (const [dependency, declared] of Object.entries(
+      manifest.dependencies ?? {},
+    )) {
+      if (declared === "workspace:*" || notNativeModules.has(dependency)) {
+        continue;
+      }
+      const bundled = expoModules[dependency];
+      expect(
+        bundled,
+        `${dependency} 不在 Expo Go 的原生模块清单里`,
+      ).toBeDefined();
+      expect(
+        majorMinor(declared),
+        `${dependency} 的版本档位和 Expo Go 对不上`,
+      ).toBe(majorMinor(bundled ?? ""));
+    }
+  });
+
   it("locks every declared mobile workspace dependency for frozen installs", () => {
     const mobileImporter = lockfile
       .split("  apps/mobile:\n", 2)[1]

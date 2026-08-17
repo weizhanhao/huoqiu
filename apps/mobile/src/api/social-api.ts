@@ -188,6 +188,30 @@ export const setFollowing = async (
     token,
   });
 
+/*
+ * 帖子配图。
+ *
+ * 图片以 base64 装在 JSON 里传，不用 multipart——站内的 Web 边界会把每个请求
+ * 体按 UTF-8 读出来扫一遍凭证，二进制的 multipart 过不了那道关。这是服务端
+ * 定下的形状，这一侧照做。
+ *
+ * 服务端卡 512 KB。相机原图动辄好几兆，所以选图那边必须压过再送，不能指望
+ * 这里兜底：兜不住的结果是用户选完图等半天，最后拿到一句「图片超过 512 KB」。
+ */
+export const uploadImage = async (
+  token: string,
+  base64: string,
+): Promise<ApiResult<string>> => {
+  const result = await request<Readonly<{ url?: unknown }>>(
+    "/api/social/uploads",
+    { body: { data: base64 }, method: "POST", token },
+  );
+  if (result.kind !== "ok") return result;
+  return typeof result.value.url === "string" && result.value.url.length > 0
+    ? { kind: "ok", value: result.value.url }
+    : { kind: "rejected", message: "服务端没有返回图片地址。" };
+};
+
 export const publishPost = async (
   token: string,
   title: string,

@@ -36,6 +36,22 @@ export const mentionToken = (displayName: string): string => `@${displayName} `;
 
 export const imageToken = (src: string): string => `![](${src})`;
 
+/**
+ * 在光标处插入。
+ *
+ * 一律追加到末尾的话，光标停在句中时插出来的东西会跑到最后，用户得自己剪切
+ * 再粘回去。有选区就替换选区——这是所有输入框的既有行为。
+ */
+export const insertAtCursor = (
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  insert: string,
+): Readonly<{ caret: number; value: string }> => ({
+  caret: selectionStart + insert.length,
+  value: value.slice(0, selectionStart) + insert + value.slice(selectionEnd),
+});
+
 /*
  * 四种记号一次扫完。
  *

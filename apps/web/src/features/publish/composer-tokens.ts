@@ -9,6 +9,7 @@
 export {
   cashtagToken,
   imageToken,
+  insertAtCursor,
   mentionToken,
   parsePostBody,
   topicToken,
@@ -16,19 +17,3 @@ export {
   type MentionAccount,
   type PostSegment,
 } from "@huoqiu/domain/social/post-body";
-
-/**
- * 在光标处插入。
- *
- * 一律追加到末尾的话，光标停在句中时插出来的东西会跑到最后，用户得自己
- * 剪切再粘回去。有选区就替换选区——这是所有输入框的既有行为。
- */
-export const insertAtCursor = (
-  value: string,
-  selectionStart: number,
-  selectionEnd: number,
-  insert: string,
-): Readonly<{ caret: number; value: string }> => ({
-  caret: selectionStart + insert.length,
-  value: value.slice(0, selectionStart) + insert + value.slice(selectionEnd),
-});

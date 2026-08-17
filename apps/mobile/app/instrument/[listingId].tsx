@@ -90,6 +90,12 @@ export default function InstrumentScreen() {
       discussions={posts.value === null ? null : discussions}
       etfs={etfs.value}
       onBack={onBack}
+      onCompose={() => {
+        router.push({
+          params: { name: live.value?.quote.name ?? symbol, symbol },
+          pathname: "/compose",
+        });
+      }}
       onOpenAnnouncement={(item) => {
         void Linking.openURL(item.href);
       }}

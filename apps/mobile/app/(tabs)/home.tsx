@@ -157,9 +157,7 @@ export default function HomeScreen() {
           show("问AI", "对话式行情问答。这一块还没做。");
         }}
         onOpenMessages={() => router.push("/messages")}
-        onOpenPublish={() => {
-          show("发帖", "手机上的发帖器还没做，网页版可以发。");
-        }}
+        onOpenPublish={() => router.push("/compose")}
         onOpenSearch={() => router.push("/search")}
       />
 

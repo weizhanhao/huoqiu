@@ -55,6 +55,7 @@ export type InstrumentScreenProperties = Readonly<{
   discussions: readonly SocialPost[] | null;
   etfs: readonly HotRow[] | null;
   onBack: () => void;
+  onCompose: () => void;
   onOpenAnnouncement: (item: Announcement) => void;
   onOpenEtf: (href: string) => void;
   onOpenPost: (postId: string) => void;
@@ -88,6 +89,7 @@ export function InstrumentScreen({
   discussions,
   etfs,
   onBack,
+  onCompose,
   onOpenAnnouncement,
   onOpenEtf,
   onOpenPost,
@@ -306,9 +308,7 @@ export function InstrumentScreen({
         </View>
         <Pressable
           accessibilityRole="button"
-          onPress={() => {
-            onShowNotice("发讨论", "手机上的发帖器还没做，网页版可以发。");
-          }}
+          onPress={onCompose}
           style={styles.bottomAction}
         >
           <Text style={styles.bottomActionText}>发讨论</Text>
