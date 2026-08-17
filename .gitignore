@@ -3,6 +3,9 @@
 
 node_modules/
 .next/
+.next-release/
+.next-rollback-*/
+.next-failed-*/
 .runtime/
 # 模拟交易的运行时存储（paper-trading.ts 的默认目录）。里面是真实账号的
 # 委托流水，和 .runtime/ 一样属于运行产物，不进版本库。

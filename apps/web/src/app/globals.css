@@ -24,18 +24,7 @@
   box-sizing: border-box;
 }
 
-/*
- * 给滚动条留出位置。
- *
- * 页面居中（margin: 0 auto），内容长短决定竖向滚动条出不出现，而经典
- * 滚动条占 15~17px——短分区页不出、长分区页出，居中容器就整体水平挪
- * 八九个像素。每次在长短分区之间切换都抖一次。
- *
- * macOS 的浮层滚动条不占位，所以开发机上根本复现不了，用户天天遇到。
- */
 html {
-  scrollbar-gutter: stable;
-
   background: var(--hq-surface-canvas);
   color: var(--hq-text-primary);
   font-family: var(--hq-type-family-sans);
@@ -109,6 +98,16 @@ textarea {
     box-shadow var(--hq-motion-duration-fast) var(--hq-motion-ease-out);
 }
 
+button {
+  font-family: inherit;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 /*
  * 链接保留下划线，但削到极淡。
  *
@@ -173,6 +172,7 @@ select {
   border-radius: var(--hq-radius-control);
   color: var(--hq-text-primary);
   font: inherit;
+  min-width: 0;
   /* 触控目标 44px。 */
   min-height: var(--hq-touch-web-minimum);
   padding: 0 var(--hq-spacing-3);
@@ -661,7 +661,7 @@ select:disabled {
   align-items: center;
   background: var(--hq-market-up);
   border-radius: var(--hq-radius-pill);
-  color: #ffffff;
+  color: var(--hq-brand-on-primary);
   display: inline-flex;
   font-size: var(--hq-type-size-micro);
   font-variant-numeric: tabular-nums;
@@ -2571,8 +2571,8 @@ a.fund-row:hover strong:first-child {
 
 /* 当前所在的一项要看得出来，否则八个页面之间跳转会迷路。 */
 .settings-nav a[aria-current="page"] {
-  background: var(--hq-brand-subtle);
-  color: var(--hq-brand-primary);
+  background: var(--hq-surface-selected);
+  color: var(--hq-text-primary);
   font-weight: var(--hq-type-weight-semibold);
 }
 
@@ -2670,14 +2670,18 @@ a.fund-row:hover strong:first-child {
 @media (max-width: 1000px) {
   .d0-topbar {
     gap: var(--hq-spacing-3);
-    grid-template-columns: 1fr auto;
-    padding: var(--hq-spacing-2) var(--hq-spacing-4);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 0 var(--hq-spacing-4);
   }
 
-  .global-search {
-    grid-column: 1 / -1;
-    grid-row: 2;
+  .global-search-shell {
     max-width: none;
+    min-width: 0;
+  }
+
+  /* 窄屏把环境信息留给页面正文，顶栏只保留导航、搜索和消息。 */
+  .demo-data-badge {
+    display: none;
   }
 
   /*
@@ -2752,9 +2756,18 @@ a.fund-row:hover strong:first-child {
    * 因此它只兜底、不篡改已经合规的组件。
    * 段落内的行内链接被排除——把正文里的链接撑成 44px 会破坏行距。
    */
-  .d0-main :where(a, button):not(p a, li p a, figcaption a) {
+  .d0-main :where(a, button):not(:where(p a, li p a, figcaption a)) {
     align-items: center;
     display: inline-flex;
+    min-height: var(--hq-touch-web-minimum);
+  }
+
+  /* 指数卡本身是两列数据网格，不能被上面的触控兜底改成单行 flex。 */
+  .index-card {
+    display: grid;
+  }
+
+  .theme-toggle button {
     min-height: var(--hq-touch-web-minimum);
   }
 
@@ -2916,6 +2929,10 @@ a.fund-row:hover strong:first-child {
 }
 
 @media (max-width: 420px) {
+  .index-strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .market-strip-grid {
     grid-template-columns: 1fr;
   }

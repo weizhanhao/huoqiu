@@ -182,14 +182,14 @@
 }
 
 .state-invalid {
-  background: rgba(198, 73, 73, 0.08);
-  border-color: rgba(198, 73, 73, 0.24);
+  background: var(--hq-feedback-danger-subtle);
+  border-color: var(--hq-feedback-danger-border);
 }
 
 .state-stale,
 .state-degraded {
-  background: rgba(224, 130, 20, 0.08);
-  border-color: rgba(224, 130, 20, 0.24);
+  background: var(--hq-feedback-warning-subtle);
+  border-color: var(--hq-feedback-warning-border);
 }
 
 .filterPanel {
@@ -611,19 +611,19 @@
 
 .status-healthy,
 .freshPill {
-  background: rgba(17, 153, 104, 0.12);
-  color: #08704c;
+  background: var(--hq-feedback-success-subtle);
+  color: var(--hq-feedback-success);
 }
 
 .status-degraded {
-  background: rgba(224, 130, 20, 0.14);
-  color: #995509;
+  background: var(--hq-feedback-warning-subtle);
+  color: var(--hq-feedback-warning);
 }
 
 .status-stale,
 .stalePill {
-  background: rgba(198, 73, 73, 0.12);
-  color: #a33030;
+  background: var(--hq-feedback-danger-subtle);
+  color: var(--hq-feedback-danger);
 }
 
 .status-unavailable {
@@ -668,7 +668,7 @@
 }
 
 .metadataNotice {
-  background: rgba(32, 128, 225, 0.08);
+  background: var(--hq-feedback-info-subtle);
   border-left: 3px solid var(--hq-brand-primary);
   color: var(--hq-text-secondary);
   line-height: var(--hq-type-line-height-body);
@@ -699,8 +699,8 @@
 }
 
 .kindPill {
-  background: rgba(32, 128, 225, 0.1);
-  color: var(--hq-brand-primary);
+  background: var(--hq-feedback-info-subtle);
+  color: var(--hq-feedback-info);
 }
 
 .publisher {

@@ -124,7 +124,7 @@
 .restoreButton,
 .inverseLink {
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--hq-radius-control);
   cursor: pointer;
   display: inline-flex;
   font-weight: 700;
@@ -322,12 +322,12 @@
 }
 
 .formField :is(input, textarea)[aria-invalid="true"] {
-  border-color: #d64045;
-  box-shadow: 0 0 0 2px rgb(214 64 69 / 12%);
+  border-color: var(--hq-feedback-danger-border);
+  box-shadow: 0 0 0 2px var(--hq-feedback-danger-subtle);
 }
 
 .fieldError {
-  color: #b42328;
+  color: var(--hq-feedback-danger);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -345,10 +345,10 @@
 }
 
 .statusMessage {
-  background: #eef7ff;
-  border: 1px solid #cce6ff;
+  background: var(--hq-feedback-info-subtle);
+  border: 1px solid var(--hq-feedback-info-border);
   border-radius: var(--hq-radius-control);
-  color: #0756a6;
+  color: var(--hq-feedback-info);
   font-size: 13px;
   line-height: 1.5;
   padding: 11px 14px;
@@ -391,8 +391,8 @@
 }
 
 .fixturePill {
-  background: #eef7ff;
-  color: #0756a6;
+  background: var(--hq-feedback-info-subtle);
+  color: var(--hq-feedback-info);
 }
 
 .unavailablePill {
@@ -628,7 +628,7 @@
 
 .productIcon {
   align-items: center;
-  background: #eef7ff;
+  background: var(--hq-feedback-info-subtle);
   border-radius: 13px;
   color: var(--hq-brand-primary);
   display: flex;
@@ -652,7 +652,7 @@
 .unavailableRow button {
   background: var(--hq-surface-subtle);
   border: 1px solid var(--hq-border-default);
-  border-radius: 999px;
+  border-radius: var(--hq-radius-control);
   color: var(--hq-text-tertiary);
   cursor: not-allowed;
   flex: 0 0 auto;

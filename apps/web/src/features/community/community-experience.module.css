@@ -154,8 +154,8 @@
 
 .avatar {
   align-items: center;
-  background: linear-gradient(145deg, #e8f3ff, #f8fbff);
-  border: 1px solid #cfe5ff;
+  background: var(--hq-feedback-info-subtle);
+  border: 1px solid var(--hq-feedback-info-border);
   border-radius: 50%;
   color: var(--hq-brand-primary);
   display: inline-flex;
@@ -166,10 +166,10 @@
 }
 
 .syntheticBadge {
-  background: #edf6ff;
-  border: 1px solid #d1e8ff;
+  background: var(--hq-feedback-info-subtle);
+  border: 1px solid var(--hq-feedback-info-border);
   border-radius: 999px;
-  color: #2468a8;
+  color: var(--hq-feedback-info);
   font-size: 0.7rem;
   font-weight: 750;
   margin-left: auto;
@@ -518,7 +518,7 @@
 }
 
 .streamLink {
-  background: #edf6ff;
+  background: var(--hq-feedback-info-subtle);
   border-radius: 999px;
   flex: 0 0 auto;
   padding: 0 14px;
@@ -560,10 +560,10 @@
 }
 
 .originBadge {
-  background: #edf6ff;
-  border: 1px solid #d1e8ff;
+  background: var(--hq-feedback-info-subtle);
+  border: 1px solid var(--hq-feedback-info-border);
   border-radius: 999px;
-  color: #2468a8;
+  color: var(--hq-feedback-info);
   display: inline-flex;
   font-size: 0.7rem;
   font-weight: 700;
@@ -679,8 +679,8 @@
 }
 
 .success {
-  background: var(--hq-surface-subtle);
-  border: 1px solid var(--hq-brand-primary);
+  background: var(--hq-feedback-success-subtle);
+  border: 1px solid var(--hq-feedback-success-border);
   border-radius: 10px;
   display: grid;
   gap: 8px;
@@ -688,7 +688,7 @@
 }
 
 .error {
-  color: #b42318;
+  color: var(--hq-feedback-danger);
   font-weight: 600;
 }
 

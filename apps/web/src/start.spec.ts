@@ -187,6 +187,40 @@ describe("Web production start preflight", () => {
     expect(code).toBe(0);
     expect(stderr).not.toContain("ERR_MODULE_NOT_FOUND");
   });
+
+  it("rejects arbitrary release output paths", async () => {
+    const child = spawn(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        `await import(${JSON.stringify(nextConfigurationUrl)})`,
+      ],
+      {
+        cwd: appRoot,
+        env: {
+          ...process.env,
+          APP_ENV: "local",
+          HUOQIU_NEXT_DIST_DIR: "../outside-project",
+          NODE_ENV: "test",
+        },
+        stdio: ["ignore", "ignore", "pipe"],
+      },
+    );
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+
+    const code = await new Promise<number | null>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("exit", resolve);
+    });
+
+    expect(code).not.toBe(0);
+    expect(stderr).toContain("HUOQIU_NEXT_DIST_DIR_INVALID");
+  });
 });
 
 type SlowUploadResult = Readonly<{

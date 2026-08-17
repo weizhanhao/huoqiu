@@ -199,6 +199,24 @@ describe("Huoqiu design tokens", () => {
     expect(darkTokens.market.downText).not.toBe(darkTokens.market.down);
   });
 
+  it("keeps interaction feedback independent from market color preferences", () => {
+    for (const [foreground, background] of [
+      [tokens.feedback.danger, tokens.feedback.dangerSubtle],
+      [tokens.feedback.success, tokens.feedback.successSubtle],
+      [tokens.feedback.warning, tokens.feedback.warningSubtle],
+      [tokens.feedback.info, tokens.feedback.infoSubtle],
+      [darkTokens.feedback.danger, darkTokens.feedback.dangerSubtle],
+      [darkTokens.feedback.success, darkTokens.feedback.successSubtle],
+      [darkTokens.feedback.warning, darkTokens.feedback.warningSubtle],
+      [darkTokens.feedback.info, darkTokens.feedback.infoSubtle],
+    ] as const) {
+      expect(contrastRatio(foreground, background)).toBeGreaterThanOrEqual(4.5);
+    }
+
+    expect(tokens.feedback.danger).not.toBe(tokens.market.upText);
+    expect(tokens.feedback.success).not.toBe(tokens.market.downText);
+  });
+
   it("separates up and down by hue, not by brightness", () => {
     // 用亮度对比衡量红绿可辨性是错的指标：两色亮度接近才是正常的，
     // 差异应该在色相上。这里直接断言红绿通道的主导关系，

@@ -1068,13 +1068,13 @@
 }
 
 .createError {
-  color: var(--hq-market-warning-text);
+  color: var(--hq-feedback-danger);
   font-size: var(--hq-type-size-caption);
   margin-top: var(--hq-spacing-2);
 }
 
 .createNotice {
-  color: var(--hq-market-down-text);
+  color: var(--hq-feedback-success);
   font-size: var(--hq-type-size-caption);
   margin-top: var(--hq-spacing-2);
 }

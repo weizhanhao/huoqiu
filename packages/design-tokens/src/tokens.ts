@@ -74,6 +74,26 @@ export const tokens = {
     linkHover: "#074A8E",
     disabled: "#98A2B0",
   },
+  /**
+   * 交互反馈色与行情涨跌色分开。
+   *
+   * 用户可以把行情切成绿涨红跌；表单错误、保存成功不能跟着交换颜色，
+   * 否则同一个错误会因为一项行情偏好从红色变成绿色。
+   */
+  feedback: {
+    danger: "#A12D35",
+    dangerSubtle: "#FDF0F1",
+    dangerBorder: "#F3B8BC",
+    success: "#16643B",
+    successSubtle: "#EAF7F0",
+    successBorder: "#B7DFC9",
+    warning: "#8A5106",
+    warningSubtle: "#FDF5E7",
+    warningBorder: "#E8C98C",
+    info: "#0756A6",
+    infoSubtle: "#EAF2FC",
+    infoBorder: "#B9DCFF",
+  },
   market: {
     /** 图表填充与描边用原色 */
     up: "#E5484D",
@@ -237,6 +257,20 @@ export const darkTokens = {
     link: "#6BB0F7",
     linkHover: "#8FC6FA",
     disabled: "#5A6673",
+  },
+  feedback: {
+    danger: "#FF9B9F",
+    dangerSubtle: "#2C1619",
+    dangerBorder: "#6A2C33",
+    success: "#58D68D",
+    successSubtle: "#10291C",
+    successBorder: "#245E3A",
+    warning: "#F0B429",
+    warningSubtle: "#2A2010",
+    warningBorder: "#684B15",
+    info: "#8FC6FA",
+    infoSubtle: "#132639",
+    infoBorder: "#294C70",
   },
   market: {
     up: "#F2555A",

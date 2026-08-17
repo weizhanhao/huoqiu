@@ -7,6 +7,8 @@
 .composer {
   display: grid;
   gap: var(--hq-spacing-2);
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
 }
 
 .inline {
@@ -71,6 +73,17 @@
 .actions {
   display: flex;
   gap: var(--hq-spacing-2);
+}
+
+@media (max-width: 520px) {
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actions {
+    justify-content: flex-end;
+  }
 }
 
 .primary,
