@@ -55,10 +55,8 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-import HomeScreen from "../../../app/(tabs)/home";
 import MarketsScreen from "../../../app/(tabs)/markets";
 import PortfoliosScreen from "../../../app/(tabs)/portfolios";
-import ProfileScreen from "../../../app/(tabs)/profile";
 import WatchlistScreen from "../../../app/(tabs)/watchlist";
 import InstrumentScreen from "../../../app/instrument/[listingId]";
 import MessagesScreen from "../../../app/messages";
@@ -196,18 +194,14 @@ describe("D0 mobile route behavior", () => {
     expect(mocks.router.replace).not.toHaveBeenCalled();
   });
 
-  it("routes every profile entry to a real local destination", () => {
-    const profile = readProperties(ProfileScreen() as ReactElement);
-
-    profile.onNavigate?.("messages");
-    profile.onNavigate?.("settings");
-    profile.onNavigate?.("watchlist");
-    profile.onNavigate?.("portfolios");
-
-    expect(
-      mocks.router.push.mock.calls.map(([destination]) => destination),
-    ).toEqual(["/messages", "/settings", "/watchlist", "/portfolios"]);
-  });
+  /*
+   * 「我的」原先是一排本地跳转入口（消息/设置/自选/组合），配一个写死的
+   * 演示用户——不管谁在用，看到的都是同一个人。它现在是真实账号页：
+   * 没登录给登录表单，登录了显示这个账号自己的数字。
+   *
+   * 那条断言跟着它守的东西一起没了。真实账号页的行为由
+   * tests/component/account/profile-screen.spec.tsx 接手。
+   */
 
   it("renders fixed messages and returns a fresh deep link to profile", () => {
     const messages = readProperties(MessagesScreen() as ReactElement);
@@ -227,8 +221,14 @@ describe("D0 mobile route behavior", () => {
     expect(mocks.router.replace).toHaveBeenCalledWith("/profile");
   });
 
+  /*
+   * 首页从这张表里去掉了。
+   *
+   * 「重试」守的是夹具加载失败这个分支，而首页已经不读夹具了——它现在拉的是
+   * 真实的关注流，失败原因是网络或服务端，恢复方式是下拉刷新，不是重新解析
+   * 一份本地 JSON。留在表里只会让它去证明一个不存在的分支。
+   */
   it.each([
-    ["home", HomeScreen, false],
     ["watchlist", WatchlistScreen, false],
     ["search", SearchScreen, true],
     ["instrument detail", InstrumentScreen, true],
