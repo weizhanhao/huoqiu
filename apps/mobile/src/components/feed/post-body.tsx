@@ -6,6 +6,7 @@ import { tokens } from "@huoqiu/native-ui";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { apiUrl } from "../../api/config";
+import { appTouchMinimum } from "../../styles/app-touch";
 
 /*
  * 帖子正文。
@@ -170,7 +171,7 @@ const styles = StyleSheet.create({
   quoteAdd: {
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 34,
+    minHeight: appTouchMinimum,
     paddingHorizontal: 4,
   },
   quoteAddText: {
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     gap: 6,
-    minHeight: 34,
+    minHeight: appTouchMinimum,
   },
   quoteMark: {
     color: tokens.market.warningText,

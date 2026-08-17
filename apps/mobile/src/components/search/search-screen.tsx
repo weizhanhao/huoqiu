@@ -283,8 +283,8 @@ const styles = StyleSheet.create({
   clear: {
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 32,
-    minWidth: 32,
+    minHeight: appTouchMinimum,
+    minWidth: appTouchMinimum,
   },
   clearText: {
     color: tokens.text.tertiary,
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.brand.primary,
     borderRadius: 999,
     justifyContent: "center",
-    minHeight: 34,
+    minHeight: 36,
     paddingHorizontal: 14,
   },
   submitText: {

@@ -608,9 +608,9 @@ const styles = StyleSheet.create({
   pickAdd: {
     alignItems: "center",
     backgroundColor: tokens.brand.subtle,
-    borderRadius: 8,
+    borderRadius: 6,
     justifyContent: "center",
-    minHeight: 34,
+    minHeight: appTouchMinimum,
     paddingHorizontal: 12,
   },
   pickAddText: {

@@ -23,6 +23,7 @@ import {
 import { WatchlistScreen as WatchlistView } from "../../src/components/markets/watchlist-screen";
 import { SegmentHeader } from "../../src/components/shell/segment-header";
 import { useRemote } from "../../src/hooks/use-remote";
+import { useComingSoon } from "../../src/components/system/coming-soon";
 import { useAccountSession } from "../../src/session/account-session";
 
 /*
@@ -94,6 +95,7 @@ type WatchlistData = Readonly<{
 export default function WatchlistScreen() {
   const router = useRouter();
   const { account, callAs } = useAccountSession();
+  const { fail } = useComingSoon();
   const [segment, setSegment] = useState<Segment>("watchlist");
 
   const loadWatchlist = useCallback(async (): Promise<
@@ -131,7 +133,14 @@ export default function WatchlistScreen() {
                 {
                   glyph: "⊕",
                   label: "新建组合",
-                  onPress: () => router.push("/portfolio/new"),
+                  onPress: () => {
+                    /* 填完名称、加十只票、调好权重才被拒，代价太大。 */
+                    if (account === null) {
+                      fail("新建组合", "请先登录。");
+                      return;
+                    }
+                    router.push("/portfolio/new");
+                  },
                 },
                 {
                   glyph: "⌕",

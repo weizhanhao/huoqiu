@@ -193,10 +193,20 @@ export default function HomeScreen() {
       : all.filter((post) => matches(post.body, index));
 
   const refreshAll = useCallback(() => {
+    /*
+     * 下拉要把这一屏能看到的都刷了。
+     *
+     * 此前只刷会话、帖子、热股榜——在「资讯」频道下拉，转圈转完，快讯一条
+     * 没变。而 7x24 快讯恰恰是最需要刷新的内容。
+     */
     void refresh();
     publicPosts.refresh();
     hot.refresh();
-  }, [hot, publicPosts, refresh]);
+    news.refresh();
+    videos.refresh();
+    topics.refresh();
+    watchlist.refresh();
+  }, [hot, news, publicPosts, refresh, topics, videos, watchlist]);
 
   const openInstrument = useCallback(
     (href: string) => {
@@ -289,7 +299,19 @@ export default function HomeScreen() {
           show("问AI", "对话式行情问答。这一块还没做。");
         }}
         onOpenMessages={() => router.push("/messages")}
-        onOpenPublish={() => router.push("/compose")}
+        onOpenPublish={() => {
+          /*
+           * 未登录先说，别让人写完再退回来。
+           *
+           * 此前是写完八百字、点发布、才收到一句「请先登录。」，而那一屏没有
+           * 任何登录入口——关掉发帖器正文就没了。
+           */
+          if (account === null) {
+            fail("发帖", "请先登录。");
+            return;
+          }
+          router.push("/compose");
+        }}
         onOpenSearch={() => router.push("/search")}
       />
 

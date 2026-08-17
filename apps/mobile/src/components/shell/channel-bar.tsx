@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.surface.base,
     height: appTouchMinimum,
     justifyContent: "center",
-    width: 40,
+    minWidth: appTouchMinimum,
   },
   manageGlyph: {
     color: tokens.text.secondary,

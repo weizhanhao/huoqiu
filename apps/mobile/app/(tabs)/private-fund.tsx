@@ -2,6 +2,7 @@ import { tokens } from "@huoqiu/native-ui";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -117,17 +118,34 @@ export default function PrivateFundScreen() {
             {loading ? "正在读取管理人……" : "还没有取到管理人，下拉重试。"}
           </Text>
         </View>
+      ) : value.length === 0 ? (
+        /* 服务端正常返回但名单是空的：不写一句，屏幕上就是一段莫名的空白。 */
+        <View style={styles.notice}>
+          <Text style={styles.noticeText}>没有取到管理人名单。</Text>
+        </View>
       ) : (
+        /*
+          这一页写着「每条都可回原页核对」，而这一行此前是 View——真想去核对的
+          人在上面戳几下，什么都不会发生。承诺要兑现。
+        */
         value.slice(0, 20).map((manager) => (
-          <View key={manager.disclosureUrl} style={styles.row}>
+          <Pressable
+            accessibilityRole="button"
+            key={manager.disclosureUrl}
+            onPress={() => {
+              void Linking.openURL(manager.disclosureUrl);
+            }}
+            style={styles.row}
+          >
             <Text style={styles.name}>{manager.name}</Text>
             <Text style={styles.meta}>
               {manager.investType} · 法定代表人 {manager.legalPerson}
             </Text>
             <Text style={styles.meta}>
-              成立 {manager.establishedOn} · 在管 {manager.fundCount} 只
+              成立 {manager.establishedOn} · 在管 {manager.fundCount} 只 ·
+              点击在中基协核对
             </Text>
-          </View>
+          </Pressable>
         ))
       )}
 

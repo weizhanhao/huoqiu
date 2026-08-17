@@ -180,9 +180,9 @@ const styles = StyleSheet.create({
   follow: {
     alignItems: "center",
     backgroundColor: tokens.brand.subtle,
-    borderRadius: 999,
+    borderRadius: 6,
     justifyContent: "center",
-    minHeight: 34,
+    minHeight: 36,
     paddingHorizontal: 18,
   },
   followOn: {

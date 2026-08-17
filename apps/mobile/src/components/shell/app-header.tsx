@@ -97,9 +97,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.55)",
     borderRadius: 999,
     borderWidth: 1,
-    height: 34,
+    height: 36,
     justifyContent: "center",
-    width: 34,
+    width: 36,
   },
   actionGlyph: {
     color: tokens.brand.onPrimary,

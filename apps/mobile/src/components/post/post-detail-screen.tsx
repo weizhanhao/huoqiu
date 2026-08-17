@@ -465,9 +465,9 @@ const styles = StyleSheet.create({
   follow: {
     alignItems: "center",
     backgroundColor: tokens.brand.subtle,
-    borderRadius: 999,
+    borderRadius: 6,
     justifyContent: "center",
-    minHeight: 32,
+    minHeight: 34,
     paddingHorizontal: 16,
   },
   followOn: {
@@ -554,8 +554,8 @@ const styles = StyleSheet.create({
   },
   replyHit: {
     justifyContent: "center",
-    minHeight: 32,
-    paddingHorizontal: 4,
+    minHeight: appTouchMinimum,
+    paddingHorizontal: 10,
   },
   replyName: {
     color: tokens.text.link,
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.brand.primary,
     borderRadius: 18,
     justifyContent: "center",
-    minHeight: 36,
+    minHeight: 40,
     paddingHorizontal: 16,
   },
   sendOff: {

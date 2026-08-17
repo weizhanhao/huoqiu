@@ -177,6 +177,11 @@ export default function FundScreen() {
             {loading ? "正在读取基金……" : "还没有取到基金，下拉重试。"}
           </Text>
         </View>
+      ) : value.length === 0 ? (
+        /* 服务端正常返回但这一档是空的：不写一句，屏幕上就是一段莫名的空白。 */
+        <View style={styles.notice}>
+          <Text style={styles.noticeText}>这个分类下没有取到基金。换一档试试。</Text>
+        </View>
       ) : (
         value.slice(0, 30).map((fund) => (
           <View key={fund.code} style={styles.row}>

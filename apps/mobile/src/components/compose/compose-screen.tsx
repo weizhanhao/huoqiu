@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.brand.primary,
     borderRadius: 999,
     justifyContent: "center",
-    minHeight: 32,
+    minHeight: 36,
     paddingHorizontal: 16,
   },
   publishOff: {

@@ -169,7 +169,8 @@ const styles = StyleSheet.create({
   },
   actionHit: {
     justifyContent: "center",
-    minHeight: 36,
+    minHeight: appTouchMinimum,
+    paddingHorizontal: 2,
   },
   actions: {
     borderTopColor: tokens.border.subtle,
@@ -210,9 +211,10 @@ const styles = StyleSheet.create({
   follow: {
     alignItems: "center",
     backgroundColor: tokens.brand.subtle,
-    borderRadius: 999,
+    /* 参考图里关注是 r=6 的圆角矩形，不是胶囊。 */
+    borderRadius: 6,
     justifyContent: "center",
-    minHeight: 32,
+    minHeight: 34,
     paddingHorizontal: 16,
   },
   followOn: {

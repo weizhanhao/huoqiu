@@ -510,7 +510,9 @@ const styles = StyleSheet.create({
   },
   period: {
     justifyContent: "center",
-    minHeight: 40,
+    /* 「分时」两个字只有 28pt 宽，热区要靠内边距撑开，否则点三次中一次。 */
+    minHeight: appTouchMinimum,
+    paddingHorizontal: 12,
   },
   periodStrip: {
     alignItems: "center",

@@ -1,6 +1,13 @@
 import { tokens } from "@huoqiu/native-ui";
 import { useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { SignInForm } from "../../src/components/account/sign-in-form";
 import { useAccountSession } from "../../src/session/account-session";
@@ -127,7 +134,20 @@ export default function ProfileScreen() {
       <Pressable
         accessibilityRole="button"
         onPress={() => {
-          void logout();
+          /*
+           * 「退出登录」紧挨着「我发的」那一列，滚动时手指容易落在上面。
+           * 退出会删掉 Keychain 里的令牌，下次要重新输密码。
+           */
+          Alert.alert("退出登录？", "下次进来要重新输一次密码。", [
+            { style: "cancel", text: "取消" },
+            {
+              onPress: () => {
+                void logout();
+              },
+              style: "destructive",
+              text: "退出",
+            },
+          ]);
         }}
         style={styles.logout}
       >
