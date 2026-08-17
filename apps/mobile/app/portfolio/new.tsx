@@ -31,8 +31,12 @@ export default function NewPortfolioRoute() {
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
   const [settled, setSettled] = useState<
-    Readonly<{ hits: readonly SearchHit[]; query: string }>
-  >({ hits: [], query: "" });
+    Readonly<{
+      failure: string | null;
+      hits: readonly SearchHit[];
+      query: string;
+    }>
+  >({ failure: null, hits: [], query: "" });
   const [failure, setFailure] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -46,7 +50,9 @@ export default function NewPortfolioRoute() {
         const result = await searchInstruments(needle);
         /* 迟到的响应丢掉：先发的后到会把新结果盖回旧的。 */
         if (cancelled) return;
+        /* 失败塞成空数组，面板会说「没有匹配的标的」——那是假话。 */
         setSettled({
+          failure: result.kind === "ok" ? null : result.message,
           hits: result.kind === "ok" ? result.value : [],
           query: needle,
         });
@@ -126,8 +132,15 @@ export default function NewPortfolioRoute() {
       }}
       picking={picking}
       query={query}
+      resultsFailure={
+        needle.length === 0 || settled.query !== needle ? null : settled.failure
+      }
       results={
-        needle.length === 0 || settled.query !== needle ? null : settled.hits
+        needle.length === 0 ||
+        settled.query !== needle ||
+        settled.failure !== null
+          ? null
+          : settled.hits
       }
       saving={saving}
       summary={summary}

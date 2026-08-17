@@ -53,8 +53,12 @@ export default function ComposeRoute() {
   const [panel, setPanel] = useState<ComposePanel>(null);
   const [cashtagQuery, setCashtagQuery] = useState("");
   const [cashtagSettled, setCashtagSettled] = useState<
-    Readonly<{ hits: readonly SearchHit[]; query: string }>
-  >({ hits: [], query: "" });
+    Readonly<{
+      failure: string | null;
+      hits: readonly SearchHit[];
+      query: string;
+    }>
+  >({ failure: null, hits: [], query: "" });
   const [failure, setFailure] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -69,7 +73,15 @@ export default function ComposeRoute() {
         const result = await searchInstruments(needle);
         /* 迟到的响应丢掉，否则先发的后到会把新结果盖回旧的。 */
         if (cancelled) return;
+        /*
+         * 失败不能塞成空数组。
+         *
+         * 塞空数组，面板会说「没有匹配的标的」——手机没连上服务时，用户搜
+         * 「贵州茅台」得到的是这句明确的假话，他会换「茅台」「600519」反复
+         * 试，最后认定这个 App 里没有茅台。
+         */
         setCashtagSettled({
+          failure: result.kind === "ok" ? null : result.message,
           hits: result.kind === "ok" ? result.value : [],
           query: needle,
         });
@@ -143,8 +155,15 @@ export default function ComposeRoute() {
       body={body}
       caret={caret}
       cashtagQuery={cashtagQuery}
-      cashtagResults={
+      cashtagFailure={
         needle.length === 0 || cashtagSettled.query !== needle
+          ? null
+          : cashtagSettled.failure
+      }
+      cashtagResults={
+        needle.length === 0 ||
+        cashtagSettled.query !== needle ||
+        cashtagSettled.failure !== null
           ? null
           : cashtagSettled.hits
       }

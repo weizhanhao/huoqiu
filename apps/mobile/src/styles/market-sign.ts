@@ -10,7 +10,21 @@ import { tokens } from "@huoqiu/native-ui";
  * 做文字达不到对比度要求。
  */
 
-export const signColor = (changePercent: number): string => {
+/*
+ * 取不到值时用 —，不是 0。
+ *
+ * 上游对停牌、新基未披露净值、场外品种给的是空值。把空当 0 处理，页面上会
+ * 印出一个「0.00%」——那读起来是「今天没动」，而事实是「不知道」。两者会被
+ * 放进同一份榜单排名次。
+ *
+ * 这几个函数收 number | null，是因为服务端的 HotRow / EtfRow / FundRow 本来
+ * 就是可空的，而移动端一度把它们声明成非空——.toFixed() 撞上 null 会直接
+ * 红屏，而那一天恰好是某只票停牌。
+ */
+export const MISSING = "—";
+
+export const signColor = (changePercent: number | null): string => {
+  if (changePercent === null) return tokens.text.secondary;
   if (changePercent > 0) return tokens.market.upText;
   if (changePercent < 0) return tokens.market.downText;
   return tokens.text.secondary;
@@ -22,8 +36,18 @@ export const signColor = (changePercent: number): string => {
  * 只靠颜色区分方向，色觉障碍的人看到的是两个一样的数字，截图转灰度之后
  * 谁也分不出来。符号是那份冗余。
  */
-export const signedPercent = (changePercent: number): string =>
-  `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(2)}%`;
+export const signedPercent = (changePercent: number | null): string =>
+  changePercent === null
+    ? MISSING
+    : `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(2)}%`;
 
-export const signedAmount = (changeAmount: number): string =>
-  `${changeAmount > 0 ? "+" : ""}${changeAmount.toFixed(2)}`;
+export const signedAmount = (changeAmount: number | null): string =>
+  changeAmount === null
+    ? MISSING
+    : `${changeAmount > 0 ? "+" : ""}${changeAmount.toFixed(2)}`;
+
+/** 价格一类的纯数字。位数由调用方定：净值四位，股价两位。 */
+export const fixedOrMissing = (
+  value: number | null | undefined,
+  digits: number,
+): string => (value === null || value === undefined ? MISSING : value.toFixed(digits));

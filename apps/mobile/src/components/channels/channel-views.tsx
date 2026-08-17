@@ -165,9 +165,11 @@ export function HotChannel({
             {hot.slice(0, 6).map((row) => (
               <Pressable
                 accessibilityRole="button"
+                /* 没有站内页的市场，href 是 null——那一格就不该能点。 */
+                disabled={row.href === null}
                 key={row.code}
                 onPress={() => {
-                  onOpenInstrument(row.href);
+                  if (row.href !== null) onOpenInstrument(row.href);
                 }}
                 style={styles.heatCell}
               >
@@ -278,8 +280,9 @@ export function WatchlistChannel({
             <View key={row.code} style={styles.pickRow}>
               <Pressable
                 accessibilityRole="button"
+                disabled={row.href === null}
                 onPress={() => {
-                  onOpenInstrument(row.href);
+                  if (row.href !== null) onOpenInstrument(row.href);
                 }}
                 style={styles.pickMain}
               >
@@ -296,8 +299,9 @@ export function WatchlistChannel({
               </Text>
               <Pressable
                 accessibilityRole="button"
+                disabled={row.href === null}
                 onPress={() => {
-                  onAdd(row.code, row.href);
+                  if (row.href !== null) onAdd(row.code, row.href);
                 }}
                 style={styles.pickAdd}
               >

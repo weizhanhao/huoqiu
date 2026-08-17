@@ -42,6 +42,7 @@ const render = (
       accounts={[account("acct_1", "林岸")]}
       body=""
       caret={null}
+      cashtagFailure={null}
       cashtagQuery=""
       cashtagResults={null}
       failure={null}
@@ -159,5 +160,20 @@ describe("compose screen", () => {
     expect(searching).toContain("正在搜");
     expect(searching).not.toContain("没有匹配");
     expect(empty).toContain("没有匹配");
+  });
+  it("does not call a failed search an empty result", () => {
+    /*
+     * 手机没连上服务时，搜「贵州茅台」得到「没有匹配的标的」是一句明确的
+     * 假话——用户会换词反复试，最后认定这个 App 里没有茅台。
+     */
+    const broken = render({
+      cashtagFailure: "连不上服务器。确认手机和服务在同一个网络里。",
+      cashtagQuery: "茅台",
+      cashtagResults: null,
+      panel: "cashtag",
+    });
+
+    expect(broken).toContain("连不上服务器");
+    expect(broken).not.toContain("没有匹配");
   });
 });

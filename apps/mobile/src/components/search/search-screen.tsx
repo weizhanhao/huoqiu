@@ -43,6 +43,21 @@ export const splitMatch = (
   };
 };
 
+/*
+ * 昨收 = 现价 ÷ (1 + 涨跌幅)。榜单里没有单列这一项。
+ *
+ * 三种情况都回 null，也就是不画基准线：现价或涨跌幅取不到（停牌、无站内页），
+ * 以及跌停到 -100% ——那时分母是 0，算出来是 Infinity，画出来是一条飞出图外
+ * 的线，而没有任何地方会报错。
+ */
+const previousCloseOf = (
+  row: Readonly<{ changePercent: number | null; last: number | null }>,
+): number | null => {
+  if (row.last === null || row.changePercent === null) return null;
+  if (row.changePercent === -100) return null;
+  return row.last / (1 + row.changePercent / 100);
+};
+
 export type SearchScreenProperties = Readonly<{
   guesses: readonly NewsItem[] | null;
   hot: readonly HotRow[] | null;
@@ -207,9 +222,11 @@ export function SearchScreen({
             {(hot ?? []).slice(0, 8).map((row, index) => (
               <Pressable
                 accessibilityRole="button"
-                key={row.href}
+                /* 没有站内页的市场，href 是 null——那一行不该能点。 */
+                disabled={row.href === null}
+                key={row.code}
                 onPress={() => {
-                  onOpenHot(row.href);
+                  if (row.href !== null) onOpenHot(row.href);
                 }}
                 style={styles.hotRow}
               >
@@ -221,16 +238,10 @@ export function SearchScreen({
                   <Text style={styles.hotCode}>{row.code}</Text>
                 </View>
                 <Sparkline
-                  previousClose={
-                    /*
-                     * 昨收 = 现价 ÷ (1 + 涨跌幅)。榜单里没有单列这一项，而
-                     * 跌停到 -100% 时分母为 0，那种情况不画基准线。
-                     */
-                    row.changePercent === -100
-                      ? null
-                      : row.last / (1 + row.changePercent / 100)
+                  previousClose={previousCloseOf(row)}
+                  prices={
+                    row.href === null ? [] : (intraday.get(row.href) ?? [])
                   }
-                  prices={intraday.get(row.href) ?? []}
                 />
                 <View style={styles.hotChange}>
                   <Text

@@ -147,15 +147,22 @@ export const fetchPortfolios = async (
 export type FundCategory = "bond" | "hybrid" | "index" | "qdii" | "stock";
 export type FundSort = "day" | "oneYear" | "threeYear" | "yearToDate";
 
+/*
+ * 可空的字段照服务端来。
+ *
+ * 这里一度把它们声明成非空，而服务端给的是 number | null——新基金还没披露净值、
+ * 场外品种没有涨跌幅时就是 null。类型撒了谎，界面上 .toFixed() 直接红屏，
+ * 而复现条件是「某一天恰好有这样一只」。
+ */
 export type FundRow = Readonly<{
   category: string;
   code: string;
-  dayPct: number;
+  dayPct: number | null;
   name: string;
-  nav: number;
+  nav: number | null;
   /** YYYY-MM-DD。净值是按日披露的，没有比日更细的粒度。 */
   navDate: string;
-  oneYearPct: number;
+  oneYearPct: number | null;
 }>;
 
 export type PrivateFundManager = Readonly<{
@@ -237,11 +244,11 @@ export const setWatchlisted = async (
  */
 
 export type HotRow = Readonly<{
-  changePercent: number;
+  changePercent: number | null;
   code: string;
-  /** 站内个股页地址，形如 /instruments/sz300314。 */
-  href: string;
-  last: number;
+  /** 站内个股页地址，形如 /instruments/sz300314；暂无详情页的市场为 null。 */
+  href: string | null;
+  last: number | null;
   name: string;
 }>;
 

@@ -58,6 +58,7 @@ export type ComposeScreenProperties = Readonly<{
   body: string;
   /** 插入之后光标要放在哪；null 表示不干预，交给输入框自己管。 */
   caret: number | null;
+  cashtagFailure: string | null;
   cashtagQuery: string;
   /** null 表示还没搜；空数组表示搜过了，确实没有。 */
   cashtagResults: readonly SearchHit[] | null;
@@ -88,6 +89,7 @@ export function ComposeScreen({
   accounts,
   body,
   caret,
+  cashtagFailure,
   cashtagQuery,
   cashtagResults,
   failure,
@@ -225,7 +227,12 @@ export function ComposeScreen({
             value={cashtagQuery}
           />
           <ScrollView keyboardShouldPersistTaps="handled">
-            {cashtagResults === null && cashtagQuery.trim().length > 0 ? (
+            {cashtagFailure === null ? null : (
+              <Text style={styles.panelHint}>{cashtagFailure}</Text>
+            )}
+            {cashtagFailure === null &&
+            cashtagResults === null &&
+            cashtagQuery.trim().length > 0 ? (
               <Text style={styles.panelHint}>正在搜……</Text>
             ) : null}
             {cashtagResults !== null && cashtagResults.length === 0 ? (

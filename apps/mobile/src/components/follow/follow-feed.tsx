@@ -1,5 +1,6 @@
 import { tokens } from "@huoqiu/native-ui";
 import {
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -37,6 +38,8 @@ export type FollowFeedProperties = Readonly<{
   failure: string | null;
   following: readonly string[];
   loading: boolean;
+  onOpenPost: (postId: string) => void;
+  onOpenUser: (accountId: string) => void;
   onRefresh: () => void;
   posts: readonly SocialPost[];
   signedIn: boolean;
@@ -52,6 +55,8 @@ export function FollowFeed({
   failure,
   following,
   loading,
+  onOpenPost,
+  onOpenUser,
   onRefresh,
   posts,
   signedIn,
@@ -90,7 +95,16 @@ export function FollowFeed({
 
       {signedIn ? null : <Notice text="登录后这里会显示你关注的人发的内容。" />}
 
-      {signedIn && followed.length === 0 && failure === null ? (
+      {/*
+        还在取的时候不要下结论。
+        这一屏是启动后的第一屏：关注了二十个人的用户每次冷启动都先看到
+        「还没有关注任何人」，慢网下这句话会停留好几秒——而它是假的。
+      */}
+      {signedIn && loading && followed.length === 0 && failure === null ? (
+        <Notice text="正在读取关注的人发的内容……" />
+      ) : null}
+
+      {signedIn && !loading && followed.length === 0 && failure === null ? (
         <Notice
           text={
             following.length === 0
@@ -100,9 +114,27 @@ export function FollowFeed({
         />
       ) : null}
 
+      {/*
+        整张卡可点进详情，作者那一行单独可点进主页。此前两者都不可点：在关注流
+        里看到一条帖子想看评论，点不动；想看这个人还写过什么，也点不动——而
+        详情页和用户主页都是做好了的。
+      */}
       {followed.map((post) => (
-        <View key={post.id} style={styles.card}>
-          <View style={styles.author}>
+        <Pressable
+          accessibilityRole="button"
+          key={post.id}
+          onPress={() => {
+            onOpenPost(post.id);
+          }}
+          style={styles.card}
+        >
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              onOpenUser(post.authorId);
+            }}
+            style={styles.author}
+          >
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
                 {post.authorName.slice(0, 1)}
@@ -110,12 +142,12 @@ export function FollowFeed({
             </View>
             <Text style={styles.authorName}>{post.authorName}</Text>
             <Text style={styles.time}>{formatTime(post.createdAt)}</Text>
-          </View>
+          </Pressable>
           {hasWrittenTitle(post.title, post.body) ? (
             <Text style={styles.title}>{post.title}</Text>
           ) : null}
           <Text style={styles.body}>{post.body}</Text>
-        </View>
+        </Pressable>
       ))}
     </ScrollView>
   );
@@ -138,14 +170,15 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: "center",
     backgroundColor: tokens.brand.subtle,
-    borderRadius: 22,
-    height: 44,
+    /* 参考图里信息流的头像是 32，详情页评论才是 36。 */
+    borderRadius: 16,
+    height: 32,
     justifyContent: "center",
-    width: 44,
+    width: 32,
   },
   avatarText: {
     color: tokens.brand.primary,
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: "700",
   },
   body: {
@@ -156,7 +189,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: tokens.surface.base,
     borderColor: tokens.border.default,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     gap: 10,
     padding: 16,

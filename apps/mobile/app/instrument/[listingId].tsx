@@ -84,11 +84,13 @@ export default function InstrumentScreen() {
   return (
     <InstrumentView
       announcements={announcements.value}
+      announcementsFailure={announcements.failure}
       chart={chart.value}
       chartFailure={chart.failure}
       chartLoading={chart.loading}
       discussions={posts.value === null ? null : discussions}
       etfs={etfs.value}
+      etfsFailure={etfs.failure}
       onBack={onBack}
       onCompose={() => {
         router.push({

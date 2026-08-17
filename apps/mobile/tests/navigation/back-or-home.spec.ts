@@ -36,11 +36,18 @@ describe("back or home", () => {
   });
 
   it("honours a fallback other than home", () => {
-    /* 组合详情回组合列表、消息回「我的」——回错地方比回不去更让人迷路。 */
+    /*
+     * 组合详情回自选页签（组合是它的一个分段）、消息回「我的」——回错地方
+     * 比回不去更让人迷路。
+     *
+     * 这条此前写的是 "/portfolios"，而那个路由早就不存在了：用例照着实现
+     * 抄了一遍，于是它守住的是那个 bug 本身。回落目标现在由 TabHref 钉死，
+     * 只有真实存在的五个页签能传进来。
+     */
     const router = makeRouter(false);
 
-    createD0BackHandler(router, "/portfolios")();
+    createD0BackHandler(router, "/watchlist")();
 
-    expect(router.replace).toHaveBeenCalledWith("/portfolios");
+    expect(router.replace).toHaveBeenCalledWith("/watchlist");
   });
 });

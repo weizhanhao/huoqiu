@@ -41,6 +41,7 @@ const render = (
       picking={false}
       query=""
       results={null}
+      resultsFailure={null}
       saving={false}
       summary=""
       {...overrides}
@@ -140,5 +141,16 @@ describe("portfolio composer", () => {
 
     expect(markup).toContain("贵州茅台");
     expect(markup).not.toContain("无页品种");
+  });
+  it("does not call a failed search an empty result", () => {
+    const broken = render({
+      picking: true,
+      query: "茅台",
+      results: null,
+      resultsFailure: "连不上服务器。确认手机和服务在同一个网络里。",
+    });
+
+    expect(broken).toContain("连不上服务器");
+    expect(broken).not.toContain("没有匹配");
   });
 });

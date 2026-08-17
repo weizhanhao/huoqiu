@@ -19,7 +19,11 @@ import { EntryGrid } from "../../src/components/shell/entry-grid";
 import { useComingSoon } from "../../src/components/system/coming-soon";
 import { useRemote } from "../../src/hooks/use-remote";
 import { appTouchMinimum } from "../../src/styles/app-touch";
-import { signColor, signedPercent } from "../../src/styles/market-sign";
+import {
+  fixedOrMissing,
+  signColor,
+  signedPercent,
+} from "../../src/styles/market-sign";
 
 /*
  * 基金页签。
@@ -176,7 +180,7 @@ export default function FundScreen() {
             <View style={styles.rowMain}>
               <Text style={styles.name}>{fund.name}</Text>
               <Text style={styles.meta}>
-                {fund.category} · {fund.code} · 净值 {fund.nav.toFixed(4)}（
+                {fund.category} · {fund.code} · 净值 {fixedOrMissing(fund.nav, 4)}（
                 {fund.navDate}）
               </Text>
             </View>

@@ -36,6 +36,8 @@ const render = (
       failure={null}
       following={[]}
       loading={false}
+      onOpenPost={vi.fn()}
+      onOpenUser={vi.fn()}
       onRefresh={vi.fn()}
       posts={[]}
       signedIn
@@ -137,5 +139,28 @@ describe("mobile follow feed", () => {
     expect(render({ following: ["alice"], posts: [] })).toContain(
       "你关注的人还没有发过内容",
     );
+  });
+  it("does not claim you follow nobody while it is still loading", () => {
+    /*
+     * 这是启动后的第一屏。关注了二十个人的用户每次冷启动都先看到「还没有
+     * 关注任何人」，慢网下这句话停留好几秒——它是假的，而且正好劝退。
+     */
+    const loading = render({ loading: true });
+    const settled = render({ loading: false });
+
+    expect(loading).toContain("正在读取");
+    expect(loading).not.toContain("还没有关注任何人");
+    expect(settled).toContain("还没有关注任何人");
+  });
+
+  it("lets you open the post and its author", () => {
+    /* 两者此前都不可点，而详情页和用户主页都是做好了的。 */
+    const markup = render({
+      following: ["acct_1"],
+      posts: [post("post_1", "acct_1", "写点什么", "2026-08-17T01:00:00.000Z")],
+    });
+
+    /* 卡片本身与作者行各是一个按钮。 */
+    expect(markup.split('role="button"').length - 1).toBeGreaterThanOrEqual(2);
   });
 });

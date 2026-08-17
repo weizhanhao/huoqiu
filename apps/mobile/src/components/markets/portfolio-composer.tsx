@@ -69,6 +69,7 @@ export type PortfolioComposerProperties = Readonly<{
   query: string;
   /** null 表示还没搜；空数组表示搜过了，确实没有。 */
   results: readonly SearchHit[] | null;
+  resultsFailure: string | null;
   saving: boolean;
   summary: string;
 }>;
@@ -89,6 +90,7 @@ export function PortfolioComposer({
   picking,
   query,
   results,
+  resultsFailure,
   saving,
   summary,
 }: PortfolioComposerProperties) {
@@ -220,7 +222,12 @@ export function PortfolioComposer({
               style={styles.pickerInput}
               value={query}
             />
-            {results === null && query.trim().length > 0 ? (
+            {resultsFailure === null ? null : (
+              <Text style={styles.pickerHint}>{resultsFailure}</Text>
+            )}
+            {resultsFailure === null &&
+            results === null &&
+            query.trim().length > 0 ? (
               <Text style={styles.pickerHint}>正在搜……</Text>
             ) : null}
             {results !== null && results.length === 0 ? (

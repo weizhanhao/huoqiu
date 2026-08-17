@@ -96,11 +96,14 @@ export default function SearchRoute() {
     void (async () => {
       const loaded = await Promise.all(
         rows.map(async (row) => {
-          const symbol = row.href.split("/").pop() ?? "";
+          /* 没有站内页的市场取不到分时，那一行就不画走势图。 */
+          if (row.href === null) return null;
+          const href = row.href;
+          const symbol = href.split("/").pop() ?? "";
           const series = await fetchChart(symbol, "intraday");
           if (series.kind !== "ok" || series.value.kind !== "line") return null;
           return [
-            row.href,
+            href,
             series.value.points.map((point) => point.price),
           ] as const;
         }),

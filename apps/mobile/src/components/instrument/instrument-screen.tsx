@@ -27,7 +27,7 @@ import { PriceChart } from "./price-chart";
  * 直接不显示这一档，而不是给一个点开永远是空的页签。
  */
 
-export type InstrumentTab = "announcements" | "discussion" | "etfs" | "news";
+export type InstrumentTab = "announcements" | "discussion" | "etfs";
 
 const periods: readonly Readonly<{ id: ChartPeriod; label: string }>[] = [
   { id: "intraday", label: "分时" },
@@ -40,20 +40,32 @@ const periods: readonly Readonly<{ id: ChartPeriod; label: string }>[] = [
   { id: "m15", label: "15分" },
 ];
 
+/*
+ * 「相关ETF」改叫「ETF」。
+ *
+ * 服务端那条接口（/api/market/etfs）只认排序和翻页，根本没有「这只股票被
+ * 哪些 ETF 持有」的概念——它回的是全市场按成交额排的 ETF。挂着「相关」两个
+ * 字，等于把无关数据说成相关：读的人会以为这几只跟手上这只票有关系，
+ * 然后据此做判断。而它不会报错，每一行看起来都正常。
+ *
+ * 资讯那一档也去掉了：点开永远是一句「还没做」，而这个文件开头自己写着
+ * 「不给一个点开永远是空的页签」。
+ */
 const tabs: readonly Readonly<{ id: InstrumentTab; label: string }>[] = [
   { id: "discussion", label: "讨论" },
-  { id: "news", label: "资讯" },
   { id: "announcements", label: "公告" },
-  { id: "etfs", label: "相关ETF" },
+  { id: "etfs", label: "ETF" },
 ];
 
 export type InstrumentScreenProperties = Readonly<{
   announcements: readonly Announcement[] | null;
+  announcementsFailure: string | null;
   chart: ChartSeries | null;
   chartFailure: string | null;
   chartLoading: boolean;
   discussions: readonly SocialPost[] | null;
   etfs: readonly HotRow[] | null;
+  etfsFailure: string | null;
   onBack: () => void;
   onCompose: () => void;
   onOpenAnnouncement: (item: Announcement) => void;
@@ -83,11 +95,13 @@ const Metric = ({
 
 export function InstrumentScreen({
   announcements,
+  announcementsFailure,
   chart,
   chartFailure,
   chartLoading,
   discussions,
   etfs,
+  etfsFailure,
   onBack,
   onCompose,
   onOpenAnnouncement,
@@ -201,7 +215,19 @@ export function InstrumentScreen({
           ))}
         </View>
 
-        {tab === "discussion" && (discussions === null || discussions.length === 0) ? (
+        {/*
+          「还没取到」和「没人讨论过」是两件事。混成一句，网慢时每只票都
+          看起来无人问津——而那是假的。
+        */}
+        {tab === "discussion" && discussions === null ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>正在读取讨论……</Text>
+          </View>
+        ) : null}
+
+        {tab === "discussion" &&
+        discussions !== null &&
+        discussions.length === 0 ? (
           <View style={styles.notice}>
             <Text style={styles.noticeText}>
               还没有人讨论这只标的。在帖子里写上它的代码，就会出现在这里。
@@ -227,10 +253,25 @@ export function InstrumentScreen({
             ))
           : null}
 
-        {tab === "announcements" &&
-        (announcements === null || announcements.length === 0) ? (
+        {tab === "announcements" && announcementsFailure !== null ? (
           <View style={styles.notice}>
-            <Text style={styles.noticeText}>还没有取到公告。</Text>
+            <Text style={styles.noticeText}>{announcementsFailure}</Text>
+          </View>
+        ) : null}
+
+        {tab === "announcements" &&
+        announcementsFailure === null &&
+        announcements === null ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>正在读取公告……</Text>
+          </View>
+        ) : null}
+
+        {tab === "announcements" &&
+        announcements !== null &&
+        announcements.length === 0 ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>这只标的最近没有公告。</Text>
           </View>
         ) : null}
 
@@ -252,17 +293,24 @@ export function InstrumentScreen({
             ))
           : null}
 
-        {tab === "news" ? (
+        {tab === "etfs" ? (
           <View style={styles.notice}>
             <Text style={styles.noticeText}>
-              这只标的的专属资讯还没做。首页的「资讯」频道有全市场快讯。
+              我们还没有「这只票被哪些 ETF 持有」的数据。下面是按成交额排的
+              全市场 ETF，不是按相关度排的。
             </Text>
           </View>
         ) : null}
 
-        {tab === "etfs" && (etfs === null || etfs.length === 0) ? (
+        {tab === "etfs" && etfsFailure !== null ? (
           <View style={styles.notice}>
-            <Text style={styles.noticeText}>没有相关的 ETF。</Text>
+            <Text style={styles.noticeText}>{etfsFailure}</Text>
+          </View>
+        ) : null}
+
+        {tab === "etfs" && etfsFailure === null && etfs === null ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>正在读取 ETF……</Text>
           </View>
         ) : null}
 
@@ -271,8 +319,9 @@ export function InstrumentScreen({
               <Pressable
                 accessibilityRole="button"
                 key={row.code}
+                disabled={row.href === null}
                 onPress={() => {
-                  onOpenEtf(row.href);
+                  if (row.href !== null) onOpenEtf(row.href);
                 }}
                 style={styles.etfRow}
               >

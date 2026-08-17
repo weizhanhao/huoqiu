@@ -272,6 +272,15 @@ export default function HomeScreen() {
             failure={failure}
             following={following}
             loading={loading}
+            onOpenPost={(postId) => {
+              router.push({ params: { postId }, pathname: "/post/[postId]" });
+            }}
+            onOpenUser={(accountId) => {
+              router.push({
+                params: { accountId },
+                pathname: "/user/[accountId]",
+              });
+            }}
             onRefresh={refreshAll}
             posts={posts}
             signedIn={account !== null}
