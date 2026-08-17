@@ -422,7 +422,14 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     borderBottomColor: tokens.border.subtle,
+    /*
+     * 分隔线从标签左缘起，不通栏。
+     *
+     * 参考图里卡内的每一条 1px 线都内缩到文字起点——通栏会把一张卡切成
+     * 几块看起来不相干的横条。
+     */
     borderBottomWidth: 1,
+    marginLeft: 16,
     flexDirection: "row",
     gap: 10,
     minHeight: appTouchMinimum,

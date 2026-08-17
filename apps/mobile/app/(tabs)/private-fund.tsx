@@ -159,11 +159,12 @@ export default function PrivateFundScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    gap: 12,
-    padding: 16,
+    /* 行是通栏的，左右留白由每一行自己给。 */
+    gap: 0,
     paddingBottom: 36,
   },
   disclosure: {
+    paddingHorizontal: 16,
     color: tokens.text.tertiary,
     fontSize: 12,
     lineHeight: 18,
@@ -235,9 +236,8 @@ const styles = StyleSheet.create({
   },
   row: {
     backgroundColor: tokens.surface.base,
-    borderColor: tokens.border.default,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderBottomColor: tokens.border.subtle,
+    borderBottomWidth: 1,
     gap: 3,
     padding: 14,
   },
@@ -246,6 +246,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
+    paddingHorizontal: 16,
     color: tokens.text.primary,
     fontSize: 16,
     fontWeight: "600",

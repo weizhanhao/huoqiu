@@ -239,11 +239,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   content: {
-    gap: 12,
-    padding: 16,
+    /* 行是通栏的，左右留白由每一行自己给。 */
+    gap: 0,
     paddingBottom: 36,
   },
   disclosure: {
+    paddingHorizontal: 16,
     color: tokens.text.tertiary,
     fontSize: 12,
     marginTop: 4,
@@ -298,13 +299,12 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     backgroundColor: tokens.surface.base,
-    borderColor: tokens.border.default,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderBottomColor: tokens.border.subtle,
+    borderBottomWidth: 1,
     flexDirection: "row",
     gap: 12,
     minHeight: 64,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 12,
   },
   rowMain: {

@@ -141,11 +141,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   content: {
-    gap: 10,
-    padding: 16,
+    /* 行之间不留缝：分隔靠细线，分节靠 8pt 灰带。 */
     paddingBottom: 36,
   },
   disclosure: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
     color: tokens.text.tertiary,
     fontSize: 12,
     marginTop: 4,
@@ -153,6 +154,8 @@ const styles = StyleSheet.create({
   },
   heading: {
     color: tokens.text.primary,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     fontSize: 22,
     fontWeight: "700",
   },
@@ -169,6 +172,7 @@ const styles = StyleSheet.create({
   notice: {
     backgroundColor: tokens.surface.subtle,
     borderRadius: 12,
+    margin: 16,
     padding: 16,
   },
   noticeText: {
@@ -183,14 +187,20 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     backgroundColor: tokens.surface.base,
-    borderColor: tokens.border.default,
-    borderRadius: 12,
-    borderWidth: 1,
+    /*
+     * 通栏白行 + 组内细线，不是圆角描边卡。
+     *
+     * 参考图这几屏都是这个结构：白底铺满、行与行之间一条从文字左缘起的 1px
+     * 细线、区块之间一条 8pt 灰带。做成一张张描边卡之后，同样一屏高度只能放
+     * 下更少的行，还显得空——这就是「密度差距」的具体来源。
+     */
+    borderBottomColor: tokens.border.subtle,
+    borderBottomWidth: 1,
     flexDirection: "row",
     gap: 12,
-    minHeight: 64,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    minHeight: 56,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   rowMain: {
     flex: 1,
