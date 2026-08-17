@@ -431,7 +431,23 @@ export type InstrumentQuote = Readonly<{
 }>;
 
 export type InstrumentLive = Readonly<{
-  metrics?: Readonly<Record<string, number | null>>;
+  /*
+   * 五行报价里除了开高低收之外的那些。
+   *
+   * 此前这里是 Record<string, number | null> ——什么名字都能取，取错了也不会
+   * 报错，只是永远拿到 undefined。而这一整块此前根本没往界面上传，参考图里
+   * 五行的报价头我们只画了四个数。
+   */
+  metrics?: Readonly<{
+    amount: number | null;
+    amplitudePercent: number | null;
+    peTtm: number | null;
+    priceToBook: number | null;
+    totalMarketCap: number | null;
+    turnoverPercent: number | null;
+    volumeRatio: number | null;
+    volumeShares: number | null;
+  }>;
   quote: InstrumentQuote;
 }>;
 

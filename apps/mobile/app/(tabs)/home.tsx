@@ -312,7 +312,20 @@ export default function HomeScreen() {
           }
           router.push("/compose");
         }}
-        onOpenSearch={() => router.push("/search")}
+        onOpenSearch={() => {
+          /*
+           * 把搜索框里那句热搜带过去。
+           *
+           * 此前只 push("/search")，搜索页的输入框是空的——用户点的就是那句
+           * 话，到了搜索页它却不见了。
+           */
+          const hot = news.value?.[0]?.title ?? "";
+          router.push(
+            hot.length === 0
+              ? "/search"
+              : { params: { q: hot }, pathname: "/search" },
+          );
+        }}
       />
 
       <ChannelBar

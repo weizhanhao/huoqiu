@@ -34,7 +34,14 @@ export type SignInFormProperties = Readonly<{
 type Mode = "login" | "register";
 
 export function SignInForm({ onLogin, onRegister }: SignInFormProperties) {
-  const [mode, setMode] = useState<Mode>("register");
+  /*
+   * 默认停在登录。
+   *
+   * 此前默认是注册：退出登录后再进「我的」，看到的是一个大写的「注册」，
+   * 已有账号的人得先找到最底下那行小字才切得回来。而这一屏最常见的来客是
+   * 「我有账号，只是被登出了」。
+   */
+  const [mode, setMode] = useState<Mode>("login");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -99,6 +106,8 @@ export function SignInForm({ onLogin, onRegister }: SignInFormProperties) {
           autoCapitalize="none"
           autoComplete="email"
           keyboardType="email-address"
+          /* 让 iOS 钥匙串认出这是邮箱，才会提示自动填充。 */
+          textContentType="emailAddress"
           onChangeText={setEmail}
           placeholder="you@example.com"
           placeholderTextColor={tokens.text.tertiary}
@@ -111,11 +120,19 @@ export function SignInForm({ onLogin, onRegister }: SignInFormProperties) {
         <Text style={styles.label}>密码</Text>
         <TextInput
           autoCapitalize="none"
+          /*
+           * 注册时说 newPassword，登录时说 password。
+           *
+           * 不说的话，钥匙串既不会在注册时提议一个强密码，也不会在登录时提示
+           * 填充——而服务端要求 12 位以上，等于逼着人自己编一个再记住。
+           */
+          autoComplete={isRegister ? "new-password" : "current-password"}
           onChangeText={setPassword}
           placeholder="至少 12 位"
           placeholderTextColor={tokens.text.tertiary}
           secureTextEntry
           style={styles.input}
+          textContentType={isRegister ? "newPassword" : "password"}
           value={password}
         />
       </View>

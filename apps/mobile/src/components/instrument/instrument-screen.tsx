@@ -7,12 +7,18 @@ import type {
   ChartPeriod,
   ChartSeries,
   HotRow,
+  InstrumentLive,
   InstrumentQuote,
 } from "../../api/market-api";
 import type { SocialPost } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
 import { useSignColor } from "../../styles/market-colors";
-import { signedAmount, signedPercent } from "../../styles/market-sign";
+import {
+  MISSING,
+  fixedOrMissing,
+  signedAmount,
+  signedPercent,
+} from "../../styles/market-sign";
 import { PriceChart } from "./price-chart";
 
 /*
@@ -64,6 +70,8 @@ export type InstrumentScreenProperties = Readonly<{
   discussions: readonly SocialPost[] | null;
   etfs: readonly HotRow[] | null;
   etfsFailure: string | null;
+  /** 五行报价里除开高低收之外的那些；上游没给时为 undefined。 */
+  metrics: InstrumentLive["metrics"];
   onBack: () => void;
   onCompose: () => void;
   onOpenAnnouncement: (item: Announcement) => void;
@@ -80,6 +88,21 @@ export type InstrumentScreenProperties = Readonly<{
   tab: InstrumentTab;
   watchlisted: boolean;
 }>;
+
+/* 一亿以上说「亿」，一万以上说「万」——原始位数在手机上读不出量级。 */
+const money = (value: number | null | undefined): string => {
+  if (value === null || value === undefined) return MISSING;
+  if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(2)} 亿`;
+  if (Math.abs(value) >= 1e4) return `${(value / 1e4).toFixed(2)} 万`;
+  return value.toFixed(2);
+};
+
+/* 成交量上游给的是股，A 股按手读。 */
+const lots = (shares: number | null | undefined): string =>
+  shares === null || shares === undefined ? MISSING : money(shares / 100);
+
+const percent = (value: number | null | undefined): string =>
+  value === null || value === undefined ? MISSING : `${value.toFixed(2)}%`;
 
 const Metric = ({
   label,
@@ -100,6 +123,7 @@ export function InstrumentScreen({
   discussions,
   etfs,
   etfsFailure,
+  metrics,
   onBack,
   onCompose,
   onOpenAnnouncement,
@@ -161,6 +185,19 @@ export function InstrumentScreen({
               <Metric label="最高" value={quote.high.toFixed(2)} />
               <Metric label="最低" value={quote.low.toFixed(2)} />
               <Metric label="昨收" value={quote.previousClose.toFixed(2)} />
+              {/*
+                后面这些此前取回来了却没往界面上传：参考图的报价头是五行，
+                我们只画了四个数，而数据一直在手里。取不到的那格写「—」，
+                不留空——留空看起来像排版坏了。
+              */}
+              <Metric label="成交量" value={lots(metrics?.volumeShares)} />
+              <Metric label="成交额" value={money(metrics?.amount)} />
+              <Metric label="换手" value={percent(metrics?.turnoverPercent)} />
+              <Metric label="振幅" value={percent(metrics?.amplitudePercent)} />
+              <Metric label="量比" value={fixedOrMissing(metrics?.volumeRatio, 2)} />
+              <Metric label="市盈TTM" value={fixedOrMissing(metrics?.peTtm, 2)} />
+              <Metric label="市净" value={fixedOrMissing(metrics?.priceToBook, 2)} />
+              <Metric label="总市值" value={money(metrics?.totalMarketCap)} />
             </View>
           )}
         </View>
@@ -479,11 +516,12 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     color: tokens.text.tertiary,
-    fontSize: 11.5,
+    /* 参考图实测：标签 12，数值 15。此前是 11.5 / 13，整体偏小一档。 */
+    fontSize: 12,
   },
   metricValue: {
     color: tokens.text.primary,
-    fontSize: 13,
+    fontSize: 15,
     fontVariant: ["tabular-nums"],
   },
   metrics: {

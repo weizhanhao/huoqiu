@@ -92,6 +92,7 @@ export default function InstrumentScreen() {
       discussions={posts.value === null ? null : discussions}
       etfs={etfs.value}
       etfsFailure={etfs.failure}
+      metrics={live.value?.metrics}
       onBack={onBack}
       onCompose={() => {
         router.push({

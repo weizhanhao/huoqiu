@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Keyboard, Linking } from "react-native";
 
@@ -31,7 +31,12 @@ export default function SearchRoute() {
   const router = useRouter();
   const onBack = createD0BackHandler(router);
 
-  const [query, setQuery] = useState("");
+  const parameters = useLocalSearchParams<{ q?: string | string[] }>();
+  const initialQuery = Array.isArray(parameters.q)
+    ? (parameters.q[0] ?? "")
+    : (parameters.q ?? "");
+  /* 从首页带过来的热搜词。没带就是空的。 */
+  const [query, setQuery] = useState(initialQuery);
   /*
    * 一份状态里同时记着「搜的是哪个词」和「搜到了什么」。
    *
