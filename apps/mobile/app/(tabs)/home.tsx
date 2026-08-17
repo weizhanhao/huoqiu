@@ -246,7 +246,10 @@ export default function HomeScreen() {
           <StarChannel
             accounts={accounts}
             onOpenUser={(accountId) => {
-              show("用户主页", `还没做这一页。账号 id：${accountId}`);
+              router.push({
+                params: { accountId },
+                pathname: "/user/[accountId]",
+              });
             }}
           />
         ) : null}

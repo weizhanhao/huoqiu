@@ -1619,15 +1619,33 @@ export const listLikedPostIds = (accountId: string): readonly string[] =>
 
 export type RealNotification = Readonly<{
   actorName: string;
-  category: "follows" | "likes" | "replies";
+  category: "follows" | "likes" | "mentions" | "replies";
   createdAt: string;
   href: string;
   id: string;
   isRead: boolean;
-  kind: "comment" | "follow" | "like" | "quote";
+  kind: "comment" | "follow" | "like" | "mention" | "quote";
   summary: string;
   targetLabel: string;
 }>;
+
+/*
+ * 正文里 @ 到了谁。
+ *
+ * 规则跟正文解析那份一致（@ 后面连着的中文、字母、数字、下划线，最多 24 个），
+ * 而且要整段相等才算：只用 includes("@林岸") 的话，「@林岸北」也会给林岸发一条
+ * 通知——被 @ 的其实是另一个人。
+ */
+const mentionedNames = (body: string): ReadonlySet<string> => {
+  const names = new Set<string>();
+  for (const match of body.matchAll(
+    /@(?<mention>[一-龥A-Za-z0-9_]{1,24})/gu,
+  )) {
+    const name = match.groups?.mention;
+    if (name !== undefined) names.add(name);
+  }
+  return names;
+};
 
 /*
  * 从真实事件推导通知。
@@ -1733,6 +1751,61 @@ export const listNotifications = (
     }));
 
   /*
+   * 提到我的。
+   *
+   * 设置页早就有「提到我的」这个开关，但没有任何东西产出这一类——那个开关
+   * 一直是个空挡，关不关都一样。发帖器把 @ 写进正文，事件本来就在库里，
+   * 只是没人去读。
+   */
+  const myName = store.accounts.find(
+    (account) => account.id === accountId,
+  )?.displayName;
+
+  const mentions: RealNotification[] =
+    myName === undefined
+      ? []
+      : [
+          ...store.posts
+            .filter(
+              (post) =>
+                post.authorId !== accountId &&
+                mentionedNames(post.body).has(myName),
+            )
+            .map(
+              (post): RealNotification => ({
+                actorName: nameOf(post.authorId),
+                category: "mentions",
+                createdAt: post.createdAt,
+                href: `/community/posts/${post.id}`,
+                id: `notification_mention_post_${post.id}`,
+                isRead: true,
+                kind: "mention",
+                summary: post.body.slice(0, 60),
+                targetLabel: post.title,
+              }),
+            ),
+          ...store.comments
+            .filter(
+              (comment) =>
+                comment.authorId !== accountId &&
+                mentionedNames(comment.body).has(myName),
+            )
+            .map(
+              (comment): RealNotification => ({
+                actorName: nameOf(comment.authorId),
+                category: "mentions",
+                createdAt: comment.createdAt,
+                href: `/community/posts/${comment.postId}`,
+                id: `notification_mention_comment_${comment.id}`,
+                isRead: true,
+                kind: "mention",
+                summary: comment.body.slice(0, 60),
+                targetLabel: titleOf(comment.postId),
+              }),
+            ),
+        ];
+
+  /*
    * 关掉的分类不出现在结果里。
    *
    * 过滤放在这里而不是界面：只在界面藏起来，未读计数照样会跳，
@@ -1743,7 +1816,7 @@ export const listNotifications = (
       ?.mutedCategories ?? [],
   );
 
-  return [...follows, ...quotes, ...likes, ...comments]
+  return [...follows, ...quotes, ...likes, ...comments, ...mentions]
     .filter((notification) => !muted.has(notification.category))
     .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt));
 };

@@ -53,7 +53,6 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-import MessagesScreen from "../../../app/messages";
 import PortfolioDetailScreen from "../../../app/portfolio/[portfolioId]";
 import SettingsScreen from "../../../app/settings";
 
@@ -147,13 +146,15 @@ describe("D0 mobile route behavior", () => {
    * tests/component/account/profile-screen.spec.tsx 接手。
    */
 
-  it("renders fixed messages and returns a fresh deep link to profile", () => {
-    const messages = readProperties(MessagesScreen() as ReactElement);
-
-    expect(messages.messages).toHaveLength(3);
-    messages.onBack?.();
-    expect(mocks.router.replace).toHaveBeenCalledWith("/profile");
-  });
+  /*
+   * 消息页也从这里去掉了。
+   *
+   * 它此前渲染三条写死的合成消息，这条用例断的正是那个 3。现在读的是
+   * /api/social/notifications——服务端从真实事件推导，条数取决于真有多少人
+   * 回复、点赞、@ 了你，没有可断的固定长度。
+   *
+   * 新行为由 tests/component/messages/ 下的用例接手。
+   */
 
   it("keeps session settings state and returns a fresh deep link to profile", () => {
     const settings = readProperties(SettingsScreen() as ReactElement);

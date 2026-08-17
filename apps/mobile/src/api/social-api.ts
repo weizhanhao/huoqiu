@@ -132,6 +132,76 @@ export const setBookmarked = async (
     token,
   });
 
+/*
+ * 别人的主页。
+ *
+ * 只有公开的那一部分：昵称、简介、关注数、发过的帖子。收藏和回复不在这里，
+ * 那两样只有本人看得到。
+ */
+export type ProfilePost = Readonly<{
+  body: string;
+  href: string;
+  id: string;
+  publishedLabel: string;
+  title: string;
+}>;
+
+export type UserProfile = Readonly<{
+  bio: string;
+  displayName: string;
+  followerCount: number;
+  followingCount: number;
+  id: string;
+  isRegisteredAccount: boolean;
+  joinedLabel: string;
+  postCount: number;
+  posts: readonly ProfilePost[];
+  role: string;
+}>;
+
+export const fetchUserProfile = async (
+  accountId: string,
+): Promise<ApiResult<UserProfile>> => {
+  const result = await request<Readonly<{ profile?: UserProfile }>>(
+    `/api/social/users/${encodeURIComponent(accountId)}`,
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return result.value.profile === undefined
+    ? { kind: "rejected", message: "服务端没有返回这个账号的资料。" }
+    : { kind: "ok", value: result.value.profile };
+};
+
+/*
+ * 消息。
+ *
+ * 服务端从真实事件推导：谁关注了我、谁回复了我、谁赞了我、谁在正文里 @ 了我。
+ * 没有「消息表」这种东西——事件本来就落在库里，通知只是它的另一种读法。
+ *
+ * 未登录时服务端回空列表而不是 401，所以这里也不必特殊处理。
+ */
+export type Notification = Readonly<{
+  actorName: string;
+  category: "follows" | "likes" | "mentions" | "replies";
+  createdAt: string;
+  href: string;
+  id: string;
+  isRead: boolean;
+  kind: "comment" | "follow" | "like" | "mention" | "quote";
+  summary: string;
+  targetLabel: string;
+}>;
+
+export const fetchNotifications = async (
+  token: string,
+): Promise<ApiResult<readonly Notification[]>> => {
+  const result = await request<
+    Readonly<{ notifications?: readonly Notification[] }>
+  >("/api/social/notifications", { method: "GET", token });
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.notifications ?? [] };
+};
+
 export const fetchTopics = async (): Promise<ApiResult<readonly string[]>> => {
   const result = await request<Readonly<{ topics?: readonly string[] }>>(
     "/api/social/topics",

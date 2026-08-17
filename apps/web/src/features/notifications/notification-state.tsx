@@ -35,15 +35,29 @@ type RealNotification = Readonly<{
   href: string;
   id: string;
   isRead: boolean;
-  kind: "follow" | "quote";
+  kind: "comment" | "follow" | "like" | "mention" | "quote";
   summary: string;
   targetLabel: string;
 }>;
 
+/*
+ * 每种通知说自己那句话。
+ *
+ * 这里原先只认 follow 和 quote，其余一律写「转发了你的帖子」——于是有人评论、
+ * 有人点赞，通知上都说是转发。服务端一直在给 kind，是这一侧没接住。
+ */
+const actionOf = (kind: RealNotification["kind"]): string => {
+  if (kind === "follow") return "关注了你";
+  if (kind === "comment") return "回复了你的帖子";
+  if (kind === "like") return "赞了你的帖子";
+  if (kind === "mention") return "提到了你";
+  return "转发了你的帖子";
+};
+
 const toDisplayNotification = (
   real: RealNotification,
 ): SyntheticNotification => ({
-  action: real.kind === "follow" ? "关注了你" : "转发了你的帖子",
+  action: actionOf(real.kind),
   actor: {
     initials: [...real.actorName][0] ?? "火",
     name: real.actorName,

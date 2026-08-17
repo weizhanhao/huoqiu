@@ -153,4 +153,70 @@ describe("notifications derived from real events", () => {
     // 查询串里写别人的 id 不该有任何效果——这条端点从来不看它。
     expect(data.notifications).toEqual([]);
   });
+  it("tells you when someone put your name in a post", () => {
+    /*
+     * 设置页早就有「提到我的」这个开关，但在此之前没有任何东西产出这一类——
+     * 那个开关一直是空挡，关不关都一样。
+     */
+    const zhang = account("zhang@example.com", "张远");
+    const lin = account("lin@example.com", "林曦");
+    const written = createPost({
+      accountId: lin.id,
+      body: "@张远 你怎么看这份季报？",
+      now: NOW,
+      title: "问一句",
+    });
+    if ("error" in written) throw new Error(written.error);
+
+    const mentions = listNotifications(zhang.id).filter(
+      (notification) => notification.category === "mentions",
+    );
+
+    expect(mentions).toHaveLength(1);
+    expect(mentions[0]?.actorName).toBe("林曦");
+  });
+
+  it("does not notify someone whose name is only a prefix of the one written", () => {
+    /*
+     * 只用 includes("@张远") 的话，「@张远山」也会给张远发一条——而被 @ 的
+     * 其实是另一个人。名字短的人会因此收到一堆与自己无关的通知。
+     */
+    const zhang = account("zhang@example.com", "张远");
+    const shan = account("shan@example.com", "张远山");
+    const lin = account("lin@example.com", "林曦");
+    const written = createPost({
+      accountId: lin.id,
+      body: "@张远山 这段我同意。",
+      now: NOW,
+      title: "回一句",
+    });
+    if ("error" in written) throw new Error(written.error);
+
+    const forZhang = listNotifications(zhang.id).filter(
+      (notification) => notification.category === "mentions",
+    );
+    const forShan = listNotifications(shan.id).filter(
+      (notification) => notification.category === "mentions",
+    );
+
+    expect(forZhang).toHaveLength(0);
+    expect(forShan).toHaveLength(1);
+  });
+
+  it("does not notify you about your own mention of yourself", () => {
+    const zhang = account("zhang@example.com", "张远");
+    const written = createPost({
+      accountId: zhang.id,
+      body: "@张远 提醒自己：别追高。",
+      now: NOW,
+      title: "自勉",
+    });
+    if ("error" in written) throw new Error(written.error);
+
+    expect(
+      listNotifications(zhang.id).filter(
+        (notification) => notification.category === "mentions",
+      ),
+    ).toHaveLength(0);
+  });
 });
