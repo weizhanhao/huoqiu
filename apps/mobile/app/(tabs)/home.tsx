@@ -61,6 +61,7 @@ export default function HomeScreen() {
   const { show } = useComingSoon();
   const {
     account,
+    accounts,
     callAs,
     failure,
     following,
@@ -121,10 +122,17 @@ export default function HomeScreen() {
 
   const postFeed = (emptyText: string) => (
     <PostChannel
+      accounts={accounts}
       emptyText={emptyText}
       failure={publicPosts.failure}
       following={following}
       loading={publicPosts.loading}
+      onAddToWatchlist={(symbol, label) => {
+        void addToWatchlist(label, `/instruments/${symbol}`);
+      }}
+      onOpenInstrument={(symbol) => {
+        openInstrument(`/instruments/${symbol}`);
+      }}
       onOpenPost={(postId) => {
         show("帖子详情", `还没做这一页。帖子 id：${postId}`);
       }}
@@ -134,6 +142,7 @@ export default function HomeScreen() {
       }}
       posts={publicPosts.value}
       signedIn={account !== null}
+      topics={topics.value ?? []}
       viewerId={account?.id ?? null}
     />
   );

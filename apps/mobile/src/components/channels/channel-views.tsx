@@ -1,6 +1,8 @@
 import { tokens } from "@huoqiu/native-ui";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import type { MentionAccount } from "@huoqiu/domain/social/post-body";
+
 import type { HotRow, NewsItem, VideoItem } from "../../api/market-api";
 import type { SocialPost } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
@@ -38,28 +40,36 @@ export const SectionTitle = ({
 /* ---------------------------------------------------------------- 帖子频道 */
 
 export type PostChannelProperties = Readonly<{
+  accounts: readonly MentionAccount[];
   emptyText: string;
   failure: string | null;
   following: readonly string[];
   loading: boolean;
+  onAddToWatchlist: (symbol: string, label: string) => void;
+  onOpenInstrument: (symbol: string) => void;
   onOpenPost: (postId: string) => void;
   onShowNotice: (title: string, detail: string) => void;
   onToggleFollow: (authorId: string) => void;
   posts: readonly SocialPost[] | null;
   signedIn: boolean;
+  topics: readonly string[];
   viewerId: string | null;
 }>;
 
 export function PostChannel({
+  accounts,
   emptyText,
   failure,
   following,
   loading,
+  onAddToWatchlist,
+  onOpenInstrument,
   onOpenPost,
   onShowNotice,
   onToggleFollow,
   posts,
   signedIn,
+  topics,
   viewerId,
 }: PostChannelProperties) {
   if (failure !== null) return <Notice text={failure} />;
@@ -74,6 +84,7 @@ export function PostChannel({
     <View style={styles.stream}>
       {posts.map((post) => (
         <PostCard
+          accounts={accounts}
           following={
             /* 自己的帖子和未登录都不显示关注按钮——点了也没有意义。 */
             !signedIn || post.authorId === viewerId
@@ -81,14 +92,17 @@ export function PostChannel({
               : following.includes(post.authorId)
           }
           key={post.id}
+          onAddToWatchlist={onAddToWatchlist}
           onOpen={() => {
             onOpenPost(post.id);
           }}
+          onOpenInstrument={onOpenInstrument}
           onShowActionNotice={onShowNotice}
           onToggleFollow={() => {
             onToggleFollow(post.authorId);
           }}
           post={post}
+          topics={topics}
         />
       ))}
     </View>
@@ -273,7 +287,10 @@ export function WatchlistChannel({
                 <Text style={styles.pickCode}>{row.code}</Text>
               </Pressable>
               <Text
-                style={[styles.pickPct, { color: signColor(row.changePercent) }]}
+                style={[
+                  styles.pickPct,
+                  { color: signColor(row.changePercent) },
+                ]}
               >
                 {signedPercent(row.changePercent)}
               </Text>

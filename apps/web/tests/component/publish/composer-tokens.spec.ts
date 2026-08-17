@@ -170,4 +170,24 @@ describe("parsing a whole post", () => {
     });
     expect(segments).toEqual([{ kind: "text", text: "成本 $100 左右" }]);
   });
+
+  it("refuses to render an image that is not in our own upload directory", () => {
+    /*
+     * 只认自家上传目录下的图片。
+     *
+     * 放开成任意地址，等于让任何人往站内页面塞一个站外地址——读者一打开帖子，
+     * 他的 IP 和访问时间就送到了那台服务器上，而页面上看起来只是一张图。
+     *
+     * 这条规则此前没有用例：把 startsWith(uploadPrefix) 整个删掉，这个文件的
+     * 10 条断言一条都不会红。移动端接同一个解析器时才发现这个缺口。
+     */
+    const segments = parsePostBody("![](https://example.com/tracker.png)", {
+      accounts: [],
+      topics: [],
+    });
+
+    expect(segments).toEqual([
+      { kind: "text", text: "![](https://example.com/tracker.png)" },
+    ]);
+  });
 });

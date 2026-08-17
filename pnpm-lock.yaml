@@ -160,6 +160,9 @@ importers:
       '@huoqiu/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@huoqiu/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@huoqiu/native-ui':
         specifier: workspace:*
         version: link:../../packages/native-ui
@@ -232,6 +235,9 @@ importers:
       '@huoqiu/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@huoqiu/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@huoqiu/web-ui':
         specifier: workspace:*
         version: link:../../packages/web-ui

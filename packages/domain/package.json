@@ -7,7 +7,8 @@
   "exports": {
     "./shared/decimal": "./src/shared/decimal.ts",
     "./shared/ids": "./src/shared/ids.ts",
-    "./shared/time": "./src/shared/time.ts"
+    "./shared/time": "./src/shared/time.ts",
+    "./social/post-body": "./src/social/post-body.ts"
   },
   "scripts": {
     "lint": "eslint --config ../config/eslint/base.mjs src test",

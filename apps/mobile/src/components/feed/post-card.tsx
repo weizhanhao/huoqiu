@@ -1,8 +1,11 @@
 import { tokens } from "@huoqiu/native-ui";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import type { MentionAccount } from "@huoqiu/domain/social/post-body";
+
 import type { SocialPost } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
+import { PostBody } from "./post-body";
 
 /*
  * 信息流里的一张帖子卡。
@@ -31,20 +34,29 @@ const hasWrittenTitle = (title: string, body: string): boolean =>
   !body.trim().startsWith(title.trim());
 
 export type PostCardProperties = Readonly<{
+  /** 用于把 @昵称 解析成链接；重名时共享包那边会主动不链接。 */
+  accounts: readonly MentionAccount[];
   /** null 表示不显示关注按钮（自己的帖子，或未登录）。 */
   following: boolean | null;
+  onAddToWatchlist: (symbol: string, label: string) => void;
   onOpen: () => void;
+  onOpenInstrument: (symbol: string) => void;
   onShowActionNotice: (title: string, detail: string) => void;
   onToggleFollow: () => void;
   post: SocialPost;
+  topics: readonly string[];
 }>;
 
 export function PostCard({
+  accounts,
   following,
+  onAddToWatchlist,
   onOpen,
+  onOpenInstrument,
   onShowActionNotice,
   onToggleFollow,
   post,
+  topics,
 }: PostCardProperties) {
   return (
     <View style={styles.card} testID="post-card">
@@ -71,14 +83,23 @@ export function PostCard({
         )}
       </View>
 
-      <Pressable accessibilityRole="button" onPress={onOpen}>
-        {hasWrittenTitle(post.title, post.body) ? (
+      {hasWrittenTitle(post.title, post.body) ? (
+        <Pressable accessibilityRole="button" onPress={onOpen}>
           <Text style={styles.title}>{post.title}</Text>
-        ) : null}
-        <Text numberOfLines={5} style={styles.body}>
-          {post.body}
-        </Text>
-      </Pressable>
+        </Pressable>
+      ) : null}
+
+      {/*
+        正文不整块包成一个按钮：里面的股票引用和「加自选」自己要能点，
+        套在外层按钮里会被它抢走点击。想进详情可以点标题或下面的「讨论」。
+      */}
+      <PostBody
+        accounts={accounts}
+        body={post.body}
+        onAddToWatchlist={onAddToWatchlist}
+        onOpenInstrument={onOpenInstrument}
+        topics={topics}
+      />
 
       {/*
         底部这排是参考图里每张卡都有的。分享和讨论还没做，点了如实说明；
