@@ -22,6 +22,7 @@ export type UserScreenProperties = Readonly<{
   /** null 表示不显示关注按钮（自己的主页，或未登录）。 */
   following: boolean | null;
   onBack: () => void;
+  onOpenChat: () => void;
   onOpenPost: (postId: string) => void;
   onToggleFollow: () => void;
   /** null 表示还没取到。 */
@@ -39,6 +40,7 @@ export function UserScreen({
   failure,
   following,
   onBack,
+  onOpenChat,
   onOpenPost,
   onToggleFollow,
   profile,
@@ -88,6 +90,17 @@ export function UserScreen({
                   {profile.role} · {profile.joinedLabel}
                 </Text>
               </View>
+              {/* 私信入口。服务端的私信一直都在，此前没有任何地方能发起。 */}
+              {following === null ? null : (
+                <Pressable
+                  accessibilityLabel="发私信"
+                  accessibilityRole="button"
+                  onPress={onOpenChat}
+                  style={styles.message}
+                >
+                  <Text style={styles.messageText}>私信</Text>
+                </Pressable>
+              )}
               {following === null ? null : (
                 <Pressable
                   accessibilityRole="button"
@@ -208,6 +221,19 @@ const styles = StyleSheet.create({
   identity: {
     flex: 1,
     gap: 3,
+  },
+  message: {
+    alignItems: "center",
+    borderColor: tokens.border.default,
+    borderRadius: 6,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: 14,
+  },
+  messageText: {
+    color: tokens.text.secondary,
+    fontSize: 14,
   },
   name: {
     color: tokens.text.primary,

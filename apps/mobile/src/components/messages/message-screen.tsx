@@ -2,7 +2,7 @@ import { tokens } from "@huoqiu/native-ui";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import type { Notification } from "../../api/social-api";
+import type { Conversation, Notification } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
 
 /*
@@ -17,6 +17,7 @@ import { appTouchMinimum } from "../../styles/app-touch";
  */
 
 const CATEGORIES = [
+  { glyph: "✉", id: "chats", label: "私信" },
   { glyph: "💬", id: "replies", label: "回复我的" },
   { glyph: "@", id: "mentions", label: "提到我的" },
   { glyph: "👍", id: "likes", label: "赞我的" },
@@ -42,29 +43,38 @@ const formatTime = (iso: string): string => {
 
 export type MessageScreenProperties = Readonly<{
   category: MessageCategory;
+  /** 私信会话。null 表示还没取到。 */
+  conversations: readonly Conversation[] | null;
   failure: string | null;
   /** null 表示还没取到；空数组表示取到了，确实没有。 */
   notifications: readonly Notification[] | null;
   onBack: () => void;
   onOpen: (notification: Notification) => void;
+  onOpenChat: (partnerId: string) => void;
   onSelectCategory: (category: MessageCategory) => void;
   signedIn: boolean;
 }>;
 
 export function MessageScreen({
   category,
+  conversations,
   failure,
   notifications,
   onBack,
   onOpen,
+  onOpenChat,
   onSelectCategory,
   signedIn,
 }: MessageScreenProperties) {
   const insets = useSafeAreaInsets();
   const all = notifications ?? [];
+  const chats = conversations ?? [];
   const shown = all.filter((entry) => entry.category === category);
   const countOf = (id: MessageCategory): number =>
-    all.filter((entry) => entry.category === id).length;
+    id === "chats"
+      ? /* 私信那一格显示未读条数，不是会话总数——没读过的才需要被提醒。 */
+        chats.reduce((sum, chat) => sum + chat.unread, 0)
+      : all.filter((entry) => entry.category === id).length;
 
   return (
     <View style={styles.screen} testID="message-screen">
@@ -125,11 +135,58 @@ export function MessageScreen({
           <Text style={styles.empty}>正在读取消息……</Text>
         ) : null}
 
-        {signedIn && notifications !== null && shown.length === 0 ? (
+        {signedIn && category === "chats" ? (
+          <>
+            {conversations === null ? (
+              <Text style={styles.empty}>正在读取私信……</Text>
+            ) : null}
+            {conversations !== null && chats.length === 0 ? (
+              <Text style={styles.empty}>
+                还没有私信。在别人的主页可以给他发一条。
+              </Text>
+            ) : null}
+            {chats.map((chat) => (
+              <Pressable
+                accessibilityRole="button"
+                key={chat.partnerId}
+                onPress={() => {
+                  onOpenChat(chat.partnerId);
+                }}
+                style={styles.row}
+              >
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {chat.partnerName.slice(0, 1)}
+                  </Text>
+                </View>
+                <View style={styles.rowMain}>
+                  <Text style={styles.rowHead}>
+                    <Text style={styles.rowActor}>{chat.partnerName}</Text>
+                    {chat.unread > 0 ? (
+                      <Text style={styles.unread}>
+                        {" "}
+                        {chat.unread} 条未读
+                      </Text>
+                    ) : null}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.rowSummary}>
+                    {chat.lastBody}
+                  </Text>
+                  <Text style={styles.rowTime}>{formatTime(chat.lastAt)}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </>
+        ) : null}
+
+        {signedIn &&
+        category !== "chats" &&
+        notifications !== null &&
+        shown.length === 0 ? (
           <Text style={styles.empty}>这一类还没有消息。</Text>
         ) : null}
 
-        {shown.map((entry) => (
+        {category === "chats" ? null : shown.map((entry) => (
           <Pressable
             accessibilityRole="button"
             key={entry.id}
@@ -272,6 +329,11 @@ const styles = StyleSheet.create({
     color: tokens.text.secondary,
     fontSize: 14,
     lineHeight: 21,
+  },
+  unread: {
+    color: tokens.brand.primary,
+    fontSize: 12.5,
+    fontWeight: "600",
   },
   rowTime: {
     color: tokens.text.tertiary,

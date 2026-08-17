@@ -38,6 +38,15 @@ export default function UserProfileRoute() {
           : following.includes(accountId)
       }
       onBack={createD0BackHandler(router)}
+      onOpenChat={() => {
+        router.push({
+          params: {
+            name: profile.value?.displayName ?? "",
+            partnerId: accountId,
+          },
+          pathname: "/chat/[partnerId]",
+        });
+      }}
       onOpenPost={(postId) => {
         router.push({ params: { postId }, pathname: "/post/[postId]" });
       }}

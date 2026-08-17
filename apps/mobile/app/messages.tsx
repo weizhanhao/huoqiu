@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 
-import { fetchNotifications } from "../src/api/social-api";
+import { fetchConversations, fetchNotifications } from "../src/api/social-api";
 import {
   MessageScreen,
   type MessageCategory,
@@ -26,14 +26,31 @@ export default function MessagesRoute() {
     useCallback(() => callAs(fetchNotifications), [callAs]),
     { refreshOnFocus: true },
   );
+  const chats = useRemote(
+    useCallback(() => callAs(fetchConversations), [callAs]),
+    { refreshOnFocus: true },
+  );
 
   return (
     <MessageScreen
       category={category}
+      conversations={
+        account === null ? [] : (chats.value?.conversations ?? null)
+      }
       /* 没登录时那句「请先登录」由界面说，不必再顶一条红色的失败提示。 */
       failure={account === null ? null : notifications.failure}
       notifications={account === null ? [] : notifications.value}
       onBack={createD0BackHandler(router, "/profile")}
+      onOpenChat={(partnerId) => {
+        const name =
+          chats.value?.conversations.find(
+            (chat) => chat.partnerId === partnerId,
+          )?.partnerName ?? "";
+        router.push({
+          params: { name, partnerId },
+          pathname: "/chat/[partnerId]",
+        });
+      }}
       onOpen={(entry) => {
         /*
          * 服务端给的是网页版地址（/community/posts/<id>、/users/<id>）。手机上

@@ -34,10 +34,12 @@ const render = (
   renderToStaticMarkup(
     <MessageScreen
       category="replies"
+      conversations={[]}
       failure={null}
       notifications={[]}
       onBack={vi.fn()}
       onOpen={vi.fn()}
+      onOpenChat={vi.fn()}
       onSelectCategory={vi.fn()}
       signedIn
       {...overrides}

@@ -173,6 +173,89 @@ export const fetchUserProfile = async (
 };
 
 /*
+ * 私信。
+ *
+ * 服务端的会话列表、单会话、发信、已读全都做好了，移动端此前连一个封装都没有
+ * ——一整块能力谁也用不到。
+ *
+ * 身份只认令牌：会话归属不接受任何 id 参数。那个 id 就印在个人主页地址里，
+ * 按 id 查询等于任何人都能读走别人的全部私信，读完还顺手替对方标成已读。
+ */
+export type Conversation = Readonly<{
+  lastAt: string;
+  lastBody: string;
+  partnerId: string;
+  partnerName: string;
+  unread: number;
+}>;
+
+export type DirectMessage = Readonly<{
+  body: string;
+  createdAt: string;
+  fromId: string;
+  id: string;
+  /** 收件人读过之后写入时间戳；未读为 null。 */
+  readAt: string | null;
+  toId: string;
+}>;
+
+type ThreadResponse = Readonly<{
+  conversations?: readonly Conversation[];
+  messages?: readonly DirectMessage[];
+}>;
+
+export type Thread = Readonly<{
+  conversations: readonly Conversation[];
+  messages: readonly DirectMessage[];
+}>;
+
+const readThread = (result: ApiResult<ThreadResponse>): ApiResult<Thread> =>
+  result.kind === "ok"
+    ? {
+        kind: "ok",
+        value: {
+          conversations: result.value.conversations ?? [],
+          messages: result.value.messages ?? [],
+        },
+      }
+    : result;
+
+export const fetchConversations = async (
+  token: string,
+): Promise<ApiResult<Thread>> =>
+  readThread(
+    await request<ThreadResponse>("/api/social/messages", {
+      method: "GET",
+      token,
+    }),
+  );
+
+/* 打开会话即已读——服务端在这条 GET 里顺手标掉，不需要再点一次。 */
+export const fetchThread = async (
+  token: string,
+  partnerId: string,
+): Promise<ApiResult<Thread>> =>
+  readThread(
+    await request<ThreadResponse>(
+      `/api/social/messages?partner=${encodeURIComponent(partnerId)}`,
+      { method: "GET", token },
+    ),
+  );
+
+export const sendDirectMessage = async (
+  token: string,
+  partnerId: string,
+  body: string,
+): Promise<ApiResult<Thread>> =>
+  readThread(
+    await request<ThreadResponse>("/api/social/messages", {
+      body: { body, target: partnerId },
+      method: "POST",
+      token,
+    }),
+  );
+
+/*
  * 消息。
  *
  * 服务端从真实事件推导：谁关注了我、谁回复了我、谁赞了我、谁在正文里 @ 了我。

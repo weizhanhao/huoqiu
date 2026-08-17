@@ -40,6 +40,7 @@ const render = (
       failure={null}
       following={false}
       onBack={vi.fn()}
+      onOpenChat={vi.fn()}
       onOpenPost={vi.fn()}
       onToggleFollow={vi.fn()}
       profile={profile}
