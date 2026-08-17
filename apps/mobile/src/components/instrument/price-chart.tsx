@@ -23,6 +23,22 @@ import { boundsOf, ratio } from "./chart-bounds";
 const CHART_HEIGHT = 168;
 const VOLUME_HEIGHT = 44;
 
+/*
+ * 坐标轴两端那两个刻度。
+ *
+ * 各周期的 date 形状不一样：日/周/月是 2026-08-17，年是 2026，而分钟级
+ * （60分、15分…）上游给的是 202604221030 这样一串十二位数——原样印出来，
+ * 图底下就是两串谁也读不出的数字。它不报错，图也画得对，只是那两个刻度废了。
+ */
+const axisLabel = (date: string | undefined): string => {
+  if (date === undefined) return "";
+  if (/^\d{12}$/u.test(date)) {
+    /* YYYYMMDDHHmm → MM-DD HH:mm。年份在分钟图上没有信息量，省掉。 */
+    return `${date.slice(4, 6)}-${date.slice(6, 8)} ${date.slice(8, 10)}:${date.slice(10, 12)}`;
+  }
+  return date;
+};
+
 export type PriceChartProperties = Readonly<{
   failure: string | null;
   loading: boolean;
@@ -214,16 +230,17 @@ export function PriceChart({
         ))}
       </View>
       <View style={styles.axis}>
-        <Text style={styles.axisText}>{shown[0]?.date ?? ""}</Text>
+        <Text style={styles.axisText}>{axisLabel(shown[0]?.date)}</Text>
         <Text style={styles.axisText}>
           {shown.length} 根 ·{" "}
           {signedPercent(
-            ((shown[shown.length - 1]?.close ?? 0) / (shown[0]?.open ?? 1) - 1) *
+            ((shown[shown.length - 1]?.close ?? 0) / (shown[0]?.open ?? 1) -
+              1) *
               100,
           )}
         </Text>
         <Text style={styles.axisText}>
-          {shown[shown.length - 1]?.date ?? ""}
+          {axisLabel(shown[shown.length - 1]?.date)}
         </Text>
       </View>
     </View>

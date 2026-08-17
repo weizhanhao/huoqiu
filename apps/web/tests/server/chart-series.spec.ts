@@ -208,6 +208,54 @@ describe("the candle periods", () => {
   });
 });
 
+describe("the year candles", () => {
+  /*
+   * 上游的 year 字段只回一根。
+   *
+   * 一根蜡烛不是一张图——年 K 那一档点开，屏幕正中是一个孤零零的方块，
+   * 而它请求成功、不报错。月 K 能回到 2001 年，年 K 由月 K 折出来：
+   * 开＝当年第一个月的开，收＝最后一个月的收，高低取极值，量求和。
+   * 这不是造数，是同一份数据换个粒度，每一格都能回月 K 对上。
+   */
+  const months = [
+    ["2025-01-31", "10.00", "12.00", "13.00", "9.00", "100"],
+    ["2025-06-30", "12.00", "11.00", "15.00", "8.00", "200"],
+    ["2025-12-31", "11.00", "14.00", "14.50", "10.50", "300"],
+    ["2026-03-31", "14.00", "16.00", "17.00", "13.00", "400"],
+  ];
+
+  it("folds the monthly series into one bar per year", async () => {
+    stub(() => klineBody("sh600519", "qfqmonth", months));
+
+    const series = await loadChartSeries("sh600519", "year");
+
+    expect(series?.kind).toBe("candle");
+    const bars = series?.kind === "candle" ? series.bars : [];
+    expect(bars).toHaveLength(2);
+
+    const [first] = bars;
+    expect(first?.date).toBe("2025");
+    /* 开＝一月的开，收＝十二月的收。 */
+    expect(first?.open).toBe(10);
+    expect(first?.close).toBe(14);
+    /* 高低是全年的极值，不是任何单月的。 */
+    expect(first?.high).toBe(15);
+    expect(first?.low).toBe(8);
+    /* 成交量是全年累计（上游给手，站内换成股）。 */
+    expect(first?.volumeShares).toBe(600 * 100);
+  });
+
+  it("asks for the monthly field, not the year field", async () => {
+    /* 直接问 year 拿回来的是一根。这条断言盯的就是「别再改回去」。 */
+    stub(() => klineBody("sh600519", "qfqmonth", months));
+
+    await loadChartSeries("sh600519", "year");
+
+    expect(requested.join(" ")).toContain(",month,");
+    expect(requested.join(" ")).not.toContain(",year,");
+  });
+});
+
 describe("when upstream gives nothing", () => {
   it("returns nothing rather than an empty chart", async () => {
     stub(() => null);

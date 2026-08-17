@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { PublicPortfolio, Quote } from "../../api/market-api";
-import { appTouchMinimum } from "../../styles/app-touch";
+import { appTouchMinimum, touchSlop } from "../../styles/app-touch";
 import { useSignColor } from "../../styles/market-colors";
 import { signedPercent } from "../../styles/market-sign";
 
@@ -63,6 +63,7 @@ export function PortfolioDetailScreen({
         </Text>
         {following === null || portfolio === null ? null : (
           <Pressable
+            hitSlop={touchSlop(32)}
             accessibilityRole="button"
             onPress={onToggleFollow}
             style={[styles.follow, following ? styles.followOn : null]}
@@ -103,7 +104,10 @@ export function PortfolioDetailScreen({
               </Text>
               <Text style={styles.returnLabel}>当日收益</Text>
               <Text
-                style={[styles.returnValue, { color: signColor(dayReturn ?? 0) }]}
+                style={[
+                  styles.returnValue,
+                  { color: signColor(dayReturn ?? 0) },
+                ]}
               >
                 {dayReturn === null ? "—" : signedPercent(dayReturn)}
               </Text>
@@ -141,7 +145,9 @@ export function PortfolioDetailScreen({
                       {holding.symbol.toUpperCase()}
                     </Text>
                   </View>
-                  <Text style={styles.weight}>{holding.weight.toFixed(2)}%</Text>
+                  <Text style={styles.weight}>
+                    {holding.weight.toFixed(2)}%
+                  </Text>
                   <Text
                     style={[
                       styles.change,

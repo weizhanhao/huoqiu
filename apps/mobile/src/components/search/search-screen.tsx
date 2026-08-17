@@ -10,7 +10,7 @@ import {
 } from "react-native";
 
 import type { HotRow, NewsItem, SearchHit } from "../../api/market-api";
-import { appTouchMinimum } from "../../styles/app-touch";
+import { appTouchMinimum, touchSlop } from "../../styles/app-touch";
 import { useSignColor } from "../../styles/market-colors";
 import { signedPercent } from "../../styles/market-sign";
 import { Sparkline } from "./sparkline";
@@ -136,6 +136,7 @@ export function SearchScreen({
           ) : null}
         </View>
         <Pressable
+          hitSlop={touchSlop(36)}
           accessibilityRole="button"
           onPress={onSubmit}
           style={styles.submit}

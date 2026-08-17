@@ -6,8 +6,8 @@ import type {
   Announcement,
   ChartPeriod,
   ChartSeries,
-  HotRow,
   InstrumentLive,
+  ResearchReport,
 } from "../../api/market-api";
 import type { SocialPost } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
@@ -31,7 +31,7 @@ import { PriceChart } from "./price-chart";
  * 直接不显示这一档，而不是给一个点开永远是空的页签。
  */
 
-export type InstrumentTab = "announcements" | "discussion" | "etfs";
+export type InstrumentTab = "announcements" | "discussion" | "research";
 
 const periods: readonly Readonly<{ id: ChartPeriod; label: string }>[] = [
   { id: "intraday", label: "分时" },
@@ -45,20 +45,23 @@ const periods: readonly Readonly<{ id: ChartPeriod; label: string }>[] = [
 ];
 
 /*
- * 「相关ETF」改叫「ETF」。
+ * 「ETF」那一档换成了「研报」。
  *
- * 服务端那条接口（/api/market/etfs）只认排序和翻页，根本没有「这只股票被
- * 哪些 ETF 持有」的概念——它回的是全市场按成交额排的 ETF。挂着「相关」两个
- * 字，等于把无关数据说成相关：读的人会以为这几只跟手上这只票有关系，
- * 然后据此做判断。而它不会报错，每一行看起来都正常。
+ * 上一版把「相关ETF」改叫「ETF」，理由是服务端那条接口（/api/market/etfs）
+ * 只认排序和翻页，根本没有「这只股票被哪些 ETF 持有」的概念。改了名，话是
+ * 不假了，可每只股票点开列的仍然是同一份全市场 ETF——摆在个股页的一档里，
+ * 位置本身就在暗示相关，得靠一句「这不是按相关度排的」去解释。
  *
- * 资讯那一档也去掉了：点开永远是一句「还没做」，而这个文件开头自己写着
+ * 研报是真按代码查的（/api/market/research），一只票一份。用真数据占这一档，
+ * 比用一句免责声明去救一份无关数据强。
+ *
+ * 资讯那一档早先去掉了：点开永远是一句「还没做」，而这个文件开头自己写着
  * 「不给一个点开永远是空的页签」。
  */
 const tabs: readonly Readonly<{ id: InstrumentTab; label: string }>[] = [
   { id: "discussion", label: "讨论" },
   { id: "announcements", label: "公告" },
-  { id: "etfs", label: "ETF" },
+  { id: "research", label: "研报" },
 ];
 
 export type InstrumentScreenProperties = Readonly<{
@@ -68,8 +71,9 @@ export type InstrumentScreenProperties = Readonly<{
   chartFailure: string | null;
   chartLoading: boolean;
   discussions: readonly SocialPost[] | null;
-  etfs: readonly HotRow[] | null;
-  etfsFailure: string | null;
+  /** 这只标的的券商研报；null 表示还没取到。 */
+  reports: readonly ResearchReport[] | null;
+  reportsFailure: string | null;
   /*
    * 名称、涨跌与全部指标。
    *
@@ -80,7 +84,7 @@ export type InstrumentScreenProperties = Readonly<{
   onBack: () => void;
   onCompose: () => void;
   onOpenAnnouncement: (item: Announcement) => void;
-  onOpenEtf: (href: string) => void;
+  onOpenReport: (report: ResearchReport) => void;
   onOpenPost: (postId: string) => void;
   onSelectPeriod: (period: ChartPeriod) => void;
   onSelectTab: (tab: InstrumentTab) => void;
@@ -129,13 +133,13 @@ export function InstrumentScreen({
   chartFailure,
   chartLoading,
   discussions,
-  etfs,
-  etfsFailure,
+  reports,
+  reportsFailure,
   metrics,
   onBack,
   onCompose,
   onOpenAnnouncement,
-  onOpenEtf,
+  onOpenReport,
   onOpenPost,
   onSelectPeriod,
   onSelectTab,
@@ -217,9 +221,18 @@ export function InstrumentScreen({
               <Metric label="成交额" value={money(metrics?.amount)} />
               <Metric label="换手" value={percent(metrics?.turnoverPercent)} />
               <Metric label="振幅" value={percent(metrics?.amplitudePercent)} />
-              <Metric label="量比" value={fixedOrMissing(metrics?.volumeRatio, 2)} />
-              <Metric label="市盈TTM" value={fixedOrMissing(metrics?.peTtm, 2)} />
-              <Metric label="市净" value={fixedOrMissing(metrics?.priceToBook, 2)} />
+              <Metric
+                label="量比"
+                value={fixedOrMissing(metrics?.volumeRatio, 2)}
+              />
+              <Metric
+                label="市盈TTM"
+                value={fixedOrMissing(metrics?.peTtm, 2)}
+              />
+              <Metric
+                label="市净"
+                value={fixedOrMissing(metrics?.priceToBook, 2)}
+              />
               <Metric label="总市值" value={money(metrics?.totalMarketCap)} />
             </View>
           )}
@@ -339,70 +352,88 @@ export function InstrumentScreen({
           </View>
         ) : null}
 
+        {/*
+          没有标题的那条不列。
+          标题是这一行唯一的内容，缺了就是一行点得动、却不知道会打开什么的空白。
+        */}
         {tab === "announcements" && announcements !== null
-          ? announcements.slice(0, 20).map((item) => (
-              <Pressable
-                accessibilityRole="button"
-                key={item.href}
-                onPress={() => {
-                  onOpenAnnouncement(item);
-                }}
-                style={styles.row}
-              >
-                <Text style={styles.rowTitle}>{item.title ?? item.name}</Text>
-                <Text style={styles.rowMeta}>
-                  {item.name} · {item.publishedOn}
-                </Text>
-              </Pressable>
-            ))
+          ? announcements
+              .filter((item) => item.title !== null)
+              .slice(0, 20)
+              .map((item) => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={item.href}
+                  onPress={() => {
+                    onOpenAnnouncement(item);
+                  }}
+                  style={styles.row}
+                >
+                  <Text style={styles.rowTitle}>{item.title}</Text>
+                  <Text style={styles.rowMeta}>
+                    {[item.category, item.publishedOn]
+                      .filter((part) => part !== null)
+                      .join(" · ")}
+                  </Text>
+                </Pressable>
+              ))
           : null}
 
-        {tab === "etfs" ? (
+        {tab === "research" && reportsFailure !== null ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>{reportsFailure}</Text>
+          </View>
+        ) : null}
+
+        {tab === "research" && reportsFailure === null && reports === null ? (
+          <View style={styles.notice}>
+            <Text style={styles.noticeText}>正在读取研报……</Text>
+          </View>
+        ) : null}
+
+        {tab === "research" && reports !== null && reports.length === 0 ? (
           <View style={styles.notice}>
             <Text style={styles.noticeText}>
-              我们还没有「这只票被哪些 ETF 持有」的数据。下面是按成交额排的
-              全市场 ETF，不是按相关度排的。
+              最近半年没有券商发过这只标的的研报。
             </Text>
           </View>
         ) : null}
 
-        {tab === "etfs" && etfsFailure !== null ? (
-          <View style={styles.notice}>
-            <Text style={styles.noticeText}>{etfsFailure}</Text>
-          </View>
-        ) : null}
-
-        {tab === "etfs" && etfsFailure === null && etfs === null ? (
-          <View style={styles.notice}>
-            <Text style={styles.noticeText}>正在读取 ETF……</Text>
-          </View>
-        ) : null}
-
-        {tab === "etfs" && etfs !== null
-          ? etfs.slice(0, 20).map((row) => (
-              <Pressable
-                accessibilityRole="button"
-                key={row.code}
-                disabled={row.href === null}
-                onPress={() => {
-                  if (row.href !== null) onOpenEtf(row.href);
-                }}
-                style={styles.etfRow}
-              >
-                <View style={styles.etfMain}>
-                  <Text style={styles.rowTitle}>{row.name}</Text>
-                  <Text style={styles.rowMeta}>{row.code}</Text>
-                </View>
-                <Text
-                  style={[
-                    styles.etfPct,
-                    { color: signColor(row.changePercent) },
-                  ]}
+        {/*
+          没有标题的那条不列——标题是这一行唯一读得懂的内容。
+        */}
+        {tab === "research" && reports !== null
+          ? reports
+              .filter((report) => report.title !== null)
+              .slice(0, 20)
+              .map((report) => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={report.href}
+                  onPress={() => {
+                    onOpenReport(report);
+                  }}
+                  style={styles.row}
                 >
-                  {signedPercent(row.changePercent)}
-                </Text>
-              </Pressable>
-            ))
+                  <Text style={styles.rowTitle}>{report.title}</Text>
+                  <Text style={styles.rowMeta}>
+                    {[report.institution, report.rating, report.publishedOn]
+                      .filter((part) => part !== null)
+                      .join(" · ")}
+                  </Text>
+                  {/*
+                    目标价必须写清是谁给的。
+                    只印一个「目标价 1680」，读起来像市场共识——而它是某一家
+                    券商在某一天的看法，另一家可能给出完全不同的数。
+                  */}
+                  {report.targetPrice === null ? null : (
+                    <Text style={styles.rowMeta}>
+                      {report.institution ?? "该券商"}给出的目标价{" "}
+                      {report.targetPrice.toFixed(2)}
+                    </Text>
+                  )}
+                </Pressable>
+              ))
           : null}
 
         <Text style={styles.disclosure}>
@@ -411,9 +442,7 @@ export function InstrumentScreen({
       </ScrollView>
 
       {/* 底部横条会盖住这一排，所以要把安全区加进去。 */}
-      <View
-        style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}
-      >
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
         <View style={styles.bottomQuote}>
           <Text style={[styles.bottomLast, { color }]}>
             {fixedOrMissing(last, 2)}
@@ -510,26 +539,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingVertical: 14,
     textAlign: "center",
-  },
-  etfMain: {
-    flex: 1,
-    gap: 2,
-  },
-  etfPct: {
-    fontSize: 15,
-    fontVariant: ["tabular-nums"],
-    fontWeight: "700",
-  },
-  etfRow: {
-    alignItems: "center",
-    backgroundColor: tokens.surface.base,
-    borderBottomColor: tokens.border.subtle,
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    minHeight: 60,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
   },
   last: {
     fontSize: 32,

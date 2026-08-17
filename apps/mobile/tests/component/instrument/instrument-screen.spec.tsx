@@ -39,14 +39,14 @@ const render = (
       chartFailure={null}
       chartLoading={false}
       discussions={[]}
-      etfs={[]}
-      etfsFailure={null}
       metrics={fixture.metrics}
       onBack={vi.fn()}
       onCompose={vi.fn()}
       onOpenAnnouncement={vi.fn()}
-      onOpenEtf={vi.fn()}
       onOpenPost={vi.fn()}
+      onOpenReport={vi.fn()}
+      reports={[]}
+      reportsFailure={null}
       onSelectPeriod={vi.fn()}
       onSelectTab={vi.fn()}
       onShowNotice={vi.fn()}
@@ -91,6 +91,81 @@ describe("instrument screen", () => {
     expect(markup).toContain(">153<");
     expect(markup).toContain("明细");
     expect(markup).toContain("15:27:10");
+  });
+
+  it("labels announcements by category, not by company name", () => {
+    /*
+     * 公告页签此前印的是「公司名 · 日期」——因为那份数据来自全市场公告流，
+     * 每一行都是别人家的公司。现在按标的查，一整页都是这一家的，再写一遍
+     * 名字是废话；有用的是类目。
+     */
+    const markup = render({
+      announcements: [
+        {
+          category: "定期报告",
+          href: "https://data.eastmoney.com/notices/detail/600519/AN1.html",
+          publishedOn: "2026-08-18",
+          title: "贵州茅台2026年半年度报告",
+        },
+      ],
+      tab: "announcements",
+    });
+
+    expect(markup).toContain("贵州茅台2026年半年度报告");
+    expect(markup).toContain("定期报告 · 2026-08-18");
+  });
+
+  it("drops an announcement with no title instead of listing a blank row", () => {
+    /* 标题是这一行唯一的内容，缺了就是一行点得动、却不知道会打开什么的空白。 */
+    const markup = render({
+      announcements: [
+        {
+          category: null,
+          href: "https://data.eastmoney.com/notices/detail/600519/AN2.html",
+          publishedOn: null,
+          title: null,
+        },
+      ],
+      tab: "announcements",
+    });
+
+    expect(markup).not.toContain("AN2.html");
+  });
+
+  it("attributes a target price to the broker who published it", () => {
+    /*
+     * 目标价只印一个数，读起来像市场共识——而它是某一家券商在某一天的看法，
+     * 隔壁那家可能给出完全不同的数。谁给的，必须和数字印在一起。
+     */
+    const markup = render({
+      reports: [
+        {
+          href: "https://data.eastmoney.com/report/info/AP1.html",
+          institution: "某某证券",
+          publishedOn: "2026-08-18",
+          rating: "买入",
+          targetPrice: 1680,
+          thisYearEps: 68.2,
+          title: "贵州茅台：中报点评",
+        },
+      ],
+      tab: "research",
+    });
+
+    expect(markup).toContain("贵州茅台：中报点评");
+    expect(markup).toContain("某某证券 · 买入 · 2026-08-18");
+    expect(markup).toContain("某某证券给出的目标价 1680.00");
+  });
+
+  it("separates a broker-less stock from an unfetched one", () => {
+    /*
+     * 「没有券商写过这只票」是一句关于这家公司的判断，「还没取到」不是。
+     * 合成一句，网慢时每只票看起来都无人问津。
+     */
+    expect(render({ reports: null, tab: "research" })).toContain("正在读取研报");
+    expect(render({ reports: [], tab: "research" })).toContain(
+      "没有券商发过这只标的的研报",
+    );
   });
 
   it("writes 破折号 rather than crashing when a block is missing", () => {

@@ -2,7 +2,7 @@ import { tokens } from "@huoqiu/native-ui";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { appTouchMinimum } from "../../styles/app-touch";
+import { appTouchMinimum, touchSlop } from "../../styles/app-touch";
 
 /*
  * 首页蓝色头部。
@@ -62,6 +62,7 @@ export function AppHeader({
       </Pressable>
 
       <Pressable
+        hitSlop={touchSlop(36)}
         accessibilityLabel="问AI"
         accessibilityRole="button"
         onPress={onAskAi}
@@ -71,6 +72,7 @@ export function AppHeader({
       </Pressable>
 
       <Pressable
+        hitSlop={touchSlop(36)}
         accessibilityLabel="发帖"
         accessibilityRole="button"
         onPress={onOpenPublish}
@@ -80,6 +82,7 @@ export function AppHeader({
       </Pressable>
 
       <Pressable
+        hitSlop={touchSlop(36)}
         accessibilityLabel="消息"
         accessibilityRole="button"
         onPress={onOpenMessages}

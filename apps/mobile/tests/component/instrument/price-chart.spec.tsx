@@ -27,6 +27,55 @@ const point = (time: string, price: number): ChartPoint => ({
 });
 
 describe("price chart", () => {
+  it("makes the minute-chart axis readable", () => {
+    /*
+     * 分钟级周期上游给的 date 是 202604221030 这样一串十二位数。原样印在坐标
+     * 轴上，图底下就是两串谁也读不出来的数字——图本身画得对，报错也没有，
+     * 只有那两个刻度废了。
+     */
+    const markup = renderToStaticMarkup(
+      <PriceChart
+        failure={null}
+        loading={false}
+        previousClose={null}
+        series={{
+          bars: [
+            bar("202604221030", 10, 11, 9, 10.5),
+            bar("202608171500", 10.5, 12, 10, 11.8),
+          ],
+          kind: "candle",
+          period: "m60",
+        }}
+      />,
+    );
+
+    expect(markup).toContain("04-22 10:30");
+    expect(markup).toContain("08-17 15:00");
+    expect(markup).not.toContain("202604221030");
+  });
+
+  it("leaves a day-level date alone", () => {
+    /* 日/周/月本来就是 2026-08-17，别自作聪明再切一遍。 */
+    const markup = renderToStaticMarkup(
+      <PriceChart
+        failure={null}
+        loading={false}
+        previousClose={null}
+        series={{
+          bars: [
+            bar("2026-08-14", 10, 11, 9, 10.5),
+            bar("2026-08-17", 10.5, 12, 10, 11.8),
+          ],
+          kind: "candle",
+          period: "day",
+        }}
+      />,
+    );
+
+    expect(markup).toContain("2026-08-14");
+    expect(markup).toContain("2026-08-17");
+  });
+
   it("says it could not fetch instead of drawing an empty frame", () => {
     const markup = renderToStaticMarkup(
       <PriceChart

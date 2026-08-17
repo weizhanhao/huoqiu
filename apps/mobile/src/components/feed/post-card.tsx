@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { MentionAccount } from "@huoqiu/domain/social/post-body";
 
 import type { SocialPost } from "../../api/social-api";
-import { appTouchMinimum } from "../../styles/app-touch";
+import { appTouchMinimum, touchSlop } from "../../styles/app-touch";
 import { PostBody } from "./post-body";
 
 /*
@@ -91,6 +91,7 @@ export function PostCard({
         </Pressable>
         {following === null ? null : (
           <Pressable
+            hitSlop={touchSlop(34)}
             accessibilityRole="button"
             onPress={onToggleFollow}
             style={[styles.follow, following ? styles.followOn : null]}

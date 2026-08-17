@@ -53,11 +53,7 @@ const COLORS: readonly Readonly<{ id: MarketColorMode; label: string }>[] = [
 ];
 
 export type SettingsSection =
-  | "colors"
-  | "comments"
-  | "notifications"
-  | "password"
-  | null;
+  "colors" | "comments" | "notifications" | "password" | null;
 
 export type SettingsScreenProperties = Readonly<{
   account: AccountSummary | null;
@@ -254,7 +250,10 @@ export function SettingsScreen({
             </View>
           ) : null}
 
-          <Row label="自选" onPress={soon("自选设置", "自选分组和排序还没做。")} />
+          <Row
+            label="自选"
+            onPress={soon("自选设置", "自选分组和排序还没做。")}
+          />
           <Row
             label="模拟交易"
             onPress={soon("模拟交易", "暂未开放。这个版本不涉及交易。")}
@@ -303,7 +302,10 @@ export function SettingsScreen({
               "只在你点「插入图片」时申请相册权限。没有定位、通讯录、相机。",
             )}
           />
-          <Row label="建议反馈" onPress={soon("建议反馈", "反馈入口还没做。")} />
+          <Row
+            label="建议反馈"
+            onPress={soon("建议反馈", "反馈入口还没做。")}
+          />
           <Row
             label="关于火球"
             onPress={soon(

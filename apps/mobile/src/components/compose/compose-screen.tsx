@@ -13,7 +13,7 @@ import {
 
 import type { SearchHit } from "../../api/market-api";
 import type { AccountSummary } from "../../api/social-api";
-import { appTouchMinimum } from "../../styles/app-touch";
+import { appTouchMinimum, touchSlop } from "../../styles/app-touch";
 
 /*
  * 发帖器。
@@ -170,6 +170,7 @@ export function ComposeScreen({
           ))}
         </View>
         <Pressable
+          hitSlop={touchSlop(36)}
           accessibilityRole="button"
           disabled={!canPublish}
           onPress={onSubmit}

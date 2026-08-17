@@ -46,7 +46,11 @@ export default function SearchRoute() {
    * 「已搜的词 ≠ 当前的词」推出来，不用维护。
    */
   const [settled, setSettled] = useState<
-    Readonly<{ failure: string | null; hits: readonly SearchHit[]; query: string }>
+    Readonly<{
+      failure: string | null;
+      hits: readonly SearchHit[];
+      query: string;
+    }>
   >({ failure: null, hits: [], query: "" });
   const [intraday, setIntraday] = useState<
     ReadonlyMap<string, readonly number[]>
@@ -156,7 +160,9 @@ export default function SearchRoute() {
         Keyboard.dismiss();
       }}
       query={query}
-      results={needle.length === 0 || settled.query === "" ? null : settled.hits}
+      results={
+        needle.length === 0 || settled.query === "" ? null : settled.hits
+      }
       resultsFailure={needle.length === 0 ? null : settled.failure}
       searching={searching}
     />

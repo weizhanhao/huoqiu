@@ -93,6 +93,7 @@ export function ComingSoonProvider({
         */}
         <Pressable
           accessibilityLabel="关闭"
+          accessibilityRole="button"
           onPress={() => {
             setNotice(null);
           }}
@@ -103,8 +104,12 @@ export function ComingSoonProvider({
 
             RN 里非交互的 View 不阻断冒泡：此前点卡片的空白处会一路冒到背景上
             把弹层关掉——用户以为自己点错了，再打开一次，再关掉一次。
+
+            accessible={false}：它只是块挡板，不是按钮。不写的话读屏会念出一个
+            没有名字的按钮罩住整张卡片，聚焦上去按下也没有任何反应。
           */}
           <Pressable
+            accessible={false}
             onPress={() => {
               /* 只为拦住冒泡，不做任何事。 */
             }}

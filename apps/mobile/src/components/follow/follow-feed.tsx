@@ -175,8 +175,7 @@ export function FollowFeed({
                     {candidate.displayName}
                   </Text>
                   <Text style={styles.suggestMeta}>
-                    粉丝 {candidate.followerCount} · 帖子{" "}
-                    {candidate.postCount}
+                    粉丝 {candidate.followerCount} · 帖子 {candidate.postCount}
                   </Text>
                 </View>
               </Pressable>

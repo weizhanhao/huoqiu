@@ -301,6 +301,37 @@ const readCandleRows = (
   return bars;
 };
 
+/**
+ * 把月 K 折成年 K。
+ *
+ * 月 K 已经按时间升序，所以「当年第一根」就是先遇到的那根，末根就是最后覆盖
+ * 上去的那根。高低取全年极值——不是任何单月的极值，这两者常常不在同一个月。
+ */
+const foldIntoYears = (
+  monthly: readonly CandleBar[],
+): readonly CandleBar[] => {
+  const byYear = new Map<string, CandleBar>();
+  for (const bar of monthly) {
+    const year = bar.date.slice(0, 4);
+    const running = byYear.get(year);
+    if (running === undefined) {
+      byYear.set(year, { ...bar, date: year });
+      continue;
+    }
+    byYear.set(year, {
+      /* 收盘价一路被后面的月份覆盖，最后留下的就是当年最后一个月的收。 */
+      close: bar.close,
+      date: year,
+      high: Math.max(running.high, bar.high),
+      low: Math.min(running.low, bar.low),
+      /* 开盘价是当年第一根的，不动。 */
+      open: running.open,
+      volumeShares: running.volumeShares + bar.volumeShares,
+    });
+  }
+  return [...byYear.values()];
+};
+
 const klinePath = (code: string): string =>
   code.startsWith("hk") ? "hkfqkline" : "fqkline";
 
@@ -378,6 +409,25 @@ export const loadChartSeries = async (
       previousClose: await loadPreviousClose(code),
       symbol,
     };
+  }
+
+  /*
+   * 年 K 由月 K 折出来，不问上游的 year 字段。
+   *
+   * 上游那个字段只回一根——就是今年的那根。一根蜡烛不是一张图：年 K 点开，
+   * 屏幕正中一个孤零零的方块，而请求成功、不报错，界面上也没有任何地方说
+   * 「只有一根」。
+   *
+   * 月 K 能回到 2001 年，折一遍就是完整的年 K：开取当年首月的开，收取末月的
+   * 收，高低取全年极值，量求和。这不是造数据，是同一份数据换个粒度，每一格
+   * 都能拿月 K 对上。
+   */
+  if (period === "year") {
+    const monthly = await loadChartSeries(symbol, "month");
+    if (monthly === null || monthly.kind !== "candle") return null;
+    const bars = foldIntoYears(monthly.bars);
+    if (bars.length === 0) return null;
+    return { bars, kind: "candle", period, previousClose: null, symbol };
   }
 
   const config = CANDLE_PERIODS[period];

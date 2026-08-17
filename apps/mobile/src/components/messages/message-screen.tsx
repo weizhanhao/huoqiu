@@ -112,7 +112,9 @@ export function MessageScreen({
                 <Text style={styles.entryGlyph}>{glyph}</Text>
               </View>
               <Text
-                style={id === category ? styles.entryLabelOn : styles.entryLabel}
+                style={
+                  id === category ? styles.entryLabelOn : styles.entryLabel
+                }
               >
                 {label}
               </Text>
@@ -163,10 +165,7 @@ export function MessageScreen({
                   <Text style={styles.rowHead}>
                     <Text style={styles.rowActor}>{chat.partnerName}</Text>
                     {chat.unread > 0 ? (
-                      <Text style={styles.unread}>
-                        {" "}
-                        {chat.unread} 条未读
-                      </Text>
+                      <Text style={styles.unread}> {chat.unread} 条未读</Text>
                     ) : null}
                   </Text>
                   <Text numberOfLines={1} style={styles.rowSummary}>
@@ -186,32 +185,36 @@ export function MessageScreen({
           <Text style={styles.empty}>这一类还没有消息。</Text>
         ) : null}
 
-        {category === "chats" ? null : shown.map((entry) => (
-          <Pressable
-            accessibilityRole="button"
-            key={entry.id}
-            onPress={() => {
-              onOpen(entry);
-            }}
-            style={styles.row}
-          >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {entry.actorName.slice(0, 1)}
-              </Text>
-            </View>
-            <View style={styles.rowMain}>
-              <Text style={styles.rowHead}>
-                <Text style={styles.rowActor}>{entry.actorName}</Text>
-                <Text style={styles.rowAction}> {ACTIONS[entry.kind]}</Text>
-              </Text>
-              <Text numberOfLines={2} style={styles.rowSummary}>
-                {entry.summary}
-              </Text>
-              <Text style={styles.rowTime}>{formatTime(entry.createdAt)}</Text>
-            </View>
-          </Pressable>
-        ))}
+        {category === "chats"
+          ? null
+          : shown.map((entry) => (
+              <Pressable
+                accessibilityRole="button"
+                key={entry.id}
+                onPress={() => {
+                  onOpen(entry);
+                }}
+                style={styles.row}
+              >
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {entry.actorName.slice(0, 1)}
+                  </Text>
+                </View>
+                <View style={styles.rowMain}>
+                  <Text style={styles.rowHead}>
+                    <Text style={styles.rowActor}>{entry.actorName}</Text>
+                    <Text style={styles.rowAction}> {ACTIONS[entry.kind]}</Text>
+                  </Text>
+                  <Text numberOfLines={2} style={styles.rowSummary}>
+                    {entry.summary}
+                  </Text>
+                  <Text style={styles.rowTime}>
+                    {formatTime(entry.createdAt)}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
       </ScrollView>
     </View>
   );

@@ -123,14 +123,20 @@ export function ChannelBar({
       >
         <Pressable
           accessibilityLabel="关闭频道管理"
+          accessibilityRole="button"
           onPress={onCloseManager}
           style={styles.backdrop}
         >
           {/*
             弹层本体要拦住触摸。RN 里非交互的 View 不阻断冒泡：点「已选频道」
             下面的空白处会一路冒到背景上把弹层关掉，用户以为自己点错了。
+
+            accessible={false}：这一层不是给人按的，只是块挡板。不写的话它照样
+            进无障碍树，读屏念出来是一个没有名字的按钮，罩住整张抽屉——聚焦到
+            它、按下去，什么也不会发生。
           */}
           <Pressable
+            accessible={false}
             onPress={() => {
               /* 只为拦住冒泡。 */
             }}
@@ -165,7 +171,9 @@ export function ChannelBar({
                     }}
                     style={[styles.chip, fixed ? styles.chipFixed : null]}
                   >
-                    <Text style={fixed ? styles.chipTextFixed : styles.chipText}>
+                    <Text
+                      style={fixed ? styles.chipTextFixed : styles.chipText}
+                    >
                       {labelOf(id)}
                     </Text>
                   </Pressable>

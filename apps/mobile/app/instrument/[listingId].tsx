@@ -6,7 +6,7 @@ import {
   fetchAnnouncements,
   fetchChart,
   fetchInstrumentLive,
-  fetchRelatedEtfs,
+  fetchResearchReports,
   fetchWatchlist,
   setWatchlisted,
   type ChartPeriod,
@@ -51,7 +51,9 @@ export default function InstrumentScreen() {
   const announcements = useRemote(
     useCallback(() => fetchAnnouncements(symbol), [symbol]),
   );
-  const etfs = useRemote(useCallback(() => fetchRelatedEtfs(symbol), [symbol]));
+  const reports = useRemote(
+    useCallback(() => fetchResearchReports(symbol), [symbol]),
+  );
   const posts = useRemote(fetchPublicPosts);
   const watchlist = useRemote(
     useCallback(() => callAs(fetchWatchlist), [callAs]),
@@ -90,8 +92,8 @@ export default function InstrumentScreen() {
       chartFailure={chart.failure}
       chartLoading={chart.loading}
       discussions={posts.value === null ? null : discussions}
-      etfs={etfs.value}
-      etfsFailure={etfs.failure}
+      reports={reports.value}
+      reportsFailure={reports.failure}
       metrics={live.value?.metrics ?? null}
       onBack={onBack}
       onCompose={() => {
@@ -103,13 +105,9 @@ export default function InstrumentScreen() {
       onOpenAnnouncement={(item) => {
         void Linking.openURL(item.href);
       }}
-      onOpenEtf={(href) => {
-        const next = href.split("/").pop() ?? "";
-        if (next.length === 0 || next === symbol) return;
-        router.push({
-          params: { listingId: next },
-          pathname: "/instrument/[listingId]",
-        });
+      onOpenReport={(report) => {
+        /* 研报正文在东财站上，站内没有转载——照实跳出去。 */
+        void Linking.openURL(report.href);
       }}
       onOpenPost={(id) => {
         router.push({ params: { postId: id }, pathname: "/post/[postId]" });

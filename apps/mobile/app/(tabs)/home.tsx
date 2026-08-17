@@ -187,7 +187,8 @@ export default function HomeScreen() {
    * 那是一句错话：不是没有，是还没查。
    */
   const indexLoading =
-    needsIndex && (etfs.value === null || funds.value === null || managers.value === null);
+    needsIndex &&
+    (etfs.value === null || funds.value === null || managers.value === null);
 
   const channelPosts = (
     all: readonly SocialPost[] | null,

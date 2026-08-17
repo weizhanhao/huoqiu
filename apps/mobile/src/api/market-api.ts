@@ -535,13 +535,24 @@ export const fetchInstrumentLive = async (
     { method: "GET", token: null },
   );
 
+/*
+ * 一只标的的公告。
+ *
+ * 此前这里的形状是照着「全市场公告流」写的（带 code 和 name），因为这条路由
+ * 当时只有全市场那一支——`symbol` 传了也不看，个股页的公告页签里印的其实是
+ * 当天全市场最新几条，别人家的公告。
+ *
+ * 现在服务端按标的查，回包里就不再有公司名了：这一页本来就是这家公司的，
+ * 每一行再写一遍名字是废话。类目（定期报告 / 临时公告）比名字有用。
+ */
 export type Announcement = Readonly<{
-  code: string;
+  /** 「定期报告」一类的类目；上游没给时为 null。 */
+  category: string | null;
   href: string;
-  name: string;
-  /** YYYY-MM-DD。公告是按日披露的。 */
-  publishedOn: string;
-  title?: string;
+  /** YYYY-MM-DD；上游没给时为 null。 */
+  publishedOn: string | null;
+  /** 上游偶尔给空标题；那一行没法读，界面上不列。 */
+  title: string | null;
 }>;
 
 export const fetchAnnouncements = async (
@@ -555,13 +566,38 @@ export const fetchAnnouncements = async (
   return { kind: "ok", value: result.value.rows ?? [] };
 };
 
-export const fetchRelatedEtfs = async (
+/*
+ * 券商研报。
+ *
+ * 这里原来是 fetchRelatedEtfs(symbol)——它把 symbol 拼进 /api/market/etfs，
+ * 而那条接口只认排序和翻页，`symbol` 收下了从不看。于是每只股票的「ETF」
+ * 那一档列的都是同一份按成交额排的全市场 ETF：参数是假的，函数名也是假的
+ * （Related 从来没有实现过），而每一行都是真 ETF，看不出破绽。
+ *
+ * 研报是真按代码查的。
+ */
+export type ResearchReport = Readonly<{
+  /** 研报正文页。 */
+  href: string;
+  /** 券商简称；上游没给时为 null。 */
+  institution: string | null;
+  /** YYYY-MM-DD。 */
+  publishedOn: string | null;
+  /** 「买入」「增持」一类的评级。 */
+  rating: string | null;
+  /** 元/股。这是**该券商的**目标价，不是市场共识——界面上必须写清是谁给的。 */
+  targetPrice: number | null;
+  thisYearEps: number | null;
+  title: string | null;
+}>;
+
+export const fetchResearchReports = async (
   symbol: string,
-): Promise<ApiResult<readonly HotRow[]>> => {
-  const result = await request<Readonly<{ rows?: readonly HotRow[] }>>(
-    `/api/market/etfs?symbol=${encodeURIComponent(symbol)}`,
+): Promise<ApiResult<readonly ResearchReport[]>> => {
+  const result = await request<Readonly<{ reports?: readonly ResearchReport[] }>>(
+    `/api/market/research?symbol=${encodeURIComponent(symbol)}`,
     { method: "GET", token: null },
   );
   if (result.kind !== "ok") return result;
-  return { kind: "ok", value: result.value.rows ?? [] };
+  return { kind: "ok", value: result.value.reports ?? [] };
 };

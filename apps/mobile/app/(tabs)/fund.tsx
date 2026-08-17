@@ -21,10 +21,7 @@ import { useComingSoon } from "../../src/components/system/coming-soon";
 import { useRemote } from "../../src/hooks/use-remote";
 import { appTouchMinimum } from "../../src/styles/app-touch";
 import { useSignColor } from "../../src/styles/market-colors";
-import {
-  fixedOrMissing,
-  signedPercent,
-} from "../../src/styles/market-sign";
+import { fixedOrMissing, signedPercent } from "../../src/styles/market-sign";
 
 /*
  * 基金页签。
@@ -180,7 +177,9 @@ export default function FundScreen() {
       ) : value.length === 0 ? (
         /* 服务端正常返回但这一档是空的：不写一句，屏幕上就是一段莫名的空白。 */
         <View style={styles.notice}>
-          <Text style={styles.noticeText}>这个分类下没有取到基金。换一档试试。</Text>
+          <Text style={styles.noticeText}>
+            这个分类下没有取到基金。换一档试试。
+          </Text>
         </View>
       ) : (
         value.slice(0, 30).map((fund) => (
@@ -188,8 +187,8 @@ export default function FundScreen() {
             <View style={styles.rowMain}>
               <Text style={styles.name}>{fund.name}</Text>
               <Text style={styles.meta}>
-                {fund.category} · {fund.code} · 净值 {fixedOrMissing(fund.nav, 4)}（
-                {fund.navDate}）
+                {fund.category} · {fund.code} · 净值{" "}
+                {fixedOrMissing(fund.nav, 4)}（{fund.navDate}）
               </Text>
             </View>
             <View style={styles.rowValues}>

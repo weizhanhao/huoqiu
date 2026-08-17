@@ -18,7 +18,7 @@ import {
 } from "react-native";
 
 import type { PostComment, SocialPost } from "../../api/social-api";
-import { appTouchMinimum } from "../../styles/app-touch";
+import { appTouchMinimum, touchSlop } from "../../styles/app-touch";
 import { PostBody } from "../feed/post-body";
 
 /*
@@ -158,6 +158,7 @@ export function PostDetailScreen({
         )}
         {following === null || post === null ? null : (
           <Pressable
+            hitSlop={touchSlop(34)}
             accessibilityRole="button"
             onPress={onToggleFollow}
             style={[styles.follow, following ? styles.followOn : null]}
@@ -222,7 +223,9 @@ export function PostDetailScreen({
                 onPress={onToggleBookmark}
                 style={styles.reaction}
               >
-                <Text style={styles.reactionGlyph}>{bookmarked ? "★" : "☆"}</Text>
+                <Text style={styles.reactionGlyph}>
+                  {bookmarked ? "★" : "☆"}
+                </Text>
                 <Text
                   style={bookmarked ? styles.reactionOn : styles.reactionCount}
                 >
@@ -353,6 +356,7 @@ export function PostDetailScreen({
             value={draft}
           />
           <Pressable
+            hitSlop={touchSlop(40)}
             accessibilityRole="button"
             disabled={!canSend}
             onPress={onSubmit}

@@ -151,7 +151,10 @@ export function TapeList({
             走中性色，不硬派一个方向。
           */}
           <Text
-            style={[styles.tapeVolume, { color: signColor(sideSign(tick.side)) }]}
+            style={[
+              styles.tapeVolume,
+              { color: signColor(sideSign(tick.side)) },
+            ]}
           >
             {lots(tick.volumeShares)}
           </Text>

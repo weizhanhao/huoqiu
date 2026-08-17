@@ -124,9 +124,7 @@ export function PortfolioScreen({
           <Text style={styles.noticeText}>{boardFailure}</Text>
         </View>
       )}
-      {board === null ? (
-        <Text style={styles.empty}>正在读取榜单……</Text>
-      ) : null}
+      {board === null ? <Text style={styles.empty}>正在读取榜单……</Text> : null}
       {board !== null && board.length === 0 ? (
         <Text style={styles.empty}>
           还没有人建过组合。建一个，它就会出现在这里。

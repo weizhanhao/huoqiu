@@ -12,7 +12,7 @@ import {
 } from "react-native";
 
 import type { SearchHit } from "../../api/market-api";
-import { appTouchMinimum } from "../../styles/app-touch";
+import { appTouchMinimum, touchSlop } from "../../styles/app-touch";
 
 /*
  * 新建组合。
@@ -126,6 +126,7 @@ export function PortfolioComposer({
         </Pressable>
         <Text style={styles.topTitle}>新建组合</Text>
         <Pressable
+          hitSlop={touchSlop(36)}
           accessibilityRole="button"
           disabled={!ready}
           onPress={onSubmit}

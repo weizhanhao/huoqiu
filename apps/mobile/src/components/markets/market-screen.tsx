@@ -37,38 +37,41 @@ const SectorRows = ({
   const signColor = useSignColor();
 
   return (
-  <View style={styles.card}>
-    {rows.slice(0, 8).map((sector) => (
-      <Pressable
-        accessibilityRole="button"
-        /* 上游没给领涨股、或它站内渲染不出来时，这一行没有可去的地方。 */
-        disabled={sector.leaderHref === null}
-        key={sector.code}
-        onPress={() => {
-          if (sector.leaderHref !== null) onOpen(sector.leaderHref);
-        }}
-        style={styles.row}
-      >
-        <View style={styles.rowMain}>
-          <Text style={styles.rowName}>{sector.name}</Text>
-          {/*
+    <View style={styles.card}>
+      {rows.slice(0, 8).map((sector) => (
+        <Pressable
+          accessibilityRole="button"
+          /* 上游没给领涨股、或它站内渲染不出来时，这一行没有可去的地方。 */
+          disabled={sector.leaderHref === null}
+          key={sector.code}
+          onPress={() => {
+            if (sector.leaderHref !== null) onOpen(sector.leaderHref);
+          }}
+          style={styles.row}
+        >
+          <View style={styles.rowMain}>
+            <Text style={styles.rowName}>{sector.name}</Text>
+            {/*
             领涨股是这一行里唯一具体的东西。只给一个板块涨幅，看的人下一句
             一定是「谁带起来的」。
           */}
-          <Text style={styles.rowNote}>
-            {sector.leaderName === null
-              ? `${String(sector.advancing)} 涨 / ${String(sector.declining)} 跌`
-              : `领涨 ${sector.leaderName} · ${String(sector.advancing)} 涨 / ${String(sector.declining)} 跌`}
+            <Text style={styles.rowNote}>
+              {sector.leaderName === null
+                ? `${String(sector.advancing)} 涨 / ${String(sector.declining)} 跌`
+                : `领涨 ${sector.leaderName} · ${String(sector.advancing)} 涨 / ${String(sector.declining)} 跌`}
+            </Text>
+          </View>
+          <Text
+            style={[
+              styles.rowValue,
+              { color: signColor(sector.changePercent) },
+            ]}
+          >
+            {signedPercent(sector.changePercent)}
           </Text>
-        </View>
-        <Text
-          style={[styles.rowValue, { color: signColor(sector.changePercent) }]}
-        >
-          {signedPercent(sector.changePercent)}
-        </Text>
-      </Pressable>
-    ))}
-  </View>
+        </Pressable>
+      ))}
+    </View>
   );
 };
 

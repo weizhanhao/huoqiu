@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { UserProfile } from "../../api/social-api";
-import { appTouchMinimum } from "../../styles/app-touch";
+import { appTouchMinimum, touchSlop } from "../../styles/app-touch";
 
 /*
  * 别人的主页。
@@ -93,6 +93,7 @@ export function UserScreen({
               {/* 私信入口。服务端的私信一直都在，此前没有任何地方能发起。 */}
               {following === null ? null : (
                 <Pressable
+                  hitSlop={touchSlop(36)}
                   accessibilityLabel="发私信"
                   accessibilityRole="button"
                   onPress={onOpenChat}
@@ -103,6 +104,7 @@ export function UserScreen({
               )}
               {following === null ? null : (
                 <Pressable
+                  hitSlop={touchSlop(36)}
                   accessibilityRole="button"
                   onPress={onToggleFollow}
                   style={[styles.follow, following ? styles.followOn : null]}

@@ -35,7 +35,10 @@ export function SegmentHeader<Id extends string>({
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 4 }]} testID="segment-header">
+    <View
+      style={[styles.root, { paddingTop: insets.top + 4 }]}
+      testID="segment-header"
+    >
       <View style={styles.segments}>
         {segments.map(({ id, label }) => (
           <Pressable

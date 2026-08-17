@@ -325,44 +325,49 @@ export function WatchlistChannel({
              * 自选存的就是末尾那一段。
              */
             const symbol = row.href === null ? null : row.href.split("/").pop();
-            const added = symbol !== undefined && symbol !== null && symbols.includes(symbol);
+            const added =
+              symbol !== undefined &&
+              symbol !== null &&
+              symbols.includes(symbol);
             return (
-            <View key={row.code} style={styles.pickRow}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={row.href === null}
-                onPress={() => {
-                  if (row.href !== null) onOpenInstrument(row.href);
-                }}
-                style={styles.pickMain}
-              >
-                <Text style={styles.pickName}>{row.name}</Text>
-                <Text style={styles.pickCode}>{row.code}</Text>
-              </Pressable>
-              <Text
-                style={[
-                  styles.pickPct,
-                  { color: signColor(row.changePercent) },
-                ]}
-              >
-                {signedPercent(row.changePercent)}
-              </Text>
-              <Pressable
-                accessibilityLabel={
-                  added ? `${row.name} 已在自选里` : `把 ${row.name} 加进自选`
-                }
-                accessibilityRole="button"
-                disabled={added || row.href === null}
-                onPress={() => {
-                  if (!added && row.href !== null) onAdd(row.code, row.href);
-                }}
-                style={added ? styles.pickAdded : styles.pickAdd}
-              >
-                <Text style={added ? styles.pickAddedText : styles.pickAddText}>
-                  {added ? "已添加" : "加自选"}
+              <View key={row.code} style={styles.pickRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={row.href === null}
+                  onPress={() => {
+                    if (row.href !== null) onOpenInstrument(row.href);
+                  }}
+                  style={styles.pickMain}
+                >
+                  <Text style={styles.pickName}>{row.name}</Text>
+                  <Text style={styles.pickCode}>{row.code}</Text>
+                </Pressable>
+                <Text
+                  style={[
+                    styles.pickPct,
+                    { color: signColor(row.changePercent) },
+                  ]}
+                >
+                  {signedPercent(row.changePercent)}
                 </Text>
-              </Pressable>
-            </View>
+                <Pressable
+                  accessibilityLabel={
+                    added ? `${row.name} 已在自选里` : `把 ${row.name} 加进自选`
+                  }
+                  accessibilityRole="button"
+                  disabled={added || row.href === null}
+                  onPress={() => {
+                    if (!added && row.href !== null) onAdd(row.code, row.href);
+                  }}
+                  style={added ? styles.pickAdded : styles.pickAdd}
+                >
+                  <Text
+                    style={added ? styles.pickAddedText : styles.pickAddText}
+                  >
+                    {added ? "已添加" : "加自选"}
+                  </Text>
+                </Pressable>
+              </View>
             );
           })
         )}

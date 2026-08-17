@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { DirectMessage } from "../../api/social-api";
-import { appTouchMinimum } from "../../styles/app-touch";
+import { appTouchMinimum, touchSlop } from "../../styles/app-touch";
 
 /*
  * 一条私信会话。
@@ -86,7 +86,9 @@ export function ChatScreen({
           </View>
         )}
 
-        {messages === null ? <Text style={styles.empty}>正在读取……</Text> : null}
+        {messages === null ? (
+          <Text style={styles.empty}>正在读取……</Text>
+        ) : null}
 
         {messages !== null && messages.length === 0 ? (
           <Text style={styles.empty}>还没有聊过。说第一句吧。</Text>
@@ -120,6 +122,7 @@ export function ChatScreen({
           value={draft}
         />
         <Pressable
+          hitSlop={touchSlop(40)}
           accessibilityRole="button"
           disabled={!canSend}
           onPress={onSubmit}
