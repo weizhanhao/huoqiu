@@ -1,5 +1,7 @@
 "use client";
 
+import { dayReturn } from "@huoqiu/domain/market/portfolio-return";
+
 import { ScrollableTable } from "../../components/system/scrollable-table";
 import Link from "next/link";
 import {
@@ -56,25 +58,6 @@ const formatPercent = (value: number | null): string => {
 const toneClass = (value: number | null): string => {
   if (value === null || value === 0) return "";
   return value > 0 ? "watchlist-up" : "watchlist-down";
-};
-
-/**
- * 组合当日收益 = Σ(标的涨跌幅 × 权重)。
- *
- * 任何一只取不到行情就返回 null：少算一只的加权和是错的，
- * 而错误结果看起来仍然像个正常的百分比。
- */
-const dayReturn = (
-  holdings: readonly Holding[],
-  quotes: ReadonlyMap<string, number | null>,
-): number | null => {
-  let total = 0;
-  for (const holding of holdings) {
-    const change = quotes.get(holding.symbol);
-    if (change === undefined || change === null) return null;
-    total += (change * holding.weight) / 100;
-  }
-  return total;
 };
 
 function PortfolioList({

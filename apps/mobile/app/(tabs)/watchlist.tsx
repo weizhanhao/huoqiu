@@ -3,16 +3,23 @@ import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { View } from "react-native";
 
+import { dayReturn } from "@huoqiu/domain/market/portfolio-return";
+
 import {
   fetchMarketOverview,
   fetchPortfolios,
+  fetchPublicPortfolios,
   fetchQuotes,
   fetchWatchlist,
+  type PublicPortfolio,
   type Quote,
 } from "../../src/api/market-api";
 import type { ApiResult } from "../../src/api/request";
 import { MarketScreen } from "../../src/components/markets/market-screen";
-import { PortfolioScreen } from "../../src/components/markets/portfolio-screen";
+import {
+  PortfolioScreen,
+  type BoardRow,
+} from "../../src/components/markets/portfolio-screen";
 import { WatchlistScreen as WatchlistView } from "../../src/components/markets/watchlist-screen";
 import { SegmentHeader } from "../../src/components/shell/segment-header";
 import { useComingSoon } from "../../src/components/system/coming-soon";
@@ -33,6 +40,50 @@ const segments = [
   { id: "markets", label: "行情" },
   { id: "portfolio", label: "组合" },
 ] as const satisfies readonly Readonly<{ id: Segment; label: string }>[];
+
+/*
+ * 榜单一次取齐。
+ *
+ * 组合列表和它们持仓的行情要一起到位才算数——分两次取的话，先到的组合会先
+ * 渲染出一片「—」，几百毫秒后再跳成真数字，看起来像刚刚才算错过一次。
+ */
+type BoardData = Readonly<{ rows: readonly BoardRow[] }>;
+
+const loadBoard = async (): Promise<ApiResult<BoardData>> => {
+  const listed = await fetchPublicPortfolios();
+  if (listed.kind !== "ok") return listed;
+
+  const symbols = [
+    ...new Set(
+      listed.value.flatMap((portfolio) =>
+        (portfolio.holdings ?? []).map((holding) => holding.symbol),
+      ),
+    ),
+  ];
+  const priced = await fetchQuotes(symbols);
+  const changes = new Map<string, number | null>(
+    priced.kind === "ok"
+      ? priced.value.map((quote) => [quote.symbol, quote.changePercent])
+      : [],
+  );
+
+  const rows = listed.value
+    .map((portfolio: PublicPortfolio) => ({
+      dayReturn: dayReturn(portfolio.holdings ?? [], changes),
+      portfolio,
+    }))
+    /*
+     * 算不出收益的排在最后，而不是当 0 混在中间。它们不是「今天没动」，
+     * 是不知道——混在中间会把一堆未知排到真涨的组合前面。
+     */
+    .sort((left, right) => {
+      if (left.dayReturn === null) return right.dayReturn === null ? 0 : 1;
+      if (right.dayReturn === null) return -1;
+      return right.dayReturn - left.dayReturn;
+    });
+
+  return { kind: "ok", value: { rows } };
+};
 
 type WatchlistData = Readonly<{
   quotes: readonly Quote[];
@@ -70,6 +121,7 @@ export default function WatchlistScreen() {
     [callAs],
   );
   const portfolios = useRemote(loadPortfolios);
+  const board = useRemote(loadBoard);
 
   return (
     <View style={{ backgroundColor: tokens.surface.canvas, flex: 1 }}>
@@ -128,7 +180,15 @@ export default function WatchlistScreen() {
 
       {segment === "portfolio" ? (
         <PortfolioScreen
+          board={board.value?.rows ?? null}
+          boardFailure={board.failure}
           failure={portfolios.failure}
+          onOpenPortfolio={(portfolioId) => {
+            router.push({
+              params: { portfolioId },
+              pathname: "/portfolio/[portfolioId]",
+            });
+          }}
           loading={portfolios.loading}
           onRefresh={portfolios.refresh}
           sets={portfolios.value}

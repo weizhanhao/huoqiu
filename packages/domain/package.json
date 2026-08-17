@@ -8,8 +8,10 @@
     "./shared/decimal": "./src/shared/decimal.ts",
     "./shared/ids": "./src/shared/ids.ts",
     "./shared/time": "./src/shared/time.ts",
+    "./market/portfolio-return": "./src/market/portfolio-return.ts",
     "./social/comment-tree": "./src/social/comment-tree.ts",
-    "./social/post-body": "./src/social/post-body.ts"
+    "./social/post-body": "./src/social/post-body.ts",
+    "./social/post-channel": "./src/social/post-channel.ts"
   },
   "scripts": {
     "lint": "eslint --config ../config/eslint/base.mjs src test",

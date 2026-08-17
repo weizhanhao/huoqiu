@@ -1,5 +1,7 @@
 "use client";
 
+import { dayReturn } from "@huoqiu/domain/market/portfolio-return";
+
 import { ScrollableTable } from "../../components/system/scrollable-table";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -47,20 +49,6 @@ const formatPercent = (value: number | null): string => {
 const toneClass = (value: number | null): string => {
   if (value === null || value === 0) return "";
   return value > 0 ? "watchlist-up" : "watchlist-down";
-};
-
-/** 组合当日收益 = Σ(标的涨跌幅 × 权重)；任一取不到就是 null。 */
-const dayReturn = (
-  holdings: readonly Holding[],
-  quotes: ReadonlyMap<string, number | null>,
-): number | null => {
-  let total = 0;
-  for (const holding of holdings) {
-    const change = quotes.get(holding.symbol);
-    if (change === undefined || change === null) return null;
-    total += (change * holding.weight) / 100;
-  }
-  return total;
 };
 
 /* 模块级常量：每次渲染新建一个空 Map 会让下游的记忆化全部失效。 */

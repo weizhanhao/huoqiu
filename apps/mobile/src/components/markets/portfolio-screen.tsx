@@ -1,5 +1,6 @@
 import { tokens } from "@huoqiu/native-ui";
 import {
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -7,18 +8,37 @@ import {
   View,
 } from "react-native";
 
-import type { Portfolio, PortfolioSets } from "../../api/market-api";
+import type {
+  Portfolio,
+  PortfolioSets,
+  PublicPortfolio,
+} from "../../api/market-api";
+import { signColor, signedPercent } from "../../styles/market-sign";
 
 /*
  * 组合。
  *
  * 这一页原先读的是 getPortfolioHub(period)——一份写死的合成榜单，切「日/周/年」
- * 只是在几组假收益之间来回换。现在是这个账号自己建的和关注的组合。
+ * 只是在几组假收益之间来回换。现在有两块真东西：站内所有账号建过的组合按当日
+ * 收益排的擂台榜，和这个账号自己建的、关注的组合。
+ *
+ * 参考图里擂台榜有日榜/周榜/年榜三档。这里只有日榜——我们没有存过组合的历史
+ * 净值，周和年算不出来。画上另外两档，点开只能是空的或者编的。
  */
 
+/** 一行榜单：组合本身，加上算出来的当日收益（取不到为 null）。 */
+export type BoardRow = Readonly<{
+  dayReturn: number | null;
+  portfolio: PublicPortfolio;
+}>;
+
 export type PortfolioScreenProperties = Readonly<{
+  /** null 表示还没取到。 */
+  board: readonly BoardRow[] | null;
+  boardFailure: string | null;
   failure: string | null;
   loading: boolean;
+  onOpenPortfolio: (portfolioId: string) => void;
   onRefresh: () => void;
   sets: PortfolioSets | null;
   signedIn: boolean;
@@ -53,8 +73,11 @@ const Section = ({
 );
 
 export function PortfolioScreen({
+  board,
+  boardFailure,
   failure,
   loading,
+  onOpenPortfolio,
   onRefresh,
   sets,
   signedIn,
@@ -75,6 +98,61 @@ export function PortfolioScreen({
           <Text style={styles.noticeText}>{failure}</Text>
         </View>
       )}
+
+      <Text style={styles.sectionHeading}>火球组合擂台榜 · 日榜</Text>
+      {boardFailure === null ? null : (
+        <View style={styles.notice}>
+          <Text style={styles.noticeText}>{boardFailure}</Text>
+        </View>
+      )}
+      {board === null ? (
+        <Text style={styles.empty}>正在读取榜单……</Text>
+      ) : null}
+      {board !== null && board.length === 0 ? (
+        <Text style={styles.empty}>
+          还没有人建过组合。建一个，它就会出现在这里。
+        </Text>
+      ) : null}
+      {(board ?? []).map((row, rank) => (
+        <Pressable
+          accessibilityRole="button"
+          key={row.portfolio.id}
+          onPress={() => {
+            onOpenPortfolio(row.portfolio.id);
+          }}
+          style={styles.boardRow}
+        >
+          <Text style={styles.rank}>{rank + 1}</Text>
+          <View style={styles.boardMain}>
+            <Text numberOfLines={1} style={styles.name}>
+              {row.portfolio.name}
+            </Text>
+            <Text style={styles.note}>
+              {row.portfolio.ownerName === ""
+                ? "已注销账号"
+                : `${row.portfolio.ownerName} 主理`}
+              {row.portfolio.followerCount > 0
+                ? ` · ${String(row.portfolio.followerCount)} 人关注`
+                : ""}
+            </Text>
+          </View>
+          <View style={styles.boardReturn}>
+            <Text style={styles.note}>日收益</Text>
+            {/*
+              取不到行情就写「—」。少算一只的加权和是错的，而错的结果看起来
+              仍然像个正常的百分比，还会被拿去比名次。
+            */}
+            <Text
+              style={[
+                styles.returnValue,
+                { color: signColor(row.dayReturn ?? 0) },
+              ]}
+            >
+              {row.dayReturn === null ? "—" : signedPercent(row.dayReturn)}
+            </Text>
+          </View>
+        </Pressable>
+      ))}
 
       {signedIn ? null : (
         <View style={styles.notice}>
@@ -103,6 +181,24 @@ export function PortfolioScreen({
 }
 
 const styles = StyleSheet.create({
+  boardMain: {
+    flex: 1,
+    gap: 3,
+  },
+  boardReturn: {
+    alignItems: "flex-end",
+    gap: 2,
+  },
+  boardRow: {
+    alignItems: "center",
+    backgroundColor: tokens.surface.base,
+    borderColor: tokens.border.default,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 14,
+  },
   card: {
     backgroundColor: tokens.surface.base,
     borderColor: tokens.border.default,
@@ -143,6 +239,16 @@ const styles = StyleSheet.create({
     color: tokens.text.secondary,
     fontSize: 14,
     lineHeight: 21,
+  },
+  rank: {
+    color: tokens.text.tertiary,
+    fontSize: 15,
+    fontWeight: "700",
+    minWidth: 18,
+  },
+  returnValue: {
+    fontSize: 16,
+    fontWeight: "700",
   },
   screen: {
     backgroundColor: tokens.surface.canvas,

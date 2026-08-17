@@ -1,5 +1,7 @@
 "use client";
 
+import { dayReturn } from "@huoqiu/domain/market/portfolio-return";
+
 import { ScrollableTable } from "../../components/system/scrollable-table";
 import { InstrumentLink } from "../../components/instrument/instrument-link";
 import { useEffect, useState } from "react";
@@ -73,16 +75,13 @@ export function PortfolioHoldings({
     };
   }, [symbols]);
 
-  /* 任一持仓缺行情，合计就是 null。 */
-  let total: number | null = 0;
-  for (const holding of holdings) {
-    const change = quotes.get(holding.symbol)?.changePercent ?? null;
-    if (change === null) {
-      total = null;
-      break;
-    }
-    total += (change * holding.weight) / 100;
-  }
+  /* 任一持仓缺行情，合计就是 null。算法与组合榜、我的组合同源。 */
+  const total = dayReturn(
+    holdings,
+    new Map(
+      [...quotes].map(([symbol, quote]) => [symbol, quote.changePercent]),
+    ),
+  );
 
   return (
     <>

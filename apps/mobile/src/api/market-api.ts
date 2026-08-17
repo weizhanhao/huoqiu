@@ -89,6 +89,25 @@ export const fetchQuotes = async (
   return { kind: "ok", value: result.value.quotes ?? [] };
 };
 
+/*
+ * 组合榜：站内账号真实建过的全部组合。
+ *
+ * 不需要登录——榜本来就是给所有人看的。收益不在服务端算：那样一次页面加载会
+ * 变成几十次上游请求，所以这一侧把所有持仓的代码凑齐，一次问完行情再自己算。
+ */
+export type PublicPortfolio = Portfolio &
+  Readonly<{ followerCount: number; ownerName: string }>;
+
+export const fetchPublicPortfolios = async (): Promise<
+  ApiResult<readonly PublicPortfolio[]>
+> => {
+  const result = await request<
+    Readonly<{ portfolios?: readonly PublicPortfolio[] }>
+  >("/api/social/portfolios/public", { method: "GET", token: null });
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.portfolios ?? [] };
+};
+
 export const fetchPortfolios = async (
   token: string,
 ): Promise<ApiResult<PortfolioSets>> =>
@@ -238,6 +257,29 @@ export const searchInstruments = async (
   );
   if (result.kind !== "ok") return result;
   return { kind: "ok", value: result.value.hits ?? [] };
+};
+
+/*
+ * ETF 列表。
+ *
+ * 首页的 ETF 频道拿它当名单用：帖子里引用到的代码在不在这张表里，决定它算不算
+ * ETF 相关。按号段猜（51 开头就是 ETF）会分出一份看着像、实则错的东西。
+ */
+export type EtfRow = Readonly<{
+  changePercent: number | null;
+  code: string;
+  href: string | null;
+  last: number | null;
+  name: string;
+}>;
+
+export const fetchEtfList = async (): Promise<ApiResult<readonly EtfRow[]>> => {
+  const result = await request<Readonly<{ rows?: readonly EtfRow[] }>>(
+    "/api/market/etfs?sort=amount&page=1",
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.rows ?? [] };
 };
 
 export type NewsItem = Readonly<{

@@ -188,8 +188,11 @@ describe("portfolio screen", () => {
   it("separates portfolios I created from ones I follow", () => {
     const markup = renderToStaticMarkup(
       <PortfolioScreen
+        board={[]}
+        boardFailure={null}
         failure={null}
         loading={false}
+        onOpenPortfolio={vi.fn()}
         onRefresh={vi.fn()}
         sets={{
           created: [
@@ -215,8 +218,11 @@ describe("portfolio screen", () => {
   it("tells a signed-out visitor to log in", () => {
     const markup = renderToStaticMarkup(
       <PortfolioScreen
+        board={[]}
+        boardFailure={null}
         failure={null}
         loading={false}
+        onOpenPortfolio={vi.fn()}
         onRefresh={vi.fn()}
         sets={null}
         signedIn={false}
@@ -225,5 +231,91 @@ describe("portfolio screen", () => {
 
     expect(markup).toContain("登录后这里会显示你建的和关注的组合");
     expect(markup).not.toContain("我建的");
+  });
+  it("ranks the board and says so when a return cannot be computed", () => {
+    /*
+     * 算不出收益的那条要写「—」，不能写成 0.00%：0 的意思是「今天没动」，
+     * 而事实是有一只持仓没取到行情——两者会被排进同一个名次区间。
+     */
+    const markup = renderToStaticMarkup(
+      <PortfolioScreen
+        board={[
+          {
+            dayReturn: 2.5,
+            portfolio: {
+              followerCount: 3,
+              holdings: [{ symbol: "sh600519", weight: 100 }],
+              id: "pf_1",
+              name: "稳一点",
+              ownerName: "林岸",
+            },
+          },
+          {
+            dayReturn: null,
+            portfolio: {
+              followerCount: 0,
+              holdings: [{ symbol: "sz000001", weight: 100 }],
+              id: "pf_2",
+              name: "停牌那只",
+              ownerName: "周野",
+            },
+          },
+        ]}
+        boardFailure={null}
+        failure={null}
+        loading={false}
+        onOpenPortfolio={vi.fn()}
+        onRefresh={vi.fn()}
+        sets={null}
+        signedIn={false}
+      />,
+    );
+
+    expect(markup).toContain("火球组合擂台榜");
+    expect(markup).toContain("+2.50%");
+    expect(markup).toContain("林岸 主理");
+    expect(markup).toContain("3 人关注");
+    expect(markup).toContain("—");
+    expect(markup).not.toContain("0.00%");
+  });
+
+  it("does not call an unfetched board empty", () => {
+    /*
+     * 「还没取到」和「一个组合都没有」是两回事。混成一句，网慢时这一页会说
+     * 站内没人建过组合——而那是假的。
+     */
+    const loading = renderToStaticMarkup(
+      <PortfolioScreen
+        board={null}
+        boardFailure={null}
+        failure={null}
+        loading={false}
+        onOpenPortfolio={vi.fn()}
+        onRefresh={vi.fn()}
+        sets={null}
+        signedIn={false}
+      />,
+    );
+
+    expect(loading).toContain("正在读取榜单");
+    expect(loading).not.toContain("还没有人建过组合");
+  });
+
+  it("names this product on the board, not the one it was modelled on", () => {
+    const markup = renderToStaticMarkup(
+      <PortfolioScreen
+        board={[]}
+        boardFailure={null}
+        failure={null}
+        loading={false}
+        onOpenPortfolio={vi.fn()}
+        onRefresh={vi.fn()}
+        sets={null}
+        signedIn={false}
+      />,
+    );
+
+    expect(markup).toContain("火球组合擂台榜");
+    expect(markup).not.toContain("雪球");
   });
 });
