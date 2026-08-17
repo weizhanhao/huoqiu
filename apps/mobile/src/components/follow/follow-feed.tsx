@@ -56,9 +56,19 @@ export function FollowFeed({
   posts,
   signedIn,
 }: FollowFeedProperties) {
-  const followed = posts
+  /*
+   * 先复制再 sort，不能用 toSorted。
+   *
+   * Hermes（React Native 0.81 自带的引擎）没有 Array.prototype.toSorted，
+   * 真机上直接抛「toSorted is not a function」整屏红。而用例跑在 Node 上，
+   * 那里有这个方法，所以全绿——测试引擎比设备新，这类问题测不出来。
+   *
+   * 也不能直接 .sort()：那会就地改掉会话状态里的数组，React 拿不到新引用，
+   * 界面不会更新，而且别处再读到的顺序已经被改过了。
+   */
+  const followed = [...posts]
     .filter((post) => following.includes(post.authorId))
-    .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt));
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   return (
     <ScrollView

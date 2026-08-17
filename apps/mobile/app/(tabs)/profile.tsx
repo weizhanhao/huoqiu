@@ -20,10 +20,15 @@ export default function ProfileScreen() {
     return <SignInForm onLogin={login} onRegister={register} />;
   }
 
-  /* 「我发的」在这一页，不在关注流里——关注流只放别人写的。 */
-  const mine = posts
+  /*
+   * 「我发的」在这一页，不在关注流里——关注流只放别人写的。
+   *
+   * 先复制再 sort：Hermes 没有 toSorted（真机会整屏红），而直接 sort 会
+   * 就地改掉会话状态里的数组。
+   */
+  const mine = [...posts]
     .filter((post) => post.authorId === account.id)
-    .toSorted((left, right) => right.createdAt.localeCompare(left.createdAt));
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   return (
     <ScrollView
