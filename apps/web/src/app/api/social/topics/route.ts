@@ -1,26 +1,32 @@
+import { extractTopics } from "@huoqiu/domain/social/post-body";
 import { NextResponse } from "next/server";
 
-import { communityFeedCards } from "../../../../features/community/community-fixtures";
+import { listPosts } from "../../../../server/social-store";
 
 /*
  * 发帖框里「#」能选的话题。
  *
- * 单独一条接口，是为了不把整份社区夹具打进客户端包——发帖框只要一串标签，
- * 不需要那些卡片正文。
+ * 此前这一串是从社区夹具（communityFeedCards）里统计出来的——「复盘方法」
+ * 「决策日志」这些标签属于几个虚构作者，站内没有任何一条真帖子用过它们。而
+ * 用户会从这个面板里选一个，写进自己真实的帖子：等于把夹具的分类体系注进
+ * 真实内容。这是全站最后一处用户看得见的假数据。
  *
- * 不鉴权：话题广场本来就是公开的一页。
+ * 现在从真实的已发布帖子里统计。没有人写过话题时它就是空的——那也是实话，
+ * 发帖器会如实说「还没有话题」，而用户仍然可以自己打一个 #xxx# 出来。
+ *
+ * 不能再 force-static：它现在读运行时存储，缓存住就等于又回到一份写死的表。
  */
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export function GET(): NextResponse {
   const counts = new Map<string, number>();
-  for (const card of communityFeedCards) {
-    for (const tag of card.tags) {
+  for (const post of listPosts()) {
+    for (const tag of extractTopics(post.body)) {
       counts.set(tag, (counts.get(tag) ?? 0) + 1);
     }
   }
 
-  /* 用得多的排前面；一样多时按名字排，免得每次构建顺序都不一样。 */
+  /* 用得多的排前面；一样多时按名字排，免得每次请求顺序都不一样。 */
   const topics = [...counts.entries()]
     .sort((left, right) =>
       right[1] === left[1]
@@ -29,5 +35,8 @@ export function GET(): NextResponse {
     )
     .map(([tag]) => tag);
 
-  return NextResponse.json({ topics });
+  return NextResponse.json(
+    { topics },
+    { headers: { "cache-control": "no-store" } },
+  );
 }

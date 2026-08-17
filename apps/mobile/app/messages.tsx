@@ -24,6 +24,7 @@ export default function MessagesRoute() {
 
   const notifications = useRemote(
     useCallback(() => callAs(fetchNotifications), [callAs]),
+    { refreshOnFocus: true },
   );
 
   return (

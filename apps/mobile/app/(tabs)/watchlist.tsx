@@ -112,14 +112,15 @@ export default function WatchlistScreen() {
     };
   }, [callAs]);
 
-  const watchlist = useRemote(loadWatchlist);
+  /* 在个股页加了自选、在新建页建了组合，回到这一页要看得到。 */
+  const watchlist = useRemote(loadWatchlist, { refreshOnFocus: true });
   const overview = useRemote(fetchMarketOverview);
   const loadPortfolios = useCallback(
     () => callAs(fetchPortfolios),
     [callAs],
   );
-  const portfolios = useRemote(loadPortfolios);
-  const board = useRemote(loadBoard);
+  const portfolios = useRemote(loadPortfolios, { refreshOnFocus: true });
+  const board = useRemote(loadBoard, { refreshOnFocus: true });
 
   return (
     <View style={{ backgroundColor: tokens.surface.canvas, flex: 1 }}>

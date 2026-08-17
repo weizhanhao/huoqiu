@@ -31,6 +31,22 @@ export const cashtagToken = (name: string, symbol: string): string =>
 
 export const topicToken = (tag: string): string => `#${tag}#`;
 
+/*
+ * 正文里写过哪些话题。
+ *
+ * 和 parsePostBody 里那一支不是一回事：那里要求话题已经在已知名单里才算数
+ * （否则一句「#3 号线#」会被当成话题链接）。而名单本身要从真实帖子里长出来，
+ * 这就成了循环——所以提取单独一支，只按写法认。
+ */
+export const extractTopics = (body: string): readonly string[] => {
+  const found: string[] = [];
+  for (const match of body.matchAll(/#(?<tag>[^#\n]{1,40})#/gu)) {
+    const tag = match.groups?.tag?.trim();
+    if (tag !== undefined && tag.length > 0) found.push(tag);
+  }
+  return found;
+};
+
 /* 末尾留一个空格：紧接着打字不会粘到名字后面，变成另一个人的名字。 */
 export const mentionToken = (displayName: string): string => `@${displayName} `;
 

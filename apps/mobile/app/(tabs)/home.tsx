@@ -96,7 +96,8 @@ export default function HomeScreen() {
     useState<readonly ChannelId[]>(DEFAULT_CHANNELS);
   const [managing, setManaging] = useState(false);
 
-  const publicPosts = useRemote(fetchPublicPosts);
+  /* 发完帖 router.back() 回到这里，新那条要在。 */
+  const publicPosts = useRemote(fetchPublicPosts, { refreshOnFocus: true });
   const hot = useRemote(useCallback(() => fetchHotBoard("gainers"), []));
   const news = useRemote(fetchLiveNews);
   const videos = useRemote(fetchVideos);

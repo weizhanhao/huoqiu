@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
+import { Alert } from "react-native";
 
 import {
   createPortfolio,
@@ -102,7 +103,21 @@ export default function NewPortfolioRoute() {
         );
       }}
       onClose={() => {
-        router.back();
+        /* 加了十几只票、一项项调好权重，误点一下全没了。 */
+        if (name.trim().length === 0 && holdings.length === 0) {
+          router.back();
+          return;
+        }
+        Alert.alert("放弃这个组合？", "填的名称和持仓不会保存。", [
+          { style: "cancel", text: "继续填" },
+          {
+            onPress: () => {
+              router.back();
+            },
+            style: "destructive",
+            text: "放弃",
+          },
+        ]);
       }}
       onPick={(hit) => {
         if (hit.symbol === null) return;

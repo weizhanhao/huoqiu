@@ -7,6 +7,7 @@ import {
 } from "@huoqiu/domain/social/post-body";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
+import { Alert } from "react-native";
 
 import { searchInstruments, type SearchHit } from "../src/api/market-api";
 import { fetchTopics, uploadImage } from "../src/api/social-api";
@@ -181,7 +182,27 @@ export default function ComposeRoute() {
       }}
       onChangeTitle={setTitle}
       onClose={() => {
-        router.back();
+        /*
+         * 写了东西再关，要问一句。
+         *
+         * 「✕」紧贴屏幕左上角，是最容易误触的位置之一，而这一页没有草稿。
+         * 写了八百字的长文误点一下就全没了，没有任何挽回余地——这是整个 App
+         * 里唯一一类不可撤销的破坏性操作。
+         */
+        if (title.trim().length === 0 && body.trim().length === 0) {
+          router.back();
+          return;
+        }
+        Alert.alert("放弃这条内容？", "写的东西不会保存。", [
+          { style: "cancel", text: "继续写" },
+          {
+            onPress: () => {
+              router.back();
+            },
+            style: "destructive",
+            text: "放弃",
+          },
+        ]);
       }}
       onOpenPanel={setPanel}
       onPickAccount={(account) => {

@@ -50,7 +50,9 @@ export default function PostDetailRoute() {
 
   const posts = useRemote(fetchPublicPosts);
   const topics = useRemote(fetchTopics);
-  const comments = useRemote(useCallback(() => fetchComments(id), [id]));
+  const comments = useRemote(useCallback(() => fetchComments(id), [id]), {
+    refreshOnFocus: true,
+  });
 
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<PostComment | null>(null);

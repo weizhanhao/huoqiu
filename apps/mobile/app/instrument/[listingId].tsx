@@ -55,6 +55,7 @@ export default function InstrumentScreen() {
   const posts = useRemote(fetchPublicPosts);
   const watchlist = useRemote(
     useCallback(() => callAs(fetchWatchlist), [callAs]),
+    { refreshOnFocus: true },
   );
 
   /*

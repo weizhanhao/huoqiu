@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ApiResult } from "../api/request";
 
@@ -18,10 +19,26 @@ export type Remote<T> = Readonly<{
   value: T | null;
 }>;
 
-export const useRemote = <T>(load: () => Promise<ApiResult<T>>): Remote<T> => {
+export type RemoteOptions = Readonly<{
+  /*
+   * 每次这一屏重新回到前台时重取。
+   *
+   * 不开的话会出现这样一幕：在个股页点了「加自选」，按钮变成「已自选」，返回
+   * 自选页签——列表还是空的。那一页的 effect 依赖没变，不会重跑，而用户刚才
+   * 明明看到加成功了。他只能下拉刷新，可他不知道要下拉。
+   */
+  refreshOnFocus?: boolean;
+}>;
+
+export const useRemote = <T>(
+  load: () => Promise<ApiResult<T>>,
+  options: RemoteOptions = {},
+): Remote<T> => {
   const [value, setValue] = useState<T | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /* 首次聚焦和挂载是同一时刻，不能取两遍。 */
+  const focusedOnce = useRef(false);
 
   const run = useCallback(async () => {
     setLoading(true);
@@ -45,6 +62,19 @@ export const useRemote = <T>(load: () => Promise<ApiResult<T>>): Remote<T> => {
   useEffect(() => {
     void run();
   }, [run]);
+
+  const shouldRefreshOnFocus = options.refreshOnFocus === true;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!shouldRefreshOnFocus) return;
+      if (!focusedOnce.current) {
+        focusedOnce.current = true;
+        return;
+      }
+      void run();
+    }, [run, shouldRefreshOnFocus]),
+  );
 
   const refresh = useCallback(() => {
     void run();
