@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import type { ChartSeries } from "../../api/market-api";
 import { signColor, signedPercent } from "../../styles/market-sign";
+import { boundsOf, ratio } from "./chart-bounds";
 
 /*
  * 分时与 K 线。
@@ -20,18 +21,6 @@ import { signColor, signedPercent } from "../../styles/market-sign";
 
 const CHART_HEIGHT = 168;
 const VOLUME_HEIGHT = 44;
-
-type Bounds = Readonly<{ high: number; low: number }>;
-
-const boundsOf = (values: readonly number[]): Bounds => {
-  const high = Math.max(...values);
-  const low = Math.min(...values);
-  /* 全平的一段（停牌、一字板）会让 high-low 为 0，除法就成了 NaN。 */
-  return high === low ? { high: high + 1, low: low - 1 } : { high, low };
-};
-
-const ratio = ({ high, low }: Bounds, value: number): number =>
-  (value - low) / (high - low);
 
 export type PriceChartProperties = Readonly<{
   failure: string | null;

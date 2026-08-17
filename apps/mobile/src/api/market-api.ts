@@ -213,6 +213,33 @@ export const fetchHotBoard = async (
   return { kind: "ok", value: result.value.rows ?? [] };
 };
 
+/*
+ * 标的搜索。
+ *
+ * symbol / href 可能是 null：上游的代码表里有一些站内渲染不出来的品种。为空
+ * 时不给跳转，也不给「加自选」——照样列出来是对的，用户至少知道有这只；
+ * 但按钮点下去打不开，比不给按钮更糟。
+ */
+export type SearchHit = Readonly<{
+  code: string;
+  href: string | null;
+  /** 上游给的分类名，例如「沪A」「深A」「ETF」。 */
+  kind: string;
+  name: string;
+  symbol: string | null;
+}>;
+
+export const searchInstruments = async (
+  query: string,
+): Promise<ApiResult<readonly SearchHit[]>> => {
+  const result = await request<Readonly<{ hits?: readonly SearchHit[] }>>(
+    `/api/market/search?q=${encodeURIComponent(query)}`,
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.hits ?? [] };
+};
+
 export type NewsItem = Readonly<{
   digest: string;
   href: string;

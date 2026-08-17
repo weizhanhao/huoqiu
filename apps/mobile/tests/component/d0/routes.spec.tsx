@@ -1,5 +1,3 @@
-import { d0FixtureSchema } from "@huoqiu/contracts/d0";
-import fixtureJson from "@huoqiu/contracts/d0/fixture";
 import type * as ReactModule from "react";
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,7 +55,6 @@ vi.mock("react", async (importOriginal) => {
 
 import MessagesScreen from "../../../app/messages";
 import PortfolioDetailScreen from "../../../app/portfolio/[portfolioId]";
-import SearchScreen from "../../../app/search";
 import SettingsScreen from "../../../app/settings";
 
 const readProperties = (element: ReactElement) =>
@@ -83,11 +80,6 @@ const readProperties = (element: ReactElement) =>
     submittedQuery?: string;
   }>;
 
-const readyFixtureResult = (): D0FixtureLoadResult => ({
-  status: "ready",
-  data: d0FixtureSchema.parse(fixtureJson),
-});
-
 beforeEach(() => {
   mocks.fixtureResult = {
     status: "error",
@@ -105,49 +97,18 @@ beforeEach(() => {
 });
 
 describe("D0 mobile route behavior", () => {
-  it.each([
-    /*
-     * 个股页从这两张表里去掉了。
-     *
-     * 它不再读夹具——报价、图形、公告、相关 ETF 都按地址里的代码现取，失败
-     * 原因是网络或上游，恢复方式是重进或切周期，不是重新解析一份本地 JSON。
-     * 「重试夹具」这条断言守的东西已经不存在。
-     *
-     * 新行为由 tests/component/instrument/ 下的用例接手。
-     */
-    ["search", SearchScreen],
-  ] as const)(
-    "returns %s fresh deep links to /home and preserves normal back history",
-    (_name, Screen) => {
-      mocks.fixtureResult = readyFixtureResult();
-      const fresh = readProperties(Screen() as ReactElement);
-      expect(fresh.onBack).toBeTypeOf("function");
-      fresh.onBack?.();
-      expect(mocks.router.replace).toHaveBeenCalledWith("/home");
-      expect(mocks.router.back).not.toHaveBeenCalled();
-
-      mocks.router.replace.mockReset();
-      mocks.router.canGoBack.mockReturnValue(true);
-      mocks.stateIndex = 0;
-      const stacked = readProperties(Screen() as ReactElement);
-      stacked.onBack?.();
-      expect(mocks.router.back).toHaveBeenCalledOnce();
-      expect(mocks.router.replace).not.toHaveBeenCalled();
-    },
-  );
-
-  it("submits the current draft through the search route", () => {
-    const ready = readyFixtureResult();
-    mocks.fixtureResult = ready;
-    mocks.stateValues = [ready, "SYN001", ""];
-
-    const search = readProperties(SearchScreen() as ReactElement);
-    expect(search.query).toBe("SYN001");
-    expect(search.submittedQuery).toBe("");
-    expect(search.onSubmit).toBeTypeOf("function");
-    search.onSubmit?.();
-    expect(mocks.stateSetters[2]).toHaveBeenCalledWith("SYN001");
-  });
+  /*
+   * 搜索页从这些表里去掉了。
+   *
+   * 它不再读夹具——联想走 /api/market/search，是真的证券代码表；「猜你想搜」
+   * 是当下的实时资讯，「热门股票」是真实榜单。失败原因是网络或上游，恢复方式
+   * 是重新输入，不是重新解析一份本地 JSON。「重试夹具」这条断言守的东西
+   * 已经不存在。
+   *
+   * 「返回时深链回首页」这条不变，只是它守的是 createD0BackHandler，跟哪一页
+   * 用它没关系——那条断言搬到了 tests/navigation/back-or-home.spec.ts，
+   * 页面内容由 tests/component/search/ 下的用例接手。
+   */
 
   /*
    * 行情与组合两条用例已随它们守的东西一起去掉。
@@ -215,19 +176,4 @@ describe("D0 mobile route behavior", () => {
    * 自选也从这张表里去掉了：它不再读夹具，名单来自账号、行情按名单现取，
    * 失败原因是网络或服务端，恢复方式是下拉刷新，不是重新解析本地 JSON。
    */
-  it.each([["search", SearchScreen, true]] as const)(
-    "wires a recovering Retry for the %s error branch without dropping stack navigation",
-    (_name, Screen, needsBack) => {
-      const error = readProperties(Screen() as ReactElement);
-      expect(error.onRetry).toBeTypeOf("function");
-      if (needsBack) {
-        expect(error.onBack).toBeTypeOf("function");
-      }
-
-      const ready = readyFixtureResult();
-      mocks.fixtureResult = ready;
-      error.onRetry?.();
-      expect(mocks.stateSetters[0]).toHaveBeenCalledWith(ready);
-    },
-  );
 });
