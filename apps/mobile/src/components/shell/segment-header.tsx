@@ -82,7 +82,8 @@ const styles = StyleSheet.create({
   },
   activeText: {
     color: tokens.text.primary,
-    fontSize: 22,
+    /* 参考图实测 20，且选中与未选中同字号——跳字号会让三个词横向重排一次。 */
+    fontSize: 20,
     fontWeight: "700",
   },
   root: {

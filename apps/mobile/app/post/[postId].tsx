@@ -135,6 +135,13 @@ export default function PostDetailRoute() {
       }}
       onBack={onBack}
       onChangeDraft={setDraft}
+      onOpenAuthor={() => {
+        if (post === null) return;
+        router.push({
+          params: { accountId: post.authorId },
+          pathname: "/user/[accountId]",
+        });
+      }}
       onOpenInstrument={(symbol) => {
         router.push({
           params: { listingId: symbol },

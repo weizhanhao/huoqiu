@@ -7,6 +7,8 @@ import { tokens } from "@huoqiu/native-ui";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -63,6 +65,7 @@ export type PostDetailScreenProperties = Readonly<{
   onAddToWatchlist: (symbol: string, label: string) => void;
   onBack: () => void;
   onChangeDraft: (text: string) => void;
+  onOpenAuthor: () => void;
   onOpenInstrument: (symbol: string) => void;
   onReplyTo: (comment: PostComment | null) => void;
   onSubmit: () => void;
@@ -97,6 +100,7 @@ export function PostDetailScreen({
   onAddToWatchlist,
   onBack,
   onChangeDraft,
+  onOpenAuthor,
   onOpenInstrument,
   onReplyTo,
   onSubmit,
@@ -119,7 +123,18 @@ export function PostDetailScreen({
   const canSend = !sending && draft.trim().length > 0;
 
   return (
-    <View style={styles.screen} testID="post-detail-screen">
+    /*
+     * 键盘弹起来时要把底下这块顶上去。
+     *
+     * iOS 上 RN 默认不做避让：底部那条输入栏会整个被键盘盖住——用户看不见
+     * 自己在打什么字。Android 由系统 adjustResize 处理，所以只在 iOS 上加
+     * behavior。
+     */
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.screen}
+      testID="post-detail-screen"
+    >
       <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <Pressable
           accessibilityLabel="返回"
@@ -129,10 +144,18 @@ export function PostDetailScreen({
         >
           <Text style={styles.topGlyph}>‹</Text>
         </Pressable>
-        {post === null ? null : <Avatar name={post.authorName} />}
-        <Text numberOfLines={1} style={styles.topName}>
-          {post?.authorName ?? ""}
-        </Text>
+        {post === null ? null : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onOpenAuthor}
+            style={styles.identityHit}
+          >
+            <Avatar name={post.authorName} />
+            <Text numberOfLines={1} style={styles.topName}>
+              {post.authorName}
+            </Text>
+          </Pressable>
+        )}
         {following === null || post === null ? null : (
           <Pressable
             accessibilityRole="button"
@@ -339,7 +362,7 @@ export function PostDetailScreen({
           </Pressable>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -353,10 +376,11 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: "center",
     backgroundColor: tokens.brand.subtle,
-    borderRadius: 16,
-    height: 32,
+    /* 参考图：详情页评论 36，信息流才是 32。 */
+    borderRadius: 18,
+    height: 36,
     justifyContent: "center",
-    width: 32,
+    width: 36,
   },
   avatarText: {
     color: tokens.brand.primary,
@@ -591,6 +615,13 @@ const styles = StyleSheet.create({
     color: tokens.text.primary,
     fontSize: 26,
     lineHeight: 30,
+  },
+  identityHit: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 10,
+    minHeight: appTouchMinimum,
   },
   topName: {
     color: tokens.text.primary,

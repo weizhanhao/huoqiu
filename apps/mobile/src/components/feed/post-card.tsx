@@ -38,10 +38,14 @@ export type PostCardProperties = Readonly<{
   accounts: readonly MentionAccount[];
   /** null 表示不显示关注按钮（自己的帖子，或未登录）。 */
   following: boolean | null;
+  /** 我赞过这条没有。 */
+  liked: boolean;
   onAddToWatchlist: (symbol: string, label: string) => void;
   onOpen: () => void;
+  onOpenAuthor: () => void;
   onOpenInstrument: (symbol: string) => void;
   onShowActionNotice: (title: string, detail: string) => void;
+  onToggleLike: () => void;
   onToggleFollow: () => void;
   post: SocialPost;
   topics: readonly string[];
@@ -50,26 +54,41 @@ export type PostCardProperties = Readonly<{
 export function PostCard({
   accounts,
   following,
+  liked,
   onAddToWatchlist,
   onOpen,
+  onOpenAuthor,
   onOpenInstrument,
   onShowActionNotice,
   onToggleFollow,
+  onToggleLike,
   post,
   topics,
 }: PostCardProperties) {
   return (
     <View style={styles.card} testID="post-card">
       <View style={styles.head}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{post.authorName.slice(0, 1)}</Text>
-        </View>
-        <View style={styles.identity}>
-          <Text numberOfLines={1} style={styles.author}>
-            {post.authorName}
-          </Text>
-          <Text style={styles.time}>{formatTime(post.createdAt)}</Text>
-        </View>
+        {/*
+          头像和昵称要能点进主页。
+          
+          用户主页整页做好了，此前唯一的入口是「达人」频道——在推荐流里看到
+          一条好帖，想看这个人还写过什么，点头像没反应，点昵称也没反应。
+        */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenAuthor}
+          style={styles.identityHit}
+        >
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{post.authorName.slice(0, 1)}</Text>
+          </View>
+          <View style={styles.identity}>
+            <Text numberOfLines={1} style={styles.author}>
+              {post.authorName}
+            </Text>
+            <Text style={styles.time}>{formatTime(post.createdAt)}</Text>
+          </View>
+        </Pressable>
         {following === null ? null : (
           <Pressable
             accessibilityRole="button"
@@ -102,8 +121,9 @@ export function PostCard({
       />
 
       {/*
-        底部这排是参考图里每张卡都有的。分享和讨论还没做，点了如实说明；
-        赞数是真的（服务端按 likes 表现算）。
+        底部这排是参考图里每张卡都有的。赞是真的——服务端的接口详情页已经在
+        用了，此前列表里点它只弹一句「还没做」，而链路只差这一处接线。
+        分享确实还没做，点了如实说明。
       */}
       <View style={styles.actions}>
         <Pressable
@@ -124,15 +144,13 @@ export function PostCard({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          onPress={() => {
-            onShowActionNotice(
-              "点赞",
-              "在列表里直接点赞还没做，进帖子详情可以赞。",
-            );
-          }}
+          accessibilityState={{ selected: liked }}
+          onPress={onToggleLike}
           style={styles.actionHit}
         >
-          <Text style={styles.action}>👍 {post.likeCount ?? 0}</Text>
+          <Text style={liked ? styles.actionOn : styles.action}>
+            👍 {post.likeCount ?? 0}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -143,6 +161,11 @@ const styles = StyleSheet.create({
   action: {
     color: tokens.text.tertiary,
     fontSize: 13,
+  },
+  actionOn: {
+    color: tokens.brand.primary,
+    fontSize: 13,
+    fontWeight: "600",
   },
   actionHit: {
     justifyContent: "center",
@@ -162,10 +185,11 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: "center",
     backgroundColor: tokens.brand.subtle,
-    borderRadius: 18,
-    height: 36,
+    /* 参考图：信息流 32，详情页评论才是 36。 */
+    borderRadius: 16,
+    height: 32,
     justifyContent: "center",
-    width: 36,
+    width: 32,
   },
   avatarText: {
     color: tokens.brand.primary,
@@ -212,6 +236,13 @@ const styles = StyleSheet.create({
   identity: {
     flex: 1,
     gap: 1,
+  },
+  identityHit: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 10,
+    minHeight: appTouchMinimum,
   },
   time: {
     color: tokens.text.tertiary,

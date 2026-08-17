@@ -62,7 +62,7 @@ export function WatchlistScreen({
       {signedIn ? null : (
         <View style={styles.notice}>
           <Text style={styles.noticeText}>
-            登录后这里会显示你的自选。自选存在账号上，和网页版是同一份。
+            登录后这里会显示你的自选。自选存在账号上，手机和网页是同一份。
           </Text>
         </View>
       )}

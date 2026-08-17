@@ -126,7 +126,17 @@ export function ChannelBar({
           onPress={onCloseManager}
           style={styles.backdrop}
         >
-          <View style={styles.sheet} testID="channel-manager">
+          {/*
+            弹层本体要拦住触摸。RN 里非交互的 View 不阻断冒泡：点「已选频道」
+            下面的空白处会一路冒到背景上把弹层关掉，用户以为自己点错了。
+          */}
+          <Pressable
+            onPress={() => {
+              /* 只为拦住冒泡。 */
+            }}
+            style={styles.sheet}
+            testID="channel-manager"
+          >
             <View style={styles.sheetHead}>
               <Pressable
                 accessibilityLabel="关闭"
@@ -190,7 +200,7 @@ export function ChannelBar({
             <Text style={styles.sheetNote}>
               点已选频道移除，点未选频道添加。新增的排在最后；关注与推荐不可移除。
             </Text>
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
     </View>

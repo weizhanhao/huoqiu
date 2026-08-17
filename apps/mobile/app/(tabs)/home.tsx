@@ -1,6 +1,6 @@
 import { tokens } from "@huoqiu/native-ui";
 import { useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Linking, RefreshControl, ScrollView, View } from "react-native";
 
 import {
@@ -27,6 +27,7 @@ import {
 import {
   fetchPublicPosts,
   fetchTopics,
+  setLiked,
   type SocialPost,
 } from "../../src/api/social-api";
 import {
@@ -45,6 +46,10 @@ import {
 } from "../../src/components/shell/channel-bar";
 import { useComingSoon } from "../../src/components/system/coming-soon";
 import { useRemote } from "../../src/hooks/use-remote";
+import {
+  readChannelOrder,
+  writeChannelOrder,
+} from "../../src/stores/channel-preference";
 import { useAccountSession } from "../../src/session/account-session";
 
 /*
@@ -83,6 +88,7 @@ export default function HomeScreen() {
     account,
     accounts,
     callAs,
+    likedPostIds,
     failure,
     following,
     loading,
@@ -94,6 +100,26 @@ export default function HomeScreen() {
   const [channel, setChannel] = useState<ChannelId>("follow");
   const [selected, setSelected] =
     useState<readonly ChannelId[]>(DEFAULT_CHANNELS);
+
+  /*
+   * 把上次排好的顺序读回来。
+   *
+   * 只认还存在的频道 id：改版删掉某个频道之后，旧记录里那一项会渲染成一个
+   * 打不开的空档。
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void readChannelOrder().then((saved) => {
+      if (cancelled || saved === null) return;
+      const known = saved.filter((id): id is ChannelId =>
+        DEFAULT_CHANNELS.includes(id as ChannelId),
+      );
+      if (known.length > 0) setSelected(known);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [managing, setManaging] = useState(false);
 
   /* 发完帖 router.back() 回到这里，新那条要在。 */
@@ -201,6 +227,21 @@ export default function HomeScreen() {
     [callAs, fail, inform, watchlist],
   );
 
+  const toggleLike = useCallback(
+    async (postId: string) => {
+      const next = !likedPostIds.includes(postId);
+      const result = await callAs((token) => setLiked(token, postId, next));
+      if (result.kind === "ok") {
+        /* 赞数在帖子列表里，我赞过没有在会话快照里，两份都要更新。 */
+        void refresh();
+        publicPosts.refresh();
+        return;
+      }
+      fail(next ? "点赞没成功" : "取消赞没成功", result.message);
+    },
+    [callAs, fail, likedPostIds, publicPosts, refresh],
+  );
+
   const postFeed = (
     emptyText: string,
     shown: readonly SocialPost[] | null = publicPosts.value,
@@ -220,7 +261,14 @@ export default function HomeScreen() {
       onOpenPost={(postId) => {
         router.push({ params: { postId }, pathname: "/post/[postId]" });
       }}
+      onOpenUser={(accountId) => {
+        router.push({ params: { accountId }, pathname: "/user/[accountId]" });
+      }}
       onShowNotice={show}
+      onToggleLike={(postId) => {
+        void toggleLike(postId);
+      }}
+      likedPostIds={likedPostIds}
       onToggleFollow={(authorId) => {
         void toggleFollow(authorId).then((message) => {
           if (message !== null) fail("关注没成功", message);
@@ -250,6 +298,7 @@ export default function HomeScreen() {
         managing={managing}
         onChangeSelected={(next) => {
           setSelected(next);
+          void writeChannelOrder(next);
           /* 当前频道被移除了就退回关注，否则页面会停在一个已经不存在的档上。 */
           if (!next.includes(channel)) setChannel("follow");
         }}

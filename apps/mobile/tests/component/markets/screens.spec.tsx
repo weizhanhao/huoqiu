@@ -173,7 +173,7 @@ describe("watchlist screen", () => {
     );
 
     expect(markup).toContain("登录后这里会显示你的自选");
-    expect(markup).toContain("和网页版是同一份");
+    expect(markup).toContain("手机和网页是同一份");
   });
 
   it("does not claim the list is empty when the fetch failed", () => {

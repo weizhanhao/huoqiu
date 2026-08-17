@@ -53,6 +53,7 @@ const render = (
       onAddToWatchlist={vi.fn()}
       onBack={vi.fn()}
       onChangeDraft={vi.fn()}
+      onOpenAuthor={vi.fn()}
       onOpenInstrument={vi.fn()}
       onReplyTo={vi.fn()}
       onSubmit={vi.fn()}

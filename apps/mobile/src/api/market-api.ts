@@ -342,7 +342,8 @@ export type VideoItem = Readonly<{
   href: string;
   /** "YYYY-MM-DD HH:mm"。 */
   publishedAt: string;
-  thumbnail: string;
+  /** 封面文件名，喂给 /api/videos/thumbnail；上游没给时为 null。 */
+  thumbnail: string | null;
   title: string;
 }>;
 

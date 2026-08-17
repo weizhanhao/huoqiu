@@ -1,6 +1,8 @@
 import { tokens } from "@huoqiu/native-ui";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -129,7 +131,18 @@ export function ComposeScreen({
     (mode === "discussion" || title.trim().length > 0);
 
   return (
-    <View style={styles.screen} testID="compose-screen">
+    /*
+     * 键盘弹起来时要把底下这块顶上去。
+     *
+     * iOS 上 RN 默认不做避让：底部那条输入栏会整个被键盘盖住——用户看不见
+     * 自己在打什么字。Android 由系统 adjustResize 处理，所以只在 iOS 上加
+     * behavior。
+     */
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.screen}
+      testID="compose-screen"
+    >
       <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <Pressable
           accessibilityLabel="关闭"
@@ -395,7 +408,7 @@ export function ComposeScreen({
           <Text style={styles.toolGlyph}>⋯</Text>
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -1,7 +1,9 @@
 import { tokens } from "@huoqiu/native-ui";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { MentionAccount } from "@huoqiu/domain/social/post-body";
+
+import { apiUrl } from "../../api/config";
 
 import type { HotRow, NewsItem, VideoItem } from "../../api/market-api";
 import type { AccountSummary, SocialPost } from "../../api/social-api";
@@ -49,8 +51,11 @@ export type PostChannelProperties = Readonly<{
   onAddToWatchlist: (symbol: string, label: string) => void;
   onOpenInstrument: (symbol: string) => void;
   onOpenPost: (postId: string) => void;
+  onOpenUser: (accountId: string) => void;
+  onToggleLike: (postId: string) => void;
   onShowNotice: (title: string, detail: string) => void;
   onToggleFollow: (authorId: string) => void;
+  likedPostIds: readonly string[];
   posts: readonly SocialPost[] | null;
   signedIn: boolean;
   topics: readonly string[];
@@ -66,8 +71,11 @@ export function PostChannel({
   onAddToWatchlist,
   onOpenInstrument,
   onOpenPost,
+  onOpenUser,
+  onToggleLike,
   onShowNotice,
   onToggleFollow,
+  likedPostIds,
   posts,
   signedIn,
   topics,
@@ -93,14 +101,21 @@ export function PostChannel({
               : following.includes(post.authorId)
           }
           key={post.id}
+          liked={likedPostIds.includes(post.id)}
           onAddToWatchlist={onAddToWatchlist}
           onOpen={() => {
             onOpenPost(post.id);
+          }}
+          onOpenAuthor={() => {
+            onOpenUser(post.authorId);
           }}
           onOpenInstrument={onOpenInstrument}
           onShowActionNotice={onShowNotice}
           onToggleFollow={() => {
             onToggleFollow(post.authorId);
+          }}
+          onToggleLike={() => {
+            onToggleLike(post.id);
           }}
           post={post}
           topics={topics}
@@ -238,9 +253,27 @@ export function VideoChannel({
           }}
           style={styles.videoCard}
         >
+          {/*
+            封面。此前这张卡只有三行文字，而参考图里封面就是它的主体——
+            服务端的转发接口早就做好了（还带 SSRF 防护），只差这一个 Image。
+          */}
+          {video.thumbnail === null ? null : (
+            <Image
+              accessibilityLabel={`${video.title} 的封面`}
+              resizeMode="cover"
+              source={{
+                uri: apiUrl(
+                  `/api/videos/thumbnail?name=${encodeURIComponent(video.thumbnail)}`,
+                ),
+              }}
+              style={styles.videoCover}
+            />
+          )}
           <Text style={styles.videoColumn}>{video.column}</Text>
           <Text style={styles.videoTitle}>{video.title}</Text>
-          <Text style={styles.videoMeta}>{video.publishedAt}</Text>
+          <Text style={styles.videoMeta}>
+            {video.publishedAt} · 点击在浏览器里打开
+          </Text>
         </Pressable>
       ))}
     </View>
@@ -656,6 +689,12 @@ const styles = StyleSheet.create({
     color: tokens.brand.primary,
     fontSize: 12,
     fontWeight: "600",
+  },
+  videoCover: {
+    aspectRatio: 16 / 9,
+    backgroundColor: tokens.surface.canvas,
+    borderRadius: 8,
+    width: "100%",
   },
   videoMeta: {
     color: tokens.text.tertiary,
