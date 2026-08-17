@@ -11,6 +11,7 @@ import type {
   PrivacySettings,
 } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
+import { AccountForm, type AccountFormProperties } from "./account-form";
 
 /*
  * 设置。
@@ -60,6 +61,8 @@ export type SettingsSection =
 
 export type SettingsScreenProperties = Readonly<{
   account: AccountSummary | null;
+  /** 改密码与改资料那一组表单的全部状态与回调。 */
+  accountForm: Omit<AccountFormProperties, "saving">;
   failure: string | null;
   onBack: () => void;
   onChangePolicy: (policy: CommentPolicy) => void;
@@ -120,6 +123,7 @@ const Choice = ({
 
 export function SettingsScreen({
   account,
+  accountForm,
   failure,
   onBack,
   onChangePolicy,
@@ -172,20 +176,11 @@ export function SettingsScreen({
             <View style={styles.panel}>
               <Text style={styles.panelText}>
                 {account === null
-                  ? "登录后可以在这里改密码。"
+                  ? "登录后可以在这里改昵称、简介和密码。"
                   : `当前账号 ${account.email}。手机和网页是同一套账号，在哪边改都算数。`}
               </Text>
               {account === null ? null : (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={soon(
-                    "修改密码",
-                    "手机上的改密码表单还没做，网页版「设置 - 账号与安全」可以改。",
-                  )}
-                  style={styles.panelAction}
-                >
-                  <Text style={styles.panelActionText}>去改密码</Text>
-                </Pressable>
+                <AccountForm {...accountForm} saving={saving} />
               )}
             </View>
           ) : null}

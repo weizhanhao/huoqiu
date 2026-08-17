@@ -2,8 +2,10 @@ import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 
 import {
+  changePassword,
   fetchPrivacy,
   savePrivacy,
+  saveProfile,
   type CommentPolicy,
   type MarketColorMode,
   type NotificationCategory,
@@ -28,11 +30,21 @@ import { useAccountSession } from "../src/session/account-session";
 export default function SettingsRoute() {
   const router = useRouter();
   const { show } = useComingSoon();
-  const { account, callAs, logout } = useAccountSession();
+  const { account, callAs, logout, refresh } = useAccountSession();
 
   const privacy = useRemote(useCallback(() => callAs(fetchPrivacy), [callAs]));
 
   const [section, setSection] = useState<SettingsSection>(null);
+  /*
+   * 昵称和简介的初值来自会话。account 变了要跟着变——刚保存完那一次，
+   * 输入框里应该是新值，而不是打开这一页时的旧值。
+   */
+  const [displayName, setDisplayName] = useState(account?.displayName ?? "");
+  const [bio, setBio] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [accountFailure, setAccountFailure] = useState<string | null>(null);
+  const [accountSaved, setAccountSaved] = useState<string | null>(null);
   const [pending, setPending] = useState<PrivacySettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -63,9 +75,61 @@ export default function SettingsRoute() {
     [callAs, current, privacy],
   );
 
+  const submitProfile = useCallback(async () => {
+    setSaving(true);
+    const result = await callAs((token) =>
+      saveProfile(token, { bio: bio.trim(), displayName: displayName.trim() }),
+    );
+    setSaving(false);
+    if (result.kind === "ok") {
+      setAccountFailure(null);
+      setAccountSaved("资料已保存。");
+      await refresh();
+      return;
+    }
+    setAccountSaved(null);
+    setAccountFailure(result.message);
+  }, [bio, callAs, displayName, refresh]);
+
+  const submitPassword = useCallback(async () => {
+    setSaving(true);
+    const result = await callAs((token) =>
+      changePassword(token, currentPassword, newPassword),
+    );
+    setSaving(false);
+    if (result.kind === "ok") {
+      /* 成功之后立刻清掉两栏：密码留在输入框里没有任何好处。 */
+      setCurrentPassword("");
+      setNewPassword("");
+      setAccountFailure(null);
+      setAccountSaved("密码已改。下次登录用新密码。");
+      return;
+    }
+    setAccountSaved(null);
+    setAccountFailure(result.message);
+  }, [callAs, currentPassword, newPassword]);
+
   return (
     <SettingsScreen
       account={account}
+      accountForm={{
+        bio,
+        currentPassword,
+        displayName,
+        failure: accountFailure,
+        newPassword,
+        onChangeBio: setBio,
+        onChangeCurrentPassword: setCurrentPassword,
+        onChangeDisplayName: setDisplayName,
+        onChangeNewPassword: setNewPassword,
+        onSavePassword: () => {
+          void submitPassword();
+        },
+        onSaveProfile: () => {
+          void submitProfile();
+        },
+        saved: accountSaved,
+      }}
       failure={failure ?? privacy.failure}
       onBack={createD0BackHandler(router, "/profile")}
       onChangePolicy={(commentPolicy: CommentPolicy) => {

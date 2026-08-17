@@ -36,6 +36,20 @@ const render = (
   renderToStaticMarkup(
     <SettingsScreen
       account={account}
+      accountForm={{
+        bio: "",
+        currentPassword: "",
+        displayName: "林岸",
+        failure: null,
+        newPassword: "",
+        onChangeBio: vi.fn(),
+        onChangeCurrentPassword: vi.fn(),
+        onChangeDisplayName: vi.fn(),
+        onChangeNewPassword: vi.fn(),
+        onSavePassword: vi.fn(),
+        onSaveProfile: vi.fn(),
+        saved: null,
+      }}
       failure={null}
       onBack={vi.fn()}
       onChangePolicy={vi.fn()}
