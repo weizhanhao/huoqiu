@@ -186,3 +186,70 @@ export const setWatchlisted = async (
       token,
     }),
   );
+
+/*
+ * 热股榜、7x24 快讯、视频。
+ *
+ * 首页的热门与视频两个频道要用。都复用网页版现成的路由，没有另建。
+ */
+
+export type HotRow = Readonly<{
+  changePercent: number;
+  code: string;
+  /** 站内个股页地址，形如 /instruments/sz300314。 */
+  href: string;
+  last: number;
+  name: string;
+}>;
+
+export const fetchHotBoard = async (
+  direction: "gainers" | "losers" = "gainers",
+): Promise<ApiResult<readonly HotRow[]>> => {
+  const result = await request<Readonly<{ rows?: readonly HotRow[] }>>(
+    `/api/market/hot?market=cn&direction=${direction}`,
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.rows ?? [] };
+};
+
+export type NewsItem = Readonly<{
+  digest: string;
+  href: string;
+  id: string;
+  /** 上游给的是 "YYYY-MM-DD HH:mm"，不是 ISO；照原样带着，不自作主张改格式。 */
+  publishedAt: string;
+  title: string;
+}>;
+
+export const fetchLiveNews = async (): Promise<
+  ApiResult<readonly NewsItem[]>
+> => {
+  const result = await request<Readonly<{ items?: readonly NewsItem[] }>>(
+    "/api/live-news",
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.items ?? [] };
+};
+
+export type VideoItem = Readonly<{
+  code: string;
+  column: string;
+  href: string;
+  /** "YYYY-MM-DD HH:mm"。 */
+  publishedAt: string;
+  thumbnail: string;
+  title: string;
+}>;
+
+export const fetchVideos = async (): Promise<
+  ApiResult<readonly VideoItem[]>
+> => {
+  const result = await request<Readonly<{ videos?: readonly VideoItem[] }>>(
+    "/api/videos",
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.videos ?? [] };
+};

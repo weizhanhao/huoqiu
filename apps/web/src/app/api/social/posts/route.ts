@@ -17,6 +17,23 @@ import {
 const readDisclosure = (value: unknown): PostDisclosure | undefined =>
   postDisclosures.find((known) => known === value);
 
+/*
+ * 公开的帖子列表。
+ *
+ * 此前拿到全量帖子的唯一途径是 /api/social/me，而那条要登录——于是未登录时
+ * 首页各频道只能是空的，而参考图里那些频道不登录也有内容。
+ *
+ * 不鉴权是安全的：这里只回已发布的帖子，草稿由 listPosts 过滤掉，和登录用户
+ * 在 /api/social/me 里看到的 posts 是同一份。真正因人而异的东西（我关注了谁、
+ * 赞过什么、收藏了什么）不在这里，仍然只有 /me 才给。
+ */
+export function GET(): NextResponse {
+  return NextResponse.json(
+    { posts: listPosts() },
+    { headers: { "cache-control": "no-store" } },
+  );
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   let payload: unknown;
   try {

@@ -47,6 +47,33 @@ export const fetchSession = async (
 ): Promise<ApiResult<SessionSnapshot>> =>
   request<SessionSnapshot>("/api/social/me", { method: "GET", token });
 
+/*
+ * 公开的帖子列表，不需要登录。
+ *
+ * 首页那些频道（推荐、热门、基金、资讯、私募、ETF）在参考图里不登录也有内容。
+ * 只用 /api/social/me 的话，未登录进来看到的是一片空白——那不是「还没关注人」，
+ * 而是整个产品看起来是空的。
+ */
+export const fetchPublicPosts = async (): Promise<
+  ApiResult<readonly SocialPost[]>
+> => {
+  const result = await request<Readonly<{ posts?: readonly SocialPost[] }>>(
+    "/api/social/posts",
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.posts ?? [] };
+};
+
+export const fetchTopics = async (): Promise<ApiResult<readonly string[]>> => {
+  const result = await request<Readonly<{ topics?: readonly string[] }>>(
+    "/api/social/topics",
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.topics ?? [] };
+};
+
 type TokenResponse = Readonly<{ token?: unknown }>;
 
 const readToken = (value: TokenResponse): ApiResult<string> =>
