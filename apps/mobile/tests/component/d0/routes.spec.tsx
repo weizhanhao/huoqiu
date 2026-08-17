@@ -55,7 +55,6 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-import InstrumentScreen from "../../../app/instrument/[listingId]";
 import MessagesScreen from "../../../app/messages";
 import PortfolioDetailScreen from "../../../app/portfolio/[portfolioId]";
 import SearchScreen from "../../../app/search";
@@ -107,8 +106,16 @@ beforeEach(() => {
 
 describe("D0 mobile route behavior", () => {
   it.each([
+    /*
+     * 个股页从这两张表里去掉了。
+     *
+     * 它不再读夹具——报价、图形、公告、相关 ETF 都按地址里的代码现取，失败
+     * 原因是网络或上游，恢复方式是重进或切周期，不是重新解析一份本地 JSON。
+     * 「重试夹具」这条断言守的东西已经不存在。
+     *
+     * 新行为由 tests/component/instrument/ 下的用例接手。
+     */
     ["search", SearchScreen],
-    ["instrument detail", InstrumentScreen],
   ] as const)(
     "returns %s fresh deep links to /home and preserves normal back history",
     (_name, Screen) => {
@@ -208,10 +215,7 @@ describe("D0 mobile route behavior", () => {
    * 自选也从这张表里去掉了：它不再读夹具，名单来自账号、行情按名单现取，
    * 失败原因是网络或服务端，恢复方式是下拉刷新，不是重新解析本地 JSON。
    */
-  it.each([
-    ["search", SearchScreen, true],
-    ["instrument detail", InstrumentScreen, true],
-  ] as const)(
+  it.each([["search", SearchScreen, true]] as const)(
     "wires a recovering Retry for the %s error branch without dropping stack navigation",
     (_name, Screen, needsBack) => {
       const error = readProperties(Screen() as ReactElement);

@@ -253,3 +253,119 @@ export const fetchVideos = async (): Promise<
   if (result.kind !== "ok") return result;
   return { kind: "ok", value: result.value.videos ?? [] };
 };
+
+/*
+ * 个股页。
+ *
+ * 参考图（instrument-*.png）里个股页有五个子页：分时/K线、讨论、成分股、
+ * 资讯、相关ETF，以及八档周期切换。这些路由网页版都有，全部复用。
+ */
+
+/** 与服务端 chart-series.server.ts 的 ChartPeriod 一致，传错会被整体拒绝。 */
+export type ChartPeriod =
+  | "5day"
+  | "day"
+  | "intraday"
+  | "m1"
+  | "m5"
+  | "m15"
+  | "m30"
+  | "m60"
+  | "m120"
+  | "month"
+  | "week"
+  | "year";
+
+export type ChartBar = Readonly<{
+  close: number;
+  /** YYYY-MM-DD。 */
+  date: string;
+  high: number;
+  low: number;
+  open: number;
+  volumeShares: number;
+}>;
+
+export type ChartPoint = Readonly<{
+  averagePrice: number;
+  price: number;
+  /** HH:mm，当天的分时刻度。 */
+  time: string;
+  volumeShares: number;
+}>;
+
+/*
+ * 两种图形状不同：分时是一条线，其余是蜡烛。
+ *
+ * 合成一个「都有 bars」的形状会逼着分时假装自己有开高低收——那四个数在分时里
+ * 根本不存在，编出来的值会被人当真。
+ */
+export type ChartSeries =
+  | Readonly<{ bars: readonly ChartBar[]; kind: "candle"; period: string }>
+  | Readonly<{ kind: "line"; period: string; points: readonly ChartPoint[] }>;
+
+export const fetchChart = async (
+  symbol: string,
+  period: ChartPeriod,
+): Promise<ApiResult<ChartSeries>> =>
+  request<ChartSeries>(
+    `/api/market/chart?symbol=${encodeURIComponent(symbol)}&period=${period}`,
+    { method: "GET", token: null },
+  );
+
+export type InstrumentQuote = Readonly<{
+  amount: number;
+  changeAmount: number;
+  changePercent: number;
+  high: number;
+  last: number;
+  low: number;
+  name: string;
+  open: number;
+  previousClose: number;
+  symbol: string;
+}>;
+
+export type InstrumentLive = Readonly<{
+  metrics?: Readonly<Record<string, number | null>>;
+  quote: InstrumentQuote;
+}>;
+
+export const fetchInstrumentLive = async (
+  symbol: string,
+): Promise<ApiResult<InstrumentLive>> =>
+  request<InstrumentLive>(
+    `/api/market/instrument-live?symbol=${encodeURIComponent(symbol)}`,
+    { method: "GET", token: null },
+  );
+
+export type Announcement = Readonly<{
+  code: string;
+  href: string;
+  name: string;
+  /** YYYY-MM-DD。公告是按日披露的。 */
+  publishedOn: string;
+  title?: string;
+}>;
+
+export const fetchAnnouncements = async (
+  symbol: string,
+): Promise<ApiResult<readonly Announcement[]>> => {
+  const result = await request<Readonly<{ rows?: readonly Announcement[] }>>(
+    `/api/market/announcements?symbol=${encodeURIComponent(symbol)}`,
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.rows ?? [] };
+};
+
+export const fetchRelatedEtfs = async (
+  symbol: string,
+): Promise<ApiResult<readonly HotRow[]>> => {
+  const result = await request<Readonly<{ rows?: readonly HotRow[] }>>(
+    `/api/market/etfs?symbol=${encodeURIComponent(symbol)}`,
+    { method: "GET", token: null },
+  );
+  if (result.kind !== "ok") return result;
+  return { kind: "ok", value: result.value.rows ?? [] };
+};
