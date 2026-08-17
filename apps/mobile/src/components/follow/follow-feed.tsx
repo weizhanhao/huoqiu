@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 
-import type { SocialPost } from "../../api/social-api";
+import type { AccountSummary, SocialPost } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
 
 /*
@@ -38,11 +38,16 @@ export type FollowFeedProperties = Readonly<{
   failure: string | null;
   following: readonly string[];
   loading: boolean;
+  /** 自己的账号 id——推荐位里要把自己剔掉。 */
+  meId: string | null;
+  onFollow: (accountId: string) => void;
   onOpenPost: (postId: string) => void;
   onOpenUser: (accountId: string) => void;
   onRefresh: () => void;
   posts: readonly SocialPost[];
   signedIn: boolean;
+  /** 站上所有账号，推荐位从里面挑。 */
+  suggestions: readonly AccountSummary[];
 }>;
 
 const Notice = ({ text }: Readonly<{ text: string }>) => (
@@ -55,11 +60,14 @@ export function FollowFeed({
   failure,
   following,
   loading,
+  meId,
+  onFollow,
   onOpenPost,
   onOpenUser,
   onRefresh,
   posts,
   signedIn,
+  suggestions,
 }: FollowFeedProperties) {
   /*
    * 先复制再 sort，不能用 toSorted。
@@ -74,6 +82,34 @@ export function FollowFeed({
   const followed = [...posts]
     .filter((post) => following.includes(post.authorId))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
+  /*
+   * 这一屏空着的时候给几个真人。
+   *
+   * 空态原来只写一句「在别人的主页点关注」——可这一屏上一个通往别人主页的
+   * 入口都没有，那句话等于把用户请出门自己找路。推荐位按真实数据排：先粉丝
+   * 数、再发帖数，和「达人」榜同一条规则，没有任何人工加权。
+   *
+   * 剔掉自己和已经关注的人：推自己没有意义；推已关注的人，那颗按钮点下去是
+   * 取消关注，长得却像「关注」。
+   */
+  const recommended = [...suggestions]
+    .filter(
+      (candidate) =>
+        candidate.id !== meId &&
+        !following.includes(candidate.id) &&
+        candidate.postCount > 0,
+    )
+    .sort(
+      (left, right) =>
+        right.followerCount - left.followerCount ||
+        right.postCount - left.postCount,
+    )
+    .slice(0, 8);
+
+  /* 有内容就不占版面：推荐位会把用户自己选好的关注挤下去。 */
+  const showRecommended =
+    signedIn && !loading && failure === null && followed.length === 0;
 
   return (
     <ScrollView
@@ -112,6 +148,51 @@ export function FollowFeed({
               : "你关注的人还没有发过内容。"
           }
         />
+      ) : null}
+
+      {showRecommended && recommended.length > 0 ? (
+        <View style={styles.suggestBlock}>
+          <Text style={styles.suggestTitle}>推荐关注</Text>
+          <Text style={styles.suggestLede}>
+            按粉丝数、发帖数排，不代表任何背书。
+          </Text>
+          {recommended.map((candidate) => (
+            <View key={candidate.id} style={styles.suggestRow}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  onOpenUser(candidate.id);
+                }}
+                style={styles.suggestMain}
+              >
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {candidate.displayName.slice(0, 1)}
+                  </Text>
+                </View>
+                <View style={styles.suggestText}>
+                  <Text numberOfLines={1} style={styles.suggestName}>
+                    {candidate.displayName}
+                  </Text>
+                  <Text style={styles.suggestMeta}>
+                    粉丝 {candidate.followerCount} · 帖子{" "}
+                    {candidate.postCount}
+                  </Text>
+                </View>
+              </Pressable>
+              <Pressable
+                accessibilityLabel={`关注 ${candidate.displayName}`}
+                accessibilityRole="button"
+                onPress={() => {
+                  onFollow(candidate.id);
+                }}
+                style={styles.suggestAction}
+              >
+                <Text style={styles.suggestActionText}>关注</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
       ) : null}
 
       {/*
@@ -217,6 +298,60 @@ const styles = StyleSheet.create({
   screen: {
     backgroundColor: tokens.surface.canvas,
     flex: 1,
+  },
+  suggestAction: {
+    alignItems: "center",
+    backgroundColor: tokens.brand.primary,
+    borderRadius: 6,
+    justifyContent: "center",
+    minHeight: appTouchMinimum,
+    paddingHorizontal: 16,
+  },
+  suggestActionText: {
+    color: tokens.text.inverse,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  suggestBlock: {
+    backgroundColor: tokens.surface.base,
+    borderRadius: 12,
+    gap: 4,
+    padding: 14,
+  },
+  suggestLede: {
+    color: tokens.text.tertiary,
+    fontSize: 12.5,
+    marginBottom: 4,
+  },
+  suggestMain: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 10,
+    minHeight: appTouchMinimum,
+  },
+  suggestMeta: {
+    color: tokens.text.tertiary,
+    fontSize: 12.5,
+  },
+  suggestName: {
+    color: tokens.text.primary,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  suggestRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  suggestText: {
+    flex: 1,
+    gap: 2,
+  },
+  suggestTitle: {
+    color: tokens.text.primary,
+    fontSize: 16,
+    fontWeight: "600",
   },
   time: {
     color: tokens.text.tertiary,

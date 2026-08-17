@@ -31,9 +31,9 @@ export const MISSING = "—";
  */
 export const signColorFor = (
   mode: "green-up" | "red-up",
-  changePercent: number | null,
+  changePercent: number | null | undefined,
 ): string => {
-  if (changePercent === null || changePercent === 0) {
+  if (changePercent === null || changePercent === undefined || changePercent === 0) {
     return tokens.text.secondary;
   }
   const rising = changePercent > 0;
@@ -47,13 +47,27 @@ export const signColorFor = (
  * 只靠颜色区分方向，色觉障碍的人看到的是两个一样的数字，截图转灰度之后
  * 谁也分不出来。符号是那份冗余。
  */
-export const signedPercent = (changePercent: number | null): string =>
-  changePercent === null
+/*
+ * 收 undefined，不只是 null。
+ *
+ * 判 `=== null` 的写法在类型说得准时是对的，可类型来自 JSON.parse 的回包，说
+ * 错了编译器不会吭声。字段名取错一个字母，进来的就是 undefined，而 undefined
+ * 从 `=== null` 底下大摇大摆走过去，撞在 .toFixed() 上——一整页红。
+ *
+ * 这里收得宽一点，等于给「类型撒谎」留一道网：真取错名字了，页面上会出现一个
+ * 破折号，而破折号是能被人看见、能被用例断言的，红屏则连页面都没有。
+ */
+export const signedPercent = (
+  changePercent: number | null | undefined,
+): string =>
+  changePercent === null || changePercent === undefined
     ? MISSING
     : `${changePercent > 0 ? "+" : ""}${changePercent.toFixed(2)}%`;
 
-export const signedAmount = (changeAmount: number | null): string =>
-  changeAmount === null
+export const signedAmount = (
+  changeAmount: number | null | undefined,
+): string =>
+  changeAmount === null || changeAmount === undefined
     ? MISSING
     : `${changeAmount > 0 ? "+" : ""}${changeAmount.toFixed(2)}`;
 

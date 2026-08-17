@@ -92,11 +92,11 @@ export default function InstrumentScreen() {
       discussions={posts.value === null ? null : discussions}
       etfs={etfs.value}
       etfsFailure={etfs.failure}
-      metrics={live.value?.metrics}
+      metrics={live.value?.metrics ?? null}
       onBack={onBack}
       onCompose={() => {
         router.push({
-          params: { name: live.value?.quote.name ?? symbol, symbol },
+          params: { name: live.value?.metrics?.name ?? symbol, symbol },
           pathname: "/compose",
         });
       }}
@@ -125,6 +125,7 @@ export default function InstrumentScreen() {
       quoteFailure={live.failure}
       symbol={symbol}
       tab={tab}
+      tape={live.value?.tape ?? null}
       watchlisted={watchlisted}
     />
   );

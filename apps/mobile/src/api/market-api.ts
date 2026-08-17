@@ -42,14 +42,21 @@ export type MarketOverview = Readonly<{
   industries: readonly Sector[];
 }>;
 
+/*
+ * 自选列表里的一行行情。
+ *
+ * 除代码外全部可空，和服务端 ListQuote 一字不差：停牌、退市、上游临时缺这一
+ * 只，回的都是 null。此前这里写的是「一定有」，于是自选里只要混进一只停牌的
+ * 票，列表就在 last.toFixed() 上整屏红。
+ */
 export type Quote = Readonly<{
-  changeAmount: number;
-  changePercent: number;
-  last: number;
-  name: string;
+  changeAmount: number | null;
+  changePercent: number | null;
+  last: number | null;
+  name: string | null;
   symbol: string;
   /** Unix 秒。上游给的就是这个粒度。 */
-  tradedAtSeconds: number;
+  tradedAtSeconds: number | null;
 }>;
 
 export type Portfolio = Readonly<{
@@ -417,38 +424,107 @@ export const fetchChart = async (
     { method: "GET", token: null },
   );
 
-export type InstrumentQuote = Readonly<{
+/*
+ * 下面这三块照抄服务端 /api/market/instrument-live 的回包，字段名一个不改。
+ *
+ * 此前这里是照着想象写的：说名称、涨跌额、涨跌幅、昨收在 quote 里。服务端把
+ * 前三样放在 metrics 里，昨收在 quote 里叫 prevClose。回包是 JSON.parse 出来
+ * 的，编译器管不着，于是这个谎一直到 quote.changeAmount.toFixed() 那一刻才
+ * 兑现成一整屏红。
+ *
+ * 对齐字段名没有讨价还价的余地：想改名就得在服务端改，让编译器两边都看得见。
+ */
+
+/** 盘口一档。停牌或档位不足时价量为 null——不是零价零量。 */
+export type OrderBookLevel = Readonly<{
+  price: number | null;
+  volume: number | null;
+}>;
+
+/** 服务端回包里的 quote：撮合出来的那一组数，加上五档。 */
+export type InstrumentTicker = Readonly<{
   amount: number;
-  changeAmount: number;
-  changePercent: number;
+  /** 卖一到卖五，价格递增。 */
+  asks: readonly OrderBookLevel[];
+  /** 买一到买五，价格递减。 */
+  bids: readonly OrderBookLevel[];
   high: number;
   last: number;
   low: number;
-  name: string;
   open: number;
-  previousClose: number;
-  symbol: string;
+  /** 服务端就叫这个名字，不是 previousClose。 */
+  prevClose: number;
+  tradedAt: string;
+  volume: number;
 }>;
 
+/*
+ * 服务端回包里的 metrics：名称、涨跌，以及报价头第二行往后的所有指标。
+ *
+ * 除名称与代码外全部可空——上游对停牌、次新、场外品种给的就是空值。把空当
+ * 零，页面上会印出一个「0.00%」，读起来是「今天没动」，而事实是「不知道」。
+ */
+export type InstrumentMetrics = Readonly<{
+  amount: number | null;
+  amplitudePercent: number | null;
+  bookValuePerShare: number | null;
+  changeAmount: number | null;
+  changePercent: number | null;
+  earningsPerShare: number | null;
+  floatMarketCap: number | null;
+  floatShares: number | null;
+  high: number | null;
+  last: number | null;
+  limitDown: number | null;
+  limitUp: number | null;
+  low: number | null;
+  name: string;
+  open: number | null;
+  orderRatioPercent: number | null;
+  peDynamic: number | null;
+  peStatic: number | null;
+  peTtm: number | null;
+  previousClose: number | null;
+  priceToBook: number | null;
+  symbol: string;
+  totalMarketCap: number | null;
+  totalShares: number | null;
+  tradedAtSeconds: number | null;
+  turnoverPercent: number | null;
+  volumeRatio: number | null;
+  /** 成交股数。服务端已经把「手」换成「股」。 */
+  volumeShares: number | null;
+  week52High: number | null;
+  week52Low: number | null;
+}>;
+
+export type TickSide = "buy" | "neutral" | "sell";
+
+export type Tick = Readonly<{
+  price: number;
+  side: TickSide;
+  /** HH:mm:ss。 */
+  time: string;
+  volumeShares: number;
+}>;
+
+export type TickTape = Readonly<{
+  previousClose: number | null;
+  symbol: string;
+  /** 最近的在最前面。 */
+  ticks: readonly Tick[];
+}>;
+
+/*
+ * 三块各自可空。
+ *
+ * 服务端是三路并发取的，一路超时就少一块，只有三块全空才回 502。少一块时
+ * 页面保持那一块原样，不清空整屏——所以这里必须是 null 而不是「一定有」。
+ */
 export type InstrumentLive = Readonly<{
-  /*
-   * 五行报价里除了开高低收之外的那些。
-   *
-   * 此前这里是 Record<string, number | null> ——什么名字都能取，取错了也不会
-   * 报错，只是永远拿到 undefined。而这一整块此前根本没往界面上传，参考图里
-   * 五行的报价头我们只画了四个数。
-   */
-  metrics?: Readonly<{
-    amount: number | null;
-    amplitudePercent: number | null;
-    peTtm: number | null;
-    priceToBook: number | null;
-    totalMarketCap: number | null;
-    turnoverPercent: number | null;
-    volumeRatio: number | null;
-    volumeShares: number | null;
-  }>;
-  quote: InstrumentQuote;
+  metrics: InstrumentMetrics | null;
+  quote: InstrumentTicker | null;
+  tape: TickTape | null;
 }>;
 
 export const fetchInstrumentLive = async (

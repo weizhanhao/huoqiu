@@ -32,7 +32,9 @@ export function MarketColorProvider({
  *
  * 返回的是函数而不是颜色，因为一屏上通常要给好几个数字上色。
  */
-export const useSignColor = (): ((change: number | null) => string) => {
+export const useSignColor = (): ((
+  change: number | null | undefined,
+) => string) => {
   const mode = useContext(MarketColorContext);
   return (change) => signColorFor(mode, change);
 };

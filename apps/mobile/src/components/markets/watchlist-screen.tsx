@@ -10,7 +10,11 @@ import {
 
 import type { Quote } from "../../api/market-api";
 import { useSignColor } from "../../styles/market-colors";
-import { signedAmount, signedPercent } from "../../styles/market-sign";
+import {
+  fixedOrMissing,
+  signedAmount,
+  signedPercent,
+} from "../../styles/market-sign";
 
 /*
  * 自选。
@@ -110,7 +114,11 @@ export function WatchlistScreen({
                     { color: signColor(quote.changePercent) },
                   ]}
                 >
-                  {quote.last.toFixed(2)}
+                  {/*
+                    停牌、退市、上游临时缺这一只，价就是空的。写 0.00 的话，
+                    自选列表里会出现一只「跌到零」的票。
+                  */}
+                  {fixedOrMissing(quote.last, 2)}
                 </Text>
                 <Text
                   style={[

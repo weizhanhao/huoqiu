@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import type { SocialPost } from "../../../src/api/social-api";
+import type { AccountSummary, SocialPost } from "../../../src/api/social-api";
 import { FollowFeed } from "../../../src/components/follow/follow-feed";
 
 /*
@@ -28,6 +28,21 @@ const post = (
   title: title ?? body.slice(0, 24),
 });
 
+const author = (
+  id: string,
+  displayName: string,
+  followerCount: number,
+  postCount: number,
+): AccountSummary => ({
+  createdAt: "2026-01-01T00:00:00.000Z",
+  displayName,
+  email: `${id}@example.com`,
+  followerCount,
+  followingCount: 0,
+  id,
+  postCount,
+});
+
 const render = (
   overrides: Partial<Parameters<typeof FollowFeed>[0]> = {},
 ): string =>
@@ -36,11 +51,14 @@ const render = (
       failure={null}
       following={[]}
       loading={false}
+      meId="me"
+      onFollow={vi.fn()}
       onOpenPost={vi.fn()}
       onOpenUser={vi.fn()}
       onRefresh={vi.fn()}
       posts={[]}
       signedIn
+      suggestions={[]}
       {...overrides}
     />,
   );
@@ -151,6 +169,58 @@ describe("mobile follow feed", () => {
     expect(loading).toContain("正在读取");
     expect(loading).not.toContain("还没有关注任何人");
     expect(settled).toContain("还没有关注任何人");
+  });
+
+  it("offers real people to follow instead of leaving the tab blank", () => {
+    /*
+     * 「还没有关注任何人」后面跟着一整屏空白，是这一页最劝退的样子：它把
+     * 「去别人的主页点关注」当成用户自己会走的路，可这一屏上根本没有通往
+     * 任何人主页的入口。给出真人真数据的推荐位，这一步才走得下去。
+     */
+    const markup = render({
+      following: [],
+      posts: [],
+      suggestions: [author("acct_1", "林岸", 12, 8)],
+    });
+
+    expect(markup).toContain("推荐关注");
+    expect(markup).toContain("林岸");
+    /* 排序理由要摆出来，否则「推荐」是凭空的。 */
+    expect(markup).toContain("粉丝 12");
+    expect(markup).toContain("帖子 8");
+  });
+
+  it("ranks suggestions by followers and drops people already followed", () => {
+    const markup = render({
+      following: ["acct_followed"],
+      posts: [],
+      suggestions: [
+        author("acct_small", "小号", 1, 1),
+        author("acct_big", "大号", 99, 20),
+        author("acct_followed", "已关注的人", 50, 5),
+        author("me", "我自己", 77, 30),
+      ],
+    });
+
+    expect(markup.indexOf("大号")).toBeLessThan(markup.indexOf("小号"));
+    /* 已经关注的人再推一次，点下去只会取消关注——那是个陷阱。 */
+    expect(markup).not.toContain("已关注的人");
+    /* 更不能推荐自己。 */
+    expect(markup).not.toContain("我自己");
+  });
+
+  it("keeps quiet about suggestions once the feed has content", () => {
+    /*
+     * 有内容还占着一块推荐位，等于把用户已经选好的关注挤到下面去。
+     */
+    const markup = render({
+      following: ["alice"],
+      posts: [post("p1", "alice", "2026-02-01T09:00:00.000Z", "关注的人写的")],
+      suggestions: [author("acct_1", "林岸", 12, 8)],
+    });
+
+    expect(markup).toContain("关注的人写的");
+    expect(markup).not.toContain("推荐关注");
   });
 
   it("lets you open the post and its author", () => {

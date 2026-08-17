@@ -1,0 +1,136 @@
+{
+  "metrics": {
+    "amount": 10114852172,
+    "amplitudePercent": 1.54,
+    "bookValuePerShare": 201.10264385692068,
+    "changeAmount": -48.9,
+    "changePercent": -3.64,
+    "earningsPerShare": 65.14307304785893,
+    "floatMarketCap": 1616468017437.0898,
+    "floatShares": 1250081601,
+    "high": 1301,
+    "last": 1293.09,
+    "limitDown": 1207.79,
+    "limitUp": 1476.19,
+    "low": 1280.34,
+    "name": "贵州茅台",
+    "open": 1295,
+    "orderRatioPercent": -87.03,
+    "peDynamic": 18.16,
+    "peStatic": 19.64,
+    "peTtm": 19.85,
+    "previousClose": 1341.99,
+    "priceToBook": 6.43,
+    "symbol": "sh600519",
+    "totalMarketCap": 1616468017437.0898,
+    "totalShares": 1250081601,
+    "tradedAtSeconds": 1786954300,
+    "turnoverPercent": 0.63,
+    "volumeRatio": 2.1,
+    "volumeShares": 7843000,
+    "week52High": 1539.98,
+    "week52Low": 1151.01
+  },
+  "quote": {
+    "amount": 10114852172,
+    "asks": [
+      {
+        "price": 1293.09,
+        "volume": 15313
+      },
+      {
+        "price": 1293.1,
+        "volume": 800
+      },
+      {
+        "price": 1293.15,
+        "volume": 100
+      },
+      {
+        "price": 1293.18,
+        "volume": 900
+      },
+      {
+        "price": 1293.2,
+        "volume": 200
+      }
+    ],
+    "bids": [
+      {
+        "price": 1293.08,
+        "volume": 200
+      },
+      {
+        "price": 1293.06,
+        "volume": 200
+      },
+      {
+        "price": 1293.05,
+        "volume": 501
+      },
+      {
+        "price": 1293.04,
+        "volume": 200
+      },
+      {
+        "price": 1293.02,
+        "volume": 100
+      }
+    ],
+    "high": 1301,
+    "last": 1293.09,
+    "low": 1280.34,
+    "open": 1295,
+    "prevClose": 1341.99,
+    "tradedAt": "2026-08-17T15:34:58",
+    "volume": 7842956
+  },
+  "tape": {
+    "previousClose": 1341.99,
+    "symbol": "sh600519",
+    "ticks": [
+      {
+        "price": 1293.09,
+        "side": "sell",
+        "time": "15:27:10",
+        "volumeShares": 100
+      },
+      {
+        "price": 1293.09,
+        "side": "sell",
+        "time": "15:26:37",
+        "volumeShares": 100
+      },
+      {
+        "price": 1293.09,
+        "side": "sell",
+        "time": "15:25:46",
+        "volumeShares": 100
+      },
+      {
+        "price": 1293.09,
+        "side": "sell",
+        "time": "15:21:12",
+        "volumeShares": 100
+      },
+      {
+        "price": 1293.09,
+        "side": "sell",
+        "time": "15:20:39",
+        "volumeShares": 200
+      },
+      {
+        "price": 1293.09,
+        "side": "sell",
+        "time": "15:17:24",
+        "volumeShares": 100
+      },
+      {
+        "price": 1293.09,
+        "side": "sell",
+        "time": "15:14:33",
+        "volumeShares": 100
+      }
+    ]
+  }
+}

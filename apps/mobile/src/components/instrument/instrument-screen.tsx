@@ -8,7 +8,6 @@ import type {
   ChartSeries,
   HotRow,
   InstrumentLive,
-  InstrumentQuote,
 } from "../../api/market-api";
 import type { SocialPost } from "../../api/social-api";
 import { appTouchMinimum } from "../../styles/app-touch";
@@ -19,6 +18,7 @@ import {
   signedAmount,
   signedPercent,
 } from "../../styles/market-sign";
+import { OrderBook, TapeList } from "./order-book";
 import { PriceChart } from "./price-chart";
 
 /*
@@ -70,7 +70,12 @@ export type InstrumentScreenProperties = Readonly<{
   discussions: readonly SocialPost[] | null;
   etfs: readonly HotRow[] | null;
   etfsFailure: string | null;
-  /** 五行报价里除开高低收之外的那些；上游没给时为 undefined。 */
+  /*
+   * 名称、涨跌与全部指标。
+   *
+   * 报价头上的数几乎都出自这里，不是 quote——quote 里只有撮合出来的那一组数
+   * 和五档，没有名称、没有涨跌额、没有涨跌幅。
+   */
   metrics: InstrumentLive["metrics"];
   onBack: () => void;
   onCompose: () => void;
@@ -82,10 +87,13 @@ export type InstrumentScreenProperties = Readonly<{
   onShowNotice: (title: string, detail: string) => void;
   onToggleWatchlist: () => void;
   period: ChartPeriod;
-  quote: InstrumentQuote | null;
+  /** 撮合出来的那一组数，外加五档盘口。 */
+  quote: InstrumentLive["quote"];
   quoteFailure: string | null;
   symbol: string;
   tab: InstrumentTab;
+  /** 逐笔成交明细。 */
+  tape: InstrumentLive["tape"];
   watchlisted: boolean;
 }>;
 
@@ -138,11 +146,28 @@ export function InstrumentScreen({
   quoteFailure,
   symbol,
   tab,
+  tape,
   watchlisted,
 }: InstrumentScreenProperties) {
   const insets = useSafeAreaInsets();
   const signColor = useSignColor();
-  const color = signColor(quote?.changePercent ?? 0);
+  const color = signColor(metrics?.changePercent ?? 0);
+
+  /*
+   * 开高低收优先读 quote，缺了才回退到 metrics。
+   *
+   * 两处都有这四个数，但 quote 是撮合快照、metrics 是指标快照，取数时间可能差
+   * 几秒。同屏的数出自同一份快照才对得上，所以定一个先后，而不是哪个非空用
+   * 哪个。任一路超时时另一路顶上，总比空一格强。
+   */
+  const last = quote?.last ?? metrics?.last ?? null;
+  const open = quote?.open ?? metrics?.open ?? null;
+  const high = quote?.high ?? metrics?.high ?? null;
+  const low = quote?.low ?? metrics?.low ?? null;
+  /* 服务端在 quote 里叫 prevClose，在 metrics 里叫 previousClose。 */
+  const previousClose =
+    quote?.prevClose ?? metrics?.previousClose ?? tape?.previousClose ?? null;
+  const empty = metrics === null && quote === null;
 
   return (
     <View style={styles.screen} testID="instrument-screen">
@@ -157,7 +182,7 @@ export function InstrumentScreen({
         </Pressable>
         <View style={styles.topTitle}>
           <Text numberOfLines={1} style={styles.name}>
-            {quote?.name ?? symbol}
+            {metrics?.name ?? symbol}
           </Text>
           <Text style={styles.symbol}>{symbol.toUpperCase()}</Text>
         </View>
@@ -172,19 +197,17 @@ export function InstrumentScreen({
 
         <View style={styles.quoteBlock}>
           <Text style={[styles.last, { color }]}>
-            {quote === null ? "—" : quote.last.toFixed(2)}
+            {fixedOrMissing(last, 2)}
           </Text>
           <Text style={[styles.change, { color }]}>
-            {quote === null
-              ? "—"
-              : `${signedAmount(quote.changeAmount)}  ${signedPercent(quote.changePercent)}`}
+            {`${signedAmount(metrics?.changeAmount)}  ${signedPercent(metrics?.changePercent)}`}
           </Text>
-          {quote === null ? null : (
+          {empty ? null : (
             <View style={styles.metrics}>
-              <Metric label="今开" value={quote.open.toFixed(2)} />
-              <Metric label="最高" value={quote.high.toFixed(2)} />
-              <Metric label="最低" value={quote.low.toFixed(2)} />
-              <Metric label="昨收" value={quote.previousClose.toFixed(2)} />
+              <Metric label="今开" value={fixedOrMissing(open, 2)} />
+              <Metric label="最高" value={fixedOrMissing(high, 2)} />
+              <Metric label="最低" value={fixedOrMissing(low, 2)} />
+              <Metric label="昨收" value={fixedOrMissing(previousClose, 2)} />
               {/*
                 后面这些此前取回来了却没往界面上传：参考图的报价头是五行，
                 我们只画了四个数，而数据一直在手里。取不到的那格写「—」，
@@ -229,9 +252,13 @@ export function InstrumentScreen({
         <PriceChart
           failure={chartFailure}
           loading={chartLoading}
-          previousClose={quote?.previousClose ?? null}
+          previousClose={previousClose}
           series={chart}
         />
+
+        <OrderBook asks={quote?.asks ?? null} bids={quote?.bids ?? null} />
+
+        <TapeList previousClose={previousClose} ticks={tape?.ticks ?? null} />
 
         <View style={styles.tabStrip}>
           {tabs.map(({ id, label }) => (
@@ -389,10 +416,10 @@ export function InstrumentScreen({
       >
         <View style={styles.bottomQuote}>
           <Text style={[styles.bottomLast, { color }]}>
-            {quote === null ? "—" : quote.last.toFixed(2)}
+            {fixedOrMissing(last, 2)}
           </Text>
           <Text style={[styles.bottomPct, { color }]}>
-            {quote === null ? "" : signedPercent(quote.changePercent)}
+            {signedPercent(metrics?.changePercent)}
           </Text>
         </View>
         <Pressable

@@ -313,7 +313,20 @@ export function WatchlistChannel({
         {hot === null || hot.length === 0 ? (
           <Notice text="还没有取到榜单。" />
         ) : (
-          hot.slice(0, 5).map((row) => (
+          hot.slice(0, 5).map((row) => {
+            /*
+             * 已经在自选里的，按钮改成「已添加」并按不动。
+             *
+             * 此前那四个字是写死的：加过之后按钮照旧写着「加自选」，还能再按，
+             * 再弹一遍「已加自选」。自选列表本来就在手里（symbols），只是没拿
+             * 它做判断——按钮的状态是能算出来的，不该是个常量。
+             *
+             * 比对的是代码，不是名字：榜单给的 href 是 /instruments/sz300314，
+             * 自选存的就是末尾那一段。
+             */
+            const symbol = row.href === null ? null : row.href.split("/").pop();
+            const added = symbol !== undefined && symbol !== null && symbols.includes(symbol);
+            return (
             <View key={row.code} style={styles.pickRow}>
               <Pressable
                 accessibilityRole="button"
@@ -335,17 +348,23 @@ export function WatchlistChannel({
                 {signedPercent(row.changePercent)}
               </Text>
               <Pressable
+                accessibilityLabel={
+                  added ? `${row.name} 已在自选里` : `把 ${row.name} 加进自选`
+                }
                 accessibilityRole="button"
-                disabled={row.href === null}
+                disabled={added || row.href === null}
                 onPress={() => {
-                  if (row.href !== null) onAdd(row.code, row.href);
+                  if (!added && row.href !== null) onAdd(row.code, row.href);
                 }}
-                style={styles.pickAdd}
+                style={added ? styles.pickAdded : styles.pickAdd}
               >
-                <Text style={styles.pickAddText}>加自选</Text>
+                <Text style={added ? styles.pickAddedText : styles.pickAddText}>
+                  {added ? "已添加" : "加自选"}
+                </Text>
               </Pressable>
             </View>
-          ))
+            );
+          })
         )}
       </View>
     </View>
@@ -612,6 +631,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: appTouchMinimum,
     paddingHorizontal: 12,
+  },
+  /*
+   * 已添加的那一档：去掉品牌底色，只留一圈描边。
+   *
+   * 蓝底是「这里可以按」的意思，留着蓝底只改字，看起来仍然像个待办动作。
+   */
+  pickAdded: {
+    alignItems: "center",
+    backgroundColor: "transparent",
+    borderColor: tokens.border.default,
+    borderRadius: 6,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: appTouchMinimum,
+    paddingHorizontal: 12,
+  },
+  pickAddedText: {
+    color: tokens.text.tertiary,
+    fontSize: 13,
   },
   pickAddText: {
     color: tokens.brand.primary,

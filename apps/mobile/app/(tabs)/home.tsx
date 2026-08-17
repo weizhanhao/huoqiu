@@ -31,6 +31,11 @@ import {
   type SocialPost,
 } from "../../src/api/social-api";
 import {
+  EtfBoard,
+  FundBoard,
+  PrivateBoard,
+} from "../../src/components/channels/channel-boards";
+import {
   HotChannel,
   NewsChannel,
   PostChannel,
@@ -237,6 +242,26 @@ export default function HomeScreen() {
     [callAs, fail, inform, watchlist],
   );
 
+  /*
+   * 关注流空着时那块推荐位上的「关注」。
+   *
+   * 只走关注这一个方向：推荐位里已经把关注过的人剔掉了，所以这里按下去不可能
+   * 是取消。成了之后 toggleFollow 会重新拉一遍会话，被关注的人发的帖子当场
+   * 进流，推荐位自己收起来。
+   */
+  const follow = useCallback(
+    async (accountId: string) => {
+      const message = await toggleFollow(accountId);
+      if (message === null) return;
+      if (message === "请先登录。") {
+        show("关注失败", message);
+        return;
+      }
+      fail("关注没成功", message);
+    },
+    [fail, show, toggleFollow],
+  );
+
   const toggleLike = useCallback(
     async (postId: string) => {
       const next = !likedPostIds.includes(postId);
@@ -359,6 +384,10 @@ export default function HomeScreen() {
             failure={failure}
             following={following}
             loading={loading}
+            meId={account?.id ?? null}
+            onFollow={(accountId) => {
+              void follow(accountId);
+            }}
             onOpenPost={(postId) => {
               router.push({ params: { postId }, pathname: "/post/[postId]" });
             }}
@@ -371,6 +400,7 @@ export default function HomeScreen() {
             onRefresh={refreshAll}
             posts={posts}
             signedIn={account !== null}
+            suggestions={accounts}
           />
         ) : null}
 
@@ -432,24 +462,52 @@ export default function HomeScreen() {
         ) : null}
 
         {channel === "recommend" ? postFeed("还没有人发过内容。") : null}
-        {channel === "fund"
-          ? postFeed(
-              "还没有基金相关的讨论。在帖子里写上基金代码或名字，就会出现在这里。",
+
+        {/*
+          这三个频道先给名单，再给讨论。
+          频道名承诺的是「这里有基金 / ETF / 私募」，不是「这里有人聊过它们」
+          ——只筛帖子的话，站上没人写过基金时整屏是空的，而三张真名单一直都
+          在手里。
+        */}
+        {channel === "fund" ? (
+          <>
+            <FundBoard funds={funds.value} />
+            {postFeed(
+              "还没有人聊过基金。在帖子里写上基金代码或名字，就会出现在这里。",
               channelPosts(publicPosts.value, isFundPost),
-            )
-          : null}
-        {channel === "private"
-          ? postFeed(
-              "还没有私募相关的讨论。在帖子里写上管理人名称，就会出现在这里。",
+            )}
+          </>
+        ) : null}
+        {channel === "private" ? (
+          <>
+            <PrivateBoard
+              managers={managers.value}
+              onOpen={(url) => {
+                void Linking.openURL(url);
+              }}
+            />
+            {postFeed(
+              "还没有人聊过私募。在帖子里写上管理人名称，就会出现在这里。",
               channelPosts(publicPosts.value, isPrivateFundPost),
-            )
-          : null}
-        {channel === "etf"
-          ? postFeed(
-              "还没有 ETF 相关的讨论。在帖子里引用一只 ETF，就会出现在这里。",
+            )}
+          </>
+        ) : null}
+        {channel === "etf" ? (
+          <>
+            <EtfBoard
+              etfs={etfs.value}
+              onAdd={(code, href) => {
+                void addToWatchlist(code, href);
+              }}
+              onOpen={openInstrument}
+              watchlist={watchlist.value ?? []}
+            />
+            {postFeed(
+              "还没有人聊过 ETF。在帖子里引用一只 ETF，就会出现在这里。",
               channelPosts(publicPosts.value, isEtfPost),
-            )
-          : null}
+            )}
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );
