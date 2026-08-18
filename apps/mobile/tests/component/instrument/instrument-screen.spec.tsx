@@ -72,7 +72,27 @@ describe("instrument screen", () => {
     /* 涨跌额和涨跌幅——就是当初红屏的那两个。 */
     expect(markup).toContain("-48.90");
     expect(markup).toContain("-3.64%");
-    /* 昨收在服务端叫 prevClose，取错名字会静静地变成一个破折号。 */
+  });
+
+  it("reads 昨收 from the field the server actually uses", () => {
+    /*
+     * 服务端在 quote 里管昨收叫 prevClose，不是 previousClose——取错名字不会
+     * 报错，只会让它静静地变成一个破折号。
+     *
+     * 指标区里已经没有「昨收」这一格了（它就是 现价 − 涨跌额，两个数都在正
+     * 上方），所以改从分时图的中位刻度上验：那条刻度画的就是昨收。
+     */
+    const markup = render({
+      chart: {
+        kind: "line",
+        period: "intraday",
+        points: [
+          { averagePrice: 1340, price: 1340, time: "09:30", volumeShares: 100 },
+          { averagePrice: 1345, price: 1350, time: "15:00", volumeShares: 100 },
+        ],
+      },
+    });
+
     expect(markup).toContain("1341.99");
   });
 
@@ -162,7 +182,9 @@ describe("instrument screen", () => {
      * 「没有券商写过这只票」是一句关于这家公司的判断，「还没取到」不是。
      * 合成一句，网慢时每只票看起来都无人问津。
      */
-    expect(render({ reports: null, tab: "research" })).toContain("正在读取研报");
+    expect(render({ reports: null, tab: "research" })).toContain(
+      "正在读取研报",
+    );
     expect(render({ reports: [], tab: "research" })).toContain(
       "没有券商发过这只标的的研报",
     );

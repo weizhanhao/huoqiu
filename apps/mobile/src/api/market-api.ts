@@ -384,6 +384,7 @@ export type ChartPeriod =
   | "m60"
   | "m120"
   | "month"
+  | "quarter"
   | "week"
   | "year";
 

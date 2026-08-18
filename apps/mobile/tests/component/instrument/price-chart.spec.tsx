@@ -74,45 +74,71 @@ describe("bar index under a finger", () => {
   });
 });
 
-/*
- * 画布里那一层的直接子元素个数。
- *
- * RN 里 position:absolute 是相对**父元素**定位的。柱子外面一旦多套一层没有
- * 样式的 View，那层自己在流里、尺寸为零，所有柱子就以它为原点排出去——画布
- * 是空的，蜡烛叠到页面顶上的报价头上。这条不会报错，断言文字的用例也照样绿，
- * 只有看屏幕的人发现整张图跑飞了。
- *
- * 所以这里数的是「深度为 1 的孩子」：多包一层，数就对不上。
- */
-const canvasChildCount = (markup: string): number => {
-  const at = markup.indexOf('data-testid="price-chart-canvas"');
-  expect(at).toBeGreaterThan(-1);
-  let cursor = markup.indexOf(">", at) + 1;
-  let depth = 0;
-  let children = 0;
-  while (cursor < markup.length) {
-    const next = markup.indexOf("<", cursor);
-    if (next === -1) break;
-    const isClose = markup[next + 1] === "/";
-    const end = markup.indexOf(">", next);
-    const selfClosing = markup[end - 1] === "/";
-    if (isClose) {
-      if (depth === 0) break;
-      depth -= 1;
-    } else {
-      if (depth === 0) children += 1;
-      if (!selfClosing) depth += 1;
-    }
-    cursor = end + 1;
-  }
-  return children;
-};
+/** 数一种 SVG 节点出现了几次。 */
+const countOf = (markup: string, tag: string): number =>
+  markup.split(`<RNSVG${tag}`).length - 1;
 
 describe("price chart", () => {
-  it("puts the candles directly inside the canvas", () => {
+  it("draws each moving average as one path, not a row of blocks", () => {
     /*
-     * 两根柱子 = 两条影线 + 两个实体 = 4 个元素，加上三条均线（这里根数不够，
-     * 一条都画不出来）和右侧两个刻度，一共 6 个。多包一层的话这个数会掉到 3。
+     * 上一版的均线是「每一列填一个矩形」——年K 只有十几根时每段有二十多点宽，
+     * 整张图是一堆彩色阶梯色块。一条均线就该是一条线，也就是一个 <Path>。
+     */
+    const bars = Array.from({ length: 25 }, (_, index) =>
+      bar(
+        `2026-07-${String(index + 1).padStart(2, "0")}`,
+        10,
+        11 + index * 0.1,
+        9,
+        10 + index * 0.1,
+      ),
+    );
+    const markup = renderToStaticMarkup(
+      <PriceChart
+        failure={null}
+        loading={false}
+        previousClose={null}
+        series={{ bars, kind: "candle", period: "day" }}
+      />,
+    );
+
+    /* 三条均线 = 三个 Path，不是几十个方块。 */
+    expect(countOf(markup, "Path")).toBe(3);
+    /* 每个 Path 都得是真的折线：多个 L 指令连起来。 */
+    const path = /d="(?<d>M[^"]+)"/u.exec(markup)?.groups?.d ?? "";
+    expect(path.split("L").length).toBeGreaterThan(10);
+  });
+
+  it("caps the candle body so a 14-bar year chart is not a row of slabs", () => {
+    /*
+     * 根数少时只让间隙变大，不让实体变胖。不封顶的话年K 每根会撑到二十多点，
+     * 一屏十几个大色块。
+     */
+    const bars = Array.from({ length: 14 }, (_, index) =>
+      bar(`20${String(index + 12)}`, 10, 12, 9, 11),
+    );
+    const markup = renderToStaticMarkup(
+      <PriceChart
+        failure={null}
+        loading={false}
+        previousClose={null}
+        series={{ bars, kind: "candle", period: "year" }}
+      />,
+    );
+
+    const widths = [...markup.matchAll(/width="(?<w>[0-9.]+)"/gu)].map(
+      (found) => Number(found.groups?.w),
+    );
+    /* 实体宽上限 11；画布本身的宽度会更大，所以只看蜡烛那一档。 */
+    const bodyWidths = widths.filter((value) => value > 0 && value < 100);
+    expect(Math.max(...bodyWidths)).toBeLessThanOrEqual(11);
+  });
+
+  it("outlines a rising candle instead of filling it", () => {
+    /*
+     * 阳线空心、阴线实心，是 A 股 K 线的固有读法，也是颜色之外的第二层编码
+     * ——色觉障碍的人只剩这一层可用。空心的内部必须是画布底色而不是透明：
+     * 影线是整根贯通画的，透明底会让它从实体中间穿过去，成了个「井」字。
      */
     const markup = renderToStaticMarkup(
       <PriceChart
@@ -121,8 +147,8 @@ describe("price chart", () => {
         previousClose={null}
         series={{
           bars: [
-            bar("2026-08-14", 10, 11, 9, 10.5),
-            bar("2026-08-17", 10.5, 12, 10, 11.8),
+            bar("2026-08-14", 10, 12, 9, 11.5),
+            bar("2026-08-17", 11.5, 12, 10, 11.8),
           ],
           kind: "candle",
           period: "day",
@@ -130,15 +156,39 @@ describe("price chart", () => {
       />,
     );
 
-    expect(canvasChildCount(markup)).toBe(6);
+    /* 空心是靠描边表达的：涨的那根必须有 stroke-width。 */
+    expect(markup).toContain('stroke-width="1"');
+    expect(countOf(markup, "Rect")).toBeGreaterThanOrEqual(2);
   });
 
-  it("draws the intraday line as a connected line, not loose dots", () => {
+  it("draws the grid and the price ticks a reader needs", () => {
+    const markup = renderToStaticMarkup(
+      <PriceChart
+        failure={null}
+        loading={false}
+        previousClose={null}
+        series={{
+          bars: [
+            bar("2026-08-14", 10, 12, 9, 11.5),
+            bar("2026-08-17", 11.5, 14, 10, 13),
+          ],
+          kind: "candle",
+          period: "day",
+        }}
+      />,
+    );
+
+    /* 五条横线 + 三条竖线，是雪球那张图的骨架。 */
+    expect(countOf(markup, "Line")).toBeGreaterThanOrEqual(8);
+    /* 纵轴刻度：最高与最低必须出现在刻度里。 */
+    expect(markup).toContain("14.00");
+    expect(markup).toContain("9.00");
+  });
+
+  it("draws the intraday line as one connected path, not loose dots", () => {
     /*
-     * 每一列要从上一个点的高度连到这个点的高度。只画点的话，价格一跳，屏幕上
-     * 就是两颗离得很远的孤点，中间什么都没有——那正是这一版之前分时图的样子。
-     *
-     * 三个点里第二段跨了 10 到 12，所以那一段的高度必须明显大于线本身的粗细。
+     * 上一版每个点画一个 2px 方块，屏幕上是一片断续的绿点——形状勉强看得出来，
+     * 但那不是一条线。现在价格线、均价线、面积填充各是一个 Path。
      */
     const markup = renderToStaticMarkup(
       <PriceChart
@@ -148,15 +198,15 @@ describe("price chart", () => {
         series={{
           kind: "line",
           period: "intraday",
-          points: [point("09:30", 10), point("09:31", 12), point("09:32", 12)],
+          points: [point("09:30", 10), point("09:31", 12), point("09:32", 11)],
         }}
       />,
     );
 
-    const heights = [...markup.matchAll(/height:([0-9.]+)px/gu)].map((found) =>
-      Number(found[1]),
-    );
-    expect(Math.max(...heights)).toBeGreaterThan(10);
+    /* 面积 + 均价线 + 价格线。 */
+    expect(countOf(markup, "Path")).toBe(3);
+    /* 面积那条要沿底边收口，否则填充会变成一个三角形。 */
+    expect(markup).toContain("Z");
   });
 
   it("lets you read the intraday chart by touch too", () => {
@@ -280,8 +330,10 @@ describe("price chart", () => {
       />,
     );
 
-    expect(markup).toContain("2026-08-14");
-    expect(markup).toContain("2026-08-17");
+    /* 轴上的刻度截到月——三个刻度写到日会挤成一团。 */
+    expect(markup).toContain("2026-08");
+    /* 读数条上写全，它回答的正是「这根是哪一天」。 */
+    expect(markup).toContain("最新 2026-08-17");
   });
 
   it("says it could not fetch instead of drawing an empty frame", () => {
@@ -337,7 +389,7 @@ describe("price chart", () => {
     );
 
     expect(markup).not.toContain("NaN");
-    expect(markup).toContain("2026-08-14");
+    expect(markup).toContain("2026-08");
   });
 
   it("keeps a flat day visible instead of collapsing it to nothing", () => {
@@ -361,7 +413,7 @@ describe("price chart", () => {
       />,
     );
 
-    expect(markup).toContain("2026-08-15");
+    expect(markup).toContain("2026-08");
     expect(markup).not.toContain("height:0px");
   });
 

@@ -40,7 +40,10 @@ const render = (
 const sendDisabled = (markup: string): boolean => {
   const at = markup.indexOf('data-testid="chat-send"');
   expect(at).toBeGreaterThan(-1);
-  const tag = markup.slice(markup.lastIndexOf("<", at), markup.indexOf(">", at));
+  const tag = markup.slice(
+    markup.lastIndexOf("<", at),
+    markup.indexOf(">", at),
+  );
   return tag.includes('aria-disabled="true"');
 };
 

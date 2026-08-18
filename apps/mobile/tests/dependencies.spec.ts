@@ -35,6 +35,13 @@ const lockfile = readFileSync(join(mobileRoot, "../../pnpm-lock.yaml"), "utf8");
 const expectedNativeDependencies = {
   "react-native-gesture-handler": "2.28.0",
   "react-native-reanimated": "4.1.1",
+  /*
+   * 图表是用 SVG 画的，所以这个版本也得钉死。
+   *
+   * Expo Go 里内置的是 15.12.1；装成别的版本，App 会在挂载第一个 <Svg> 时崩，
+   * 报的是原生层符号找不到——和 package.json 看不出任何关系。
+   */
+  "react-native-svg": "15.12.1",
   "react-native-worklets": "0.5.1",
 } as const;
 

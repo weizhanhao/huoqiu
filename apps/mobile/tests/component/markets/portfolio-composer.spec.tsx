@@ -51,7 +51,10 @@ const render = (
 const saveDisabled = (markup: string): boolean => {
   const at = markup.indexOf('data-testid="portfolio-save"');
   expect(at).toBeGreaterThan(-1);
-  const tag = markup.slice(markup.lastIndexOf("<", at), markup.indexOf(">", at));
+  const tag = markup.slice(
+    markup.lastIndexOf("<", at),
+    markup.indexOf(">", at),
+  );
   return tag.includes('aria-disabled="true"');
 };
 

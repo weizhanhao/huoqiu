@@ -11,7 +11,7 @@ import type {
   ResearchReport,
 } from "../../api/market-api";
 import type { SocialPost } from "../../api/social-api";
-import { appTouchMinimum } from "../../styles/app-touch";
+import { appTouchMinimum, touchSlop } from "../../styles/app-touch";
 import { useSignColor } from "../../styles/market-colors";
 import {
   MISSING,
@@ -40,6 +40,7 @@ const periods: readonly Readonly<{ id: ChartPeriod; label: string }>[] = [
   { id: "day", label: "日K" },
   { id: "week", label: "周K" },
   { id: "month", label: "月K" },
+  { id: "quarter", label: "季K" },
   { id: "year", label: "年K" },
   { id: "m60", label: "60分" },
   { id: "m15", label: "15分" },
@@ -117,13 +118,25 @@ const lots = (shares: number | null | undefined): string =>
 const percent = (value: number | null | undefined): string =>
   value === null || value === undefined ? MISSING : `${value.toFixed(2)}%`;
 
+/*
+ * 一格指标：标签和数值挤在同一行。
+ *
+ * 此前是标签在上、数值在下，两行一格 —— 十二格就是四行，头部把图表挤到了
+ * 屏幕很靠下的地方。雪球是八格两行，标签用单字缩写，整块只占两行的高度。
+ */
 const Metric = ({
   label,
+  tone,
   value,
-}: Readonly<{ label: string; value: string }>) => (
+}: Readonly<{ label: string; tone?: string | undefined; value: string }>) => (
   <View style={styles.metric}>
     <Text style={styles.metricLabel}>{label}</Text>
-    <Text style={styles.metricValue}>{value}</Text>
+    <Text
+      numberOfLines={1}
+      style={[styles.metricValue, tone === undefined ? null : { color: tone }]}
+    >
+      {value}
+    </Text>
   </View>
 );
 
@@ -174,6 +187,18 @@ export function InstrumentScreen({
     quote?.prevClose ?? metrics?.previousClose ?? tape?.previousClose ?? null;
   const empty = metrics === null && quote === null;
 
+  /*
+   * 高 / 低 / 开 相对昨收上色。
+   *
+   * 不是「高必红、低必绿」：全天下跌时最高价也可能低于昨收，那一格就该是绿的。
+   * 昨收拿不到时保持中性——拿 null 去减会得到 NaN，而 NaN > 0 是 false，
+   * 会被静悄悄地染成跌色。
+   */
+  const priceTone = (value: number | null): string | undefined =>
+    value === null || previousClose === null
+      ? undefined
+      : signColor(value - previousClose);
+
   return (
     <View style={styles.screen} testID="instrument-screen">
       <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
@@ -201,41 +226,64 @@ export function InstrumentScreen({
         )}
 
         <View style={styles.quoteBlock}>
-          <Text style={[styles.last, { color }]}>
-            {fixedOrMissing(last, 2)}
-          </Text>
-          <Text style={[styles.change, { color }]}>
-            {`${signedAmount(metrics?.changeAmount)}  ${signedPercent(metrics?.changePercent)}`}
-          </Text>
+          {/*
+            价格与涨跌在**同一行**。此前涨跌另起一行，白占一整行高度，而这一
+            行只有两个短数字。
+          */}
+          <View style={styles.priceRow}>
+            <Text style={[styles.last, { color }]}>
+              {fixedOrMissing(last, 2)}
+            </Text>
+            <Text style={[styles.change, { color }]}>
+              {signedAmount(metrics?.changeAmount)}
+            </Text>
+            <Text style={[styles.change, { color }]}>
+              {signedPercent(metrics?.changePercent)}
+            </Text>
+          </View>
+
+          {/*
+            八格两行，标签是单字缩写。
+
+            此前是十二格、每格两行、标签写全（「今开」「成交量」「市盈TTM」），
+            光这一块就四行。砍掉的四个都是能被别处推出来或读不准的：昨收 =
+            现价 − 涨跌额（就在正上方），振幅 = (高−低)/昨收（高低就在同一列），
+            量比开盘初期噪声极大且极易被读成「放量几倍」，市净只对重资产行业
+            有解释力。
+
+            列内成对：高低 / 开换 / 量额 / 估值——想看「今天成交怎么样」的人
+            扫一列就够，不用在对角线上找两格。
+          */}
           {empty ? null : (
-            <View style={styles.metrics}>
-              <Metric label="今开" value={fixedOrMissing(open, 2)} />
-              <Metric label="最高" value={fixedOrMissing(high, 2)} />
-              <Metric label="最低" value={fixedOrMissing(low, 2)} />
-              <Metric label="昨收" value={fixedOrMissing(previousClose, 2)} />
-              {/*
-                后面这些此前取回来了却没往界面上传：参考图的报价头是五行，
-                我们只画了四个数，而数据一直在手里。取不到的那格写「—」，
-                不留空——留空看起来像排版坏了。
-              */}
-              <Metric label="成交量" value={lots(metrics?.volumeShares)} />
-              <Metric label="成交额" value={money(metrics?.amount)} />
-              <Metric label="换手" value={percent(metrics?.turnoverPercent)} />
-              <Metric label="振幅" value={percent(metrics?.amplitudePercent)} />
-              <Metric
-                label="量比"
-                value={fixedOrMissing(metrics?.volumeRatio, 2)}
-              />
-              <Metric
-                label="市盈TTM"
-                value={fixedOrMissing(metrics?.peTtm, 2)}
-              />
-              <Metric
-                label="市净"
-                value={fixedOrMissing(metrics?.priceToBook, 2)}
-              />
-              <Metric label="总市值" value={money(metrics?.totalMarketCap)} />
-            </View>
+            <>
+              <View style={styles.metricRow}>
+                <Metric
+                  label="高"
+                  tone={priceTone(high)}
+                  value={fixedOrMissing(high, 2)}
+                />
+                <Metric
+                  label="开"
+                  tone={priceTone(open)}
+                  value={fixedOrMissing(open, 2)}
+                />
+                <Metric label="量" value={lots(metrics?.volumeShares)} />
+                <Metric label="额" value={money(metrics?.amount)} />
+              </View>
+              <View style={styles.metricRow}>
+                <Metric
+                  label="低"
+                  tone={priceTone(low)}
+                  value={fixedOrMissing(low, 2)}
+                />
+                <Metric label="换" value={percent(metrics?.turnoverPercent)} />
+                <Metric label="总市值" value={money(metrics?.totalMarketCap)} />
+                <Metric
+                  label="市盈TTM"
+                  value={fixedOrMissing(metrics?.peTtm, 2)}
+                />
+              </View>
+            </>
           )}
         </View>
 
@@ -252,6 +300,7 @@ export function InstrumentScreen({
               onPress={() => {
                 onSelectPeriod(id);
               }}
+              hitSlop={touchSlop(34)}
               style={styles.period}
             >
               <Text
@@ -259,6 +308,8 @@ export function InstrumentScreen({
               >
                 {label}
               </Text>
+              {/* 选中靠字重加一条下划线表达，不靠换颜色——蓝色在这一屏是链接色。 */}
+              {id === period ? <View style={styles.periodMark} /> : null}
             </Pressable>
           ))}
         </ScrollView>
@@ -545,27 +596,42 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontVariant: ["tabular-nums"],
     fontWeight: "700",
+    letterSpacing: -0.4,
+    lineHeight: 38,
+  },
+  priceRow: {
+    alignItems: "baseline",
+    columnGap: 9,
+    flexDirection: "row",
   },
   metric: {
-    flexBasis: "24%",
+    alignItems: "baseline",
+    columnGap: 4,
+    flexDirection: "row",
+    /*
+     * 四列宽度不等分。
+     *
+     * 等分的话「总市值 16164.68亿」会溢出，而「高 55.88」那一格白留一大片。
+     * 按各列最宽的内容分配。
+     */
     flexGrow: 1,
-    gap: 2,
   },
   metricLabel: {
     color: tokens.text.tertiary,
-    /* 参考图实测：标签 12，数值 15。此前是 11.5 / 13，整体偏小一档。 */
     fontSize: 12,
+    lineHeight: 18,
   },
   metricValue: {
     color: tokens.text.primary,
-    fontSize: 15,
+    flexShrink: 1,
+    fontSize: 13,
     fontVariant: ["tabular-nums"],
+    fontWeight: "500",
+    lineHeight: 18,
   },
-  metrics: {
+  metricRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 8,
+    marginTop: 7,
   },
   name: {
     color: tokens.text.primary,
@@ -584,30 +650,46 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   period: {
+    alignItems: "center",
+    /*
+     * 视觉高度 38，热区靠 hitSlop 撑到 48。
+     *
+     * 此前直接把视觉高度设成 48，周期条白白高出一截，而这一条只是七个短词。
+     */
+    height: 38,
     justifyContent: "center",
-    /* 「分时」两个字只有 28pt 宽，热区要靠内边距撑开，否则点三次中一次。 */
-    minHeight: appTouchMinimum,
-    paddingHorizontal: 12,
+    paddingHorizontal: 6,
+  },
+  periodMark: {
+    backgroundColor: tokens.text.primary,
+    borderRadius: 1,
+    bottom: 4,
+    height: 2,
+    position: "absolute",
+    width: 18,
   },
   periodStrip: {
     alignItems: "center",
-    gap: 18,
-    paddingHorizontal: 14,
+    gap: 16,
+    paddingHorizontal: 12,
   },
   periodText: {
     color: tokens.text.secondary,
     fontSize: 14,
+    lineHeight: 20,
   },
   periodTextOn: {
-    color: tokens.brand.primary,
-    fontSize: 14.5,
+    color: tokens.text.primary,
+    /* 字号和未选中保持一致——差 0.5pt 会让相邻项在每次点击时左右抖一下。 */
+    fontSize: 14,
     fontWeight: "700",
+    lineHeight: 20,
   },
   quoteBlock: {
     backgroundColor: tokens.surface.base,
-    gap: 2,
+    paddingBottom: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 10,
   },
   row: {
     backgroundColor: tokens.surface.base,

@@ -255,6 +255,41 @@ describe("the short-lived series cache", () => {
   });
 });
 
+describe("the quarter candles", () => {
+  /*
+   * 上游没有季线这一档，雪球的周期条上却有。月 K 折成季 K 和折成年 K 是同一件
+   * 事，只是分组的键从「年」换成「年+第几季」——同一份数据换个粒度，每一格都
+   * 能回月 K 对上。
+   */
+  const months = [
+    ["2025-01-31", "10.00", "12.00", "13.00", "9.00", "100"],
+    ["2025-02-28", "12.00", "11.00", "15.00", "8.00", "200"],
+    ["2025-03-31", "11.00", "14.00", "14.50", "10.50", "300"],
+    ["2025-04-30", "14.00", "16.00", "17.00", "13.00", "400"],
+  ];
+
+  it("groups three months into one bar", async () => {
+    stub(() => klineBody("sh600519", "qfqmonth", months));
+
+    const series = await loadChartSeries("sh600519", "quarter");
+
+    expect(series?.kind).toBe("candle");
+    const bars = series?.kind === "candle" ? series.bars : [];
+    expect(bars).toHaveLength(2);
+
+    const [first] = bars;
+    expect(first?.date).toBe("2025Q1");
+    expect(first?.open).toBe(10);
+    expect(first?.close).toBe(14);
+    expect(first?.high).toBe(15);
+    expect(first?.low).toBe(8);
+    expect(first?.volumeShares).toBe(600 * 100);
+
+    /* 四月单独成一季，不能被并进一季度。 */
+    expect(bars[1]?.date).toBe("2025Q2");
+  });
+});
+
 describe("the year candles", () => {
   /*
    * 上游的 year 字段只回一根。

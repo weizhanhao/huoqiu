@@ -35,6 +35,7 @@ export type ChartPeriod =
   | "m60"
   | "m120"
   | "month"
+  | "quarter"
   | "week"
   | "year";
 
@@ -53,6 +54,7 @@ const CANDLE_PERIODS = {
   m60: { field: "m60", param: "m60" },
   m120: { field: "m120", param: "m120" },
   month: { field: "qfqmonth", param: "month" },
+  quarter: { field: "qfqmonth", param: "month" },
   week: { field: "qfqweek", param: "week" },
   year: { field: "year", param: "year" },
 } as const;
@@ -68,6 +70,7 @@ export const CHART_PERIODS: readonly Readonly<{
   { id: "day", label: "日K" },
   { id: "week", label: "周K" },
   { id: "month", label: "月K" },
+  { id: "quarter", label: "季K" },
   { id: "year", label: "年K" },
   { id: "m120", label: "120分" },
   { id: "m60", label: "60分" },
@@ -307,10 +310,13 @@ const readCandleRows = (
  * 月 K 已经按时间升序，所以「当年第一根」就是先遇到的那根，末根就是最后覆盖
  * 上去的那根。高低取全年极值——不是任何单月的极值，这两者常常不在同一个月。
  */
-const foldIntoYears = (monthly: readonly CandleBar[]): readonly CandleBar[] => {
+const foldMonths = (
+  monthly: readonly CandleBar[],
+  keyOf: (date: string) => string,
+): readonly CandleBar[] => {
   const byYear = new Map<string, CandleBar>();
   for (const bar of monthly) {
-    const year = bar.date.slice(0, 4);
+    const year = keyOf(bar.date);
     const running = byYear.get(year);
     if (running === undefined) {
       byYear.set(year, { ...bar, date: year });
@@ -493,10 +499,17 @@ export const loadChartSeries = async (
    * 收，高低取全年极值，量求和。这不是造数据，是同一份数据换个粒度，每一格
    * 都能拿月 K 对上。
    */
-  if (period === "year") {
+  if (period === "year" || period === "quarter") {
     const monthly = await loadChartSeries(symbol, "month");
     if (monthly === null || monthly.kind !== "candle") return null;
-    const bars = foldIntoYears(monthly.bars);
+    const bars = foldMonths(
+      monthly.bars,
+      period === "year"
+        ? (date) => date.slice(0, 4)
+        : /* 2025-05-31 → 2025Q2 */
+          (date) =>
+            `${date.slice(0, 4)}Q${String(Math.floor((Number(date.slice(5, 7)) - 1) / 3) + 1)}`,
+    );
     if (bars.length === 0) return null;
     return remember({
       bars,

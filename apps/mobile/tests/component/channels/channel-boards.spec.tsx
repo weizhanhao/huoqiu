@@ -84,7 +84,9 @@ describe("fund board", () => {
     expect(renderToStaticMarkup(<FundBoard funds={null} />)).toContain(
       "正在读取",
     );
-    expect(renderToStaticMarkup(<FundBoard funds={[]} />)).toContain("没有取到");
+    expect(renderToStaticMarkup(<FundBoard funds={[]} />)).toContain(
+      "没有取到",
+    );
   });
 });
 
@@ -127,7 +129,10 @@ describe("private fund board", () => {
      * 分辨我们是抄来的还是编的。
      */
     const markup = renderToStaticMarkup(
-      <PrivateBoard managers={[manager("某某资产管理", 23)]} onOpen={vi.fn()} />,
+      <PrivateBoard
+        managers={[manager("某某资产管理", 23)]}
+        onOpen={vi.fn()}
+      />,
     );
 
     expect(markup).toContain("某某资产管理");

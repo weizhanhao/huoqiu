@@ -51,6 +51,51 @@ export const movingAverage = (
   return out;
 };
 
+/**
+ * 一条从 (x1,y1) 到 (x2,y2) 的细斜线，用一个可旋转的方块表达。
+ *
+ * 只有 View 可用时，画斜线的唯一办法是「摆一个细长方块，再把它转到那个角度」。
+ * 此前的做法是给每一列填一个「从上一点的高度到这一点的高度」的矩形——根数多
+ * 时看着还像条线，根数一少（年K 只有十几根）每段就变成二三十像素宽的实心
+ * **色块**，整张图成了一堆彩色阶梯。
+ *
+ * 坐标以左上角为原点，y 向下。
+ */
+export const segmentGeometry = (
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  thickness: number,
+): Readonly<{ angle: number; left: number; top: number; width: number }> => {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const width = Math.hypot(dx, dy);
+  return {
+    angle: Math.atan2(dy, dx),
+    /* 方块以中点为轴旋转，所以先摆到中点、再往回退半个长度。 */
+    left: (x1 + x2) / 2 - width / 2,
+    top: (y1 + y2) / 2 - thickness / 2,
+    width,
+  };
+};
+
+/**
+ * 纵轴刻度：把价格区间等分成 count-1 段，从高到低。
+ *
+ * 不取整到「好看的数」——雪球那几档（60.07 / 47.50 / 34.94 / 22.38 / 9.81）
+ * 相邻差值都是 12.56~12.57，是等分而不是取整。取整会让最上一档高出画面顶端，
+ * 那一格刻度就飘在图外面了。
+ */
+export const axisLevels = (
+  { high, low }: Bounds,
+  count: number,
+): readonly number[] => {
+  if (count < 2) return [high];
+  const stepSize = (high - low) / (count - 1);
+  return Array.from({ length: count }, (_, index) => high - stepSize * index);
+};
+
 export const barIndexAt = (x: number, width: number, count: number): number => {
   if (count <= 0) return 0;
   if (!Number.isFinite(x) || width <= 0) return 0;
