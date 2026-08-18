@@ -12,6 +12,8 @@ import { D0WatchlistProvider } from "../stores/d0-watchlist";
 
 import "./globals.css";
 import "./xueqiu-theme.css";
+/* 必须排在最后：它要顶掉令牌那套的暗色覆盖。理由见文件内的说明。 */
+import "./light-only.css";
 
 export const metadata: Metadata = {
   title: "火球",

@@ -610,69 +610,16 @@ summary:focus-visible {
   display: none;
 }
 
-.d0-layout:has(.home-view-stage[data-home-view="watchlist"]) {
-  grid-template-columns: 190px 960px;
-}
-
-.d0-layout:has(.home-view-stage[data-home-view="watchlist"]) .d0-main {
-  width: 920px;
-}
-
-.d0-layout:has(.home-view-stage[data-home-view="watchlist"]) .d0-rail {
-  display: none;
-}
-
-/* 自选是完整工作区：股票、基金与组合共用正文宽度，不再挤进右侧热榜。 */
-.d0-layout:has(.watchlist-workspace) {
-  grid-template-columns: 190px 960px;
-}
-
-.d0-layout:has(.watchlist-workspace) .d0-main {
-  width: 920px;
-}
-
-.d0-layout:has(.watchlist-workspace) .d0-rail {
-  display: none;
-}
-
-.d0-layout:has([data-testid="fund-center-hub"]) {
-  grid-template-columns: 190px 960px;
-}
-
-.d0-layout:has([data-testid="fund-center-hub"]) .d0-main {
-  width: 920px;
-}
-
-.d0-layout:has([data-testid="fund-center-hub"]) .d0-rail {
-  display: none;
-}
-
-.d0-layout:has([data-testid="private-funds-hub"]) {
-  grid-template-columns: 190px 960px;
-}
-
-.d0-layout:has([data-testid="private-funds-hub"]) .d0-main {
-  width: 920px;
-}
-
-.d0-layout:has([data-testid="private-funds-hub"]) .d0-rail {
-  display: none;
-}
-
-.d0-layout:has([data-testid="etf-center"]),
-.d0-layout:has([data-testid="topics-hub"]) {
-  grid-template-columns: 190px 960px;
-}
-
-.d0-layout:has([data-testid="etf-center"]) .d0-main,
-.d0-layout:has([data-testid="topics-hub"]) .d0-main {
-  width: 920px;
-}
-
-.d0-layout:has([data-testid="etf-center"]) .d0-rail,
-.d0-layout:has([data-testid="topics-hub"]) .d0-rail {
-  display: none;
-}
+/*
+ * 自选 / 基金 / 私募 / ETF / 话题 这几页此前各有一条规则，把布局压成两栏并
+ * 把右栏 display:none 掉。
+ *
+ * 结果不是「正文变宽」，而是右边空出一大片白：外层容器仍按三栏的 1150px 居中，
+ * 少掉的那一栏就成了一块什么都没有的空地。而这几页恰恰是频道条上点得最多的
+ * 几个——从首页切过去，右侧热榜整块消失，看起来像页面加载坏了。
+ *
+ * 三栏是这个站的骨架，不该随页面变。宽表格自己在正文栏内横向滚动即可。
+ */
 
 .seed-user {
   align-items: center;
@@ -1836,48 +1783,55 @@ summary:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * 名次在链接**外面**，不在里面。
+ *
+ * 这一段原先是照着「<li><a><span>01</span><strong>标题</strong></a></li>」写的：
+ * li 改成 block、网格挪到 <a> 上、留了 24px 1fr 两列。可组件渲染出来的是
+ * 「<li><span>01</span><a><strong>标题</strong></a></li>」——<a> 里只有标题，
+ * 于是标题落进那个 24px 宽的第一列，配上 ellipsis 就成了「一个字 + 省略号」，
+ * 名次也被挤到单独一行。
+ *
+ * 网格留在 li 上，和 globals.css 一致，两份样式表就不再各说各话。
+ */
 .hot-list li {
-  display: block;
+  align-items: center;
+  color: var(--hq-text-primary);
+  display: grid;
   font-size: 13px;
+  gap: 8px;
+  grid-template-columns: 24px minmax(0, 1fr);
   min-height: 32px;
-  padding: 0;
+  padding: 0 4px;
 }
 
 .hot-list li > a {
-  align-items: center;
-  color: #33353c;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 24px 1fr;
-  min-height: 32px;
-  padding: 0 4px;
+  color: inherit;
+  display: block;
+  /* grid 子项默认最小宽是 min-content，不压到 0 的话长标题会把整条撑宽。 */
+  min-width: 0;
   text-decoration: none;
 }
 
-.hot-list li > a:hover,
-.hot-list li > a[aria-current="page"] {
-  background: transparent;
-  color: #1576e8;
-}
-
-.hot-list li > a[aria-current="page"] strong {
-  font-weight: 500;
+.hot-list li > a:hover strong {
+  color: var(--hq-text-link);
 }
 
 .hot-list li strong {
+  display: block;
   font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.hot-list li > a > span {
+.hot-list li > span {
   font-family: var(--hq-type-family-sans);
   font-size: 13px;
 }
 
-.hot-list li:nth-child(-n + 3) > a > span {
-  color: #ff5b34;
+.hot-list li:nth-child(-n + 3) > span {
+  color: var(--hq-market-up-text);
 }
 
 .rail-tabs {

@@ -1,0 +1,148 @@
+/*
+ * 全站锁成浅色。
+ *
+ * 站里现在有两套主题并存：
+ *   - 设计令牌那套（web-ui 注入的 --hq-* 变量）带完整暗色，跟随系统；
+ *   - xueqiu-theme.css 这套新皮肤是照雪球做的，四百多处颜色直接写死，只有浅色。
+ *
+ * 系统处于深色时，前者把变量换成暗色、后者纹丝不动，于是同一屏上频道条、
+ * 发帖框、右侧热榜是深的，卡片、正文、左侧导航是浅的——用户看到的就是
+ * 「深色浅色相间」。这不是某一处写错了，是两套主题各自都自洽、合在一起不自洽。
+ *
+ * 雪球本身就是纯浅色产品，新皮肤的方向没问题。所以这里把令牌那套的暗色覆盖
+ * 顶回浅色值，让全站只有一套配色。选择器多带一个 html 是为了在特指度上稳压
+ * 暗色那条（:root:not([data-theme="light"])），不依赖样式表的加载顺序。
+ *
+ * 这是一层「锁」，不是设计。等新皮肤补齐自己的暗色调色板，把这个文件删掉即可，
+ * 令牌那套的暗色会自动重新生效。
+ */
+
+html:root,
+html:root[data-theme=dark],
+html:root[data-theme=light] {
+  color-scheme: light;
+    --hq-border-default: #E1E5EB;
+    --hq-border-focus: #0967C7;
+    --hq-border-inverse: rgba(255, 255, 255, 0.14);
+    --hq-border-strong: #CAD2DB;
+    --hq-border-subtle: #EDEFF3;
+    --hq-brand-accent: #2F88E9;
+    --hq-brand-focus: #73AFFF;
+    --hq-brand-on-primary: #FFFFFF;
+    --hq-brand-primary: #0967C7;
+    --hq-brand-primary-hover: #0756A6;
+    --hq-brand-primary-pressed: #064584;
+    --hq-brand-secondary: #B9DCFF;
+    --hq-brand-subtle: #EAF2FC;
+    --hq-feedback-danger: #A12D35;
+    --hq-feedback-danger-border: #F3B8BC;
+    --hq-feedback-danger-subtle: #FDF0F1;
+    --hq-feedback-info: #0756A6;
+    --hq-feedback-info-border: #B9DCFF;
+    --hq-feedback-info-subtle: #EAF2FC;
+    --hq-feedback-success: #16643B;
+    --hq-feedback-success-border: #B7DFC9;
+    --hq-feedback-success-subtle: #EAF7F0;
+    --hq-feedback-warning: #8A5106;
+    --hq-feedback-warning-border: #E8C98C;
+    --hq-feedback-warning-subtle: #FDF5E7;
+    --hq-market-down: #17A673;
+    --hq-market-down-border: #B4E3D0;
+    --hq-market-down-subtle: #EDF9F4;
+    --hq-market-down-text: #05714B;
+    --hq-market-flat: #5F6975;
+    --hq-market-up: #E5484D;
+    --hq-market-up-border: #F5C2C4;
+    --hq-market-up-subtle: #FDF0F0;
+    --hq-market-up-text: #C0272D;
+    --hq-market-warning: #C2700A;
+    --hq-market-warning-subtle: #FDF5E7;
+    --hq-market-warning-text: #8A5106;
+    --hq-shadow-card: 0 1px 2px rgba(15, 22, 32, 0.04);
+    --hq-shadow-floating: 0 12px 32px rgba(15, 22, 32, 0.16);
+    --hq-shadow-focus: 0 0 0 2px #0967C7;
+    --hq-shadow-raised: 0 4px 12px rgba(15, 22, 32, 0.08);
+    --hq-surface-base: #FFFFFF;
+    --hq-surface-canvas: #F5F6F8;
+    --hq-surface-divider: #E4E8ED;
+    --hq-surface-inverse: #0E1620;
+    --hq-surface-overlay: #FFFFFF;
+    --hq-surface-raised: #FFFFFF;
+    --hq-surface-scrim: rgba(14, 22, 32, 0.55);
+    --hq-surface-selected: #E8EFF8;
+    --hq-surface-subtle: #F0F5FC;
+    --hq-surface-sunken: #EBEEF2;
+    --hq-text-disabled: #98A2B0;
+    --hq-text-inverse: #FFFFFF;
+    --hq-text-inverse-muted: #C7D1DC;
+    --hq-text-link: #0A5FB4;
+    --hq-text-link-hover: #074A8E;
+    --hq-text-primary: #0F1620;
+    --hq-text-secondary: #47525F;
+    --hq-text-tertiary: #5F6975;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:root:not([data-theme=light]) {
+    color-scheme: light;
+    --hq-border-default: #E1E5EB;
+    --hq-border-focus: #0967C7;
+    --hq-border-inverse: rgba(255, 255, 255, 0.14);
+    --hq-border-strong: #CAD2DB;
+    --hq-border-subtle: #EDEFF3;
+    --hq-brand-accent: #2F88E9;
+    --hq-brand-focus: #73AFFF;
+    --hq-brand-on-primary: #FFFFFF;
+    --hq-brand-primary: #0967C7;
+    --hq-brand-primary-hover: #0756A6;
+    --hq-brand-primary-pressed: #064584;
+    --hq-brand-secondary: #B9DCFF;
+    --hq-brand-subtle: #EAF2FC;
+    --hq-feedback-danger: #A12D35;
+    --hq-feedback-danger-border: #F3B8BC;
+    --hq-feedback-danger-subtle: #FDF0F1;
+    --hq-feedback-info: #0756A6;
+    --hq-feedback-info-border: #B9DCFF;
+    --hq-feedback-info-subtle: #EAF2FC;
+    --hq-feedback-success: #16643B;
+    --hq-feedback-success-border: #B7DFC9;
+    --hq-feedback-success-subtle: #EAF7F0;
+    --hq-feedback-warning: #8A5106;
+    --hq-feedback-warning-border: #E8C98C;
+    --hq-feedback-warning-subtle: #FDF5E7;
+    --hq-market-down: #17A673;
+    --hq-market-down-border: #B4E3D0;
+    --hq-market-down-subtle: #EDF9F4;
+    --hq-market-down-text: #05714B;
+    --hq-market-flat: #5F6975;
+    --hq-market-up: #E5484D;
+    --hq-market-up-border: #F5C2C4;
+    --hq-market-up-subtle: #FDF0F0;
+    --hq-market-up-text: #C0272D;
+    --hq-market-warning: #C2700A;
+    --hq-market-warning-subtle: #FDF5E7;
+    --hq-market-warning-text: #8A5106;
+    --hq-shadow-card: 0 1px 2px rgba(15, 22, 32, 0.04);
+    --hq-shadow-floating: 0 12px 32px rgba(15, 22, 32, 0.16);
+    --hq-shadow-focus: 0 0 0 2px #0967C7;
+    --hq-shadow-raised: 0 4px 12px rgba(15, 22, 32, 0.08);
+    --hq-surface-base: #FFFFFF;
+    --hq-surface-canvas: #F5F6F8;
+    --hq-surface-divider: #E4E8ED;
+    --hq-surface-inverse: #0E1620;
+    --hq-surface-overlay: #FFFFFF;
+    --hq-surface-raised: #FFFFFF;
+    --hq-surface-scrim: rgba(14, 22, 32, 0.55);
+    --hq-surface-selected: #E8EFF8;
+    --hq-surface-subtle: #F0F5FC;
+    --hq-surface-sunken: #EBEEF2;
+    --hq-text-disabled: #98A2B0;
+    --hq-text-inverse: #FFFFFF;
+    --hq-text-inverse-muted: #C7D1DC;
+    --hq-text-link: #0A5FB4;
+    --hq-text-link-hover: #074A8E;
+    --hq-text-primary: #0F1620;
+    --hq-text-secondary: #47525F;
+    --hq-text-tertiary: #5F6975;
+  }
+}
