@@ -1,35 +1,212 @@
-/*
- * 创作者权益。
- *
- * 条件列表是这一页的主体：左边写条件、右边写状态，中间用点线牵起来，
- * 长短不一的条件文字也能一眼对上它的状态。
- */
-.wrap {
+.page {
+  display: grid;
+  gap: 16px;
+}
+
+.hero {
+  align-items: center;
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--hq-brand-primary) 12%, white),
+    color-mix(in srgb, var(--hq-brand-primary) 5%, white)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--hq-brand-primary) 16%, var(--hq-border-default));
+  border-radius: 14px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 112px;
+  overflow: hidden;
+  padding: 20px 22px;
+  position: relative;
+}
+
+.hero::after {
+  background: color-mix(in srgb, var(--hq-brand-primary) 7%, transparent);
+  border-radius: 50%;
+  content: "";
+  height: 150px;
+  position: absolute;
+  right: -54px;
+  top: -76px;
+  width: 150px;
+}
+
+.heroIcon,
+.cardIcon {
+  align-items: center;
+  background: rgb(255 255 255 / 72%);
+  border: 1px solid color-mix(in srgb, var(--hq-brand-primary) 18%, transparent);
+  border-radius: 12px;
+  color: var(--hq-brand-primary);
+  display: flex;
+  font-weight: var(--hq-type-weight-semibold);
+  justify-content: center;
+}
+
+.heroIcon {
+  font-size: 22px;
+  height: 52px;
+  width: 52px;
+}
+
+.hero > div {
+  display: grid;
+  gap: 2px;
+}
+
+.hero p {
+  color: var(--hq-brand-primary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-semibold);
+  margin: 0;
+}
+
+.hero h1 {
+  font-size: 21px;
+  line-height: var(--hq-type-line-height-compact);
+  margin: 0;
+}
+
+.hero > div > span {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.heroBadge,
+.statusChip {
+  background: rgb(255 255 255 / 72%);
+  border: 1px solid color-mix(in srgb, var(--hq-brand-primary) 14%, transparent);
+  border-radius: 999px;
+  color: var(--hq-brand-primary);
+  font-size: var(--hq-type-size-caption);
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.heroBadge {
+  position: relative;
+  z-index: 1;
+}
+
+.grid {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.benefitCard {
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgb(36 91 145 / 6%);
+  display: grid;
+  gap: 14px;
+  overflow: hidden;
+  padding: 18px;
+}
+
+.cardHeader {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.cardIcon {
+  background: color-mix(in srgb, var(--hq-brand-primary) 9%, white);
+  border-radius: 10px;
+  height: 42px;
+  width: 42px;
+}
+
+.cardHeader > div {
+  display: grid;
+  gap: 2px;
+}
+
+.cardHeader h2 {
+  font-size: var(--hq-type-size-label);
+  margin: 0;
+}
+
+.cardHeader p {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  margin: 0;
+}
+
+.statusChip {
+  background: var(--hq-surface-subtle);
+  border-color: var(--hq-border-subtle);
+  color: var(--hq-text-secondary);
+}
+
+.progressHeader {
+  align-items: center;
+  color: var(--hq-text-secondary);
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  justify-content: space-between;
+}
+
+.progressHeader strong {
+  color: var(--hq-brand-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.progressTrack {
+  background: color-mix(in srgb, var(--hq-brand-primary) 8%, white);
+  border-radius: 999px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.progressTrack span {
+  background: color-mix(in srgb, var(--hq-brand-primary) 48%, white);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
 .conditions {
   display: grid;
-  gap: 0;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
 .condition {
-  align-items: baseline;
-  display: flex;
-  font-size: var(--hq-type-size-body-compact);
-  gap: var(--hq-spacing-2);
-  justify-content: space-between;
-  min-height: 34px;
-  padding: 6px 0;
+  align-items: center;
+  border-top: 1px solid var(--hq-border-subtle);
+  display: grid;
+  font-size: var(--hq-type-size-caption);
+  gap: 9px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 40px;
 }
 
-.condition + .condition {
-  border-top: 1px solid var(--hq-border-subtle);
+.check,
+.checkMet {
+  align-items: center;
+  border: 1px solid var(--hq-border-default);
+  border-radius: 50%;
+  color: var(--hq-text-tertiary);
+  display: flex;
+  height: 18px;
+  justify-content: center;
+  width: 18px;
+}
+
+.checkMet {
+  background: color-mix(in srgb, var(--hq-brand-primary) 11%, white);
+  border-color: color-mix(in srgb, var(--hq-brand-primary) 18%, transparent);
+  color: var(--hq-brand-primary);
+}
+
+.conditionLabel {
+  color: var(--hq-text-primary);
 }
 
 .met {
@@ -40,30 +217,144 @@
   color: var(--hq-text-tertiary);
 }
 
-/*
- * 申请按钮一律禁用。
- *
- * 看得见但按不动，配合下面那句说明，比藏起来诚实——用户知道有这件事，
- * 也知道现在为什么不能做。
- */
-.apply {
-  background: var(--hq-brand-subtle);
-  border: 1px solid transparent;
-  border-radius: var(--hq-radius-control);
-  color: var(--hq-brand-primary);
-  font-size: var(--hq-type-size-body-compact);
-  justify-self: start;
-  min-height: 32px;
-  padding: 0 13px;
+.cardFooter {
+  align-items: center;
+  background: var(--hq-surface-subtle);
+  border-radius: 9px;
+  color: var(--hq-text-secondary);
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 10px;
 }
 
-.apply:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
+.cardFooter > span {
+  color: var(--hq-brand-primary);
+  font-size: 16px;
+}
+
+.truthNote {
+  align-items: center;
+  background: color-mix(in srgb, var(--hq-brand-primary) 5%, white);
+  border: 1px solid
+    color-mix(in srgb, var(--hq-brand-primary) 12%, var(--hq-border-default));
+  border-radius: 12px;
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.truthNote > span {
+  align-items: center;
+  background: color-mix(in srgb, var(--hq-brand-primary) 12%, white);
+  border-radius: 50%;
+  color: var(--hq-brand-primary);
+  display: flex;
+  flex: 0 0 auto;
+  font-weight: var(--hq-type-weight-semibold);
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.truthNote p {
+  color: var(--hq-text-secondary);
+  display: grid;
+  font-size: var(--hq-type-size-caption);
+  gap: 2px;
+  margin: 0;
+}
+
+.truthNote strong {
+  color: var(--hq-text-primary);
+}
+
+.verificationGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.verificationCard {
+  align-items: start;
+  background: var(--hq-surface-raised);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 13px;
+  box-shadow: 0 7px 22px rgb(36 91 145 / 5%);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 152px;
+  padding: 17px;
+}
+
+.verificationIcon {
+  align-items: center;
+  background: color-mix(in srgb, var(--hq-brand-primary) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--hq-brand-primary) 16%, transparent);
+  border-radius: 11px;
+  color: var(--hq-brand-primary);
+  display: flex;
+  font-weight: var(--hq-type-weight-semibold);
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.verificationCard > div {
+  display: grid;
+  gap: 4px;
+}
+
+.verificationCard h2 {
+  font-size: var(--hq-type-size-label);
+  margin: 0;
+}
+
+.verificationCard p {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-snug);
+  margin: 0;
+}
+
+.verificationStatus {
+  background: var(--hq-surface-subtle);
+  border-radius: 999px;
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-micro);
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 4px 9px;
 }
 
 @media (max-width: 760px) {
-  .wrap {
+  .hero {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .heroBadge {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .verificationGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .cardHeader {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .statusChip {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 }

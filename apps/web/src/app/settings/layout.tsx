@@ -20,7 +20,7 @@ export default function SettingsLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <div className={styles.shell}>
-      <SiteTopbar />
+      <SiteTopbar homeReturn />
       <main className={styles.layout}>
         <SettingsNav />
         <div className={styles.content}>

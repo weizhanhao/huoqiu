@@ -42,11 +42,6 @@ const unavailableSettings = [
     id: "brokerage-account",
     label: "证券账户",
   },
-  /*
-   * 「模拟交易」原本在这份不可用清单里，和证券开户、基金申购并排。
-   * 但模拟盘不碰真实资金、不下真实委托，不需要牌照——它已经在组合详情页
-   * 实现（模拟调仓），继续标为不可用是错的，所以从这里移除。
-   */
 ] as const;
 
 function ProfileContentTabs() {
@@ -369,22 +364,9 @@ export function ProfilePageExperience() {
   );
 }
 
-/**
- * 设置页顶部的身份与统计，取自当前登录账号。
- *
- * 三个数字都来自服务端算好的真实计数（发帖数、粉丝数、关注数），不在这里
- * 二次统计——本地再数一遍只会数到本次会话看到过的那几条。
- */
 function SessionIdentity() {
   const { account, loading } = useAccountSession();
 
-  /*
-   * 会话还在读取时不要说「未登录」。
-   *
-   * 原先只判断 account === null，于是首屏水合期间已登录的人也会先看到
-   * 「未登录，登录后这里显示你的资料」——读屏念完这句、用户去点那个登录
-   * 链接，而他其实早就登录了；随后这块内容还会无声换掉。
-   */
   if (loading) {
     return (
       <section
@@ -409,7 +391,7 @@ function SessionIdentity() {
           <p className={styles.sectionLabel}>当前账号</p>
           <h3 id="settings-profile-heading">未登录</h3>
           <span>
-            <Link href="/login">登录</Link>后这里显示你的资料与数据。
+            <Link href="/login">登录</Link>后同步账号资料与偏好。
           </span>
         </div>
       </section>
@@ -424,7 +406,6 @@ function SessionIdentity() {
       <div className={styles.sessionIdentity}>
         <p className={styles.sectionLabel}>当前账号</p>
         <h3 id="settings-profile-heading">{account.displayName}</h3>
-        {/* 注册日期取 createdAt 的日期部分，不另做时区换算。 */}
         <span>注册于 {account.createdAt.slice(0, 10)}</span>
       </div>
       <dl aria-label="当前账号统计" className={styles.summaryStats}>
@@ -459,14 +440,6 @@ export function SettingsPageExperience() {
       className={`${styles.page} ${styles.settingsPage}`}
       data-testid="settings-page"
     >
-      {/*
-        这一块此前显示的是一份写死的身份：「火球演示用户 @huoqiu_demo」，
-        动态 12、收藏 38、关注 24。跟谁登录了毫无关系——真实账号打开设置页
-        看到的也是这一套，而且没有任何地方说明它是假的（旁边那条说明讲的是
-        「哪些设置已接真实账号」，不是这块资料）。
-
-        现在取真实账号；没登录就说没登录，不拿一个虚构用户顶上。
-      */}
       <SessionIdentity />
 
       <section
@@ -475,8 +448,8 @@ export function SettingsPageExperience() {
       >
         <div className={styles.sectionHeading}>
           <div>
-            <h3 id="display-preferences-heading">显示设置</h3>
-            <p>偏好只在当前会话保留，不写入浏览器存储。</p>
+            <h3 id="display-preferences-heading">界面与内容</h3>
+            <p>按你的阅读习惯调整主题、动效与公开数据展示。</p>
           </div>
           <span className={styles.fixturePill}>会话级</span>
         </div>
@@ -551,71 +524,62 @@ export function SettingsPageExperience() {
         ) : null}
       </section>
 
-      <nav aria-label="已接入的产品页面" className={styles.productLinks}>
-        <Link href="/notifications">
-          <span className={styles.productIcon} aria-hidden="true">
-            消
-          </span>
-          <span>
-            <strong>消息中心</strong>
-            <small>查看回复、提及、赞与系统消息</small>
-          </span>
-          <span aria-hidden="true">→</span>
-        </Link>
-        <Link href="/watchlist">
-          <span className={styles.productIcon} aria-hidden="true">
-            自
-          </span>
-          <span>
-            <strong>自选设置</strong>
-            <small>自选列表只在本次会话保留，行情是实时的</small>
-          </span>
-          <span aria-hidden="true">→</span>
-        </Link>
-        <Link href="/portfolios">
-          <span className={styles.productIcon} aria-hidden="true">
-            组
-          </span>
-          <span>
-            <strong>组合设置</strong>
-            <small>查看你的组合、公开榜单与调仓记录</small>
-          </span>
-          <span aria-hidden="true">→</span>
-        </Link>
-        {/*
-          收藏与模拟交易在窄屏上够不到：侧栏在 390px 下隐藏，底栏固定五项。
-          这一组入口在移动端可达（我的 → 设置），所以把这两条补在这里。
-        */}
-        <Link href="/bookmarks">
-          <span className={styles.productIcon} aria-hidden="true">
-            藏
-          </span>
-          <span>
-            <strong>收藏</strong>
-            <small>你收藏过的帖子，只有你自己看得到</small>
-          </span>
-          <span aria-hidden="true">→</span>
-        </Link>
-        <Link href="/trade">
-          <span className={styles.productIcon} aria-hidden="true">
-            拟
-          </span>
-          <span>
-            <strong>模拟交易</strong>
-            <small>用真实行情记虚拟买卖，不涉及真实资金</small>
-          </span>
-          <span aria-hidden="true">→</span>
-        </Link>
+      <nav aria-label="相关产品入口" className={styles.productLinks}>
+        {(
+          [
+            {
+              description: "查看回复、提及、赞与系统消息",
+              href: "/notifications",
+              icon: "消",
+              label: "消息中心",
+            },
+            {
+              description: "管理自选列表与实时行情",
+              href: "/watchlist",
+              icon: "自",
+              label: "自选设置",
+            },
+            {
+              description: "查看组合、榜单与调仓记录",
+              href: "/portfolios",
+              icon: "组",
+              label: "组合设置",
+            },
+            {
+              description: "查看你收藏过的帖子",
+              href: "/bookmarks",
+              icon: "藏",
+              label: "收藏",
+            },
+            {
+              description: "使用真实行情记录虚拟买卖",
+              href: "/trade",
+              icon: "拟",
+              label: "模拟交易",
+            },
+          ] as const
+        ).map(({ description, href, icon, label }) => (
+          <Link href={href} key={href}>
+            <span className={styles.productIcon} aria-hidden="true">
+              {icon}
+            </span>
+            <span>
+              <strong>{label}</strong>
+              <small>{description}</small>
+            </span>
+            <span aria-hidden="true">→</span>
+          </Link>
+        ))}
       </nav>
 
       <section
         aria-labelledby="unavailable-settings-heading"
-        className={styles.settingsCard}
+        className={`${styles.settingsCard} ${styles.capabilitySection}`}
       >
         <div className={styles.sectionHeading}>
           <div>
             <h3 id="unavailable-settings-heading">账户与交易能力</h3>
-            <p>以下能力涉及真实身份、账户或交易，本演示环境不提供。</p>
+            <p>涉及真实身份、账户或交易的能力暂未接入。</p>
           </div>
           <span className={styles.unavailablePill}>全部未接入</span>
         </div>

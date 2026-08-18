@@ -89,10 +89,6 @@ export function SettingsNav() {
 
   return (
     <nav aria-label="设置导航" className={styles.navigation}>
-      <Link className={styles.backLink} href="/">
-        <span aria-hidden="true">←</span>
-        返回首页
-      </Link>
       <ul>
         {NAVIGATION.map((item, index) => (
           <li key={item.href}>

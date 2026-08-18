@@ -62,14 +62,39 @@ export function StudioMetrics({
 
   const cells =
     scope === "followers"
-      ? [{ label: "粉丝量", primary: true, value: followerCount }]
+      ? [{ icon: "粉", label: "粉丝量", primary: true, value: followerCount }]
       : [
-          { label: "阅读量", primary: true, value: stats.totalViews },
-          { label: "讨论量", primary: false, value: stats.commentCount },
-          { label: "点赞量", primary: false, value: stats.likeCount },
-          { label: "收藏量", primary: false, value: stats.bookmarkCount },
-          { label: "已发布", primary: false, value: stats.publishedCount },
-          { label: "粉丝量", primary: false, value: followerCount },
+          {
+            icon: "阅",
+            label: "阅读量",
+            primary: true,
+            value: stats.totalViews,
+          },
+          {
+            icon: "评",
+            label: "讨论量",
+            primary: false,
+            value: stats.commentCount,
+          },
+          {
+            icon: "赞",
+            label: "点赞量",
+            primary: false,
+            value: stats.likeCount,
+          },
+          {
+            icon: "藏",
+            label: "收藏量",
+            primary: false,
+            value: stats.bookmarkCount,
+          },
+          {
+            icon: "作",
+            label: "已发布",
+            primary: false,
+            value: stats.publishedCount,
+          },
+          { icon: "粉", label: "粉丝量", primary: false, value: followerCount },
         ];
 
   return (
@@ -96,8 +121,13 @@ export function StudioMetrics({
             className={`${styles.metric} ${cell.primary ? styles.metricPrimary : ""}`}
             key={cell.label}
           >
-            <span className={styles.metricLabel}>{cell.label}</span>
-            <strong className={styles.metricValue}>{cell.value}</strong>
+            <span aria-hidden="true" className={styles.metricIcon}>
+              {cell.icon}
+            </span>
+            <span className={styles.metricCopy}>
+              <span className={styles.metricLabel}>{cell.label}</span>
+              <strong className={styles.metricValue}>{cell.value}</strong>
+            </span>
           </div>
         ))}
       </div>

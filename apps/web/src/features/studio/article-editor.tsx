@@ -98,61 +98,114 @@ export function ArticleEditor() {
 
   return (
     <section className={styles.editor} aria-label="发布长文">
-      <input
-        aria-label="标题"
-        className={styles.title}
-        onChange={(event) => {
-          setTitle(event.target.value);
-        }}
-        placeholder="请输入标题"
-        value={title}
-      />
-
-      <textarea
-        aria-label="正文"
-        className={styles.body}
-        onChange={(event) => {
-          setBody(event.target.value);
-        }}
-        placeholder="请输入正文"
-        value={body}
-      />
-
-      <div className={styles.settings}>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>分享范围</span>
-          <select
-            onChange={(event) => {
-              setVisibility(event.target.value as PostVisibility);
-            }}
-            value={visibility}
-          >
-            {postVisibilities.map((value) => (
-              <option key={value} value={value}>
-                {VISIBILITY_LABELS[value]}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className={styles.actions}>
-          <button
-            className={styles.secondary}
-            disabled={busy}
-            onClick={() => void save(false)}
-            type="button"
-          >
-            存草稿
-          </button>
-          <button
-            className={styles.primary}
-            disabled={!canSubmit}
-            onClick={() => void save(true)}
-            type="button"
-          >
-            发布
-          </button>
+      <header className={styles.editorHeader}>
+        <span aria-hidden="true" className={styles.editorIcon}>
+          ✎
+        </span>
+        <div>
+          <p>长文创作</p>
+          <h1>写下值得沉淀的观点</h1>
+          <span>清晰的标题和完整的论述，会让内容更容易被读者发现。</span>
         </div>
+        <span className={styles.draftState}>
+          {draftId === null ? "新文章" : "草稿已创建"}
+        </span>
+      </header>
+
+      <div className={styles.composerGrid}>
+        <div className={styles.paper}>
+          <label className={styles.inputHeading} htmlFor="article-title">
+            <span>文章标题</span>
+            <small>{title.length} / 80</small>
+          </label>
+          <input
+            aria-label="标题"
+            className={styles.title}
+            id="article-title"
+            maxLength={80}
+            onChange={(event) => {
+              setTitle(event.target.value);
+            }}
+            placeholder="给文章起一个清晰、有信息量的标题"
+            value={title}
+          />
+
+          <div className={styles.bodyHeading}>
+            <label htmlFor="article-body">正文内容</label>
+            <span>纯文本 · {body.length} 字</span>
+          </div>
+          <textarea
+            aria-label="正文"
+            className={styles.body}
+            id="article-body"
+            onChange={(event) => {
+              setBody(event.target.value);
+            }}
+            placeholder="从你的核心观点开始，补充事实、数据和推理过程……"
+            value={body}
+          />
+        </div>
+
+        <aside className={styles.publishPanel}>
+          <div className={styles.panelHeading}>
+            <span aria-hidden="true">↗</span>
+            <div>
+              <h2>发布设置</h2>
+              <p>保存前确认内容状态与可见范围</p>
+            </div>
+          </div>
+
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>谁可以看到</span>
+            <select
+              onChange={(event) => {
+                setVisibility(event.target.value as PostVisibility);
+              }}
+              value={visibility}
+            >
+              {postVisibilities.map((value) => (
+                <option key={value} value={value}>
+                  {VISIBILITY_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className={styles.completion}>
+            <p>发布检查</p>
+            <span data-complete={title.trim().length > 0}>
+              <i aria-hidden="true" />
+              标题{title.trim().length > 0 ? "已填写" : "待填写"}
+            </span>
+            <span data-complete={body.trim().length > 0}>
+              <i aria-hidden="true" />
+              正文{body.trim().length > 0 ? "已填写" : "待填写"}
+            </span>
+          </div>
+
+          <div className={styles.actions}>
+            <button
+              className={styles.primary}
+              disabled={!canSubmit}
+              onClick={() => void save(true)}
+              type="button"
+            >
+              发布文章
+            </button>
+            <button
+              className={styles.secondary}
+              disabled={busy}
+              onClick={() => void save(false)}
+              type="button"
+            >
+              保存到草稿箱
+            </button>
+          </div>
+
+          <p className={styles.publishHint}>
+            发布后仍可在“我的作品”中查看，草稿会保留在当前账号下。
+          </p>
+        </aside>
       </div>
 
       {notice === null ? null : (

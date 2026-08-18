@@ -2,20 +2,9 @@
 
 import Link from "next/link";
 
-import styles from "./studio-page.module.css";
 import benefitStyles from "./studio-benefits.module.css";
 import { useStudioData } from "./studio-data";
-
-/*
- * 创作者权益。
- *
- * 开通条件是**真的**：发够几篇长文、粉丝数、累计互动数，全都从库里数出来，
- * 所以「已满足 / 未满足」这两个字可信。
- *
- * 但「申请开通」这个动作站内没有——它背后要有审核流程；打赏与悬赏更要有
- * 真实的支付与结算。做一个点了就说「申请成功」的按钮，那是彻头彻尾的假
- * 功能，比不做糟得多。所以按钮明确禁用，并且说清楚为什么。
- */
+import styles from "./studio-page.module.css";
 
 type Condition = Readonly<{ label: string; met: boolean }>;
 
@@ -24,18 +13,24 @@ function ConditionList({ items }: Readonly<{ items: readonly Condition[] }>) {
     <ul className={benefitStyles.conditions}>
       {items.map((item) => (
         <li className={benefitStyles.condition} key={item.label}>
-          <span>{item.label}</span>
-          {/*
-            只靠颜色区分对色觉障碍不够，所以文字本身就说明状态。
-          */}
+          <span
+            aria-hidden="true"
+            className={item.met ? benefitStyles.checkMet : benefitStyles.check}
+          >
+            {item.met ? "✓" : "·"}
+          </span>
+          <span className={benefitStyles.conditionLabel}>{item.label}</span>
           <span className={item.met ? benefitStyles.met : benefitStyles.unmet}>
-            {item.met ? "已满足" : "未满足"}
+            {item.met ? "已满足" : "待完成"}
           </span>
         </li>
       ))}
     </ul>
   );
 }
+
+const progressOf = (items: readonly Condition[]): number =>
+  Math.round((items.filter((item) => item.met).length / items.length) * 100);
 
 export function StudioBenefits() {
   const { state } = useStudioData();
@@ -65,7 +60,6 @@ export function StudioBenefits() {
       </section>
     );
   }
-
   if (state.kind === "failed") {
     return (
       <section className={styles.card}>
@@ -79,49 +73,102 @@ export function StudioBenefits() {
     (post) => post.kind === "article" && post.status === "published",
   ).length;
   const interactions = stats.commentCount + stats.likeCount;
+  const columnConditions: readonly Condition[] = [
+    { label: "发布 5 篇长文", met: articleCount >= 5 },
+    { label: "长文累计互动达到 20 次", met: interactions >= 20 },
+    { label: "遵守社区规则", met: true },
+  ];
+  const rewardConditions: readonly Condition[] = [
+    { label: "粉丝数超过 500", met: followerCount > 500 },
+    { label: "累计原发帖超过 6 篇", met: stats.publishedCount > 6 },
+    { label: "累计互动超过 50 次", met: interactions > 50 },
+  ];
 
   return (
-    <div className={benefitStyles.wrap}>
-      <section className={styles.card}>
-        <h2 className={styles.heading}>创作者专栏</h2>
-        <p className={styles.subheading}>
-          开通后可获得专栏标识与更多推荐位。下面每一条都按你账号里的真实数据计算。
-        </p>
-        <ConditionList
-          items={[
-            { label: "发布 5 篇长文", met: articleCount >= 5 },
-            { label: "长文累计互动达到 20 次", met: interactions >= 20 },
-            { label: "遵守社区规则", met: true },
-          ]}
-        />
-        <button className={benefitStyles.apply} disabled type="button">
-          申请开通专栏
-        </button>
-        <p className={styles.statusBar}>
-          申请通道尚未接入：它需要一套人工审核流程，站内还没有。上面的条件与进度是真实的。
-        </p>
-      </section>
+    <div className={benefitStyles.page}>
+      <header className={benefitStyles.hero}>
+        <span aria-hidden="true" className={benefitStyles.heroIcon}>
+          ✦
+        </span>
+        <div>
+          <p>创作者权益</p>
+          <h1>持续创作，解锁更多能力</h1>
+          <span>所有进度都来自你的真实作品与互动数据。</span>
+        </div>
+        <span className={benefitStyles.heroBadge}>2 项能力成长中</span>
+      </header>
 
-      <section className={styles.card}>
-        <h2 className={styles.heading}>打赏与悬赏</h2>
-        <p className={styles.subheading}>
-          打赏让读者直接赞赏一篇帖子；悬赏是发帖时挂出赏金，分配给参与讨论的人。
-        </p>
-        <ConditionList
-          items={[
-            { label: "粉丝数超过 500", met: followerCount > 500 },
-            { label: "累计原发帖超过 6 篇", met: stats.publishedCount > 6 },
-            { label: "累计互动超过 50 次", met: interactions > 50 },
-          ]}
+      <div className={benefitStyles.grid}>
+        <BenefitCard
+          conditions={columnConditions}
+          description="获得专栏标识与更多内容推荐机会"
+          footer="继续完成条件；审核通道开放后即可申请。"
+          icon="专"
+          status="审核暂未开放"
+          title="创作者专栏"
         />
-        <button className={benefitStyles.apply} disabled type="button">
-          申请开通打赏与悬赏
-        </button>
-        <p className={styles.statusBar}>
-          这两项涉及真实资金的收付与结算，站内没有支付后端，因此不提供申请。
-          做一个点了就提示「开通成功」的按钮，等于凭空许诺一件做不到的事。
+        <BenefitCard
+          conditions={rewardConditions}
+          description="让优质创作获得读者支持与讨论激励"
+          footer="涉及真实资金结算，支付能力接入前不开放申请。"
+          icon="赏"
+          status="支付暂未接入"
+          title="打赏与悬赏"
+        />
+      </div>
+
+      <aside className={benefitStyles.truthNote}>
+        <span aria-hidden="true">i</span>
+        <p>
+          <strong>进度真实，可用性透明</strong>
+          条件按账号数据实时计算；站内没有审核或支付能力时，不提供虚假的开通按钮。
         </p>
-      </section>
+      </aside>
     </div>
+  );
+}
+
+function BenefitCard({
+  conditions,
+  description,
+  footer,
+  icon,
+  status,
+  title,
+}: Readonly<{
+  conditions: readonly Condition[];
+  description: string;
+  footer: string;
+  icon: string;
+  status: string;
+  title: string;
+}>) {
+  const progress = progressOf(conditions);
+
+  return (
+    <section className={benefitStyles.benefitCard}>
+      <header className={benefitStyles.cardHeader}>
+        <span aria-hidden="true" className={benefitStyles.cardIcon}>
+          {icon}
+        </span>
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+        <span className={benefitStyles.statusChip}>{status}</span>
+      </header>
+      <div className={benefitStyles.progressHeader}>
+        <span>解锁进度</span>
+        <strong>{progress}%</strong>
+      </div>
+      <div aria-hidden="true" className={benefitStyles.progressTrack}>
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      <ConditionList items={conditions} />
+      <footer className={benefitStyles.cardFooter}>
+        <span aria-hidden="true">⌁</span>
+        {footer}
+      </footer>
+    </section>
   );
 }

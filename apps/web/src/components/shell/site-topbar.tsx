@@ -26,8 +26,9 @@ import { SettingsMenu } from "./settings-menu";
 const TOPBAR_MATCHES = ["/notifications", "/settings"];
 
 export function SiteTopbar({
+  homeReturn = false,
   variant = "full",
-}: Readonly<{ variant?: "auth" | "full" }>) {
+}: Readonly<{ homeReturn?: boolean; variant?: "auth" | "full" }>) {
   /* 没有路由上下文时返回 null（静态渲染、测试里单独渲染都是）。 */
   const active = activeNavHref(usePathname() ?? "", TOPBAR_MATCHES);
   const notificationsActive = active === "/notifications";
@@ -35,7 +36,9 @@ export function SiteTopbar({
   const auth = variant === "auth";
 
   return (
-    <header className={`d0-topbar${auth ? " d0-topbar-auth" : ""}`}>
+    <header
+      className={`d0-topbar${auth ? " d0-topbar-auth" : ""}${homeReturn ? " d0-topbar-context" : ""}`}
+    >
       <Link className="d0-brand" href="/" aria-label="火球首页">
         <span className="brand-mark" aria-hidden="true">
           <BrandGlyph />
@@ -47,6 +50,12 @@ export function SiteTopbar({
         */}
         <span className="brand-word">火球</span>
       </Link>
+      {homeReturn ? (
+        <Link className="d0-home-return" href="/">
+          <span aria-hidden="true">↩</span>
+          返回首页
+        </Link>
+      ) : null}
       {auth ? null : (
         <>
           <GlobalSearchBox />

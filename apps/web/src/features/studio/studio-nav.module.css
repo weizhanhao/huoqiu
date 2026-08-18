@@ -27,7 +27,7 @@
   margin: 0;
   font-weight: var(--hq-type-weight-medium);
   opacity: 0.82;
-  padding: 1px 9px 3px 10px;
+  padding: 3px 9px 5px 10px;
   pointer-events: none;
 }
 
@@ -44,12 +44,14 @@
   border-radius: var(--hq-radius-control);
   color: var(--hq-text-secondary);
   display: flex;
-  font-size: var(--hq-type-size-body-compact);
+  font-size: var(--hq-type-size-label-compact);
+  font-weight: var(--hq-type-weight-medium);
   gap: 8px;
   justify-content: flex-start;
   line-height: 20px;
-  min-height: 30px;
-  padding: 5px 9px;
+  min-height: 34px;
+  padding: 6px 9px;
+  position: relative;
   text-decoration: none;
 }
 
@@ -61,7 +63,7 @@
 }
 
 .link:hover {
-  background: color-mix(in srgb, var(--hq-brand-primary) 4%, transparent);
+  background: color-mix(in srgb, var(--hq-brand-primary) 7%, transparent);
   color: var(--hq-brand-primary);
 }
 
@@ -77,15 +79,30 @@
 }
 
 .current {
-  /*
-   * 工作台和首页共用同一个选中语义：浅蓝承托、品牌蓝文字。
-   * 这里不使用 surface-selected；部分主题里它会落成偏深的实蓝块，
-   * 进入创作者中心时像突然换了一套导航。
-   */
-  background: var(--hq-brand-subtle);
-  box-shadow: inset 2px 0 0 var(--hq-brand-primary);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--hq-brand-primary) 11%, white),
+    color-mix(in srgb, var(--hq-brand-primary) 18%, white)
+  );
+  border: 1px solid color-mix(in srgb, var(--hq-brand-primary) 18%, transparent);
+  box-shadow: 0 5px 14px
+    color-mix(in srgb, var(--hq-brand-primary) 10%, transparent);
   color: var(--hq-brand-primary);
   font-weight: var(--hq-type-weight-semibold);
+}
+
+.current:hover {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--hq-brand-primary) 15%, white),
+    color-mix(in srgb, var(--hq-brand-primary) 22%, white)
+  );
+  color: var(--hq-brand-primary);
+}
+
+.current .icon,
+.current:hover .icon {
+  color: var(--hq-brand-primary);
 }
 
 /* 未接入的那几块，在导航上就说清楚。 */
@@ -93,9 +110,11 @@
   background: var(--hq-surface-sunken);
   border-radius: var(--hq-radius-control);
   color: var(--hq-text-tertiary);
-  font-size: var(--hq-type-size-micro);
+  font-size: 10px;
+  font-weight: var(--hq-type-weight-medium);
   margin-left: auto;
   padding: 1px 5px;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {

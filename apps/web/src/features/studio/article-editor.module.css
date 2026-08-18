@@ -1,40 +1,137 @@
-/*
- * 长文编辑。
- *
- * 标题与正文都做成无边框的大输入区：写长文时那些框线只会打断视线，
- * 而这一页除了写字没有别的事可做。
- */
 .editor {
-  align-content: start;
+  display: grid;
+  gap: 16px;
+}
+
+.editorHeader {
+  align-items: center;
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--hq-brand-primary) 11%, white),
+    color-mix(in srgb, var(--hq-brand-primary) 4%, white)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--hq-brand-primary) 14%, var(--hq-border-default));
+  border-radius: 14px;
+  display: grid;
+  gap: 13px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 17px 20px;
+}
+
+.editorIcon,
+.panelHeading > span {
+  align-items: center;
+  background: rgb(255 255 255 / 72%);
+  border: 1px solid color-mix(in srgb, var(--hq-brand-primary) 16%, transparent);
+  border-radius: 11px;
+  color: var(--hq-brand-primary);
+  display: flex;
+  font-weight: var(--hq-type-weight-semibold);
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.editorHeader > div {
+  display: grid;
+  gap: 2px;
+}
+
+.editorHeader p {
+  color: var(--hq-brand-primary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-semibold);
+  margin: 0;
+}
+
+.editorHeader h1 {
+  font-size: 20px;
+  line-height: var(--hq-type-line-height-compact);
+  margin: 0;
+}
+
+.editorHeader > div > span {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+}
+
+.draftState {
+  background: rgb(255 255 255 / 72%);
+  border: 1px solid rgb(255 255 255 / 82%);
+  border-radius: 999px;
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  padding: 5px 10px;
+}
+
+.composerGrid {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 248px;
+}
+
+.paper,
+.publishPanel {
   background: var(--hq-surface-raised);
   border: 1px solid var(--hq-border-default);
-  border-radius: var(--hq-radius-card);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgb(36 91 145 / 5%);
+}
+
+.paper {
   display: grid;
-  /*
-   * 节奏按「写作区 → 设置 → 操作」三段拉开，段内紧、段间松。
-   * 原先整卡一个 gap，标题、正文、分享范围、按钮四块等距排开，读起来
-   * 没有主次。
-   */
-  gap: 0;
-  padding: 16px 20px 14px;
+  min-height: 470px;
+  padding: 20px 22px 24px;
+}
+
+.inputHeading,
+.bodyHeading {
+  align-items: center;
+  color: var(--hq-text-secondary);
+  display: flex;
+  font-size: var(--hq-type-size-caption);
+  justify-content: space-between;
+}
+
+.inputHeading small,
+.bodyHeading span {
+  color: var(--hq-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--hq-type-size-micro);
 }
 
 .title {
-  background: none;
-  border: none;
+  background: transparent;
+  border: 0;
   border-bottom: 1px solid var(--hq-border-subtle);
   border-radius: 0;
   color: var(--hq-text-primary);
-  font-size: 21px;
+  font-size: 23px;
   font-weight: var(--hq-type-weight-semibold);
-  height: 46px;
-  min-height: 46px;
-  padding: 4px 0 9px;
+  min-height: 56px;
+  padding: 8px 0 12px;
+}
+
+.bodyHeading {
+  padding-top: 16px;
+}
+
+.body {
+  background: transparent;
+  border: 0;
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-body-compact);
+  line-height: 1.85;
+  min-height: 330px;
+  padding: 12px 0;
+  resize: vertical;
 }
 
 .title::placeholder,
 .body::placeholder {
-  color: var(--hq-text-tertiary);
+  color: color-mix(in srgb, var(--hq-text-tertiary) 74%, white);
 }
 
 .title:focus,
@@ -43,110 +140,151 @@
 .body:focus-visible {
   border-color: color-mix(
     in srgb,
-    var(--hq-brand-primary) 35%,
+    var(--hq-brand-primary) 30%,
     var(--hq-border-subtle)
   );
-  box-shadow: 0 1px 0
-    color-mix(in srgb, var(--hq-brand-primary) 18%, transparent);
+  box-shadow: none;
   outline: none;
 }
 
-.body {
-  background: none;
-  border: none;
-  color: var(--hq-text-primary);
-  font-size: var(--hq-type-size-body-compact);
-  line-height: var(--hq-type-line-height-body);
-  /*
-   * 原先是 40dvh（实测 400px）。一进来就是一大片空白，像页面没加载完；
-   * 写长了它自己会长（resize 与滚动都在），不必先占住半屏。
-   */
-  min-height: 176px;
-  padding: 14px 0;
-  resize: vertical;
+.publishPanel {
+  display: grid;
+  gap: 16px;
+  padding: 17px;
+  position: sticky;
+  top: 76px;
 }
 
-/*
- * 分享范围与两个按钮是同一件事的两半（发之前定范围、然后发），
- * 排成一行：左边设置、右边操作。原先上下两块各占一行，中间隔着一段空，
- * 视线要来回跑。
- */
-.settings {
+.panelHeading {
   align-items: center;
-  border-top: 1px solid var(--hq-border-subtle);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: space-between;
-  min-height: 52px;
-  padding-top: 10px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.panelHeading > span {
+  background: color-mix(in srgb, var(--hq-brand-primary) 9%, white);
+  border-radius: 9px;
+  height: 34px;
+  width: 34px;
+}
+
+.panelHeading h2 {
+  font-size: var(--hq-type-size-label-compact);
+  margin: 0;
+}
+
+.panelHeading p,
+.publishHint {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-micro);
+  line-height: var(--hq-type-line-height-snug);
+  margin: 2px 0 0;
 }
 
 .field {
-  align-items: center;
-  display: flex;
-  gap: 9px;
+  display: grid;
+  gap: 7px;
 }
 
 .fieldLabel {
-  color: var(--hq-text-tertiary);
+  color: var(--hq-text-secondary);
   font-size: var(--hq-type-size-caption);
-  white-space: nowrap;
+  font-weight: var(--hq-type-weight-medium);
 }
 
-/*
- * 原生下拉在深色下会带浏览器自己的箭头，形态和站内控件对不上，
- * 看着像嵌进来的外来件。这里自己画一个：清掉原生外观，用背景图放箭头，
- * 右侧留出它的位置。
- */
 .field select {
   appearance: none;
+  background-color: var(--hq-surface-base);
   background-image:
     linear-gradient(45deg, transparent 50%, var(--hq-text-tertiary) 50%),
     linear-gradient(135deg, var(--hq-text-tertiary) 50%, transparent 50%);
   background-position:
-    calc(100% - 17px) center,
-    calc(100% - 12px) center;
+    calc(100% - 16px) 50%,
+    calc(100% - 11px) 50%;
   background-repeat: no-repeat;
   background-size:
     5px 5px,
     5px 5px;
-  max-width: 200px;
-  height: 32px;
-  min-height: 32px;
-  padding: 0 34px 0 11px;
+  border: 1px solid var(--hq-border-default);
+  border-radius: 8px;
+  color: var(--hq-text-primary);
+  font: inherit;
+  font-size: var(--hq-type-size-caption);
+  min-height: 38px;
+  padding: 0 32px 0 11px;
+  width: 100%;
 }
 
 .field select:focus,
 .field select:focus-visible {
-  border-color: color-mix(
-    in srgb,
-    var(--hq-brand-primary) 35%,
-    var(--hq-border-default)
-  );
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--hq-brand-primary) 8%, transparent);
+  border-color: var(--hq-brand-primary);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--hq-brand-primary) 10%, transparent);
   outline: none;
 }
 
-.actions {
+.completion {
+  border-top: 1px solid var(--hq-border-subtle);
+  display: grid;
+  gap: 9px;
+  padding-top: 13px;
+}
+
+.completion p {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-medium);
+  margin: 0;
+}
+
+.completion > span {
+  align-items: center;
+  color: var(--hq-text-tertiary);
   display: flex;
-  gap: var(--hq-spacing-2);
-  justify-content: flex-end;
+  font-size: var(--hq-type-size-caption);
+  gap: 7px;
+}
+
+.completion i {
+  border: 1px solid var(--hq-border-default);
+  border-radius: 50%;
+  height: 15px;
+  width: 15px;
+}
+
+.completion > span[data-complete="true"] {
+  color: var(--hq-brand-primary);
+}
+
+.completion > span[data-complete="true"] i {
+  background: color-mix(in srgb, var(--hq-brand-primary) 32%, white);
+  border-color: color-mix(in srgb, var(--hq-brand-primary) 36%, white);
+  box-shadow: inset 0 0 0 3px white;
+}
+
+.actions {
+  display: grid;
+  gap: 8px;
 }
 
 .primary,
 .secondary {
-  border-radius: var(--hq-radius-control);
-  font-size: var(--hq-type-size-body-compact);
-  min-height: 32px;
+  border-radius: 8px;
+  font-size: var(--hq-type-size-caption);
+  min-height: 38px;
   padding: 0 13px;
+  width: 100%;
 }
 
 .primary {
-  background: var(--hq-brand-primary);
-  border: 1px solid var(--hq-brand-primary);
+  background: var(--hq-brand-accent);
+  border: 1px solid var(--hq-brand-accent);
   color: var(--hq-brand-on-primary);
+}
+
+.primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--hq-brand-accent) 90%, white);
 }
 
 .primary:disabled {
@@ -162,34 +300,30 @@
   color: var(--hq-text-primary);
 }
 
-.primary:focus-visible,
-.secondary:focus-visible {
-  border-color: color-mix(
-    in srgb,
-    var(--hq-brand-primary) 38%,
-    var(--hq-border-default)
-  );
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--hq-brand-primary) 8%, transparent);
-  outline: none;
-}
-
-.primary:not(:disabled):hover {
-  background: var(--hq-brand-primary-hover);
-}
-
 .secondary:hover {
-  background: var(--hq-surface-sunken);
+  background: var(--hq-surface-subtle);
   border-color: var(--hq-border-focus);
 }
 
+.primary:focus-visible,
+.secondary:focus-visible {
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--hq-brand-primary) 10%, transparent);
+  outline: none;
+}
+
+.publishHint {
+  border-top: 1px solid var(--hq-border-subtle);
+  padding-top: 12px;
+}
+
 .notice {
-  background: var(--hq-surface-canvas);
-  border-left: 2px solid var(--hq-brand-primary);
-  border-radius: var(--hq-radius-control);
+  background: color-mix(in srgb, var(--hq-brand-primary) 5%, white);
+  border: 1px solid
+    color-mix(in srgb, var(--hq-brand-primary) 13%, var(--hq-border-default));
+  border-radius: 10px;
   color: var(--hq-text-secondary);
-  font-size: var(--hq-type-size-body-compact);
-  margin-top: 10px;
+  font-size: var(--hq-type-size-caption);
   min-height: 40px;
   padding: 9px 11px;
 }
@@ -200,17 +334,31 @@
   text-decoration: none;
 }
 
-@media (max-width: 600px) {
-  .editor {
-    padding: 14px 16px;
+@media (max-width: 760px) {
+  .editorHeader {
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .settings {
-    align-items: stretch;
-    flex-direction: column;
+  .draftState {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 
-  .actions {
-    justify-content: flex-end;
+  .composerGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .publishPanel {
+    position: static;
+  }
+}
+
+@media (max-width: 520px) {
+  .paper {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: 20px;
   }
 }

@@ -137,7 +137,7 @@ export function ProfileEditorPanel() {
           登录后编辑资料
         </Link>
       ) : (
-        <form method="post" onSubmit={submit}>
+        <form className={styles.profileForm} method="post" onSubmit={submit}>
           <div className={styles.profilePreview}>
             <span aria-hidden="true" className={styles.profileAvatar}>
               {displayName.slice(0, 1)}

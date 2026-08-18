@@ -109,6 +109,27 @@ summary:focus-visible {
   text-decoration-color: transparent;
 }
 
+.d0-home-return {
+  align-items: center;
+  background: rgb(255 255 255 / 16%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 4px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 13px;
+  gap: 6px;
+  grid-column: 2;
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 12px;
+  text-decoration: none;
+}
+
+.d0-home-return:hover {
+  background: rgb(255 255 255 / 24%);
+  color: #fff;
+}
+
 .d0-brand .brand-mark {
   background: transparent;
   border: 0;
@@ -5719,6 +5740,14 @@ body:has(.watchlist-workspace),
     padding-inline: 16px;
   }
 
+  .d0-topbar-context {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .d0-topbar-context .top-actions {
+    grid-column: 3;
+  }
+
   .d0-layout {
     gap: 20px;
     grid-template-columns: 160px minmax(0, 1fr) 260px;
@@ -6119,7 +6148,7 @@ body:has(.watchlist-workspace),
     overflow-x: hidden;
   }
 
-  .d0-app-shell .d0-topbar {
+  .xueqiu-home-shell .d0-topbar {
     gap: 0;
     grid-template-columns: 200px minmax(0, 1fr) 335px 180px;
     height: 78px;
@@ -6128,35 +6157,39 @@ body:has(.watchlist-workspace),
     width: 100%;
   }
 
-  .d0-app-shell .d0-brand {
+  .xueqiu-home-shell .d0-brand {
     gap: 8px;
   }
 
-  .d0-app-shell .d0-brand h1,
-  .d0-app-shell .d0-brand .brand-word {
+  .xueqiu-home-shell .d0-brand h1,
+  .xueqiu-home-shell .d0-brand .brand-word {
     font-size: 38px;
     font-weight: 600;
     letter-spacing: 0.06em;
   }
 
-  .d0-app-shell .d0-brand .brand-mark,
-  .d0-app-shell .brand-glyph {
+  .xueqiu-home-shell .d0-brand .brand-mark,
+  .xueqiu-home-shell .brand-glyph {
     height: 48px;
     width: 48px;
   }
 
-  .d0-app-shell .global-search-shell {
+  .xueqiu-home-shell .global-search-shell {
     height: 50px;
     max-width: 335px;
     transform: translateX(-8px);
     width: 335px;
   }
 
-  .d0-app-shell .global-search {
+  .xueqiu-home-shell .global-search {
     height: 50px;
   }
 
-  .d0-topbar .global-search-shell .global-search input[type="search"] {
+  .xueqiu-home-shell
+    .d0-topbar
+    .global-search-shell
+    .global-search
+    input[type="search"] {
     font-size: 20px;
     height: 50px;
     line-height: 50px;
@@ -6164,37 +6197,37 @@ body:has(.watchlist-workspace),
     padding: 0 58px 0 25px;
   }
 
-  .d0-app-shell .global-search button {
+  .xueqiu-home-shell .global-search button {
     height: 50px;
     width: 56px;
   }
 
-  .d0-app-shell .global-search button .shell-icon {
+  .xueqiu-home-shell .global-search button .shell-icon {
     height: 28px;
     width: 28px;
   }
 
-  .d0-app-shell .top-actions {
+  .xueqiu-home-shell .top-actions {
     color: #fff;
     gap: 16px;
     justify-content: flex-start;
   }
 
-  .d0-app-shell .top-actions > a,
-  .d0-app-shell .top-actions .top-settings-trigger {
+  .xueqiu-home-shell .top-actions > a,
+  .xueqiu-home-shell .top-actions .top-settings-trigger {
     color: #fff;
     font-size: 18px;
     min-height: 46px;
     padding-inline: 10px;
   }
 
-  .d0-app-shell .notification-nav-link-top > span:nth-child(2) {
+  .xueqiu-home-shell .notification-nav-link-top > span:nth-child(2) {
     display: none;
   }
 
-  .d0-app-shell .notification-nav-icon svg,
-  .d0-app-shell .top-actions > a .shell-icon,
-  .d0-app-shell .top-actions .top-settings-trigger .shell-icon {
+  .xueqiu-home-shell .notification-nav-icon svg,
+  .xueqiu-home-shell .top-actions > a .shell-icon,
+  .xueqiu-home-shell .top-actions .top-settings-trigger .shell-icon {
     height: 28px;
     width: 28px;
   }
@@ -6205,7 +6238,7 @@ body:has(.watchlist-workspace),
     width: 60px;
   }
 
-  .d0-app-shell .d0-layout {
+  .xueqiu-home-shell .d0-layout {
     grid-template-columns: 210px 667px 280px;
     margin-left: calc((100vw - 1608px) / 2);
     margin-right: 0;
@@ -6216,7 +6249,7 @@ body:has(.watchlist-workspace),
     width: 1157px;
   }
 
-  .d0-app-shell .d0-sidebar {
+  .xueqiu-home-shell .d0-sidebar {
     transform: translateX(22px);
   }
 

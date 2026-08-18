@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 import styles from "./studio.module.css";
 import { SiteTopbar } from "../../components/shell/site-topbar";
-import { StudioAccountSummary } from "../../features/studio/studio-account-summary";
 import { StudioNav } from "../../features/studio/studio-nav";
 
 /*
@@ -26,12 +25,11 @@ export default function StudioLayout({
         从首页点进来，最上面整个跳一下，像换了个站。
         「创作者中心」这个标题移到左侧导航的顶部，那里本来就是讲这一节的。
       */}
-      <SiteTopbar />
+      <SiteTopbar homeReturn />
 
       <div className={styles.layout}>
         <aside aria-label="创作者中心导航" className={styles.nav}>
           <p className={styles.title}>创作者中心</p>
-          <StudioAccountSummary />
           <StudioNav />
         </aside>
         <main className={styles.main}>{children}</main>

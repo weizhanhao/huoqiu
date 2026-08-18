@@ -66,8 +66,13 @@ const authTopbar = (): string =>
   );
 
 describe("the top bar is the same one on every page", () => {
-  it("renders an identical top bar in every shell", () => {
+  it("keeps one shared top bar structure while dedicated workspaces add a home return", () => {
     const home = homeTopbar();
+    const studio = studioTopbar();
+    const normalizeContextTopbar = (markup: string): string =>
+      markup
+        .replace(" d0-topbar-context", "")
+        .replace(/<a class="d0-home-return"[\s\S]*?<\/a>/u, "");
 
     /* 先确认真的取到了，否则下面的相等断言在两个空串上也会通过。 */
     expect(home.length).toBeGreaterThan(200);
@@ -76,7 +81,9 @@ describe("the top bar is the same one on every page", () => {
      * 创作者中心是第三套外壳，一开始也自己写了一条顶栏（logo + 分隔线 +
      * 「创作者中心」标题 + 搜索框），同样少了消息、发帖、设置。
      */
-    expect(studioTopbar()).toBe(home);
+    expect(normalizeContextTopbar(studio)).toBe(home);
+    expect(studio).toContain('class="d0-home-return"');
+    expect(studio).toContain("返回首页");
   });
 
   it("keeps every top-bar entry present outside the community shell", () => {
