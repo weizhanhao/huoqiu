@@ -1974,7 +1974,22 @@ summary:focus-visible {
 
 /* 箭头占轮播外框两侧的预留区，视觉上在卡片外，不覆盖行情内容。 */
 .market-index-carousel {
+  background: #f3f7fc;
+  border: 1px solid #e4ebf4;
+  border-radius: 10px;
   padding-inline: 24px;
+}
+
+.market-index-carousel .index-strip {
+  background: #f3f7fc;
+  gap: 6px;
+  padding-block: 6px;
+}
+
+/* 平盘同样保留浅蓝行情底，避免接口返回 0 时整组轮播退化成白底。 */
+.market-index-carousel .index-card {
+  background: #f9fbfe;
+  border-color: #dfe8f2;
 }
 
 .home-index-strip {
