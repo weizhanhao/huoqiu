@@ -211,31 +211,30 @@ describe("dense synthetic community in a real Chrome DOM", () => {
     expect(browserErrors).toEqual([]);
   });
 
-  it("renders the followed-people stream and nothing else on the home route", async () => {
-    /*
-     * 根路径只列关注对象发的内容。
-     *
-     * 这条用例原先量的是首页那条社区流——八张编辑部卡片、媒体占位、
-     * 三屏高。那条流已经删了：用户要的是「这个关注只显示关注人发的内容」。
-     * 现在量的是关注流本身：关注的人发的都在，自己发的不在（那在个人主页），
-     * 并且这一页仍然不许请求任何站外资源。
-     */
+  it("keeps the teammate home implementation without external resources", async () => {
     resourceUrls = [];
     await page.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
-    const stream = page.getByTestId("follow-stream");
 
-    /* 夹具里 8 条，第 8 条是自己发的，只应出现前 7 条。 */
-    expect(await stream.locator("article").count()).toBe(7);
-    expect(await stream.getByText("关注内容 7").count()).toBe(1);
-    expect(await stream.getByText("关注内容 8").count()).toBe(0);
-    /* 社区那整套版面不能再出现在这一页。 */
-    expect(await page.getByTestId("community-feed-card").count()).toBe(0);
-    expect(await page.getByText("达人观察席").count()).toBe(0);
+    expect(await page.locator(".index-strip").count()).toBe(1);
+    expect(await page.locator(".home-index-carousel").count()).toBe(1);
+    expect(await page.getByRole("button", { name: "上一组指数" }).count()).toBe(
+      1,
+    );
+    expect(await page.getByRole("button", { name: "下一组指数" }).count()).toBe(
+      1,
+    );
+    expect(await page.getByTestId("follow-stream").count()).toBe(1);
+    expect(await page.getByText("关注内容 7", { exact: true }).count()).toBe(1);
+    expect(await page.getByRole("link", { name: "消息" }).count()).toBe(1);
+    expect(await page.getByRole("button", { name: "账号与设置" }).count()).toBe(
+      1,
+    );
+    expect(await page.getByText("热门话题", { exact: true }).count()).toBe(0);
     expect(resourceUrls.every((url) => new URL(url).origin === baseUrl)).toBe(
       true,
     );
     expect(browserErrors).toEqual([]);
-  });
+  }, 60_000);
 
   /*
    * 这条用例原先验证的是「匿名也能评论」。
@@ -300,7 +299,9 @@ describe("dense synthetic community in a real Chrome DOM", () => {
        */
       await page.goto(`${baseUrl}${pathname}`, { waitUntil: "networkidle" });
       const controls = page.locator(
-        '[data-testid^="community"] button, [data-testid^="community"] a, [data-testid^="community"] input, [data-testid^="community"] textarea, [data-testid="follow-stream"] a',
+        pathname === "/"
+          ? ".d0-main textarea, .d0-main button, .sidebar-publish"
+          : '[data-testid^="community"] button, [data-testid^="community"] a, [data-testid^="community"] input, [data-testid^="community"] textarea',
       );
       const sizes = await controls.evaluateAll((elements) =>
         elements

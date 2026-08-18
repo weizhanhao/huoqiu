@@ -97,12 +97,12 @@ export function EmailPanel() {
         value={email}
       />
 
-      <button disabled={pending} type="submit">
+      <button className={styles.primaryButton} disabled={pending} type="submit">
         {pending ? "提交中…" : "保存"}
       </button>
 
       {status === "" ? null : (
-        <p aria-live="polite" className={styles.hint}>
+        <p aria-live="polite" className={styles.statusMessage}>
           {status}
         </p>
       )}

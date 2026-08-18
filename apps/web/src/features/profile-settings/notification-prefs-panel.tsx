@@ -15,11 +15,11 @@ import styles from "./profile-settings.module.css";
  */
 
 const CATEGORIES = [
-  { id: "replies", label: "回复我的" },
-  { id: "mentions", label: "提到我的" },
-  { id: "likes", label: "赞我的" },
-  { id: "follows", label: "新增粉丝" },
-  { id: "system", label: "系统消息" },
+  { description: "有人回复你的帖子或评论", id: "replies", label: "回复我的" },
+  { description: "有人在帖子或评论中 @ 你", id: "mentions", label: "提到我的" },
+  { description: "有人给你的内容点赞", id: "likes", label: "赞我的" },
+  { description: "有新账号关注你", id: "follows", label: "新增粉丝" },
+  { description: "账号安全与服务状态通知", id: "system", label: "系统消息" },
 ] as const;
 
 /** 只取数、不碰状态。 */
@@ -109,21 +109,24 @@ export function NotificationPrefsPanel() {
       className={styles.contentSection}
       data-testid="notification-prefs-panel"
     >
-      <h3 className={styles.sectionHeading} id="notification-prefs-heading">
-        消息提醒设置
-      </h3>
+      <div className={styles.panelIntroduction}>
+        <h3 id="notification-prefs-heading">提醒分类</h3>
+        <p>关闭后，该类消息不再进入消息中心，也不计入未读。</p>
+      </div>
 
       {account === null ? (
         <Link className={styles.inverseLink} href="/login">
           登录后设置消息提醒
         </Link>
       ) : loading ? (
-        <p className={styles.contentMeta}>读取中…</p>
+        <div aria-label="正在读取消息提醒" className={styles.loadingState}>
+          <span />
+          <span />
+          <span />
+        </div>
       ) : (
         <fieldset>
-          <legend className={styles.contentMeta}>
-            关闭后，该分类不再出现在消息中心，也不计入未读。
-          </legend>
+          <legend className={styles.contentMeta}>选择接收的消息</legend>
           {CATEGORIES.map((category) => (
             <label className={styles.preferenceRow} key={category.id}>
               <input
@@ -132,14 +135,17 @@ export function NotificationPrefsPanel() {
                 onChange={() => toggle(category.id)}
                 type="checkbox"
               />
-              <span>{category.label}</span>
+              <span className={styles.optionCopy}>
+                <strong>{category.label}</strong>
+                <small>{category.description}</small>
+              </span>
             </label>
           ))}
         </fieldset>
       )}
 
       {status === "" ? null : (
-        <p aria-live="polite" className={styles.contentMeta}>
+        <p aria-live="polite" className={styles.statusMessage}>
           {status}
         </p>
       )}

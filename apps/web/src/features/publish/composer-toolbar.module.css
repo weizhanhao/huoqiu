@@ -25,13 +25,23 @@
    * 观感不变。
    */
   flex-wrap: wrap;
-  gap: var(--hq-spacing-2);
+  gap: 6px;
 }
 
 @media (max-width: 520px) {
   .bar {
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .icon {
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .longform {
+    min-height: 44px;
   }
 
   .bar::-webkit-scrollbar {
@@ -44,7 +54,7 @@
   /* 图标多于一行时也要能折下来，而不是把整条工具栏撑宽。 */
   flex: 1 1 auto;
   flex-wrap: wrap;
-  gap: var(--hq-spacing-1);
+  gap: 2px;
   min-width: 0;
 }
 
@@ -65,19 +75,29 @@
   font-size: var(--hq-type-size-body);
   justify-content: center;
   line-height: 1;
-  min-height: var(--hq-touch-web-minimum);
-  min-width: var(--hq-touch-web-minimum);
+  height: 34px;
+  min-height: 34px;
+  min-width: 34px;
   padding: 0;
 }
 
 .icon:hover:not(:disabled) {
-  background: var(--hq-surface-base);
-  color: var(--hq-text-primary);
+  background: var(--hq-brand-subtle);
+  color: var(--hq-text-link);
 }
 
 .icon:focus-visible {
-  outline: 2px solid var(--hq-border-focus);
-  outline-offset: -2px;
+  background: var(--hq-brand-subtle);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--hq-brand-primary) 28%, transparent);
+  color: var(--hq-text-link);
+  outline: 0;
+}
+
+.icon svg {
+  height: 22px;
+  stroke-width: 1.6;
+  width: 22px;
 }
 
 .icon:disabled {
@@ -97,21 +117,31 @@
   border-radius: var(--hq-radius-control);
   color: var(--hq-text-secondary);
   display: inline-flex;
-  font-size: var(--hq-type-size-body-compact);
-  gap: var(--hq-spacing-1);
-  padding: var(--hq-spacing-1) var(--hq-spacing-2);
+  font-size: 13px;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 8px;
   text-decoration: none;
   white-space: nowrap;
 }
 
 .longform:hover {
-  background: var(--hq-surface-base);
-  color: var(--hq-text-primary);
+  background: var(--hq-brand-subtle);
+  color: var(--hq-text-link);
 }
 
 .longform:focus-visible {
-  outline: 2px solid var(--hq-border-focus);
-  outline-offset: 1px;
+  background: var(--hq-brand-subtle);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--hq-brand-primary) 28%, transparent);
+  color: var(--hq-text-link);
+  outline: 0;
+}
+
+.longform svg {
+  height: 22px;
+  stroke-width: 1.6;
+  width: 22px;
 }
 
 /*
@@ -282,4 +312,17 @@
 .emoji:focus-visible {
   outline: 2px solid var(--hq-border-focus);
   outline-offset: -2px;
+}
+
+/* 桌面保持 34px 的紧凑工具条，触屏则给足 44px 命中区域。 */
+@media (max-width: 520px) {
+  .icon {
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .longform {
+    min-height: 44px;
+  }
 }

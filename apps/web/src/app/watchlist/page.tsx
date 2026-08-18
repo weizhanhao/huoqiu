@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 
 import { DesktopShell } from "../../components/shell/desktop-shell";
-import {
-  WatchlistPanel,
-  type WatchlistEntry,
-} from "../../components/watchlist/watchlist-panel";
+import { type WatchlistEntry } from "../../components/watchlist/watchlist-panel";
+import { WatchlistWorkspace } from "../../components/watchlist/watchlist-workspace";
 import { loadKlineSnapshot } from "../../features/real-finance/kline.server";
 import { loadD0Fixture } from "../../lib/d0-fixture";
 import { normalizeD0FixtureState } from "../../lib/d0-page-state";
@@ -45,7 +43,10 @@ export const metadata: Metadata = {
 
 type WatchlistPageProperties = Readonly<{
   searchParams: Promise<
-    Readonly<{ fixture_state?: string | readonly string[] }>
+    Readonly<{
+      fixture_state?: string | readonly string[];
+      type?: string | readonly string[];
+    }>
   >;
 }>;
 
@@ -53,7 +54,14 @@ export default async function WatchlistPage({
   searchParams,
 }: WatchlistPageProperties) {
   const fixtureResult = loadD0Fixture();
-  const state = normalizeD0FixtureState((await searchParams).fixture_state);
+  const params = await searchParams;
+  const state = normalizeD0FixtureState(params.fixture_state);
+  const initialTab =
+    params.type === "fund"
+      ? "fund"
+      : params.type === "portfolio"
+        ? "portfolio"
+        : "stock";
 
   return (
     <DesktopShell fixtureResult={fixtureResult}>
@@ -62,7 +70,11 @@ export default async function WatchlistPage({
         一次也不会被查到，却会整份塞进这一页的载荷。
       */}
       {fixtureResult.status === "ready" ? (
-        <WatchlistPanel realEntries={realWatchlistEntries()} state={state} />
+        <WatchlistWorkspace
+          initialTab={initialTab}
+          realEntries={realWatchlistEntries()}
+          state={state}
+        />
       ) : null}
     </DesktopShell>
   );

@@ -124,17 +124,9 @@ describe("market and portfolio route shell truth", () => {
       searchParams: Promise.resolve({}),
     });
 
-    /*
-     * 这条断言原先要求涨跌榜把「行情」标成当前项——那正是用户报的那个 bug：
-     * 「点了页面过去了，但是导航栏的选中状态并不是选中的页面」。侧栏里
-     * 涨跌榜是独立一条，就该亮它自己；移动端底栏没有这一格，归在「行情」下。
-     */
+    /* 侧栏收敛为一级入口，涨跌榜归属「行情」，桌面与移动端保持一致。 */
     currentPathname = "/markets/rankings";
-    expectPrimaryDestination(
-      renderRoute(rankings),
-      "/markets/rankings",
-      "/markets",
-    );
+    expectPrimaryDestination(renderRoute(rankings), "/markets");
   });
 
   it("gives instrument detail its own page instead of a community surface", async () => {

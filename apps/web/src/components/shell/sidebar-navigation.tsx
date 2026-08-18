@@ -6,7 +6,7 @@ import { Fragment } from "react";
 
 import { activeNavHref } from "./active-nav";
 import { NotificationNavigationLink } from "./notification-navigation-link";
-import { SidebarProfileLink } from "./profile-navigation-link";
+import { ShellIcon, type ShellIconName } from "./shell-icons";
 
 /*
  * 侧栏主导航。
@@ -22,11 +22,12 @@ import { SidebarProfileLink } from "./profile-navigation-link";
  */
 
 type NavItem = Readonly<{
+  alsoMatches?: readonly string[];
   /** 链接地址；由专门组件渲染的项没有，它们自己算（见 kind）。 */
   href?: string;
-  icon: string;
+  icon: ShellIconName;
   /** 消息有未读角标、我的主页地址随登录状态变，各自由专门的组件渲染。 */
-  kind?: "notifications" | "profile";
+  kind?: "notifications";
   label: string;
   /*
    * 用来判断「当前是否停在这一项」的路径前缀。
@@ -44,25 +45,30 @@ const GROUPS: readonly NavGroup[] = [
   {
     items: [
       /* 根路径是关注流，站内没有「首页」这一档。 */
-      { href: "/", icon: "⌂", label: "关注", match: "/" },
-      { href: "/watchlist", icon: "☆", label: "自选", match: "/watchlist" },
-      { href: "/markets", icon: "⌁", label: "行情", match: "/markets" },
-      /*
-        涨跌榜与选股器此前只有路由、导航里一个入口都没有——两页都是真实
-        行情，却只能靠手输地址到达。雪球把它们摆在行情这一组里。
-      */
+      { href: "/", icon: "home", label: "首页", match: "/" },
       {
-        href: "/markets/rankings",
-        icon: "⇅",
-        label: "涨跌榜",
-        match: "/markets/rankings",
+        href: "/watchlist",
+        icon: "watchlist",
+        label: "自选",
+        match: "/watchlist",
       },
-      { href: "/screener", icon: "⋔", label: "选股器", match: "/screener" },
-      { href: "/funds", icon: "◇", label: "基金", match: "/funds" },
-      { href: "/etfs", icon: "◈", label: "ETF", match: "/etfs" },
+      {
+        alsoMatches: ["/markets/rankings", "/screener"],
+        href: "/markets",
+        icon: "market",
+        label: "行情",
+        match: "/markets",
+      },
+      {
+        alsoMatches: ["/etfs"],
+        href: "/funds",
+        icon: "fund",
+        label: "基金",
+        match: "/funds",
+      },
       {
         href: "/private-funds",
-        icon: "♦",
+        icon: "private",
         label: "私募",
         match: "/private-funds",
       },
@@ -71,32 +77,26 @@ const GROUPS: readonly NavGroup[] = [
   },
   {
     items: [
-      { href: "/portfolios", icon: "◫", label: "组合", match: "/portfolios" },
-      /*
-        雪球顶栏的「交易」是券商对接，需要牌照与真实资金通道，做不了；
-        它同样有「模拟交易」，那个能真做——价格用真实行情，盈亏照真实价格
-        算，只有钱是虚拟的。这里放的是后者，并且写明是模拟。
-      */
-      { href: "/trade", icon: "⇄", label: "模拟交易", match: "/trade" },
-      { icon: "◉", kind: "profile", label: "我的主页", match: "/users" },
-      /*
-        收藏此前只是个人主页里的一个页签：得先进主页、再切页签才能看到，
-        左栏一个入口都没有。收藏本身是真的，只是找不到。
-      */
-      { href: "/bookmarks", icon: "☆", label: "收藏", match: "/bookmarks" },
-      /*
-        创作者中心此前从站内任何地方都点不到：草稿箱、内容管理、数据中心
-        全都做好了，只有直接敲地址才进得去。
-      */
-      { href: "/studio", icon: "✎", label: "创作者中心", match: "/studio" },
+      {
+        alsoMatches: ["/trade"],
+        href: "/portfolios",
+        icon: "portfolio",
+        label: "我的资产",
+        match: "/portfolios",
+      },
+      {
+        href: "/studio",
+        icon: "studio",
+        label: "创作者中心",
+        match: "/studio",
+      },
       {
         href: "/notifications",
-        icon: "✉",
+        icon: "support",
         kind: "notifications",
         label: "消息",
         match: "/notifications",
       },
-      { href: "/settings", icon: "⚙", label: "设置", match: "/settings" },
     ],
     title: "我的",
   },
@@ -108,18 +108,10 @@ const GROUPS: readonly NavGroup[] = [
  * 这四条过去全部指向 /notifications，点哪条都落到默认视图——四个入口做同
  * 一件事，等于没做。现在各自带分类参数直达；选中态跟着父项「消息」走。
  */
-const NOTIFICATION_SUBS: readonly Readonly<{ href: string; label: string }>[] =
-  [
-    { href: "/notifications?category=replies", label: "回复" },
-    { href: "/notifications?category=mentions", label: "@ 我" },
-    { href: "/notifications?category=likes", label: "赞与收藏" },
-    { href: "/notifications?category=system", label: "系统消息" },
-    /* 私信是独立路由：它是账号之间的真实会话，不是通知流的一类。 */
-    { href: "/messages", label: "私信" },
-  ];
-
 const ALL_MATCHES = [
-  ...GROUPS.flatMap((group) => group.items.map((item) => item.match)),
+  ...GROUPS.flatMap((group) =>
+    group.items.flatMap((item) => [item.match, ...(item.alsoMatches ?? [])]),
+  ),
   "/messages",
 ];
 
@@ -139,7 +131,10 @@ export function SidebarNavigation() {
         <Fragment key={group.title}>
           <p className="sidebar-group-label">{group.title}</p>
           {group.items.map((item) => {
-            const current = active === item.match;
+            const current =
+              active !== null &&
+              (active === item.match ||
+                (item.alsoMatches?.includes(active) ?? false));
             if (item.kind === "notifications") {
               return (
                 <NotificationNavigationLink
@@ -149,29 +144,17 @@ export function SidebarNavigation() {
                 />
               );
             }
-            if (item.kind === "profile") {
-              return <SidebarProfileLink active={current} key={item.match} />;
-            }
             return (
               <Link
                 aria-current={current ? "page" : undefined}
                 href={item.href ?? item.match}
                 key={item.match}
               >
-                <span aria-hidden="true" className="nav-icon">
-                  {item.icon}
-                </span>
+                <ShellIcon name={item.icon} />
                 {item.label}
               </Link>
             );
           })}
-          {group.title === "我的"
-            ? NOTIFICATION_SUBS.map((sub) => (
-                <Link className="nav-sub" href={sub.href} key={sub.href}>
-                  {sub.label}
-                </Link>
-              ))
-            : null}
         </Fragment>
       ))}
     </nav>

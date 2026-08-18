@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { EmailPanel } from "../../../features/profile-settings/email-panel";
+import styles from "../../../features/profile-settings/profile-settings.module.css";
 
 /*
  * 账号绑定。
@@ -23,18 +24,28 @@ export const metadata: Metadata = {
 
 export default function SettingsBindingPage() {
   return (
-    <section aria-labelledby="binding-heading">
-      <h3 id="binding-heading">账号绑定</h3>
+    <section
+      aria-labelledby="binding-heading"
+      className={styles.contentSection}
+    >
+      <div className={styles.panelIntroduction}>
+        <h3 id="binding-heading">登录方式</h3>
+        <p>登录邮箱已接入真实账号；未接入的方式不显示虚假绑定状态。</p>
+      </div>
 
-      <h4>登录邮箱</h4>
-      <EmailPanel />
+      <div className={styles.bindingGrid}>
+        <article className={styles.bindingCard}>
+          <h4>登录邮箱</h4>
+          <EmailPanel />
+        </article>
 
-      <h4>手机号与微信</h4>
-      <p>
-        手机号绑定与微信绑定<strong>未接入</strong>
-        ：前者需要短信通道，后者需要微信开放平台资质，本机都不具备。
-        这里不会显示一个并不存在的绑定状态。
-      </p>
+        <article className={styles.bindingCard}>
+          <h4>其他登录方式</h4>
+          <p className={styles.bindingState}>
+            手机号和微信登录尚未接入。它们需要短信通道或微信开放平台资质，因此暂不提供操作入口。
+          </p>
+        </article>
+      </div>
     </section>
   );
 }

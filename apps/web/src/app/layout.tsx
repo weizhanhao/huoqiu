@@ -11,6 +11,7 @@ import { loadKlineSnapshot } from "../features/real-finance/kline.server";
 import { D0WatchlistProvider } from "../stores/d0-watchlist";
 
 import "./globals.css";
+import "./xueqiu-theme.css";
 
 export const metadata: Metadata = {
   title: "火球",

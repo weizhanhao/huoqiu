@@ -317,7 +317,7 @@ export default async function ScreenerPage({
               </div>
             </section>
 
-            <nav aria-label="翻页" className={styles.pager}>
+            <nav aria-label="翻页" className={`${styles.pager} hq-pagination`}>
               {page > 1 ? (
                 <Link
                   className={styles.chip}

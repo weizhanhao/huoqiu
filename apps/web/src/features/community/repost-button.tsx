@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { useAccountSession } from "../account/account-session";
+import { formatCommunityCount } from "./community-content-model";
 import styles from "./community-experience.module.css";
 
 /*
@@ -17,9 +18,14 @@ import styles from "./community-experience.module.css";
  * 要消灭的东西。
  */
 export function RepostButton({
+  fallbackCount,
   postId,
   postTitle,
-}: Readonly<{ postId: string; postTitle: string }>) {
+}: Readonly<{
+  fallbackCount: number;
+  postId: string;
+  postTitle: string;
+}>) {
   const { account, publish } = useAccountSession();
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState("");
@@ -29,7 +35,8 @@ export function RepostButton({
   if (account === null) {
     return (
       <Link className={styles.action} href="/login">
-        登录后转发
+        <ShareIcon />
+        转发 {formatCommunityCount(fallbackCount)}
       </Link>
     );
   }
@@ -63,7 +70,8 @@ export function RepostButton({
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
-        转发
+        <ShareIcon />
+        转发 {formatCommunityCount(fallbackCount)}
       </button>
       {open ? (
         <span className={styles.repostComposer}>
@@ -91,5 +99,13 @@ export function RepostButton({
         </span>
       )}
     </span>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M8 12h9m0 0-4-4m4 4-4 4M10 6H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h4" />
+    </svg>
   );
 }

@@ -35,7 +35,7 @@ export function StudioContentList({
     return (
       <section className={styles.card}>
         <h2 className={styles.heading}>{heading}</h2>
-        <p className="page-state-message">
+        <p className={styles.statusBar}>
           <Link href="/login">登录</Link>后可以看到自己的内容。
         </p>
       </section>
@@ -44,9 +44,17 @@ export function StudioContentList({
 
   if (state.kind === "loading") {
     return (
-      <section className={styles.card}>
-        <h2 className={styles.heading}>{heading}</h2>
-        <p className={styles.empty}>正在读取……</p>
+      <section
+        aria-busy="true"
+        aria-label={`正在读取${heading}`}
+        className={styles.loadingCard}
+      >
+        <span className={styles.loadingTitle} />
+        <div className={styles.loadingRows}>
+          <span />
+          <span />
+          <span />
+        </div>
       </section>
     );
   }
@@ -56,7 +64,7 @@ export function StudioContentList({
     return (
       <section className={styles.card}>
         <h2 className={styles.heading}>{heading}</h2>
-        <p className="page-state-message">内容暂时取不到，请稍后再试。</p>
+        <p className={styles.statusBar}>内容暂时取不到，请稍后再试。</p>
       </section>
     );
   }

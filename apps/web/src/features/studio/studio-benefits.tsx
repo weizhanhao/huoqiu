@@ -43,18 +43,33 @@ export function StudioBenefits() {
   if (state.kind === "anonymous") {
     return (
       <section className={styles.card}>
-        <p className="page-state-message">
+        <p className={styles.statusBar}>
           <Link href="/login">登录</Link>后可以看到自己的权益进度。
         </p>
       </section>
     );
   }
-  if (state.kind !== "ready") {
+  if (state.kind === "loading") {
+    return (
+      <section
+        aria-busy="true"
+        aria-label="正在读取权益进度"
+        className={styles.loadingCard}
+      >
+        <span className={styles.loadingTitle} />
+        <div className={styles.loadingRows}>
+          <span />
+          <span />
+          <span />
+        </div>
+      </section>
+    );
+  }
+
+  if (state.kind === "failed") {
     return (
       <section className={styles.card}>
-        <p className={styles.empty}>
-          {state.kind === "loading" ? "正在读取……" : "数据暂时取不到。"}
-        </p>
+        <p className={styles.statusBar}>数据暂时取不到。</p>
       </section>
     );
   }
@@ -82,7 +97,7 @@ export function StudioBenefits() {
         <button className={benefitStyles.apply} disabled type="button">
           申请开通专栏
         </button>
-        <p className="page-state-message">
+        <p className={styles.statusBar}>
           申请通道尚未接入：它需要一套人工审核流程，站内还没有。上面的条件与进度是真实的。
         </p>
       </section>
@@ -102,7 +117,7 @@ export function StudioBenefits() {
         <button className={benefitStyles.apply} disabled type="button">
           申请开通打赏与悬赏
         </button>
-        <p className="page-state-message">
+        <p className={styles.statusBar}>
           这两项涉及真实资金的收付与结算，站内没有支付后端，因此不提供申请。
           做一个点了就提示「开通成功」的按钮，等于凭空许诺一件做不到的事。
         </p>

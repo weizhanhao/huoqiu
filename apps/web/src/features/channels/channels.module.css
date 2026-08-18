@@ -6,8 +6,10 @@
  */
 
 .page {
+  align-content: start;
   display: grid;
   gap: var(--hq-spacing-3);
+  grid-auto-rows: max-content;
   min-width: 0;
 }
 
@@ -19,6 +21,7 @@
 }
 
 .hero {
+  align-content: center;
   align-items: baseline;
   background: var(--hq-surface-base);
   border: 1px solid var(--hq-border-default);
@@ -27,6 +30,7 @@
   flex-wrap: wrap;
   gap: var(--hq-spacing-2) var(--hq-spacing-4);
   justify-content: space-between;
+  min-height: 0;
   padding: var(--hq-spacing-3) var(--hq-spacing-4);
 }
 
@@ -133,7 +137,14 @@
  * 靠它），只把这一张放宽，窄屏时由外层容器横向滚动。
  */
 .registryTable {
-  min-width: 900px;
+  min-width: 840px;
+}
+
+/* 外部公示链接只在 hover 变蓝，不用密集下划线切碎表格。 */
+.registryTable a strong,
+.registryTable a:hover strong,
+.registryTable a:focus-visible strong {
+  text-decoration: none;
 }
 
 .panelHeading {
@@ -145,6 +156,7 @@
   padding: var(--hq-spacing-3) var(--hq-spacing-4);
 }
 
+.panelHeading h2,
 .panelHeading h3 {
   font-size: var(--hq-type-size-label-compact);
   font-weight: var(--hq-type-weight-semibold);
@@ -174,20 +186,106 @@
 
 /* ---------- 视频 ---------- */
 
-.videoRow {
+.videoPage {
+  gap: 0;
+}
+
+.videoFilters {
   align-items: center;
+  border-bottom: 1px solid var(--hq-border-subtle);
+  display: flex;
+  gap: 30px;
+  overflow-x: auto;
+  padding: 0 2px;
+  scrollbar-width: none;
+}
+
+.videoFilters::-webkit-scrollbar {
+  display: none;
+}
+
+.videoFilters button {
+  background: transparent;
+  border: 0;
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 15px;
+  min-height: 50px;
+  padding: 0;
+  position: relative;
+}
+
+.videoFilters button:hover,
+.videoFilters button[aria-selected="true"] {
+  color: var(--hq-text-link);
+}
+
+.videoFilters button[aria-selected="true"] {
+  font-weight: 600;
+}
+
+.videoFilters button[aria-selected="true"]::after {
+  background: var(--hq-brand-primary);
+  border-radius: 999px;
+  bottom: 0;
+  content: "";
+  height: 3px;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 24px;
+}
+
+.videoPanel {
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.videoPanelHeading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 22px 2px 10px;
+}
+
+.videoPanelHeading h2 {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.videoPanelHeading p {
+  color: var(--hq-text-tertiary);
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.videoPanelHeading span {
+  color: var(--hq-text-tertiary);
+  font-size: 13px;
+}
+
+.videoEmpty {
+  color: var(--hq-text-secondary);
+  padding: 56px 16px;
+  text-align: center;
+}
+
+.videoRows > li {
+  border-bottom-color: var(--hq-border-subtle);
+}
+
+.videoRow {
   color: var(--hq-text-primary);
-  display: grid;
-  gap: var(--hq-spacing-3);
-  /* 封面本身是 210×154，96px 太窄，看不清是什么画面。 */
-  grid-template-columns: 132px minmax(0, 1fr);
-  min-height: var(--hq-touch-web-minimum);
-  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+  display: block;
+  padding: 22px 2px 24px;
   text-decoration: none;
 }
 
 .videoRow:hover {
-  background: var(--hq-surface-canvas);
+  background: transparent;
 }
 
 /*
@@ -198,8 +296,10 @@
   aspect-ratio: 210 / 154;
   background: var(--hq-surface-sunken);
   border: 1px solid var(--hq-border-default);
-  border-radius: var(--hq-radius-chip);
+  border-radius: 6px;
   display: block;
+  margin-top: 14px;
+  max-width: 320px;
 }
 
 /*
@@ -213,9 +313,12 @@
   aspect-ratio: 210 / 154;
   background: var(--hq-surface-sunken);
   border: 1px solid var(--hq-border-default);
-  border-radius: var(--hq-radius-chip);
+  border-radius: 6px;
   display: block;
   height: auto;
+  margin-top: 14px;
+  max-height: 235px;
+  max-width: 320px;
   object-fit: cover;
   width: 100%;
 }
@@ -227,14 +330,42 @@
 
 .videoBody {
   display: grid;
-  gap: 2px;
   min-width: 0;
 }
 
-.videoBody strong {
-  font-size: var(--hq-type-size-label-compact);
-  font-weight: var(--hq-type-weight-semibold);
-  line-height: var(--hq-type-line-height-compact);
+.videoSource {
+  align-items: center;
+  color: var(--hq-text-tertiary);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.videoSource b {
+  align-items: center;
+  background: #ef6c22;
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  font-size: 12px;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.videoSource strong {
+  color: var(--hq-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.videoTitle {
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.45;
+  margin-top: 10px;
+  max-width: 560px;
 }
 
 .videoBody p {
@@ -253,15 +384,59 @@
   gap: var(--hq-spacing-2);
 }
 
+.videoAction {
+  align-items: center;
+  color: var(--hq-text-tertiary);
+  display: flex;
+  font-size: 14px;
+  justify-content: space-between;
+  margin-top: 12px;
+  max-width: 320px;
+}
+
+.videoRow:hover .videoTitle,
+.videoRow:focus-visible .videoTitle,
+.videoRow:hover .videoAction span:last-child,
+.videoRow:focus-visible .videoAction span:last-child {
+  color: var(--hq-text-link);
+}
+
 /* ---------- 达人 ---------- */
+
+.creatorHero {
+  align-content: center;
+  align-items: center;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  display: grid;
+  grid-auto-rows: max-content;
+  grid-template-columns: minmax(150px, 0.38fr) minmax(0, 1fr);
+  min-height: 0;
+  padding: 14px 2px 16px;
+}
+
+.creatorHero h1 {
+  font-size: 22px;
+}
+
+.creatorHero .heroNote {
+  justify-self: end;
+  margin: 0;
+  max-width: 560px;
+  text-align: right;
+}
+
+.creatorPanel .panelHeading {
+  padding: 14px 16px;
+}
 
 .creatorRow {
   align-items: center;
   display: grid;
   gap: var(--hq-spacing-3);
   grid-template-columns: 20px 36px minmax(0, 1fr) auto;
-  min-height: 56px;
-  padding: var(--hq-spacing-2) var(--hq-spacing-4);
+  min-height: 68px;
+  padding: 11px 16px;
 }
 
 .rank {
@@ -271,8 +446,16 @@
   font-weight: var(--hq-type-weight-semibold);
 }
 
-.rows > li:nth-child(-n + 3) .rank {
-  color: var(--hq-market-up-text);
+.rows > li:nth-child(1) .rank {
+  color: #ef3340;
+}
+
+.rows > li:nth-child(2) .rank {
+  color: #ff5b1a;
+}
+
+.rows > li:nth-child(3) .rank {
+  color: #f59e0b;
 }
 
 .avatar {
@@ -316,33 +499,148 @@
   gap: var(--hq-spacing-2);
 }
 
-/* 关注按钮：描边幽灵。榜单里每行一个，实心会盖过作者信息本身。 */
+/* 关注是榜单唯一行动，沿用侧栏发帖的品牌蓝，但保持数据行尺度。 */
 .followButton {
-  background: var(--hq-surface-base);
-  border: 1px solid var(--hq-border-strong);
-  border-radius: var(--hq-radius-control);
-  color: var(--hq-text-secondary);
+  background: var(--hq-brand-primary);
+  border: 0;
+  border-radius: 999px;
+  color: var(--hq-brand-on-primary);
   cursor: pointer;
   font: inherit;
-  font-size: var(--hq-type-size-label-compact);
-  min-height: var(--hq-touch-web-minimum);
-  padding: 0 var(--hq-spacing-4);
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 30px;
+  padding: 0 14px;
   white-space: nowrap;
+  width: 64px;
 }
 
 .followButton:hover {
-  border-color: var(--hq-brand-primary);
-  color: var(--hq-text-link);
+  background: var(--hq-brand-primary-hover);
+  color: var(--hq-brand-on-primary);
 }
 
 /* 已关注是完成态，要更安静而不是更响。 */
 .followButton[aria-pressed="true"] {
+  background: var(--hq-brand-subtle);
+  box-shadow: inset 0 0 0 1px var(--hq-brand-primary);
+  color: var(--hq-text-link);
+}
+
+.followButton[aria-pressed="true"]:hover {
   background: var(--hq-surface-canvas);
-  border-color: var(--hq-border-default);
-  color: var(--hq-text-tertiary);
 }
 
 /* ---------- 私募 ---------- */
+
+.privateHero {
+  padding: 16px 18px;
+}
+
+.privateHero h1 {
+  font-size: 22px;
+}
+
+.privateHero .heroNote {
+  max-width: 520px;
+}
+
+.privateTypeFilters {
+  gap: 6px;
+  justify-content: flex-start;
+  padding: 0 2px 4px;
+}
+
+.privateTypeFilters button {
+  border-radius: 15px;
+  font-size: 13px;
+  min-height: 30px;
+  padding: 0 12px;
+}
+
+.privateTypeFilters button[aria-pressed="true"] {
+  background: var(--hq-brand-subtle);
+  border-color: transparent;
+  color: var(--hq-text-link);
+  font-weight: 600;
+}
+
+.privateSearch {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding-bottom: 4px;
+}
+
+.privateSearch input {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 4px;
+  color: var(--hq-text-primary);
+  font: inherit;
+  font-size: 13px;
+  min-height: 34px;
+  min-width: 0;
+  padding: 0 12px;
+}
+
+.privateSearch input:focus-visible {
+  border-color: var(--hq-brand-primary);
+  box-shadow: 0 0 0 2px var(--hq-brand-subtle);
+  outline: 0;
+}
+
+.privateSearch button {
+  border-radius: 4px;
+  font-size: 13px;
+  min-height: 34px;
+  padding: 0 14px;
+}
+
+.privateSearch button[type="submit"] {
+  background: var(--hq-brand-primary);
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-brand-on-primary);
+}
+
+.privateSearch button[type="submit"]:hover {
+  background: var(--hq-brand-primary-hover);
+  color: var(--hq-brand-on-primary);
+}
+
+.registryStatus {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+  min-height: 36px;
+  padding: 10px 16px;
+}
+
+.panel[aria-busy="true"] .registryTable {
+  opacity: 0.72;
+}
+
+.panel[aria-busy="true"] {
+  min-height: 390px;
+}
+
+.privatePagination {
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  padding: 12px 16px 0;
+}
+
+.privatePagination button {
+  border-radius: 4px;
+  font-size: 13px;
+  min-height: 32px;
+  padding: 0 12px;
+}
+
+.privatePagination span {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+}
 
 .fundRow {
   align-items: center;
@@ -440,8 +738,25 @@
 }
 
 @media (max-width: 620px) {
+  .creatorHero {
+    grid-template-columns: 1fr;
+  }
+
+  .creatorHero .heroNote {
+    justify-self: start;
+    text-align: left;
+  }
+
   .videoRow {
-    grid-template-columns: 84px minmax(0, 1fr);
+    padding-inline: 0;
+  }
+
+  .videoFilters {
+    gap: 24px;
+  }
+
+  .videoTitle {
+    font-size: 17px;
   }
 
   .fundRow,
@@ -462,5 +777,13 @@
   .followButton {
     grid-column: 2 / -1;
     justify-self: start;
+  }
+
+  .privateSearch {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .privateSearch input {
+    grid-column: 1 / -1;
   }
 }

@@ -20,22 +20,37 @@ type State =
   | Readonly<{ kind: "loading" }>
   | Readonly<{ kind: "ready"; posts: readonly HotPost[] }>;
 
+let hotPostsCache: readonly HotPost[] | null = null;
+let hotPostsRequest: Promise<readonly HotPost[]> | null = null;
+
+const loadHotPosts = async (): Promise<readonly HotPost[]> => {
+  if (hotPostsCache !== null) return hotPostsCache;
+  hotPostsRequest ??= (async () => {
+    const response = await fetch("/api/social/posts/hot");
+    if (!response.ok) throw new Error("hot posts unavailable");
+    const data = (await response.json()) as { posts?: readonly HotPost[] };
+    hotPostsCache = data.posts ?? [];
+    return hotPostsCache;
+  })().finally(() => {
+    hotPostsRequest = null;
+  });
+  return hotPostsRequest;
+};
+
 export function RailHotPosts() {
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const [state, setState] = useState<State>(() =>
+    hotPostsCache === null
+      ? { kind: "loading" }
+      : { kind: "ready", posts: hotPostsCache },
+  );
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch("/api/social/posts/hot");
+        const posts = await loadHotPosts();
         if (cancelled) return;
-        if (!response.ok) {
-          setState({ kind: "failed" });
-          return;
-        }
-        const data = (await response.json()) as { posts?: readonly HotPost[] };
-        if (cancelled) return;
-        setState({ kind: "ready", posts: data.posts ?? [] });
+        setState({ kind: "ready", posts });
       } catch {
         if (!cancelled) setState({ kind: "failed" });
       }

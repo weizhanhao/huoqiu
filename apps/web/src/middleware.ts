@@ -623,12 +623,36 @@ const hasSingleSessionCookie = (request: NextRequest): boolean => {
   );
 };
 
+/*
+ * Local development is deliberately reachable without the deployment edge.
+ *
+ * Production and preview requests arrive through a gateway that supplies the
+ * signed Zero Trust proof and transport cookie. `next dev` has no such edge,
+ * so requiring that proof locally makes the app return 503 before any page can
+ * render. The development script binds to 127.0.0.1, and this bypass checks the
+ * request host again; a development server exposed under another host still
+ * fails closed. Account-owned writes remain protected by their API session
+ * checks.
+ */
+const isLoopbackDevelopmentRequest = (
+  request: NextRequest,
+  environment: RuntimeEnvironment,
+): boolean =>
+  environment.NODE_ENV === "development" &&
+  request.nextUrl.protocol === "http:" &&
+  (request.nextUrl.hostname === "127.0.0.1" ||
+    request.nextUrl.hostname === "localhost");
+
 export const enforceWebBoundary = async (
   request: NextRequest,
   runtime: WebBoundaryRuntime,
 ): Promise<NextResponse> => {
   if (hasForbiddenNonCookieCredential(request)) {
     return rejection(401, "Unauthorized");
+  }
+
+  if (isLoopbackDevelopmentRequest(request, runtime.environment)) {
+    return NextResponse.next();
   }
 
   if (isFullyPublicRequest(request)) {

@@ -10,6 +10,7 @@ import {
 } from "../../../src/features/community/community-experience";
 
 import "../../../src/app/globals.css";
+import "../../../src/app/xueqiu-theme.css";
 
 const root = document.querySelector("#root");
 if (root === null) {

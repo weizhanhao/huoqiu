@@ -1,9 +1,42 @@
 .section {
+  align-content: start;
   display: grid;
   gap: 18px;
-  max-width: 760px;
+  grid-auto-rows: max-content;
+  max-width: none;
   min-width: 0;
   padding: 4px 0 28px;
+}
+
+/* 热门频道是内容流，不使用说明页与后台卡片的巨型比例。 */
+.section > .intro {
+  border-width: 0 0 1px;
+  border-radius: 0;
+  gap: 6px;
+  padding: 16px 2px 18px;
+}
+
+.section > .intro h2 {
+  font-size: 22px;
+}
+
+.section > .intro > p:not(.eyebrow) {
+  color: var(--hq-text-tertiary);
+  font-size: 13px;
+  line-height: 1.65;
+  max-width: 66ch;
+}
+
+.section > .intro .backLink {
+  background: var(--hq-brand-primary);
+  border-radius: 4px;
+  color: var(--hq-brand-on-primary);
+  font-size: 13px;
+  justify-content: center;
+  margin-top: 6px;
+  min-height: 32px;
+  padding: 0 14px;
+  width: fit-content;
 }
 
 .eyebrow,
@@ -71,7 +104,49 @@
 
 .channels {
   border-bottom: 1px solid var(--hq-border-default);
-  padding-bottom: 10px;
+  gap: 28px;
+  min-height: 46px;
+  padding: 0;
+}
+
+.channels .channel {
+  align-self: stretch;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--hq-text-secondary);
+  font-size: 14px;
+  min-height: 0;
+  padding: 0 2px;
+  position: relative;
+}
+
+.channels .channel:hover {
+  color: var(--hq-text-link);
+}
+
+.channels .channel[aria-pressed="true"] {
+  background: transparent;
+  border: 0;
+  color: var(--hq-text-link);
+  font-weight: 600;
+}
+
+.channels .channel[aria-pressed="true"]::after {
+  background: var(--hq-brand-primary);
+  border-radius: 999px;
+  bottom: -1px;
+  content: "";
+  height: 2px;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 22px;
+}
+
+.channels .channel:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: -3px;
 }
 
 .channel,
@@ -101,20 +176,26 @@
 .modeTab[aria-pressed="true"],
 .actionActive,
 .submit {
-  background: var(--hq-brand-primary);
-  border-color: var(--hq-brand-primary);
+  /*
+   * 顶栏继续用雪球参考图里的亮蓝色；小字号白字按钮需要更深一档，
+   * 否则 #1576e9 与白色只有 4.37:1，过不了正文的 4.5:1 门槛。
+   */
+  background: var(--hq-text-link);
+  border-color: var(--hq-text-link);
   color: var(--hq-brand-on-primary);
 }
 
 .feed {
   display: grid;
-  gap: 14px;
+  gap: 0;
 }
 
 .card {
+  border-width: 0 0 1px;
+  border-radius: 0;
   display: grid;
-  gap: 13px;
-  padding: 20px;
+  gap: 8px;
+  padding: 14px 4px 16px;
 }
 
 .card h3,
@@ -123,7 +204,7 @@
 }
 
 .card > h3 {
-  font-size: 1.16rem;
+  font-size: 16px;
   line-height: 1.42;
 }
 
@@ -159,22 +240,34 @@
   border-radius: 50%;
   color: var(--hq-brand-primary);
   display: inline-flex;
-  flex: 0 0 44px;
+  flex: 0 0 36px;
   font-weight: 750;
-  height: 44px;
+  height: 36px;
   justify-content: center;
 }
 
+.card > p {
+  color: var(--hq-text-secondary);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
 .syntheticBadge {
-  background: var(--hq-feedback-info-subtle);
-  border: 1px solid var(--hq-feedback-info-border);
+  background: #f2f5f9;
+  border: 1px solid #dce2ea;
   border-radius: 999px;
-  color: var(--hq-feedback-info);
-  font-size: 0.7rem;
-  font-weight: 750;
-  margin-left: auto;
-  padding: 5px 8px;
+  color: #566171;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
   white-space: nowrap;
+}
+
+.cardAuthorActions {
+  align-items: center;
+  display: inline-flex;
+  gap: 10px;
+  margin-left: auto;
 }
 
 .cardTitleRow {
@@ -182,11 +275,41 @@
 }
 
 .kind {
-  background: var(--hq-surface-subtle);
-  border-radius: 999px;
+  border-left: 3px solid currentColor;
+  border-radius: 2px;
   display: inline-block;
-  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  padding: 3px 7px;
   width: fit-content;
+}
+
+/* 类型只是阅读线索：用低饱和色区分，不与主操作蓝抢层级。 */
+.card[data-kind="帖子"] .kind {
+  background: #f3f5f8;
+  color: #626b78;
+}
+
+.card[data-kind="长文摘要"] .kind {
+  background: #f4efff;
+  color: #7048b5;
+}
+
+.card[data-kind="资讯"] .kind {
+  background: #edf8f3;
+  color: #18794e;
+}
+
+.card[data-kind="话题"] .kind {
+  background: #fff5e8;
+  color: #a15c08;
+}
+
+.card[data-kind="图文占位"] .kind,
+.card[data-kind="视频占位"] .kind {
+  background: #eaf8f8;
+  color: #167a7a;
 }
 
 .card p,
@@ -281,15 +404,27 @@
  * 不该和阅读争夺注意力。固定最小宽度，「屏蔽 / 取消屏蔽」切换时不推动相邻元素。
  */
 .blockButton {
+  align-items: center;
   background: transparent;
   border: 0;
   color: var(--hq-text-tertiary);
   cursor: pointer;
+  display: inline-flex;
   font: inherit;
-  font-size: var(--hq-type-size-caption);
-  min-width: 4.5em;
+  font-size: 12px;
+  gap: 4px;
+  min-height: 26px;
+  min-width: 0;
   padding: 0;
-  text-align: right;
+}
+
+.blockButton svg {
+  fill: none;
+  height: 14px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.7;
+  width: 14px;
 }
 
 .blockButton:hover:not(:disabled) {
@@ -346,7 +481,7 @@
 
 .tagList a:hover {
   color: var(--hq-text-link-hover);
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .engagement {
@@ -431,11 +566,44 @@
 }
 
 .cardFooter {
+  border-top: 1px solid var(--hq-border-subtle);
   justify-content: space-between;
+  min-height: 36px;
+  padding-top: 10px;
 }
 
 .cardFooter > div {
   flex: 1 1 420px;
+}
+
+/* 信息流操作是图标文字，不是大号圆形按钮。 */
+.cardFooter .action {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--hq-text-tertiary);
+  display: inline-flex;
+  font-size: 13px;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 2px;
+  text-decoration: none;
+}
+
+.cardFooter .action:hover {
+  background: transparent;
+  color: var(--hq-text-link);
+}
+
+.cardFooter .action svg {
+  fill: none;
+  height: 16px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 16px;
 }
 
 .cardFooter a,
@@ -443,17 +611,23 @@
 .success a,
 .streamLink {
   align-items: center;
-  color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
   display: inline-flex;
   font-weight: var(--hq-type-weight-medium);
   min-height: 44px;
   text-decoration: none;
 }
 
+.cardFooter > a:last-child {
+  font-size: 13px;
+  min-height: 30px;
+}
+
 .authorSpotlight {
   display: grid;
-  gap: 16px;
-  padding: 18px;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 14px 16px 16px;
 }
 
 .spotlightHeading,
@@ -475,26 +649,43 @@
 
 .authorGrid {
   display: grid;
-  gap: 10px;
+  gap: 8px 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .authorCard {
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+@media (max-width: 760px) {
+  .authorGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .channels {
+    gap: 22px;
+    overflow-x: auto;
+  }
 }
 
 .authorCard p {
   color: var(--hq-text-secondary);
-  font-size: 0.86rem;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .authorIdentity span,
 .authorStats {
   color: var(--hq-text-tertiary);
-  font-size: 0.76rem;
+  font-size: 12px;
+}
+
+.authorStats {
+  border-top: 1px solid var(--hq-border-subtle);
+  gap: 16px;
+  padding-top: 8px;
 }
 
 .homeStream {
@@ -722,7 +913,7 @@
   }
 
   .syntheticBadge {
-    margin-left: 56px;
+    margin-left: 0;
   }
 
   .mediaArtwork {
@@ -860,4 +1051,15 @@
 .cardAuthorCopy strong a:hover,
 .cardAuthorCopy a:hover {
   color: var(--hq-text-link);
+}
+
+@media (max-width: 520px) {
+  .section > .intro .backLink,
+  .channels .channel,
+  .cardFooter .action,
+  .cardFooter > a:last-child {
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
+  }
 }

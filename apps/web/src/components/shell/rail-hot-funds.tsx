@@ -24,6 +24,25 @@ type State =
   | Readonly<{ kind: "loading" }>
   | Readonly<{ kind: "ready"; rows: readonly FundRow[] }>;
 
+let hotFundsCache: readonly FundRow[] | null = null;
+let hotFundsRequest: Promise<readonly FundRow[]> | null = null;
+
+const loadHotFunds = async (): Promise<readonly FundRow[]> => {
+  if (hotFundsCache !== null) return hotFundsCache;
+  hotFundsRequest ??= (async () => {
+    const response = await fetch(
+      `/api/funds/list?category=hybrid&sort=oneYear&size=${ROWS}`,
+    );
+    if (!response.ok) throw new Error("hot funds unavailable");
+    const data = (await response.json()) as { rows?: readonly FundRow[] };
+    hotFundsCache = data.rows ?? [];
+    return hotFundsCache;
+  })().finally(() => {
+    hotFundsRequest = null;
+  });
+  return hotFundsRequest;
+};
+
 const formatPercent = (value: number | null): string => {
   if (value === null) return "—";
   const sign = value > 0 ? "+" : "";
@@ -36,23 +55,19 @@ const toneClass = (value: number | null): string | undefined => {
 };
 
 export function RailHotFunds() {
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const [state, setState] = useState<State>(() =>
+    hotFundsCache === null
+      ? { kind: "loading" }
+      : { kind: "ready", rows: hotFundsCache },
+  );
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch(
-          `/api/funds/list?category=hybrid&sort=oneYear&size=${ROWS}`,
-        );
+        const rows = await loadHotFunds();
         if (cancelled) return;
-        if (!response.ok) {
-          setState({ kind: "failed" });
-          return;
-        }
-        const data = (await response.json()) as { rows?: readonly FundRow[] };
-        if (cancelled) return;
-        setState({ kind: "ready", rows: data.rows ?? [] });
+        setState({ kind: "ready", rows });
       } catch {
         if (!cancelled) setState({ kind: "failed" });
       }
@@ -87,7 +102,7 @@ export function RailHotFunds() {
               key={fund.code}
             >
               <span>
-                <strong>{fund.name}</strong>
+                <strong title={fund.name}>{fund.name}</strong>
                 <small>
                   {fund.category} · {fund.code}
                 </small>

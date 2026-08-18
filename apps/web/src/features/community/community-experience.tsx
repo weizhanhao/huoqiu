@@ -169,8 +169,6 @@ export function CommunityFeed({
         </Link>
       </header>
 
-      <CommunityAuthorSpotlight />
-
       <nav className={styles.channels} aria-label="社区频道">
         {communityChannels.map((channel) => (
           <button
@@ -221,6 +219,8 @@ export function CommunityFeed({
           </>
         )}
       </p>
+
+      <CommunityAuthorSpotlight />
     </section>
   );
 }

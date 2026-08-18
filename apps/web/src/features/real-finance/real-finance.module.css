@@ -1,7 +1,9 @@
 .surface {
+  align-content: start;
   color: var(--hq-text-primary);
   display: grid;
   gap: var(--hq-spacing-6);
+  grid-auto-rows: max-content;
   min-width: 0;
   width: 100%;
 }
@@ -181,6 +183,29 @@
   line-height: var(--hq-type-line-height-body);
 }
 
+/* 无数据不是告警：用紧凑的数据状态栏，不用整块浅蓝提示卡。 */
+.state-missing,
+.state-empty {
+  background: var(--hq-surface-base);
+  border-color: var(--hq-border-default);
+  border-left: 3px solid var(--hq-border-strong);
+  border-radius: 4px;
+  gap: 4px;
+  padding: 18px 20px;
+}
+
+.state-missing h2,
+.state-empty h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.state-missing p,
+.state-empty p {
+  color: var(--hq-text-tertiary);
+  font-size: 13px;
+}
+
 .state-invalid {
   background: var(--hq-feedback-danger-subtle);
   border-color: var(--hq-feedback-danger-border);
@@ -346,9 +371,9 @@
   cursor: pointer;
   flex: 0 0 auto;
   font: inherit;
-  font-size: var(--hq-type-size-label-compact);
-  min-height: var(--hq-touch-web-minimum);
-  padding: 0 var(--hq-spacing-4);
+  font-size: 14px;
+  min-height: 36px;
+  padding: 0 14px;
 }
 
 .sectionHeading button:hover {
@@ -360,6 +385,41 @@
   background: var(--hq-brand-subtle);
   border-color: var(--hq-brand-primary);
   color: var(--hq-text-link);
+}
+
+.sectionHeading .refreshToggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--hq-text-tertiary);
+  display: inline-flex;
+  font-size: 12px;
+  gap: 7px;
+  min-height: 28px;
+  padding: 0 6px;
+}
+
+.sectionHeading .refreshToggle:hover {
+  background: var(--hq-surface-canvas);
+  color: var(--hq-text-primary);
+}
+
+.sectionHeading .refreshToggle[aria-pressed="true"] {
+  background: transparent;
+  border: 0;
+  color: var(--hq-text-tertiary);
+}
+
+.refreshDot {
+  background: var(--hq-feedback-success);
+  border-radius: 50%;
+  height: 7px;
+  width: 7px;
+}
+
+.refreshToggle[aria-pressed="true"] .refreshDot {
+  background: var(--hq-text-disabled);
 }
 
 .sectionHeading p,
@@ -429,9 +489,9 @@
 .timelineList li {
   border-left: 2px solid var(--hq-border-default);
   display: grid;
-  gap: var(--hq-spacing-2);
+  gap: 6px;
   margin-left: var(--hq-spacing-2);
-  padding: 0 0 var(--hq-spacing-5) var(--hq-spacing-5);
+  padding: 0 0 18px 20px;
   position: relative;
 }
 
@@ -469,6 +529,55 @@
   background: var(--hq-surface-subtle);
   border-radius: var(--hq-radius-pill);
   padding: var(--hq-spacing-1) var(--hq-spacing-2);
+}
+
+.status {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+  margin: -6px 0 10px;
+  min-height: 18px;
+}
+
+.sectionPanel > .timelineList .recordLink {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
+  min-height: 0;
+}
+
+.sectionPanel > .timelineList .publisher {
+  color: var(--hq-text-tertiary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.timelineSkeleton li {
+  min-height: 82px;
+  pointer-events: none;
+}
+
+.timelineSkeleton li > span {
+  animation: finance-skeleton-pulse 1.2s ease-in-out infinite alternate;
+  background: var(--hq-surface-sunken);
+  border-radius: 3px;
+  display: block;
+  height: 12px;
+  max-width: 620px;
+}
+
+.timelineSkeleton li > span:first-child {
+  max-width: 110px;
+}
+
+.timelineSkeleton li > span:nth-child(2) {
+  height: 16px;
+  max-width: 520px;
+}
+
+@keyframes finance-skeleton-pulse {
+  to {
+    opacity: 0.45;
+  }
 }
 
 .detailPanel {
@@ -725,7 +834,7 @@
 .recordLink:hover,
 .recordLink:focus-visible {
   color: var(--hq-brand-primary);
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .tagList {
@@ -772,6 +881,26 @@
 }
 
 @media (max-width: 640px) {
+  /*
+   * 真实财经页在手机上不仅有标题按钮，还有来源筛选、详情链接和表单控件。
+   * 它们都属于同一个交互面，统一守住 44px 触控目标，避免后加的紧凑样式
+   * 把某一个入口压回桌面尺寸。
+   */
+  .surface :is(button, a, input, select) {
+    min-height: var(--hq-touch-web-minimum);
+    min-width: var(--hq-touch-web-minimum);
+  }
+
+  .sectionHeading button {
+    min-height: var(--hq-touch-web-minimum);
+  }
+
+  .sectionPanel > .timelineList .recordLink {
+    align-items: center;
+    display: inline-flex;
+    min-height: var(--hq-touch-web-minimum);
+  }
+
   .homeSummaryHeading {
     align-items: stretch;
     flex-direction: column;

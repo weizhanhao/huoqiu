@@ -94,18 +94,26 @@ export function BlockedUsersPanel() {
       className={styles.contentSection}
       data-testid="blocked-users-panel"
     >
-      <h3 className={styles.sectionHeading} id="blocked-users-heading">
-        已屏蔽用户不能对你进行关注、评论、私信等操作
-      </h3>
+      <div className={styles.panelIntroduction}>
+        <h3 id="blocked-users-heading">已屏蔽账号</h3>
+        <p>屏蔽后，对方无法关注、评论或私信你。</p>
+      </div>
 
       {account === null ? (
         <Link className={styles.inverseLink} href="/login">
           登录后管理屏蔽名单
         </Link>
       ) : loading ? (
-        <p className={styles.contentMeta}>读取中…</p>
+        <div aria-label="正在读取屏蔽名单" className={styles.loadingState}>
+          <span />
+          <span />
+          <span />
+        </div>
       ) : blocked.length === 0 ? (
-        <p className={styles.contentMeta}>暂无屏蔽用户</p>
+        <div className={styles.emptyState}>
+          <strong>没有已屏蔽的账号</strong>
+          <span>你在用户主页屏蔽的账号会出现在这里。</span>
+        </div>
       ) : (
         <ul className={styles.contentList}>
           {blocked.map((entry) => (

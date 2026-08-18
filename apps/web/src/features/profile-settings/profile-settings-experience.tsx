@@ -448,7 +448,6 @@ function SessionIdentity() {
 export function SettingsPageExperience() {
   const {
     preferences,
-    profile,
     setReducedMotion,
     setImageWatermark,
     setSocialStatsVisibility,
@@ -457,42 +456,9 @@ export function SettingsPageExperience() {
 
   return (
     <section
-      aria-labelledby="settings-heading"
       className={`${styles.page} ${styles.settingsPage}`}
       data-testid="settings-page"
     >
-      <header className={styles.settingsHero}>
-        {/*
-          这两句原先写的是「演示账号」「本次浏览会话中的演示资料」。
-          下面那块资料现在取的是真实登录账号，屏蔽名单也真的存在账号下——
-          同一页里，上面说是演示，下面说已接真实账号，自己打自己的脸。
-        */}
-        <p className={styles.heroKicker}>账号与偏好</p>
-        <div className={styles.settingsHeroCopy}>
-          <h2 id="settings-heading">设置</h2>
-          <p>管理你的账号资料、屏蔽名单与本机显示偏好。</p>
-        </div>
-        <Link className={styles.inverseLink} href={`/users/${profile.userId}`}>
-          返回用户主页
-        </Link>
-      </header>
-
-      {/*
-        这段说明必须跟着实现走。
-        原文是「本页不连接 API、数据库或真实账户；刷新后恢复固定 fixture」——
-        而下面的屏蔽名单恰恰连真实接口、真实落盘。不改这句，页面就在自己
-        打自己的脸，而且是往「更假」的方向误导。
-      */}
-      <aside aria-label="设置数据说明" className={styles.disclosure}>
-        <span aria-hidden="true">说</span>
-        <div>
-          <strong>部分设置已接真实账号</strong>
-          <p>
-            屏蔽名单保存在你的账号下，换设备仍然生效；显示偏好等其余项仍只作用于本次浏览会话。
-          </p>
-        </div>
-      </aside>
-
       {/*
         这一块此前显示的是一份写死的身份：「火球演示用户 @huoqiu_demo」，
         动态 12、收藏 38、关注 24。跟谁登录了毫无关系——真实账号打开设置页
@@ -509,7 +475,7 @@ export function SettingsPageExperience() {
       >
         <div className={styles.sectionHeading}>
           <div>
-            <h3 id="display-preferences-heading">显示偏好</h3>
+            <h3 id="display-preferences-heading">显示设置</h3>
             <p>偏好只在当前会话保留，不写入浏览器存储。</p>
           </div>
           <span className={styles.fixturePill}>会话级</span>

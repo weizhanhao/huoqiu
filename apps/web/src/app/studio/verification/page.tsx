@@ -25,12 +25,12 @@ export default function StudioVerificationPage() {
         认证用来标明账号背后的真实身份，常见的有实名认证、个人身份认证与公司机构认证。
       </p>
 
-      <p className="page-state-message">
+      <p className={styles.statusBar}>
         站内暂不提供认证。它需要对接真实的身份核验渠道（实名信息、营业执照等），
         我们没有这套能力。
       </p>
 
-      <p className={styles.subheading}>
+      <p className={styles.explanation}>
         这里没有做一个走完流程就发放标识的界面：一个未经核验就发出去的身份标识，
         会让其他用户据此信任一个其实没有被核验过的账号——那比没有认证更危险。
       </p>

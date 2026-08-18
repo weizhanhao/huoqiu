@@ -44,9 +44,8 @@ const render = async (overrides: SessionOverrides): Promise<string> => {
       ...overrides,
     }),
   }));
-  const { FollowFeed } = await import(
-    "../../src/features/community/follow-feed"
-  );
+  const { FollowFeed } =
+    await import("../../src/features/community/follow-feed");
   return renderToStaticMarkup(<FollowFeed />);
 };
 

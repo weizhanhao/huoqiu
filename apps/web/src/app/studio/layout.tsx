@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import styles from "./studio.module.css";
 import { SiteTopbar } from "../../components/shell/site-topbar";
+import { StudioAccountSummary } from "../../features/studio/studio-account-summary";
 import { StudioNav } from "../../features/studio/studio-nav";
 
 /*
@@ -30,6 +31,7 @@ export default function StudioLayout({
       <div className={styles.layout}>
         <aside aria-label="创作者中心导航" className={styles.nav}>
           <p className={styles.title}>创作者中心</p>
+          <StudioAccountSummary />
           <StudioNav />
         </aside>
         <main className={styles.main}>{children}</main>

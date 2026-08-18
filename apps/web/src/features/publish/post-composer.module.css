@@ -12,9 +12,12 @@
 }
 
 .inline {
-  background: var(--hq-surface-sunken);
-  border-radius: var(--hq-radius-card);
-  padding: var(--hq-spacing-4);
+  background: #f7f8fa;
+  border: 1px solid var(--hq-border-subtle);
+  border-radius: 6px;
+  margin: 14px 0 16px;
+  min-height: 132px;
+  padding: 14px 16px 10px;
 }
 
 .modal {
@@ -29,20 +32,32 @@
  */
 .input {
   background: var(--hq-surface-base);
-  border: none;
-  border-radius: var(--hq-radius-control);
+  border: 1px solid transparent;
+  border-radius: 5px;
   color: var(--hq-text-primary);
   font: inherit;
-  line-height: var(--hq-type-line-height-body);
-  min-height: 96px;
-  padding: var(--hq-spacing-3);
+  font-size: 16px;
+  line-height: 1.55;
+  min-height: 68px;
+  padding: 8px 10px;
   resize: vertical;
   width: 100%;
 }
 
-.input:focus-visible {
-  outline: 2px solid var(--hq-border-focus);
-  outline-offset: -1px;
+.composer .input:hover {
+  border-color: var(--hq-border-subtle);
+}
+
+.composer .input:focus,
+.composer .input:focus-visible {
+  border-color: color-mix(
+    in srgb,
+    var(--hq-brand-primary) 28%,
+    var(--hq-border-subtle)
+  );
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--hq-brand-primary) 7%, transparent);
+  outline: 0;
 }
 
 .toolbar {
@@ -88,16 +103,18 @@
 
 .primary,
 .secondary {
-  border-radius: var(--hq-radius-control);
-  font-size: var(--hq-type-size-body-compact);
-  min-height: var(--hq-touch-web-minimum);
-  padding: 0 var(--hq-spacing-4);
+  border-radius: 4px;
+  font-size: 13px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 14px;
 }
 
 .primary {
   background: var(--hq-brand-primary);
   border: 1px solid var(--hq-brand-primary);
   color: var(--hq-brand-on-primary);
+  min-width: 64px;
 }
 
 /*
@@ -114,8 +131,28 @@
   color: var(--hq-text-secondary);
 }
 
+.primary:hover:not(:disabled) {
+  background: var(--hq-brand-primary-hover);
+  border-color: var(--hq-brand-primary-hover);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--hq-surface-base);
+  border-color: var(--hq-border-strong);
+  color: var(--hq-text-primary);
+}
+
 .primary:focus-visible,
 .secondary:focus-visible {
-  outline: 2px solid var(--hq-border-focus);
-  outline-offset: 2px;
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--hq-brand-primary) 16%, transparent);
+  outline: 0;
+}
+
+@media (max-width: 520px) {
+  .primary,
+  .secondary {
+    height: 44px;
+    min-height: 44px;
+  }
 }

@@ -200,13 +200,41 @@ describe("Zero Trust startup configuration", () => {
     ).toThrowError("ZERO_TRUST_CONFIGURATION_INVALID");
   });
 
-  it("does not create a test or development bypass when config is absent", async () => {
+  it("does not create a test bypass when config is absent", async () => {
     vi.stubEnv("APP_ENV", "test");
     vi.stubEnv("ZERO_TRUST_HMAC_SECRET", "");
     vi.stubEnv("ZERO_TRUST_ISSUER", "");
     vi.stubEnv("ZERO_TRUST_MAX_SKEW_SECONDS", "");
 
     const response = await middleware(protectedRequest("/watchlist"));
+
+    expect(response.status).toBe(503);
+    await expect(response.text()).resolves.toBe("Service unavailable");
+  });
+
+  it("allows an HTTP loopback development server without a deployment edge", async () => {
+    const response = await enforceWebBoundary(
+      new NextRequest("http://127.0.0.1:3000/watchlist"),
+      {
+        consumeEdgeNonce: () => true,
+        environment: { NODE_ENV: "development" },
+        now: () => fixedNowMilliseconds,
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
+  it("keeps a non-loopback development host behind the deployment edge", async () => {
+    const response = await enforceWebBoundary(
+      new NextRequest("http://web.huoqiu.test/watchlist"),
+      {
+        consumeEdgeNonce: () => true,
+        environment: { NODE_ENV: "development" },
+        now: () => fixedNowMilliseconds,
+      },
+    );
 
     expect(response.status).toBe(503);
     await expect(response.text()).resolves.toBe("Service unavailable");

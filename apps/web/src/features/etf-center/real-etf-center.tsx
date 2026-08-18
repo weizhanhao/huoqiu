@@ -77,6 +77,7 @@ export function RealEtfCenter({
   const [sort, setSort] = useState<SortId>(initialSort);
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
+  const [pending, setPending] = useState(true);
   const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
@@ -87,14 +88,18 @@ export function RealEtfCenter({
        * 同步改状态会在同一轮渲染里再触发一次。对用户没有分别——它和
        * 紧随其后的请求本来就是同一件事。
        */
-      setState({ kind: "loading" });
+      /* 排序与翻页时保留旧表，避免页面高度骤降带动左栏跳动。 */
+      setPending(true);
       try {
         const response = await fetch(
           `/api/market/etfs?sort=${sort}&page=${page}`,
         );
         if (cancelled) return;
         if (!response.ok) {
-          setState({ kind: "failed" });
+          setState((current) =>
+            current.kind === "ready" ? current : { kind: "failed" },
+          );
+          setPending(false);
           return;
         }
         const data = (await response.json()) as {
@@ -109,8 +114,14 @@ export function RealEtfCenter({
           rows: data.rows ?? [],
           total: data.total ?? null,
         });
+        setPending(false);
       } catch {
-        if (!cancelled) setState({ kind: "failed" });
+        if (!cancelled) {
+          setState((current) =>
+            current.kind === "ready" ? current : { kind: "failed" },
+          );
+          setPending(false);
+        }
       }
     })();
     return () => {
@@ -145,6 +156,7 @@ export function RealEtfCenter({
       </header>
 
       <section
+        aria-busy={pending}
         aria-labelledby="etf-list-heading"
         className={styles.panel}
         tabIndex={-1}
@@ -156,21 +168,24 @@ export function RealEtfCenter({
           ) : null}
         </div>
 
-        <div aria-label="排序依据" className={styles.rankings} role="group">
-          {SORTS.map((item) => (
-            <button
-              aria-pressed={sort === item.id}
-              key={item.id}
-              onClick={() => {
-                setSort(item.id);
-                // 换排序要回到第一页，否则会停在上一种口径的第 5 页。
-                setPage(1);
-              }}
-              type="button"
-            >
-              {item.label}
-            </button>
-          ))}
+        <div className={styles.sortRow}>
+          <span className={styles.sortLabel}>排序</span>
+          <div aria-label="排序依据" className={styles.rankings} role="group">
+            {SORTS.map((item) => (
+              <button
+                aria-pressed={sort === item.id}
+                key={item.id}
+                onClick={() => {
+                  setSort(item.id);
+                  // 换排序要回到第一页，否则会停在上一种口径的第 5 页。
+                  setPage(1);
+                }}
+                type="button"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/*
@@ -179,16 +194,16 @@ export function RealEtfCenter({
           只换文字，所以切排序、切市场、失败都会被念出来。
         */}
         <p aria-live="polite" className={styles.resultStatus} role="status">
-          {state.kind === "loading"
-            ? "正在读取……"
+          {pending
+            ? state.kind === "ready"
+              ? "正在更新 ETF 排名……"
+              : "正在读取……"
             : state.kind === "failed"
               ? "ETF列表取不到。"
-              : `已列出 ${state.rows.length} 条。`}
+              : state.kind === "ready"
+                ? `已列出 ${state.rows.length} 条。`
+                : "正在读取……"}
         </p>
-
-        {state.kind === "loading" ? (
-          <p className={styles.resultStatus}>正在读取 ETF 列表……</p>
-        ) : null}
 
         {state.kind === "failed" ? (
           <p className={styles.resultStatus}>
@@ -213,7 +228,7 @@ export function RealEtfCenter({
         {state.kind === "ready" ? (
           <>
             <ScrollableTable label="ETF 列表">
-              <table className="watchlist-table">
+              <table className={`${styles.etfListTable} watchlist-table`}>
                 <thead>
                   <tr>
                     <th scope="col">ETF</th>
@@ -240,11 +255,16 @@ export function RealEtfCenter({
                           再给一张空页，比不给链接更糟。
                         */}
                         {etf.href === null ? (
-                          <span>{etf.name}</span>
+                          <span className="watchlist-cell">
+                            <strong>{etf.name}</strong>
+                            <small>{etf.code}</small>
+                          </span>
                         ) : (
-                          <Link href={etf.href}>{etf.name}</Link>
+                          <Link href={etf.href}>
+                            <strong>{etf.name}</strong>
+                            <small>{etf.code}</small>
+                          </Link>
                         )}
-                        <small>{etf.code}</small>
                       </th>
                       <td className="watchlist-numeric">
                         {formatPrice(etf.last)}
@@ -264,7 +284,11 @@ export function RealEtfCenter({
               </table>
             </ScrollableTable>
 
-            <div aria-label="翻页" className={styles.rankings} role="group">
+            <div
+              aria-label="翻页"
+              className={`${styles.pagination} hq-pagination`}
+              role="group"
+            >
               <button
                 disabled={page === 1}
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
@@ -288,7 +312,7 @@ export function RealEtfCenter({
           </>
         ) : null}
 
-        <p className={styles.resultStatus}>
+        <p className={styles.dataNote}>
           行情来自公开接口；成交额按元换算成亿元，成交量按手换算成万手。
           取不到的值显示「—」，不以 0 代替。
         </p>

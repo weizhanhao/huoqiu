@@ -799,3 +799,355 @@
     padding: 10px 8px;
   }
 }
+
+/*
+ * 设置中心的输入与选择。这些规则只对 profile-settings 模块生效，
+ * 不依赖全局白底，深色主题会自动跟随 token 换色。
+ */
+.contentSection {
+  box-shadow: none;
+  gap: var(--hq-spacing-4);
+  padding: var(--hq-spacing-5);
+}
+
+.contentSection > .sectionHeading,
+.contentSection > h3.sectionHeading {
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+  line-height: var(--hq-type-line-height-compact);
+  margin: 0;
+}
+
+.panelIntroduction {
+  display: grid;
+  gap: 4px;
+}
+
+.panelIntroduction h3 {
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+  line-height: var(--hq-type-line-height-compact);
+  margin: 0;
+}
+
+.panelIntroduction p,
+.hint {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-snug);
+  margin: 0;
+}
+
+.profilePreview {
+  align-items: center;
+  background: var(--hq-surface-subtle);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  display: grid;
+  gap: var(--hq-spacing-3);
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: var(--hq-spacing-3);
+}
+
+.profileAvatar {
+  align-items: center;
+  background: var(--hq-brand-subtle);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 50%;
+  color: var(--hq-brand-primary);
+  display: flex;
+  font-size: var(--hq-type-size-label);
+  font-weight: var(--hq-type-weight-semibold);
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.profilePath {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profilePreview > span:last-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.contentSection form,
+.form {
+  display: grid;
+  gap: var(--hq-spacing-4);
+  max-width: 620px;
+}
+
+.formField {
+  gap: var(--hq-spacing-2);
+}
+
+.formField > label,
+.form > label {
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-semibold);
+}
+
+.formField input,
+.formField select,
+.formField textarea,
+.form input {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-primary);
+  font: inherit;
+  min-height: 38px;
+  padding: 7px 11px;
+  width: 100%;
+}
+
+.formField :is(input, select, textarea):focus,
+.form input:focus {
+  border-color: var(--hq-brand-primary);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--hq-brand-primary) 12%, transparent);
+  outline: none;
+}
+
+.locationFields {
+  display: grid;
+  gap: var(--hq-spacing-2);
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+.formField textarea {
+  min-height: 88px;
+}
+
+.primaryButton,
+.secondaryButton,
+.restoreButton,
+.inverseLink,
+.form button {
+  min-height: 36px;
+  padding: 7px 16px;
+}
+
+.form button {
+  background: var(--hq-brand-primary);
+  border: 1px solid var(--hq-brand-primary);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-brand-on-primary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--hq-type-weight-semibold);
+  justify-self: start;
+}
+
+.contentSection fieldset {
+  border: 0;
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.contentSection legend {
+  margin-bottom: var(--hq-spacing-2);
+}
+
+.contentSection .preferenceRow {
+  border-top: 1px solid var(--hq-border-default);
+  cursor: pointer;
+  min-height: 52px;
+  padding: var(--hq-spacing-3) var(--hq-spacing-1);
+}
+
+.contentSection .preferenceRow:first-of-type {
+  border-top: 0;
+}
+
+.contentSection .preferenceRow:hover {
+  background: var(--hq-surface-subtle);
+}
+
+.contentSection .preferenceRow > input {
+  accent-color: var(--hq-brand-primary);
+  flex: 0 0 auto;
+  height: 18px;
+  margin: 0;
+  order: 2;
+  width: 18px;
+}
+
+.optionCopy {
+  display: grid;
+  gap: 3px;
+}
+
+.optionCopy small {
+  color: var(--hq-text-tertiary);
+  font-size: var(--hq-type-size-caption);
+  font-weight: var(--hq-type-weight-regular);
+}
+
+.emptyState {
+  align-items: center;
+  background: var(--hq-surface-subtle);
+  border: 1px dashed var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-height: 116px;
+  padding: var(--hq-spacing-5);
+  text-align: center;
+}
+
+.emptyState strong {
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-label-compact);
+}
+
+.loadingState {
+  display: grid;
+  gap: var(--hq-spacing-2);
+  padding: var(--hq-spacing-2) 0;
+}
+
+.loadingState span {
+  animation: settings-loading 1.2s ease-in-out infinite alternate;
+  background: var(--hq-surface-subtle);
+  border-radius: var(--hq-radius-control);
+  height: 42px;
+}
+
+.loadingState span:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.loadingState span:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+@keyframes settings-loading {
+  from {
+    opacity: 0.55;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loadingState span {
+    animation: none;
+  }
+}
+
+.contentSection .contentList {
+  border-top: 1px solid var(--hq-border-default);
+  gap: 0;
+}
+
+.contentSection .contentItem {
+  align-items: center;
+  border-bottom: 1px solid var(--hq-border-default);
+  display: flex;
+  justify-content: space-between;
+  padding: var(--hq-spacing-3) 0;
+}
+
+.contentSection .contentLink {
+  background: transparent;
+  border: 0;
+  color: var(--hq-text-primary);
+  padding: 0;
+}
+
+.bindingGrid {
+  display: grid;
+  gap: var(--hq-spacing-3);
+}
+
+.bindingCard {
+  background: var(--hq-surface-subtle);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-control);
+  display: grid;
+  gap: var(--hq-spacing-2);
+  padding: var(--hq-spacing-4);
+}
+
+.bindingCard h4 {
+  color: var(--hq-text-primary);
+  font-size: var(--hq-type-size-label-compact);
+  margin: 0;
+}
+
+.bindingState {
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-caption);
+  line-height: var(--hq-type-line-height-snug);
+  margin: 0;
+}
+
+.settingsPage {
+  gap: var(--hq-spacing-3);
+  padding: 0;
+}
+
+.settingsPage .sessionSummary,
+.settingsPage .settingsCard {
+  box-shadow: none;
+  padding: var(--hq-spacing-4) var(--hq-spacing-5);
+}
+
+.settingsPage .sessionSummary {
+  gap: var(--hq-spacing-4);
+}
+
+.settingsPage .preferenceRow {
+  min-height: 58px;
+  padding: var(--hq-spacing-3) 0;
+}
+
+.settingsPage .switchControl {
+  min-height: 32px;
+  min-width: 72px;
+  padding: 5px 12px;
+}
+
+.settingsPage
+  :is(.primaryButton, .secondaryButton, .restoreButton, .inverseLink) {
+  min-height: 34px;
+  padding: 6px 14px;
+}
+
+.settingsPage .productLinks {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settingsPage .productLinks > a {
+  box-shadow: none;
+  min-height: 72px;
+  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+}
+
+@media (max-width: 720px) {
+  .contentSection {
+    padding: var(--hq-spacing-4);
+  }
+
+  .locationFields,
+  .settingsPage .productLinks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

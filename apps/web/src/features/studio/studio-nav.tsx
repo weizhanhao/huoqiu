@@ -4,7 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import styles from "./studio-nav.module.css";
+import { StudioNavIcon, type StudioNavIconName } from "./studio-nav-icon";
 import { studioGroups } from "./studio-sections";
+
+const sectionIcons: Readonly<Record<string, StudioNavIconName>> = {
+  benefits: "benefit",
+  content: "content",
+  data: "chart",
+  "data/followers": "users",
+  "data/posts": "table",
+  "drafts/article": "draft",
+  "drafts/discussion": "discussion",
+  publish: "article",
+  verification: "verify",
+};
 
 /*
  * 创作者中心左侧导航。
@@ -29,7 +42,8 @@ export function StudioNav() {
         className={`${styles.link}${current === "" ? ` ${styles.current}` : ""}`}
         href="/studio"
       >
-        首页
+        <StudioNavIcon className={styles.icon} name="home" />
+        <span>首页</span>
       </Link>
 
       {studioGroups.map((group) => (
@@ -45,6 +59,10 @@ export function StudioNav() {
                   }`}
                   href={`/studio/${section.slug}`}
                 >
+                  <StudioNavIcon
+                    className={styles.icon}
+                    name={sectionIcons[section.slug] ?? "content"}
+                  />
                   <span>{section.label}</span>
                   {/*
                     背后没有真能力的那几块，在导航上就标出来。

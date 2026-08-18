@@ -77,9 +77,10 @@ export function PasswordPanel() {
       className={styles.contentSection}
       data-testid="password-panel"
     >
-      <h3 className={styles.sectionHeading} id="password-heading">
-        修改密码
-      </h3>
+      <div className={styles.panelIntroduction}>
+        <h3 id="password-heading">更换登录密码</h3>
+        <p>保存后会退出其他设备，当前设备保持登录。</p>
+      </div>
 
       {account === null ? (
         <Link className={styles.inverseLink} href="/login">
@@ -137,7 +138,7 @@ export function PasswordPanel() {
       )}
 
       {status === "" ? null : (
-        <p aria-live="polite" className={styles.contentMeta}>
+        <p aria-live="polite" className={styles.statusMessage}>
           {status}
         </p>
       )}

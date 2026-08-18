@@ -96,27 +96,25 @@ export function VideosHub() {
   return (
     <section
       aria-labelledby="videos-heading"
-      className={styles.page}
+      className={`${styles.page} ${styles.videoPage}`}
       data-testid="videos-hub"
     >
-      <header className={styles.hero}>
-        <div>
-          <p className={styles.kicker}>视频</p>
-          <h1 id="videos-heading">视频</h1>
-        </div>
-        <p className={styles.heroNote}>
-          东方财富公开视频列表的最近更新，点开在源站播放。
-          本站不转存视频文件，也不提供上传与直播。
-        </p>
-      </header>
+      <h1 className="visually-hidden" id="videos-heading">
+        视频
+      </h1>
 
       {columns.length === 0 ? null : (
-        <div aria-label="视频栏目" className={styles.filters} role="group">
+        <div
+          aria-label="视频栏目"
+          className={styles.videoFilters}
+          role="tablist"
+        >
           {columnFilters.map(([value, label]) => (
             <button
-              aria-pressed={column === value}
+              aria-selected={column === value}
               key={value === "" ? "all" : value}
               onClick={() => setColumn(value)}
+              role="tab"
               type="button"
             >
               {label}
@@ -125,9 +123,12 @@ export function VideosHub() {
         </div>
       )}
 
-      <section className={styles.panel}>
-        <div className={styles.panelHeading}>
-          <h2>{column.length === 0 ? "最近更新" : column}</h2>
+      <section className={`${styles.panel} ${styles.videoPanel}`}>
+        <div className={styles.videoPanelHeading}>
+          <div>
+            <h2>{column.length === 0 ? "最近更新" : column}</h2>
+            <p>东方财富公开视频 · 点开在源站播放</p>
+          </div>
           {/*
             说「本页 N 条」而不是「共 N 条」：这是取回来的最近一批，
             不是源站的全部。
@@ -142,7 +143,7 @@ export function VideosHub() {
           原先三段各自渲染一个 live region，容器和文字同时插进 DOM——多数
           读屏对这种情况根本不播，于是切栏目之后一片沉默。成功也要出声。
         */}
-        <p className={styles.empty} role="status">
+        <p className="visually-hidden" role="status">
           {state.kind === "loading"
             ? "正在读取视频列表……"
             : state.kind === "failed"
@@ -152,8 +153,16 @@ export function VideosHub() {
                 : `已列出 ${shown.length} 条视频。`}
         </p>
 
-        {shown.length === 0 ? null : (
-          <ul className={styles.rows}>
+        {shown.length === 0 ? (
+          <p className={styles.videoEmpty}>
+            {state.kind === "loading"
+              ? "正在读取视频列表……"
+              : state.kind === "failed"
+                ? "视频列表暂时取不到。本站不以占位内容代替。"
+                : "该栏目下暂无视频。"}
+          </p>
+        ) : (
+          <ul className={`${styles.rows} ${styles.videoRows}`}>
             {shown.map((video) => (
               <li key={video.code}>
                 <a
@@ -166,34 +175,39 @@ export function VideosHub() {
                     封面经本站转发，浏览器不直连第三方——与顶栏搜索同一条
                     边界。宽高写死，避免图片加载完把下面的内容顶下去。
                   */}
-                  {video.thumbnail === null ? (
-                    <span aria-hidden="true" className={styles.thumbnail} />
-                  ) : (
-                    <img
-                      alt=""
-                      className={styles.cover}
-                      height={THUMBNAIL_HEIGHT}
-                      loading="lazy"
-                      src={`/api/videos/thumbnail?name=${encodeURIComponent(video.thumbnail)}`}
-                      width={THUMBNAIL_WIDTH}
-                    />
-                  )}
                   <span className={styles.videoBody}>
-                    <strong>
+                    <span className={styles.videoSource}>
+                      <b aria-hidden="true">东</b>
+                      <strong>东方财富</strong>
+                      {video.publishedAt === null ? null : (
+                        <time>{video.publishedAt}</time>
+                      )}
+                      {video.column === null ? null : (
+                        <span>{video.column}</span>
+                      )}
+                    </span>
+                    <strong className={styles.videoTitle}>
                       {video.title}
                       {/* 按下之前就该知道这会跳出站、并且新开窗口。 */}
                       <span className="visually-hidden">
                         （东方财富，新窗口打开）
                       </span>
                     </strong>
-                    <span className={styles.videoMeta}>
-                      {video.column === null ? null : (
-                        <span>{video.column}</span>
-                      )}
-                      {video.publishedAt === null ? null : (
-                        <span>{video.publishedAt}</span>
-                      )}
-                      <span>东方财富 · 站外播放</span>
+                    {video.thumbnail === null ? (
+                      <span aria-hidden="true" className={styles.thumbnail} />
+                    ) : (
+                      <img
+                        alt=""
+                        className={styles.cover}
+                        height={THUMBNAIL_HEIGHT}
+                        loading="lazy"
+                        src={`/api/videos/thumbnail?name=${encodeURIComponent(video.thumbnail)}`}
+                        width={THUMBNAIL_WIDTH}
+                      />
+                    )}
+                    <span className={styles.videoAction}>
+                      <span>查看源视频</span>
+                      <span>站外播放 ↗</span>
                     </span>
                   </span>
                 </a>
@@ -204,14 +218,14 @@ export function VideosHub() {
       </section>
 
       <aside aria-label="受限能力说明" className={styles.restricted}>
-        <strong>仅列表与跳转</strong>
+        <strong>视频说明</strong>
         {/*
           这里原先挂着一个 disabled 的「投稿暂未开放」按钮。一个永远按不动的
           按钮不是能力说明，是个摆设——说明写成话就够了。
         */}
         <span>
-          本站不转存视频文件，不提供上传、直播或站内播放；时长与播放量源站
-          未公开，因此不显示。
+          保留栏目筛选与源站跳转；本站不转存视频文件。时长与播放量源站未公开，
+          因此不显示。
         </span>
       </aside>
     </section>

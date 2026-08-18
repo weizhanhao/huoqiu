@@ -538,3 +538,233 @@
     gap: 5px;
   }
 }
+
+/*
+ * 紧凑版信息架构：分类是筛选器，不是五张数据卡。
+ * 数字只作辅助徽标，把视觉重心还给消息本身。
+ */
+.center {
+  gap: 12px;
+  padding-bottom: 24px;
+}
+
+.hero {
+  align-items: center;
+  gap: 12px 20px;
+  padding: 14px 16px;
+}
+
+.heroCopy h1 {
+  font-size: 22px;
+  font-weight: var(--hq-type-weight-semibold);
+  letter-spacing: var(--hq-type-tracking-tight);
+  line-height: var(--hq-type-line-height-compact);
+}
+
+.heroCopy > p:last-child {
+  max-width: 48ch;
+}
+
+.unreadSummary {
+  align-items: center;
+  background: var(--hq-brand-subtle);
+  border: 0;
+  border-radius: 999px;
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px 12px;
+}
+
+.unreadSummary > small {
+  display: none;
+}
+
+.unreadSummary strong {
+  color: var(--hq-brand-primary);
+  font-size: 18px;
+}
+
+.disclosure {
+  gap: 10px;
+  padding: 11px 14px;
+}
+
+.disclosure > span {
+  height: 30px;
+  width: 30px;
+}
+
+.toolbar {
+  align-items: center;
+  padding: 3px 2px 0;
+}
+
+.readAllButton,
+.filters button,
+.cardActions button,
+.empty button {
+  min-height: 36px;
+}
+
+.readAllButton {
+  padding: 0 13px;
+}
+
+.filters {
+  align-items: center;
+  border-bottom: 1px solid var(--hq-border-subtle);
+  display: flex;
+  gap: 4px;
+  grid-template-columns: none;
+  overflow-x: auto;
+  padding: 0 0 8px;
+  scrollbar-width: thin;
+}
+
+.filters button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  grid-template-columns: none;
+  min-width: 96px;
+  padding: 0 11px;
+  text-align: center;
+}
+
+.filters button > strong {
+  align-items: center;
+  background: var(--hq-surface-sunken);
+  border-radius: 999px;
+  color: var(--hq-text-secondary);
+  display: inline-flex;
+  font-size: 12px;
+  grid-column: auto;
+  grid-row: auto;
+  justify-content: center;
+  min-width: 22px;
+  padding: 2px 6px;
+}
+
+.filters button > small {
+  display: none;
+}
+
+.filters button[aria-pressed="true"] {
+  background: var(--hq-surface-selected);
+  border-color: transparent;
+  box-shadow: inset 0 -2px 0 var(--hq-brand-primary);
+}
+
+.filters button[aria-pressed="true"] > strong {
+  background: var(--hq-brand-primary);
+  color: var(--hq-brand-on-primary);
+}
+
+.list {
+  gap: 8px;
+}
+
+.card {
+  gap: 12px;
+  padding: 14px 15px;
+}
+
+.avatar {
+  flex-basis: 38px;
+  height: 38px;
+  width: 38px;
+}
+
+.cardBody {
+  gap: 7px;
+}
+
+.storyLink,
+.inertStory {
+  gap: 5px;
+  min-height: 0;
+}
+
+.storyLink:hover .targetLabel {
+  color: var(--hq-brand-primary);
+  text-decoration: none;
+}
+
+.cardActions button {
+  min-height: 32px;
+  padding: 5px 10px;
+}
+
+.empty {
+  align-items: center;
+  display: grid;
+  gap: 4px 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 116px;
+  padding: 22px 24px;
+  text-align: left;
+}
+
+.empty > span {
+  font-size: 18px;
+  grid-row: 1 / 3;
+  height: 38px;
+  width: 38px;
+}
+
+.empty p {
+  font-size: 13px;
+  grid-column: 2;
+  max-width: 560px;
+}
+
+.empty button {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  padding: 7px 14px;
+}
+
+.footer {
+  letter-spacing: 0;
+  padding: 10px 2px 0;
+}
+
+@media (max-width: 600px) {
+  .hero {
+    padding: 14px;
+  }
+
+  .unreadSummary {
+    align-self: flex-start;
+  }
+
+  .filters {
+    padding-bottom: 8px;
+  }
+
+  .filters button {
+    flex-basis: auto;
+    min-width: 92px;
+  }
+
+  .readAllButton,
+  .filters button,
+  .cardActions button,
+  .empty button {
+    min-height: 44px;
+  }
+
+  .empty {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .empty button {
+    grid-column: 2;
+    grid-row: auto;
+    justify-self: start;
+  }
+}

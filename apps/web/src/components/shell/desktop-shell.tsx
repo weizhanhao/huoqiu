@@ -27,30 +27,29 @@ export function DesktopShell({
   fixtureResult = loadD0Fixture(),
   requiresD0Fixture = true,
 }: DesktopShellProperties) {
-  const fixture = fixtureResult.status === "ready" ? fixtureResult.data : null;
   // 真实汇率：服务端读本地快照，浏览器不直连第三方。
   const fx = loadFxSnapshot();
   /*
-   * 只影响版面：消息、设置、个人主页这几页用更窄的正文栏。
-   * 导航选中态不再看它——那由各导航组件按地址自己算。
+   * 只影响版面：设置页使用独立的宽正文栏。
+   * 消息与个人主页都保留标准三栏；否则第三列会被浏览器自动排到下一行，
+   * 看起来像右栏掉到了左侧导航下面。
+   * 导航选中态不看它——那由各导航组件按地址自己算。
    */
-  const profileActive = activeUtility !== undefined;
+  const narrowUtility = activeUtility === "settings";
 
   return (
     <div
       className={`d0-app-shell${
-        profileActive ? " d0-app-shell-notifications" : ""
+        narrowUtility ? " d0-app-shell-notifications" : ""
       }`}
     >
       <SiteTopbar />
 
       <div className="d0-layout">
         <aside className="d0-sidebar" aria-label="用户与主导航">
-          <SidebarAccount
-            fallbackName={fixture?.seed_user.name ?? "火球研究员"}
-          />
+          <SidebarAccount fallbackName="未登录" />
 
-          <PublishDialog className="sidebar-publish">＋ 发帖</PublishDialog>
+          <PublishDialog className="sidebar-publish">发帖</PublishDialog>
 
           <SidebarNavigation />
 

@@ -1156,7 +1156,7 @@ a.fund-row:hover strong:first-child {
 .index-strip {
   display: grid;
   gap: var(--hq-spacing-2);
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   min-width: 0;
   /*
    * 撑不下就自己横向滚，别把整页撑宽。
@@ -1236,9 +1236,9 @@ a.fund-row:hover strong:first-child {
   border-color: var(--hq-border-subtle);
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 720px) {
   .index-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2679,7 +2679,7 @@ a.fund-row:hover strong:first-child {
     min-width: 0;
   }
 
-  /* 窄屏把环境信息留给页面正文，顶栏只保留导航、搜索和消息。 */
+  /* 窄屏把环境信息留给页面正文，顶栏保留搜索、消息和设置。 */
   .demo-data-badge {
     display: none;
   }
@@ -2689,10 +2689,9 @@ a.fund-row:hover strong:first-child {
    *
    * 原来这里是 display: none，配合 ≤720px 隐藏侧栏，结果手机上「消息」和
    * 「发布」两个入口一个都不剩——功能存在但到不了，等于没做。
-   * 现在只收起文字标签和次要入口，消息图标（含未读角标）保留；
-   * 发布由下方的浮动按钮承担。
+   * 现在只收起文字标签，消息（含未读角标）和设置两个图标都保留；发布由
+   * 下方的浮动按钮承担。
    */
-  .top-actions > a:not(.notification-nav-link),
   .top-actions .unavailable-action {
     display: none;
   }

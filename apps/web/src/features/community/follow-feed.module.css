@@ -8,17 +8,18 @@
 
 .stream {
   display: grid;
-  gap: var(--hq-spacing-3);
-  margin-top: var(--hq-spacing-5);
+  gap: 0;
+  margin-top: 0;
 }
 
 .card {
-  background: var(--hq-surface-base);
-  border: 1px solid var(--hq-border-default);
-  border-radius: var(--hq-radius-card);
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #edf0f5;
+  border-radius: 0;
   display: grid;
-  gap: var(--hq-spacing-3);
-  padding: var(--hq-spacing-5);
+  gap: 10px;
+  padding: 22px 0;
 }
 
 .author {
@@ -54,7 +55,7 @@
 }
 
 .identity strong {
-  font-size: 0.94rem;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -73,22 +74,23 @@
   border-radius: 50%;
   color: var(--hq-brand-primary);
   display: inline-flex;
-  flex: 0 0 44px;
+  flex: 0 0 46px;
+  font-size: 14px;
   font-weight: 700;
-  height: 44px;
+  height: 46px;
   justify-content: center;
 }
 
 .time {
-  color: var(--hq-text-secondary);
-  font-size: 0.8rem;
+  color: #666c72;
+  font-size: 14px;
   /* 时间跟着卡片走，不跟着昵称走——它不是这个人的一部分。 */
   white-space: nowrap;
 }
 
 .title {
-  font-size: 1.1rem;
-  line-height: 1.45;
+  font-size: 18px;
+  line-height: 1.5;
   margin: 0;
 }
 
@@ -117,12 +119,23 @@
 }
 
 .body {
-  color: var(--hq-text-secondary);
-  line-height: 1.7;
+  color: #33353c;
+  font-size: 17px;
+  line-height: 1.72;
   margin: 0;
   /* 长文只露前几行，点标题看全文。 */
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
+}
+
+@media (max-width: 720px) {
+  .card {
+    padding: 18px 0;
+  }
+
+  .body {
+    font-size: 15px;
+  }
 }

@@ -26,6 +26,7 @@ import {
 import { useWatchlistQuotes, WatchlistQuotes } from "./watchlist-quotes";
 import { PageState } from "../system/page-state";
 import { WatchlistToggle } from "./watchlist-toggle";
+import styles from "./watchlist-panel.module.css";
 
 type WatchlistPanelProperties = Readonly<{
   /*
@@ -165,7 +166,10 @@ export function WatchlistPanel({
   };
 
   return (
-    <section className="watchlist-panel" aria-labelledby="watchlist-heading">
+    <section
+      className={`watchlist-panel ${styles.panel}`}
+      aria-labelledby="watchlist-heading"
+    >
       {/*
         实时行情表。
         下面那份条目列表的价格来自最后一根日线的收盘价——隔夜的陈价，
@@ -173,7 +177,7 @@ export function WatchlistPanel({
         并按品种分页签。
       */}
       <WatchlistQuotes symbols={listingIds} />
-      <header className="watchlist-heading">
+      <header className={`watchlist-heading ${styles.heading}`}>
         <div>
           <p className="card-kicker">自选 · 仅本次会话</p>
           <h1 id="watchlist-heading">我的自选</h1>
@@ -187,7 +191,7 @@ export function WatchlistPanel({
         */}
       </header>
 
-      <div className="watchlist-toolbar">
+      <div className={`watchlist-toolbar ${styles.toolbar}`}>
         <nav aria-label="自选分组" className="watchlist-groups">
           {groups.map((group) => (
             <button
@@ -201,65 +205,67 @@ export function WatchlistPanel({
           ))}
         </nav>
 
-        <form
-          method="post"
-          className="watchlist-group-form"
-          onSubmit={submitGroup}
-        >
-          <label className="visually-hidden" htmlFor="watchlist-new-group">
-            新建分组名称
-          </label>
-          <input
-            id="watchlist-new-group"
-            maxLength={12}
-            onChange={(event) => setNewGroup(event.target.value)}
-            placeholder="新建分组"
-            value={newGroup}
-          />
-          <button type="submit">新建</button>
-        </form>
-
-        <div className="watchlist-columns" role="group" aria-label="列组切换">
-          {(
-            [
-              ["quote", "行情"],
-              ["profile", "资料"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              aria-pressed={columnSet === id}
-              key={id}
-              onClick={() => setColumnSet(id)}
-              type="button"
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <button
-          aria-pressed={custom}
-          className="watchlist-custom-toggle"
-          onClick={() => setCustom(!custom)}
-          type="button"
-        >
-          {custom ? "自定义顺序（已启用）" : "自定义顺序"}
-        </button>
-
-        <label className="watchlist-sort">
-          <span>排序</span>
-          <select
-            disabled={custom}
-            onChange={(event) => setSort(event.target.value as typeof sort)}
-            value={sort}
-          >
-            {watchlistSortOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
+        <div className={styles.toolbarActions}>
+          <div className="watchlist-columns" role="group" aria-label="列组切换">
+            {(
+              [
+                ["quote", "行情"],
+                ["profile", "资料"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                aria-pressed={columnSet === id}
+                key={id}
+                onClick={() => setColumnSet(id)}
+                type="button"
+              >
+                {label}
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+
+          <button
+            aria-pressed={custom}
+            className="watchlist-custom-toggle"
+            onClick={() => setCustom(!custom)}
+            type="button"
+          >
+            {custom ? "自定义顺序（已启用）" : "自定义顺序"}
+          </button>
+
+          <label className="watchlist-sort">
+            <span>排序</span>
+            <select
+              disabled={custom}
+              onChange={(event) => setSort(event.target.value as typeof sort)}
+              value={sort}
+            >
+              {watchlistSortOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <form
+            method="post"
+            className="watchlist-group-form"
+            onSubmit={submitGroup}
+          >
+            <label className="visually-hidden" htmlFor="watchlist-new-group">
+              新建分组名称
+            </label>
+            <input
+              id="watchlist-new-group"
+              maxLength={12}
+              onChange={(event) => setNewGroup(event.target.value)}
+              placeholder="新建分组"
+              value={newGroup}
+            />
+            <button type="submit">新建</button>
+          </form>
+        </div>
       </div>
 
       {groupError === null ? null : (

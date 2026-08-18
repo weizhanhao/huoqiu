@@ -9,14 +9,15 @@ import {
 } from "../../../src/stores/d0-watchlist";
 
 describe("D0 Web seed session", () => {
-  it("renders the fixture identity, preserved routes, and product navigation", () => {
+  it("keeps fixture data from impersonating a signed-in account", () => {
     const markup = renderToStaticMarkup(
       <DesktopShell>
         <p>内容</p>
       </DesktopShell>,
     );
 
-    expect(markup).toContain("演示用户");
+    expect(markup).toContain("未登录");
+    expect(markup).not.toContain("演示用户");
     expect(markup).toContain("内容");
     expect(markup).toContain('href="/"');
     expect(markup).toContain('href="/watchlist"');

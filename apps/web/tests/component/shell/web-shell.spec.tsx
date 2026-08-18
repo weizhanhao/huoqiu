@@ -39,7 +39,29 @@ const renderNotificationShell = (): string => {
   );
 };
 
+const renderUtilityShell = (
+  activeUtility: "notifications" | "profile" | "settings",
+): string =>
+  renderToStaticMarkup(
+    <DesktopShell activeUtility={activeUtility}>
+      <p>页面内容</p>
+    </DesktopShell>,
+  );
+
 describe("financial community web shell", () => {
+  it("keeps the profile rail in the standard three-column shell", () => {
+    expect(renderUtilityShell("profile")).toContain('class="d0-app-shell"');
+    expect(renderUtilityShell("profile")).not.toContain(
+      "d0-app-shell-notifications",
+    );
+    expect(renderUtilityShell("notifications")).not.toContain(
+      "d0-app-shell-notifications",
+    );
+    expect(renderUtilityShell("settings")).toContain(
+      "d0-app-shell-notifications",
+    );
+  });
+
   it("renders semantic header, centered content, and both desktop sidebars", () => {
     const markup = renderShell();
 
@@ -143,13 +165,12 @@ describe("financial community web shell", () => {
 
     expect(markup).toContain('aria-label="顶部功能"');
     expect(markup).toContain(">消息<");
-    /*
-     * 顶栏那一项叫「发帖」不叫「发布」：它现在弹出一个写短帖的框，
-     * 而「发布」在创作者中心另有所指（发布长文）。同一个词指两件事，
-     * 用户会以为点它能写长文。
-     */
-    expect(markup).toContain(">发帖<");
     expect(markup).toContain(">设置<");
+    const topActions = markup.match(
+      /<nav class="top-actions"[^>]*>[\s\S]*?<\/nav>/u,
+    )?.[0];
+    expect(topActions).toBeDefined();
+    expect(topActions).not.toContain(">发帖<");
     expect(markup).toContain('aria-label="移动端主导航"');
 
     /* 底部第一格是「关注」——站内没有首页这一档。 */
@@ -164,9 +185,7 @@ describe("financial community web shell", () => {
      * 且交互按钮必须有**可观察的状态**，不能是哑巴。
      *
      * 可观察的状态有两种：切换类用 aria-pressed；打开弹框的用
-     * aria-expanded（配合 aria-haspopup）。发帖按钮属于后者——读屏用户
-     * 按下去之前要知道它会弹出对话框，按下去之后要知道它开着。
-     * 只认 aria-pressed 的话，正确标注的弹框触发器反而通不过。
+     * aria-expanded（配合 aria-haspopup）。
      */
     const buttons = [...markup.matchAll(/<button\b[^>]*>/gu)].map(
       ([tag]) => tag,
@@ -175,7 +194,7 @@ describe("financial community web shell", () => {
     for (const tag of buttons) {
       expect(tag).toMatch(/\stype="(button|submit)"/u);
       if (!tag.includes('type="submit"')) {
-        expect(tag).toMatch(/\saria-(?:pressed|expanded)="/u);
+        expect(tag).toMatch(/\saria-(?:pressed|expanded|label)="/u);
       }
     }
   });
@@ -183,15 +202,14 @@ describe("financial community web shell", () => {
   it("exposes notifications on desktop and carries unread state on mobile My", () => {
     const markup = renderShell();
 
-    // 顶栏 1 + 侧栏消息 1 + 侧栏二级项 4（回复 / @我 / 赞与收藏 / 系统消息）
     /*
-     * 六个入口不变，但其中四个侧栏子链接现在带 ?category= 直达对应分类——
-     * 过去它们全部指向同一个默认视图。正则放宽到允许查询串，计数不变。
+     * 持久侧栏只保留一个「消息」入口，具体分类在消息中心内部切换。
+     * 因此外壳只应有顶栏和侧栏两个入口，不再把四个子分类全铺在左边。
      */
     expect(markup.match(/href="\/notifications(?:\?[^"]*)?"/gu)).toHaveLength(
-      6,
+      2,
     );
-    expect(markup).toContain('href="/notifications?category=replies"');
+    expect(markup).not.toContain('href="/notifications?category=replies"');
     /*
      * 「我的」不再写死到内置样本用户：已登录指向本人主页，未登录指向 /login。
      * 服务端静态渲染出的是未登录态，所以这里顺带钉死整个外壳不得再出现
@@ -230,11 +248,9 @@ describe("financial community web shell", () => {
     const markup = renderShell();
 
     /*
-     * 三处：顶栏「发布」、侧栏「＋ 写帖子」、以及移动端发布浮动按钮。
-     * 第三处是后加的——移动端隐藏了顶栏功能区和侧栏，原先手机上根本
-     * 到不了发帖页。这条断言顺带把那个入口锁住，防止再被隐藏掉。
+     * 两处：侧栏「＋ 写帖子」和移动端发布浮动按钮。
      */
-    expect(markup.match(/href="\/publish"/gu)).toHaveLength(3);
+    expect(markup.match(/href="\/publish"/gu)).toHaveLength(2);
     expect(markup).toContain('class="mobile-publish-fab"');
     expect(markup.match(/href="\/markets"/gu)).toHaveLength(2);
     expect(markup.match(/href="\/portfolios"/gu)).toHaveLength(2);

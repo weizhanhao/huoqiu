@@ -127,11 +127,13 @@ describe("combined profile and finance navigation", () => {
     expect(profileShell).toMatch(/<a class="seed-user" href="\/login">/u);
     expect(profileShell).toContain('class="channel-tabs"');
 
-    expect(settingsShell.match(/href="\/settings"/gu)).toHaveLength(2);
+    expect(settingsShell.match(/href="\/settings"/gu)).toHaveLength(1);
     expect(settingsShell).not.toContain('aria-label="设置，暂未开放"');
     expect(settingsShell).toContain(
-      'aria-current="page" class="top-action-link" href="/settings"',
+      'aria-current="page" aria-expanded="false" aria-haspopup="menu"',
     );
+    expect(settingsShell).toContain('role="menuitem" href="/settings"');
+    expect(settingsShell).toContain('aria-label="退出账号"');
     expect(settingsShell).toContain('class="channel-tabs"');
 
     /*
@@ -141,10 +143,7 @@ describe("combined profile and finance navigation", () => {
      */
     expect(
       notificationsShell.match(/href="\/notifications(?:\?[^"]*)?"/gu),
-    ).toHaveLength(6);
-    expect(notificationsShell).toContain(
-      'href="/notifications?category=system"',
-    );
+    ).toHaveLength(2);
     expect(notificationsShell).toContain('class="channel-tabs"');
   });
 
@@ -183,22 +182,17 @@ describe("combined profile and finance navigation", () => {
   });
 
   it("keeps the desktop primary navigation aligned with the active surface", () => {
-    const destinations = {
-      bookmarks: "/bookmarks",
-      home: "/",
-      markets: "/markets",
-      /*
-        涨跌榜是这次出问题的那一条：它在 /markets 之下，按短前缀算会把
-        「行情」点亮，而人明明站在涨跌榜上。
-      */
-      rankings: "/markets/rankings",
-      portfolios: "/portfolios",
-      studio: "/studio",
-      watchlist: "/watchlist",
-    } as const;
+    const destinations = [
+      { destination: "/", pathname: "/" },
+      { destination: "/markets", pathname: "/markets" },
+      { destination: "/markets", pathname: "/markets/rankings" },
+      { destination: "/portfolios", pathname: "/portfolios" },
+      { destination: "/studio", pathname: "/studio" },
+      { destination: "/watchlist", pathname: "/watchlist" },
+    ] as const;
 
-    for (const [, href] of Object.entries(destinations)) {
-      currentPathname = href;
+    for (const { destination, pathname } of destinations) {
+      currentPathname = pathname;
       const shellMarkup = renderToStaticMarkup(
         <DesktopShell>
           <p>页面内容</p>
@@ -207,7 +201,7 @@ describe("combined profile and finance navigation", () => {
       const primaryNavigation =
         /<nav aria-label="主导航">([\s\S]*?)<\/nav>/u.exec(shellMarkup)?.[1] ??
         "";
-      const escapedHref = href.replaceAll("/", "\\/");
+      const escapedHref = destination.replaceAll("/", "\\/");
 
       expect(primaryNavigation.match(/aria-current="page"/gu)).toHaveLength(1);
       expect(primaryNavigation).toMatch(

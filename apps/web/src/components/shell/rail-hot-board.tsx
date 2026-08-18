@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
+
 import { InstrumentLink } from "../instrument/instrument-link";
+import { WatchlistToggle } from "../watchlist/watchlist-toggle";
 import { useEffect, useState } from "react";
 
 /*
@@ -19,10 +22,10 @@ import { useEffect, useState } from "react";
  */
 
 const MARKETS = [
+  { id: "global", label: "全球" },
   { id: "cn", label: "沪深" },
   { id: "hk", label: "港股" },
   { id: "us", label: "美股" },
-  { id: "global", label: "全球" },
 ] as const;
 
 type MarketId = (typeof MARKETS)[number]["id"];
@@ -41,11 +44,55 @@ type State =
   | Readonly<{ kind: "loading" }>
   | Readonly<{ delayed: boolean; kind: "ready"; rows: readonly HotRow[] }>;
 
+type ReadyState = Extract<State, Readonly<{ kind: "ready" }>>;
+const hotBoardCache = new Map<string, ReadyState>();
+const hotBoardRequests = new Map<string, Promise<ReadyState>>();
+
+const loadHotBoard = (
+  market: MarketId,
+  direction: Direction,
+): Promise<ReadyState> => {
+  const key = `${market}:${direction}`;
+  const cached = hotBoardCache.get(key);
+  if (cached !== undefined) return Promise.resolve(cached);
+  const running = hotBoardRequests.get(key);
+  if (running !== undefined) return running;
+  const request = (async () => {
+    const response = await fetch(
+      `/api/market/hot?market=${market}&direction=${direction}`,
+    );
+    if (!response.ok) throw new Error("hot board unavailable");
+    const data = (await response.json()) as {
+      delayed?: boolean;
+      rows?: readonly HotRow[];
+    };
+    const next: ReadyState = {
+      delayed: data.delayed ?? false,
+      kind: "ready",
+      rows: data.rows ?? [],
+    };
+    hotBoardCache.set(key, next);
+    return next;
+  })().finally(() => {
+    hotBoardRequests.delete(key);
+  });
+  hotBoardRequests.set(key, request);
+  return request;
+};
+
 const formatPercent = (value: number | null): string => {
   if (value === null) return "—";
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
 };
+
+const formatPrice = (value: number | null): string =>
+  value === null
+    ? "—"
+    : value.toLocaleString("zh-CN", {
+        maximumFractionDigits: 3,
+        minimumFractionDigits: 2,
+      });
 
 const toneClass = (value: number | null): string | undefined => {
   if (value === null || value === 0) return undefined;
@@ -53,11 +100,34 @@ const toneClass = (value: number | null): string | undefined => {
 };
 
 export function RailHotBoard() {
-  const [market, setMarket] = useState<MarketId>("cn");
+  const [market, setMarket] = useState<MarketId>("global");
   const [direction, setDirection] = useState<Direction>("gainers");
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const initial = hotBoardCache.get("global:gainers");
+  const [pending, setPending] = useState(initial === undefined);
+  const [state, setState] = useState<State>(initial ?? { kind: "loading" });
+
+  const selectMarket = (next: MarketId): void => {
+    const cached = hotBoardCache.get(`${next}:${direction}`);
+    if (cached !== undefined) {
+      setState(cached);
+      setPending(false);
+    }
+    setMarket(next);
+  };
+
+  const selectDirection = (next: Direction): void => {
+    const cached = hotBoardCache.get(`${market}:${next}`);
+    if (cached !== undefined) {
+      setState(cached);
+      setPending(false);
+    }
+    setDirection(next);
+  };
 
   useEffect(() => {
+    const cached = hotBoardCache.get(`${market}:${direction}`);
+    if (cached !== undefined) return undefined;
+
     let cancelled = false;
     void (async () => {
       /*
@@ -65,28 +135,19 @@ export function RailHotBoard() {
        * 同步改状态会在同一轮渲染里再触发一次。对用户没有分别——它和
        * 紧随其后的请求本来就是同一件事。
        */
-      setState({ kind: "loading" });
+      setPending(true);
       try {
-        const response = await fetch(
-          `/api/market/hot?market=${market}&direction=${direction}`,
-        );
+        const next = await loadHotBoard(market, direction);
         if (cancelled) return;
-        if (!response.ok) {
-          setState({ kind: "failed" });
-          return;
-        }
-        const data = (await response.json()) as {
-          delayed?: boolean;
-          rows?: readonly HotRow[];
-        };
-        if (cancelled) return;
-        setState({
-          delayed: data.delayed ?? false,
-          kind: "ready",
-          rows: data.rows ?? [],
-        });
+        setState(next);
+        setPending(false);
       } catch {
-        if (!cancelled) setState({ kind: "failed" });
+        if (!cancelled) {
+          setState((current) =>
+            current.kind === "ready" ? current : { kind: "failed" },
+          );
+          setPending(false);
+        }
       }
     })();
     return () => {
@@ -95,14 +156,14 @@ export function RailHotBoard() {
   }, [direction, market]);
 
   return (
-    <section className="rail-card" aria-labelledby="rail-hot-board-heading">
+    <section
+      aria-busy={pending}
+      className="rail-card rail-hot-board"
+      aria-labelledby="rail-hot-board-heading"
+    >
       <div className="rail-heading">
         <h2 id="rail-hot-board-heading">热股榜</h2>
-        {/*
-          走延时源时要说出来。一份晚十几分钟的真行情有用，
-          但把它当成此刻的价就是另一回事了。
-        */}
-        <span>{state.kind === "ready" && state.delayed ? "延时" : "实时"}</span>
+        <Link href="/markets/rankings">更多</Link>
       </div>
 
       <div className="rail-tabs" role="group" aria-label="右栏热股榜市场切换">
@@ -110,7 +171,7 @@ export function RailHotBoard() {
           <button
             aria-pressed={market === item.id}
             key={item.id}
-            onClick={() => setMarket(item.id)}
+            onClick={() => selectMarket(item.id)}
             type="button"
           >
             {item.label}
@@ -128,7 +189,7 @@ export function RailHotBoard() {
           <button
             aria-pressed={direction === id}
             key={id}
-            onClick={() => setDirection(id)}
+            onClick={() => selectDirection(id)}
             type="button"
           >
             {label}
@@ -136,46 +197,80 @@ export function RailHotBoard() {
         ))}
       </div>
 
-      {state.kind === "loading" ? (
+      {/* 延时源必须如实说明，但不再占掉标题右侧的“更多”入口。 */}
+      {state.kind === "ready" && state.delayed ? (
+        <p className="rail-hot-board-status">延时行情</p>
+      ) : null}
+
+      {pending ? (
         <p aria-live="polite" className="rail-empty">
-          正在读取榜单……
+          {state.kind === "ready" ? "正在更新榜单……" : "正在读取榜单……"}
         </p>
       ) : null}
 
-      {state.kind === "failed" ? (
+      {!pending && state.kind === "failed" ? (
         <p className="rail-empty">榜单暂时取不到。</p>
       ) : null}
 
       {state.kind === "ready" ? (
         <ol className="rail-rank">
-          {state.rows.map((row, index) => (
-            <li key={row.code}>
-              <span className="rail-rank-index">{index + 1}</span>
-              {/*
+          {state.rows.map((row, index) => {
+            const listingSymbol =
+              row.href?.replace("/instruments/", "") ?? null;
+
+            return (
+              <li key={row.code}>
+                <span className="rail-rank-index">{index + 1}</span>
+                {/*
                 沪深、港股、美股都有站内详情页了。北交所、新三板仍然没有，
                 那几行照旧只给文字——先许诺点得进去、再给一张空页，
                 比不给链接更糟。
               */}
-              {row.href === null ? (
-                <span>
-                  <strong>{row.name}</strong>
-                  <small>{row.code}</small>
-                </span>
-              ) : (
-                /*
+                {row.href === null ? (
+                  <span>
+                    <strong>{row.name}</strong>
+                    <small>{row.code}</small>
+                  </span>
+                ) : (
+                  /*
                   接口给的是地址，链接组件要的是代码。取出来的若不是合法
                   代码，它会退回成纯文字，而不是给出一条坏链接。
                 */
-                <InstrumentLink symbol={row.href.replace("/instruments/", "")}>
-                  <strong>{row.name}</strong>
-                  <small>{row.code}</small>
-                </InstrumentLink>
-              )}
-              <strong className={toneClass(row.changePercent)}>
-                {formatPercent(row.changePercent)}
-              </strong>
-            </li>
-          ))}
+                  <InstrumentLink symbol={listingSymbol ?? ""}>
+                    <strong>{row.name}</strong>
+                    <small>{row.code}</small>
+                  </InstrumentLink>
+                )}
+                <aside
+                  aria-label={`${row.name} 快速操作`}
+                  className="rail-stock-preview"
+                >
+                  <p>
+                    <strong>{row.name}</strong>
+                    <span>{row.code}</span>
+                  </p>
+                  <div className="rail-stock-preview-quote">
+                    <strong>{formatPrice(row.last)}</strong>
+                    <span className={toneClass(row.changePercent)}>
+                      {formatPercent(row.changePercent)}
+                    </span>
+                  </div>
+                  <small>真实行情 · 点击名称查看详情</small>
+                  {listingSymbol === null ? null : (
+                    <div className="rail-stock-preview-actions">
+                      <WatchlistToggle
+                        listingId={listingSymbol}
+                        removeLabel="取消自选"
+                      />
+                    </div>
+                  )}
+                </aside>
+                <strong className={toneClass(row.changePercent)}>
+                  {formatPercent(row.changePercent)}
+                </strong>
+              </li>
+            );
+          })}
         </ol>
       ) : null}
     </section>

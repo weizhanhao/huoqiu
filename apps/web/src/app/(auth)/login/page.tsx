@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
 import { AuthExperience } from "../../../features/account/auth-experience";
-import { LoginMethods } from "../../../features/account/login-methods";
 
 /*
  * 登录。
@@ -25,16 +24,9 @@ export default async function LoginPage({
 }>) {
   const { next } = await searchParams;
   return (
-    <>
-      <AuthExperience
-        mode="login"
-        nextPath={typeof next === "string" ? next : null}
-      />
-      {/*
-        登录方式一览。验证码、扫码、微信这三种本机都接不了，
-        所以如实列出并写明原因，而不是摆三个点了没反应的按钮。
-      */}
-      <LoginMethods />
-    </>
+    <AuthExperience
+      mode="login"
+      nextPath={typeof next === "string" ? next : null}
+    />
   );
 }

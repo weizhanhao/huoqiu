@@ -15,6 +15,7 @@ export function CommunityFeedCard({ card }: Readonly<{ card: FeedCard }>) {
     <article
       className={styles.card}
       data-card-id={card.id}
+      data-kind={card.kind}
       data-testid="community-feed-card"
     >
       <header className={styles.cardAuthor}>
@@ -34,10 +35,20 @@ export function CommunityFeedCard({ card }: Readonly<{ card: FeedCard }>) {
           还是注册用户自己发的。栏目账号在 author fixtures 里有登记，
           用户帖子没有，因此这里只给前者加标。
         */}
-        {author === undefined ? null : (
-          <span className={styles.syntheticBadge}>栏目</span>
-        )}
-        <BlockAuthorButton authorId={card.authorId} authorName={card.author} />
+        <div className={styles.cardAuthorActions}>
+          {author === undefined ? null : (
+            <span
+              className={styles.syntheticBadge}
+              title="由站内编辑栏目维护的内容"
+            >
+              栏目内容
+            </span>
+          )}
+          <BlockAuthorButton
+            authorId={card.authorId}
+            authorName={card.author}
+          />
+        </div>
       </header>
 
       <div className={styles.cardTitleRow}>
@@ -78,7 +89,6 @@ export function CommunityFeedCard({ card }: Readonly<{ card: FeedCard }>) {
       </div>
       <footer className={styles.cardFooter}>
         <div className={styles.engagement} aria-label="互动统计">
-          <span>{formatCommunityCount(card.engagement.reposts)} 转发</span>
           <span>{formatCommunityCount(card.engagement.comments)} 评论</span>
           {/*
             真实帖子的赞会落盘并成为对方的一条真实通知；样本卡片仍是静态
@@ -92,7 +102,11 @@ export function CommunityFeedCard({ card }: Readonly<{ card: FeedCard }>) {
           detailHref 缺省时按 id 回落到帖子路由。
         */}
         <BookmarkButton postId={card.id} />
-        <RepostButton postId={card.id} postTitle={card.title} />
+        <RepostButton
+          fallbackCount={card.engagement.reposts}
+          postId={card.id}
+          postTitle={card.title}
+        />
         <Link href={card.detailHref ?? `/community/posts/${card.id}`}>
           查看完整帖子
         </Link>

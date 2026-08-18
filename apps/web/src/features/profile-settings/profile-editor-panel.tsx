@@ -127,9 +127,10 @@ export function ProfileEditorPanel() {
       className={styles.contentSection}
       data-testid="profile-editor-panel"
     >
-      <h3 className={styles.sectionHeading} id="profile-editor-heading">
-        个人简介
-      </h3>
+      <div className={styles.panelIntroduction}>
+        <h3 id="profile-editor-heading">公开资料</h3>
+        <p>这些内容会显示在你的个人主页，登录邮箱不会公开。</p>
+      </div>
 
       {account === null ? (
         <Link className={styles.inverseLink} href="/login">
@@ -137,6 +138,18 @@ export function ProfileEditorPanel() {
         </Link>
       ) : (
         <form method="post" onSubmit={submit}>
+          <div className={styles.profilePreview}>
+            <span aria-hidden="true" className={styles.profileAvatar}>
+              {displayName.slice(0, 1)}
+            </span>
+            <span>
+              <strong>{displayName}</strong>
+              <span className={styles.profilePath}>
+                个人主页 /users/{account.id}
+              </span>
+            </span>
+          </div>
+
           <div className={styles.formField}>
             <label htmlFor="profile-display-name">昵称</label>
             <input
@@ -151,26 +164,28 @@ export function ProfileEditorPanel() {
 
           <div className={styles.formField}>
             <label htmlFor="profile-province">居住地</label>
-            <select
-              id="profile-province"
-              onChange={(event) => setProvince(event.target.value)}
-              value={province}
-            >
-              <option value="">省/直辖市</option>
-              {PROVINCES.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <input
-              aria-label="城市/地区"
-              maxLength={40}
-              onChange={(event) => setCity(event.target.value)}
-              placeholder="城市/地区"
-              type="text"
-              value={city}
-            />
+            <div className={styles.locationFields}>
+              <select
+                id="profile-province"
+                onChange={(event) => setProvince(event.target.value)}
+                value={province}
+              >
+                <option value="">省/直辖市</option>
+                {PROVINCES.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <input
+                aria-label="城市/地区"
+                maxLength={40}
+                onChange={(event) => setCity(event.target.value)}
+                placeholder="城市/地区"
+                type="text"
+                value={city}
+              />
+            </div>
           </div>
 
           <div className={styles.formField}>
@@ -213,7 +228,7 @@ export function ProfileEditorPanel() {
       )}
 
       {status === "" ? null : (
-        <p aria-live="polite" className={styles.contentMeta}>
+        <p aria-live="polite" className={styles.statusMessage}>
           {status}
         </p>
       )}

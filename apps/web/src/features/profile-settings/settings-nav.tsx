@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import styles from "../../app/settings/settings-shell.module.css";
+
 /*
  * 设置页的八项导航。
  *
@@ -12,14 +14,54 @@ import { usePathname } from "next/navigation";
  */
 
 const NAVIGATION = [
-  { href: "/settings", label: "个人资料" },
-  { href: "/settings/password", label: "修改登录密码" },
-  { href: "/settings/notifications", label: "消息提醒设置" },
-  { href: "/settings/privacy", label: "隐私设置" },
-  { href: "/settings/blocked", label: "已屏蔽用户" },
-  { href: "/settings/market", label: "股票设置" },
-  { href: "/settings/binding", label: "账号绑定" },
-  { href: "/settings/preferences", label: "偏好设置" },
+  {
+    description: "编辑公开昵称、居住地与简介",
+    group: "账号",
+    href: "/settings",
+    label: "个人资料",
+  },
+  {
+    description: "验证当前密码后更换登录凭证",
+    group: "账号",
+    href: "/settings/password",
+    label: "登录密码",
+  },
+  {
+    description: "管理登录邮箱与其他绑定状态",
+    group: "账号",
+    href: "/settings/binding",
+    label: "账号绑定",
+  },
+  {
+    description: "选择进入消息中心的提醒类型",
+    group: "互动",
+    href: "/settings/notifications",
+    label: "消息提醒",
+  },
+  {
+    description: "限制谁可以评论你发布的讨论",
+    group: "互动",
+    href: "/settings/privacy",
+    label: "隐私",
+  },
+  {
+    description: "查看并管理你已屏蔽的账号",
+    group: "互动",
+    href: "/settings/blocked",
+    label: "屏蔽管理",
+  },
+  {
+    description: "选择行情中的涨跌配色习惯",
+    group: "显示",
+    href: "/settings/market",
+    label: "行情配色",
+  },
+  {
+    description: "调整主题、动效和内容显示方式",
+    group: "显示",
+    href: "/settings/preferences",
+    label: "显示偏好",
+  },
 ] as const;
 
 /**
@@ -34,17 +76,29 @@ const NAVIGATION = [
 export function SettingsHeading() {
   const pathname = usePathname();
   const current = NAVIGATION.find((item) => item.href === pathname);
-  return <h1>{current?.label ?? "设置"}</h1>;
+  return (
+    <header className={styles.heading}>
+      <h1>{current?.label ?? "设置"}</h1>
+      <p>{current?.description ?? "管理账号与显示偏好"}</p>
+    </header>
+  );
 }
 
 export function SettingsNav() {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="设置导航" className="settings-nav">
+    <nav aria-label="设置导航" className={styles.navigation}>
+      <Link className={styles.backLink} href="/">
+        <span aria-hidden="true">←</span>
+        返回首页
+      </Link>
       <ul>
-        {NAVIGATION.map((item) => (
+        {NAVIGATION.map((item, index) => (
           <li key={item.href}>
+            {index === 0 || NAVIGATION[index - 1]?.group !== item.group ? (
+              <p className={styles.groupLabel}>{item.group}</p>
+            ) : null}
             <Link
               /*
                * 根路径要精确匹配。

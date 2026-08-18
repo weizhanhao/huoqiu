@@ -59,6 +59,7 @@ export function PrivateFundsHub() {
   const [draft, setDraft] = useState("");
   const [keyword, setKeyword] = useState("");
   const [page, setPage] = useState(0);
+  const [pending, setPending] = useState(true);
   const [state, setState] = useState<State>({ kind: "loading" });
   // 清除关键词后要把焦点交还给它，否则焦点会掉回 body。
   const searchRef = useRef<HTMLInputElement>(null);
@@ -71,7 +72,11 @@ export function PrivateFundsHub() {
        * 同步改状态会在同一轮渲染里再触发一次。对用户没有分别——它和
        * 紧随其后的请求本来就是同一件事。
        */
-      setState({ kind: "loading" });
+      /*
+       * 切类型、检索或翻页时保留上一页表格。若立刻卸载整张表，页面高度会
+       * 瞬间变短，浏览器会回收 scrollTop，左侧导航看起来就整块向上跳。
+       */
+      setPending(true);
       const query = new URLSearchParams({ page: String(page) });
       if (investType.length > 0) query.set("type", investType);
       if (keyword.length > 0) query.set("q", keyword);
@@ -79,7 +84,10 @@ export function PrivateFundsHub() {
         const response = await fetch(`/api/private-funds?${query.toString()}`);
         if (cancelled) return;
         if (!response.ok) {
-          setState({ kind: "failed" });
+          setState((current) =>
+            current.kind === "ready" ? current : { kind: "failed" },
+          );
+          setPending(false);
           return;
         }
         const data = (await response.json()) as {
@@ -92,8 +100,14 @@ export function PrivateFundsHub() {
           managers: data.managers ?? [],
           total: data.total ?? 0,
         });
+        setPending(false);
       } catch {
-        if (!cancelled) setState({ kind: "failed" });
+        if (!cancelled) {
+          setState((current) =>
+            current.kind === "ready" ? current : { kind: "failed" },
+          );
+          setPending(false);
+        }
       }
     })();
     return () => {
@@ -110,7 +124,7 @@ export function PrivateFundsHub() {
       className={styles.page}
       data-testid="private-funds-hub"
     >
-      <header className={styles.hero}>
+      <header className={`${styles.hero} ${styles.privateHero}`}>
         <div>
           <p className={styles.kicker}>私募</p>
           <h1 id="private-funds-heading">私募管理人</h1>
@@ -121,7 +135,11 @@ export function PrivateFundsHub() {
         </p>
       </header>
 
-      <div aria-label="机构类型筛选" className={styles.filters} role="group">
+      <div
+        aria-label="机构类型筛选"
+        className={`${styles.filters} ${styles.privateTypeFilters}`}
+        role="group"
+      >
         {TYPE_FILTERS.map(([value, label]) => (
           <button
             aria-pressed={investType === value}
@@ -140,7 +158,7 @@ export function PrivateFundsHub() {
 
       <form
         method="post"
-        className={styles.filters}
+        className={`${styles.filters} ${styles.privateSearch}`}
         onSubmit={(event) => {
           event.preventDefault();
           setKeyword(draft.trim());
@@ -181,7 +199,7 @@ export function PrivateFundsHub() {
         </button>
       </form>
 
-      <section className={styles.panel}>
+      <section aria-busy={pending} className={styles.panel}>
         <div className={styles.panelHeading}>
           <h2>{investType.length === 0 ? "全部机构类型" : investType}</h2>
           <span>
@@ -197,21 +215,25 @@ export function PrivateFundsHub() {
           读屏对这种情况根本不播；于是点了筛选、检索、翻页之后一片沉默，
           用户不知道结果换了没有。成功也要出声，不能只有失败才说话。
         */}
-        <p className={styles.empty} role="status">
-          {state.kind === "loading"
-            ? "正在读取中基协公示信息……"
+        <p className={styles.registryStatus} role="status">
+          {pending
+            ? state.kind === "ready"
+              ? "正在更新中基协公示信息……"
+              : "正在读取中基协公示信息……"
             : state.kind === "failed"
               ? "中基协公示信息暂时取不到。本页不以样本数据代替。"
-              : state.managers.length === 0
+              : state.kind === "ready" && state.managers.length === 0
                 ? "没有符合条件的登记管理人。"
-                : `第 ${page + 1} 页，共 ${total} 家登记管理人。`}
+                : state.kind === "ready"
+                  ? `第 ${page + 1} 页，共 ${total} 家登记管理人。`
+                  : "正在读取中基协公示信息……"}
         </p>
 
         {state.kind === "ready" && state.managers.length > 0 ? (
           <ScrollableTable label="私募管理人登记信息">
             <table className={`watchlist-table ${styles.registryTable}`}>
               {/* 表要有名字：读屏的表格列表里念的就是 caption。 */}
-              <caption className={styles.empty}>私募管理人登记信息</caption>
+              <caption className="visually-hidden">私募管理人登记信息</caption>
               <thead>
                 <tr>
                   <th scope="col">管理人</th>
@@ -260,7 +282,11 @@ export function PrivateFundsHub() {
         ) : null}
 
         {pageCount > 1 ? (
-          <div aria-label="翻页" className={styles.filters} role="group">
+          <div
+            aria-label="翻页"
+            className={`${styles.filters} ${styles.privatePagination} hq-pagination`}
+            role="group"
+          >
             {/*
               翻页按钮用 aria-disabled，不用 disabled。
               连续按到最后一页时，disabled 会让浏览器把焦点从这个按钮上收走、

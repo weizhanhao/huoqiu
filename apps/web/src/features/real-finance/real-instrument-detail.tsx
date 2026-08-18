@@ -168,7 +168,7 @@ export function RealInstrumentDetail({
             这个区别不该靠含糊措辞抹平。
           */}
             <p className={styles.disclosure}>
-              以上数字均由上述日线数据直接计算得出。数据抓取于{" "}
+              以上数字均由腾讯财经公开行情接口的日线数据直接计算得出。数据抓取于{" "}
               {fetchedAt.slice(0, 10)}
               ，为日线快照而非实时行情，不提供投资建议或交易能力。
             </p>

@@ -129,8 +129,7 @@ describe("profile and settings shell navigation", () => {
       </SettingsLayout>,
     );
 
-    // 频道栏现在在所有页面都渲染：之前工具页把它摘掉，导致从别处点进来时
-    // 主列内容整体上跳 52px，跳完又"恢复正常"，正是要消除的抖动。
+    // 个人主页仍属于社区外壳，保留频道导航。
     expect(profileMarkup).toContain('class="channel-tabs"');
     /*
      * 「我的」入口已改为跟随真实账号，服务端渲染的是未登录态，落点为 /login。
@@ -139,9 +138,16 @@ describe("profile and settings shell navigation", () => {
     expect(profileMarkup).toMatch(
       /<a[^>]*aria-current="page"[^>]*href="\/login"[^>]*>/u,
     );
-    expect(settingsMarkup).toContain('class="channel-tabs"');
+    // 设置是独立的账号工作台：只保留共享顶栏、设置导航与内容，
+    // 不能把首页频道、轮播、左侧行情菜单或右侧热榜带进来。
+    expect(settingsMarkup).not.toContain('class="channel-tabs"');
+    expect(settingsMarkup).not.toContain('class="d0-sidebar"');
+    expect(settingsMarkup).not.toContain('aria-label="社区行情与热榜"');
+    expect(settingsMarkup).toContain("返回首页");
+    expect(settingsMarkup).toContain('aria-label="设置导航"');
     expect(settingsMarkup).toContain(
-      'aria-current="page" class="top-action-link" href="/settings"',
+      'aria-current="page" aria-expanded="false" aria-haspopup="menu"',
     );
+    expect(settingsMarkup).toContain('role="menuitem" href="/settings"');
   });
 });

@@ -15,8 +15,8 @@ type NotificationNavigationLinkProperties = Readonly<{
 function BellIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M6.7 9.3a5.3 5.3 0 0 1 10.6 0c0 5 2.1 5.7 2.1 5.7H4.6s2.1-.7 2.1-5.7Z" />
-      <path d="M9.8 18a2.4 2.4 0 0 0 4.4 0" />
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z" />
+      <path d="M9.6 20a2.8 2.8 0 0 0 4.8 0" />
     </svg>
   );
 }
@@ -29,6 +29,7 @@ export function NotificationNavigationLink({
 
   return (
     <Link
+      aria-label="消息"
       aria-current={active ? "page" : undefined}
       className={className}
       href="/notifications"

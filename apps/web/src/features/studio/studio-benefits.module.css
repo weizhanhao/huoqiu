@@ -6,12 +6,13 @@
  */
 .wrap {
   display: grid;
-  gap: var(--hq-spacing-4);
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .conditions {
   display: grid;
-  gap: var(--hq-spacing-2);
+  gap: 0;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -23,6 +24,12 @@
   font-size: var(--hq-type-size-body-compact);
   gap: var(--hq-spacing-2);
   justify-content: space-between;
+  min-height: 34px;
+  padding: 6px 0;
+}
+
+.condition + .condition {
+  border-top: 1px solid var(--hq-border-subtle);
 }
 
 .met {
@@ -46,11 +53,17 @@
   color: var(--hq-brand-primary);
   font-size: var(--hq-type-size-body-compact);
   justify-self: start;
-  min-height: var(--hq-touch-web-minimum);
-  padding: 0 var(--hq-spacing-5);
+  min-height: 32px;
+  padding: 0 13px;
 }
 
 .apply:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+@media (max-width: 760px) {
+  .wrap {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

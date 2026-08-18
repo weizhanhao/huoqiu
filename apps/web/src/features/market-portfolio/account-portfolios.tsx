@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import { useAccountSession } from "../account/account-session";
+import styles from "./market-portfolio.module.css";
 
 /*
  * 组合页签：我创建的、我关注的。
@@ -70,12 +71,12 @@ function PortfolioList({
   quotes: ReadonlyMap<string, number | null>;
 }>) {
   if (portfolios.length === 0) {
-    return <p className="watchlist-hint">{emptyHint}</p>;
+    return <p className={styles.accountPortfolioEmpty}>{emptyHint}</p>;
   }
 
   return (
     <ScrollableTable label="我的组合">
-      <table className="watchlist-table">
+      <table className={`watchlist-table ${styles.accountPortfolioTable}`}>
         <thead>
           <tr>
             <th scope="col">组合名称</th>
@@ -130,7 +131,7 @@ function CreatePortfolio({ onCreated }: Readonly<{ onCreated: () => void }>) {
   const { authorizedFetch } = useAccountSession();
   const [name, setName] = useState("");
   const [summary, setSummary] = useState("");
-  const [rows, setRows] = useState("sh600519 60\nsz300862 40");
+  const [rows, setRows] = useState("");
   const [status, setStatus] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -180,41 +181,60 @@ function CreatePortfolio({ onCreated }: Readonly<{ onCreated: () => void }>) {
   return (
     <form
       method="post"
-      className="watchlist-quotes"
+      className={styles.portfolioForm}
       onSubmit={(event) => void submit(event)}
     >
-      <label htmlFor="portfolio-name">组合名称</label>
-      <input
-        id="portfolio-name"
-        maxLength={40}
-        onChange={(event) => setName(event.target.value)}
-        required
-        type="text"
-        value={name}
-      />
+      <div className={styles.portfolioFormHeading}>
+        <div>
+          <h2>新建组合</h2>
+          <p>组合跟随当前账号保存，持仓权重合计需为 100。</p>
+        </div>
+      </div>
 
-      <label htmlFor="portfolio-summary">组合说明</label>
-      <input
-        id="portfolio-summary"
-        maxLength={200}
-        onChange={(event) => setSummary(event.target.value)}
-        type="text"
-        value={summary}
-      />
+      <div className={styles.portfolioFieldGrid}>
+        <label htmlFor="portfolio-name">
+          <span>组合名称</span>
+          <input
+            id="portfolio-name"
+            maxLength={40}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="例如：长期观察组合"
+            required
+            type="text"
+            value={name}
+          />
+        </label>
 
-      <label htmlFor="portfolio-holdings">
-        持仓（每行一条「代码 权重」，权重合计 100）
+        <label htmlFor="portfolio-summary">
+          <span>组合说明</span>
+          <input
+            id="portfolio-summary"
+            maxLength={200}
+            onChange={(event) => setSummary(event.target.value)}
+            placeholder="可选，简要说明组合思路"
+            type="text"
+            value={summary}
+          />
+        </label>
+      </div>
+
+      <label className={styles.portfolioHoldings} htmlFor="portfolio-holdings">
+        <span>持仓与权重</span>
+        <small>每行填写“证券代码 权重”，权重合计 100</small>
+        <textarea
+          id="portfolio-holdings"
+          onChange={(event) => setRows(event.target.value)}
+          placeholder={"每行一只证券，例如：\nsh600519 60\nsz300862 40"}
+          rows={4}
+          value={rows}
+        />
       </label>
-      <textarea
-        id="portfolio-holdings"
-        onChange={(event) => setRows(event.target.value)}
-        rows={4}
-        value={rows}
-      />
 
-      <button disabled={pending} type="submit">
-        {pending ? "创建中…" : "创建组合"}
-      </button>
+      <div className={styles.portfolioFormActions}>
+        <button disabled={pending} type="submit">
+          {pending ? "创建中…" : "创建组合"}
+        </button>
+      </div>
 
       {status === "" ? null : (
         <p aria-live="polite" className="watchlist-hint">
@@ -379,8 +399,18 @@ export function AccountPortfolios() {
   }
 
   return (
-    <section className="watchlist-panel" data-testid="account-portfolios">
-      <nav aria-label="组合分类" className="watchlist-categories">
+    <section
+      className={`${styles.accountPortfolioPanel} watchlist-panel`}
+      data-testid="account-portfolios"
+    >
+      <header className={styles.accountPortfolioHeading}>
+        <div>
+          <p>自选组合</p>
+          <h1>我的组合</h1>
+        </div>
+        <span>{state.created.length + state.followed.length} 个</span>
+      </header>
+      <nav aria-label="组合分类" className={styles.portfolioTabs}>
         <button
           aria-pressed={tab === "created"}
           onClick={() => setTab("created")}
@@ -414,7 +444,7 @@ export function AccountPortfolios() {
         />
       )}
 
-      <p className="watchlist-hint">
+      <p className={styles.portfolioNote}>
         当日收益按持仓权重对各标的当日涨跌幅加权得出，数据来自公开行情接口；
         任一持仓取不到行情时显示「—」，不给出不完整的加权结果。
       </p>

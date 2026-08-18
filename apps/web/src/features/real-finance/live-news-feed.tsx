@@ -31,6 +31,9 @@ type State =
   | Readonly<{ kind: "failed" }>
   | Readonly<{ kind: "loading" }>;
 
+/* 频道间切换不重复空等；只缓存本会话取到的真实快讯。 */
+let newsCache: readonly NewsItem[] | null = null;
+
 /**
  * 只取数、不碰状态。
  *
@@ -44,14 +47,21 @@ const fetchNews = async (signal: AbortSignal): Promise<State | null> => {
     if (!response.ok) return { kind: "failed" };
     const data = (await response.json()) as { items?: readonly NewsItem[] };
     if (signal.aborted) return null;
-    return { items: data.items ?? [], kind: "ready" };
+    const items = data.items ?? [];
+    newsCache = items;
+    return { items, kind: "ready" };
   } catch {
     return signal.aborted ? null : { kind: "failed" };
   }
 };
 
 export function LiveNewsFeed() {
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const [state, setState] = useState<State>(() =>
+    newsCache === null
+      ? { kind: "loading" }
+      : { items: newsCache, kind: "ready" },
+  );
+  const [pending, setPending] = useState(newsCache === null);
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
@@ -61,8 +71,14 @@ export function LiveNewsFeed() {
      * 因此一定发生在 await 之后，不会在同一轮渲染里再触发一次。
      */
     const refresh = async (): Promise<void> => {
+      setPending(true);
       const next = await fetchNews(controller.signal);
-      if (next !== null) setState(next);
+      if (next !== null) {
+        setState((current) =>
+          next.kind === "failed" && current.kind === "ready" ? current : next,
+        );
+        setPending(false);
+      }
     };
 
     void refresh();
@@ -84,6 +100,7 @@ export function LiveNewsFeed() {
 
   return (
     <section
+      aria-busy={pending}
       aria-labelledby="live-news-heading"
       className={styles.sectionPanel}
     >
@@ -92,10 +109,12 @@ export function LiveNewsFeed() {
         <span className={styles.muted}>东方财富公开快讯 · 北京时间</span>
         <button
           aria-pressed={paused}
+          className={styles.refreshToggle}
           onClick={() => setPaused((current) => !current)}
           type="button"
         >
-          {paused ? "已暂停刷新" : "每分钟刷新"}
+          <span aria-hidden="true" className={styles.refreshDot} />
+          {paused ? "已暂停" : "自动刷新中"}
         </button>
       </div>
 
@@ -104,13 +123,15 @@ export function LiveNewsFeed() {
         同时插进 DOM 时，多数读屏根本不播。
       */}
       <p className={styles.status} role="status">
-        {state.kind === "loading"
-          ? "正在读取快讯……"
-          : state.kind === "failed"
-            ? "快讯暂时取不到。本页不以样本内容代替。"
-            : state.items.length === 0
-              ? "暂无快讯。"
-              : `已列出 ${state.items.length} 条快讯。`}
+        {pending && state.kind === "ready"
+          ? "正在后台更新快讯……"
+          : state.kind === "loading"
+            ? "正在读取快讯……"
+            : state.kind === "failed"
+              ? "快讯暂时取不到。本页不以样本内容代替。"
+              : state.items.length === 0
+                ? "暂无快讯。"
+                : `已列出 ${state.items.length} 条快讯。`}
       </p>
 
       {state.kind === "ready" && state.items.length > 0 ? (
@@ -138,6 +159,19 @@ export function LiveNewsFeed() {
               {item.digest === null ? null : (
                 <p className={styles.publisher}>{item.digest}</p>
               )}
+            </li>
+          ))}
+        </ol>
+      ) : state.kind === "loading" ? (
+        <ol
+          aria-hidden="true"
+          className={`${styles.timelineList} ${styles.timelineSkeleton}`}
+        >
+          {Array.from({ length: 6 }, (_, index) => (
+            <li key={index}>
+              <span />
+              <span />
+              <span />
             </li>
           ))}
         </ol>

@@ -27,7 +27,7 @@ export function StudioMetrics({
   if (state.kind === "anonymous") {
     return (
       <section className={styles.card}>
-        <p className="page-state-message">
+        <p className={styles.statusBar}>
           <Link href="/login">登录</Link>后可以看到自己的数据。
         </p>
       </section>
@@ -35,15 +35,24 @@ export function StudioMetrics({
   }
   if (state.kind === "loading") {
     return (
-      <section className={styles.card}>
-        <p className={styles.empty}>正在读取……</p>
+      <section
+        aria-busy="true"
+        aria-label="正在读取创作数据"
+        className={styles.loadingCard}
+      >
+        <span className={styles.loadingTitle} />
+        <div className={styles.loadingMetrics}>
+          {Array.from({ length: 5 }, (_, index) => (
+            <span key={index} />
+          ))}
+        </div>
       </section>
     );
   }
   if (state.kind === "failed") {
     return (
       <section className={styles.card}>
-        <p className="page-state-message">数据暂时取不到，请稍后再试。</p>
+        <p className={styles.statusBar}>数据暂时取不到，请稍后再试。</p>
       </section>
     );
   }
@@ -60,13 +69,26 @@ export function StudioMetrics({
           { label: "点赞量", primary: false, value: stats.likeCount },
           { label: "收藏量", primary: false, value: stats.bookmarkCount },
           { label: "已发布", primary: false, value: stats.publishedCount },
+          { label: "粉丝量", primary: false, value: followerCount },
         ];
 
   return (
     <section className={styles.card}>
-      <h2 className={styles.heading}>
-        {scope === "followers" ? "粉丝数据" : "数据总览"}
-      </h2>
+      <header className={styles.sectionHeader}>
+        <div>
+          <h2 className={styles.heading}>
+            {scope === "followers" ? "粉丝数据" : "数据总览"}
+          </h2>
+          <p className={styles.subheading}>
+            {scope === "followers"
+              ? "按真实关注关系统计"
+              : "来自已发布作品的真实互动"}
+          </p>
+        </div>
+        {scope === "content" ? (
+          <span className={styles.periodLabel}>昨日阅读 {yesterday}</span>
+        ) : null}
+      </header>
 
       <div className={styles.metrics}>
         {cells.map((cell) => (
@@ -79,10 +101,6 @@ export function StudioMetrics({
           </div>
         ))}
       </div>
-
-      {scope === "content" ? (
-        <p className={styles.subheading}>昨天阅读量：{yesterday}</p>
-      ) : null}
 
       {/*
         说清楚哪些数字这里没有。留白让人以为是零，而实际上是没记。
@@ -110,19 +128,34 @@ export function StudioPostMetrics() {
   if (state.kind === "anonymous") {
     return (
       <section className={styles.card}>
-        <p className="page-state-message">
+        <p className={styles.statusBar}>
           <Link href="/login">登录</Link>后可以看到自己的数据。
         </p>
       </section>
     );
   }
 
-  if (state.kind !== "ready") {
+  if (state.kind === "loading") {
+    return (
+      <section
+        aria-busy="true"
+        aria-label="正在读取作品数据"
+        className={styles.loadingCard}
+      >
+        <span className={styles.loadingTitle} />
+        <div className={styles.loadingRows}>
+          <span />
+          <span />
+          <span />
+        </div>
+      </section>
+    );
+  }
+
+  if (state.kind === "failed") {
     return (
       <section className={styles.card}>
-        <p className={styles.empty}>
-          {state.kind === "loading" ? "正在读取……" : "数据暂时取不到。"}
-        </p>
+        <p className={styles.statusBar}>数据暂时取不到。</p>
       </section>
     );
   }

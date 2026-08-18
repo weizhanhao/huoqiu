@@ -6,12 +6,14 @@ import RootLayout from "../../../src/app/layout";
 import { isWatchableSymbol } from "../../../src/lib/watchlist-symbol";
 import { WatchlistPanel } from "../../../src/components/watchlist/watchlist-panel";
 import { WatchlistToggle } from "../../../src/components/watchlist/watchlist-toggle";
+import { WatchlistWorkspace } from "../../../src/components/watchlist/watchlist-workspace";
 import { loadKlineSnapshot } from "../../../src/features/real-finance/kline.server";
 import { loadD0Fixture } from "../../../src/lib/d0-fixture";
 import {
   createD0WatchlistState,
   D0WatchlistProvider,
 } from "../../../src/stores/d0-watchlist";
+import { parseFundWatchlist } from "../../../src/stores/fund-watchlist";
 
 const readyFixture = () => {
   const result = loadD0Fixture();
@@ -44,6 +46,29 @@ const renderWithWatchlist = (
   );
 
 describe("D0 session watchlist", () => {
+  it("keeps stock features and exposes the real fund and portfolio workspaces", () => {
+    const markup = renderWithWatchlist(
+      <WatchlistWorkspace initialTab="fund" realEntries={[]} state="normal" />,
+      [],
+    );
+
+    expect(markup).toContain("自选股票");
+    expect(markup).toContain("自选基金");
+    expect(markup).toContain("自选组合</button>");
+    expect(markup).not.toContain('href="/portfolios"');
+    expect(markup).toContain("排行推荐");
+    expect(markup).toContain('aria-label="正在读取真实基金排行"');
+  });
+
+  it("accepts only unique six-digit fund codes from browser storage", () => {
+    expect(
+      parseFundWatchlist(
+        JSON.stringify(["001480", "bad", "001480", 21528, "021528"]),
+      ),
+    ).toEqual(["001480", "021528"]);
+    expect(parseFundWatchlist("broken-json")).toEqual([]);
+  });
+
   it("normalizes initial state to unique, known listing IDs", () => {
     expect(
       createD0WatchlistState(

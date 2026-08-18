@@ -6,7 +6,7 @@
   "scripts": {
     "build": "next build --webpack",
     "build:release": "node scripts/build-release.mjs",
-    "dev": "next dev",
+    "dev": "next dev --webpack --hostname 127.0.0.1",
     "finance:fx": "node scripts/fetch-fx-rates.mjs",
     "finance:kline": "node scripts/fetch-kline.mjs",
     "finance:news": "../../node_modules/.bin/tsx scripts/fetch-finance-public.ts",

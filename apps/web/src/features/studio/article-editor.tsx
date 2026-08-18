@@ -89,7 +89,7 @@ export function ArticleEditor() {
   if (account === null) {
     return (
       <section className={styles.editor}>
-        <p className="page-state-message">
+        <p className={styles.notice}>
           <a href="/login">登录</a>后可以写长文。
         </p>
       </section>
@@ -134,32 +134,32 @@ export function ArticleEditor() {
             ))}
           </select>
         </label>
+
+        <div className={styles.actions}>
+          <button
+            className={styles.secondary}
+            disabled={busy}
+            onClick={() => void save(false)}
+            type="button"
+          >
+            存草稿
+          </button>
+          <button
+            className={styles.primary}
+            disabled={!canSubmit}
+            onClick={() => void save(true)}
+            type="button"
+          >
+            发布
+          </button>
+        </div>
       </div>
 
       {notice === null ? null : (
-        <p aria-live="polite" className="page-state-message">
+        <p aria-live="polite" className={styles.notice}>
           {notice}
         </p>
       )}
-
-      <div className={styles.actions}>
-        <button
-          className={styles.secondary}
-          disabled={busy}
-          onClick={() => void save(false)}
-          type="button"
-        >
-          存草稿
-        </button>
-        <button
-          className={styles.primary}
-          disabled={!canSubmit}
-          onClick={() => void save(true)}
-          type="button"
-        >
-          发布
-        </button>
-      </div>
     </section>
   );
 }

@@ -1,0 +1,249 @@
+.panel {
+  align-content: start;
+  display: grid;
+  gap: 10px;
+  grid-auto-rows: max-content;
+  min-width: 0;
+  overflow-anchor: none;
+}
+
+.heading {
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid var(--hq-surface-divider);
+  border-radius: 0;
+  min-height: 48px;
+  padding: 8px 2px 12px;
+}
+
+.heading > div {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+}
+
+.heading :global(.card-kicker) {
+  color: var(--hq-text-link);
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.heading h1 {
+  flex: 0 0 auto;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.heading > div > p:last-child {
+  color: var(--hq-text-secondary);
+  flex: 1 1 360px;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.toolbar {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--hq-surface-divider);
+  border-radius: 5px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 6px 8px;
+}
+
+.toolbarActions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.toolbar :global(.watchlist-groups),
+.toolbar :global(.watchlist-columns),
+.toolbar :global(.watchlist-group-form) {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.panel .toolbar .toolbarActions :global(.watchlist-columns) button,
+.panel .toolbar .toolbarActions :global(.watchlist-custom-toggle),
+.panel .toolbar .toolbarActions :global(.watchlist-sort) select,
+.panel .toolbar .toolbarActions :global(.watchlist-group-form) input,
+.panel .toolbar .toolbarActions :global(.watchlist-group-form) button,
+.panel .toolbar :global(.watchlist-groups) button {
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 12px;
+  height: 30px;
+  line-height: normal;
+  max-height: 30px;
+  min-height: 30px;
+}
+
+.toolbar :global(.watchlist-groups) button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--hq-text-secondary);
+  padding: 0 10px;
+}
+
+.toolbar :global(.watchlist-groups) button[aria-pressed="true"] {
+  background: var(--hq-brand-subtle);
+  border-color: transparent;
+  color: var(--hq-text-link);
+  font-weight: 600;
+}
+
+.toolbar :global(.watchlist-columns) {
+  background: var(--hq-surface-sunken);
+  border: 1px solid var(--hq-border-subtle);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.toolbar :global(.watchlist-columns) button {
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--hq-text-secondary);
+  min-width: 44px;
+  padding: 0 8px;
+}
+
+.toolbar :global(.watchlist-columns) button[aria-pressed="true"] {
+  background: var(--hq-brand-primary);
+  color: var(--hq-brand-on-primary);
+  font-weight: 600;
+}
+
+.toolbar :global(.watchlist-columns) button[aria-pressed="true"]::after {
+  display: none;
+}
+
+.toolbar :global(.watchlist-custom-toggle) {
+  background: #fff;
+  border: 1px solid var(--hq-border-default);
+  border-radius: 4px;
+  color: var(--hq-text-secondary);
+  min-width: 86px;
+  padding: 0 9px;
+}
+
+.toolbar :global(.watchlist-custom-toggle)[aria-pressed="true"] {
+  background: var(--hq-brand-subtle);
+  border-color: var(--hq-brand-primary);
+  color: var(--hq-text-link);
+}
+
+.toolbar :global(.watchlist-sort) {
+  align-items: center;
+  color: var(--hq-text-tertiary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 12px;
+  gap: 5px;
+}
+
+.panel .toolbar .toolbarActions :global(.watchlist-sort) select {
+  border: 1px solid var(--hq-border-default);
+  border-radius: 4px;
+  color: var(--hq-text-primary);
+  padding: 0 25px 0 8px;
+  width: 102px;
+}
+
+.toolbar :global(.watchlist-group-form) {
+  margin-left: 2px;
+}
+
+.panel .toolbar .toolbarActions :global(.watchlist-group-form) input {
+  border: 1px solid var(--hq-border-default);
+  border-radius: 4px;
+  padding: 0 8px;
+  width: 108px;
+}
+
+.toolbar :global(.watchlist-group-form) button {
+  background: var(--hq-brand-primary);
+  border: 1px solid var(--hq-brand-primary);
+  border-radius: 4px;
+  color: var(--hq-brand-on-primary);
+  padding: 0 10px;
+}
+
+.toolbar :global(.watchlist-group-form) button:hover {
+  background: var(--hq-brand-primary-hover);
+  border-color: var(--hq-brand-primary-hover);
+}
+
+.toolbar button:focus-visible,
+.toolbar input:focus-visible,
+.toolbar select:focus-visible {
+  border-color: var(--hq-brand-primary);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--hq-brand-primary) 18%, transparent);
+  outline: 0;
+}
+
+.panel > :global(.page-state) {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--hq-surface-divider);
+  border-radius: 5px;
+  display: flex;
+  justify-content: center;
+  min-height: 116px;
+  padding: 24px 18px;
+  text-align: center;
+}
+
+.panel > :global(.page-state) :global(.page-state-mark) {
+  display: none;
+}
+
+@media (max-width: 1080px) {
+  .toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .toolbarActions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .heading > div {
+    display: grid;
+  }
+
+  .toolbarActions {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .toolbar :global(.watchlist-group-form) {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
+  .toolbar :global(.watchlist-group-form) input {
+    flex: 1 1 auto;
+    width: auto;
+  }
+}

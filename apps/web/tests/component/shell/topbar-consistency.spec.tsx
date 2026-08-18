@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import AuthLayout from "../../../src/app/(auth)/layout";
 import StudioLayout from "../../../src/app/studio/layout";
 import { DesktopShell } from "../../../src/components/shell/desktop-shell";
 import { StockShell } from "../../../src/components/shell/stock-shell";
@@ -15,13 +16,14 @@ import { StockShell } from "../../../src/components/shell/stock-shell";
  * 后果是：从首页点进一只股票，最上面那条整个跳一下——图标少了几个、
  * 搜索框换了位置。用户的原话是「感觉不是一个页面，有点草台班子」。
  *
- * 顶栏是全站固定的那一块，不该随页面变。这里守两件事：
+ * 顶栏是全站固定的那一块，不该随页面变。这里守三件事：
  *   1. 两个外壳渲染出来的顶栏一字不差（同一个组件，不是两份长得像的代码）；
  *   2. 顶栏里那几个入口，在哪一页都在。
+ *   3. 登录注册复用同一组件的认证态，只留品牌，不露出搜索、消息和设置。
  */
 
 const topbarOf = (markup: string): string => {
-  const start = markup.indexOf('<header class="d0-topbar"');
+  const start = markup.indexOf('<header class="d0-topbar');
   if (start === -1) return "";
   const end = markup.indexOf("</header>", start);
   return markup.slice(start, end + "</header>".length);
@@ -54,6 +56,15 @@ const stockTopbar = (): string =>
     ),
   );
 
+const authTopbar = (): string =>
+  topbarOf(
+    renderToStaticMarkup(
+      <AuthLayout>
+        <p>登录正文</p>
+      </AuthLayout>,
+    ),
+  );
+
 describe("the top bar is the same one on every page", () => {
   it("renders an identical top bar in every shell", () => {
     const home = homeTopbar();
@@ -76,9 +87,20 @@ describe("the top bar is the same one on every page", () => {
     for (const topbar of [stockTopbar(), studioTopbar()]) {
       expect(topbar).toContain("火球");
       expect(topbar).toContain('action="/search"');
-      for (const entry of ["消息", "发帖", "设置"]) {
+      for (const entry of ["消息", "设置"]) {
         expect(topbar).toContain(`>${entry}<`);
       }
+      expect(topbar).not.toContain("发帖");
     }
+  });
+
+  it("keeps the auth top bar focused while sharing the same shell", () => {
+    const auth = authTopbar();
+
+    expect(auth).toContain('class="d0-topbar d0-topbar-auth"');
+    expect(auth).toContain("火球");
+    expect(auth).not.toContain('action="/search"');
+    expect(auth).not.toContain('href="/notifications"');
+    expect(auth).not.toContain('href="/settings"');
   });
 });

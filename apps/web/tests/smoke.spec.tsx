@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -12,6 +14,25 @@ const renderShell = async (): Promise<string> =>
   renderToStaticMarkup(<RootLayout>{HomePage()}</RootLayout>);
 
 describe("web shell", () => {
+  it("loads the recovered Xueqiu theme after the base stylesheet", () => {
+    const layoutSource = readFileSync(
+      new URL("../src/app/layout.tsx", import.meta.url),
+      "utf8",
+    );
+    const theme = readFileSync(
+      new URL("../src/app/xueqiu-theme.css", import.meta.url),
+      "utf8",
+    );
+
+    expect(layoutSource.indexOf('import "./globals.css"')).toBeLessThan(
+      layoutSource.indexOf('import "./xueqiu-theme.css"'),
+    );
+    expect(theme).toContain("--hq-brand-primary: #1d7bea");
+    expect(theme).toContain(".d0-topbar");
+    expect(theme).toContain(".d0-layout");
+    expect(theme).toContain("@media (max-width: 720px)");
+  });
+
   it("keeps the brand out of the page heading", async () => {
     const markup = await renderShell();
 
@@ -22,10 +43,6 @@ describe("web shell", () => {
      */
     expect(markup).toContain('class="brand-word">火球');
     expect(markup).not.toMatch(/<h1\b[^>]*>火球<\/h1>/u);
-    /*
-     * 这一页自己的标题要在。根路径现在是关注流——站内不再有一个叫「首页」的
-     * 页面，进站第一眼就是自己关注的人。
-     */
     expect(markup).toMatch(/<h1\b[^>]*>关注<\/h1>/u);
     expect(metadata.title).toBe("火球");
   });
@@ -60,11 +77,8 @@ describe("web shell", () => {
     }
 
     expect(markup).toContain("暂时没有资讯");
-    /*
-     * 环境标识收敛成了「预览环境」。「本地受保护」描述的是部署配置，
-     * 而它出现在顶栏最显眼的位置、每一页都在——读者只需要知道这不是正式环境。
-     */
-    expect(markup).toContain("预览环境");
+    // 顶栏只留消息与设置，不再塞一个没有操作的环境标签。
+    expect(markup).not.toContain("预览环境");
     expect(markup).not.toContain("当前使用演示数据和合成数据");
     expect(markup).not.toContain("星海智造完成日内数据更新");
   });

@@ -275,6 +275,255 @@
   text-align: start;
 }
 
+/* ---------- 自选组合工作区 ---------- */
+
+.accountPortfolioPanel {
+  display: grid;
+  gap: 16px;
+  min-height: 620px;
+}
+
+.accountPortfolioHeading {
+  align-items: center;
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 18px;
+}
+
+.accountPortfolioHeading p {
+  color: var(--hq-text-link);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.accountPortfolioHeading h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.accountPortfolioHeading > span {
+  color: var(--hq-text-tertiary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.portfolioTabs {
+  align-items: center;
+  border-bottom: 1px solid var(--hq-border-subtle);
+  display: flex;
+  gap: 24px;
+  min-height: 42px;
+}
+
+.portfolioTabs button {
+  align-self: stretch;
+  background: transparent;
+  border: 0;
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  padding: 0 2px;
+  position: relative;
+}
+
+.portfolioTabs button:hover,
+.portfolioTabs button[aria-pressed="true"] {
+  color: var(--hq-text-link);
+}
+
+.portfolioTabs button[aria-pressed="true"] {
+  font-weight: 600;
+}
+
+.portfolioTabs button[aria-pressed="true"]::after {
+  background: var(--hq-brand-primary);
+  border-radius: 999px;
+  bottom: -1px;
+  content: "";
+  height: 2px;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 22px;
+}
+
+.portfolioTabs button:focus-visible {
+  outline: 2px solid var(--hq-border-focus);
+  outline-offset: 2px;
+}
+
+.accountPortfolioEmpty {
+  align-items: center;
+  border: 1px dashed var(--hq-border-default);
+  color: var(--hq-text-tertiary);
+  display: flex;
+  font-size: 14px;
+  justify-content: center;
+  min-height: 92px;
+  padding: 18px;
+}
+
+.accountPortfolioTable {
+  min-width: 680px;
+}
+
+.accountPortfolioTable a,
+.accountPortfolioTable a:hover,
+.accountPortfolioTable a:focus-visible {
+  text-decoration: none;
+}
+
+.portfolioForm {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: var(--hq-radius-card);
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.portfolioFormHeading {
+  border-bottom: 1px solid var(--hq-border-subtle);
+  padding-bottom: 12px;
+}
+
+.portfolioFormHeading h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.portfolioFormHeading p {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.portfolioFieldGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.portfolioFieldGrid label,
+.portfolioHoldings {
+  color: var(--hq-text-secondary);
+  display: grid;
+  font-size: 13px;
+  gap: 7px;
+}
+
+.portfolioHoldings small {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+}
+
+.portfolioFieldGrid input,
+.portfolioHoldings textarea {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 4px;
+  color: var(--hq-text-primary);
+  font: inherit;
+  font-size: 14px;
+  min-width: 0;
+  padding: 0 12px;
+  width: 100%;
+}
+
+.portfolioFieldGrid input {
+  min-height: 36px;
+}
+
+.portfolioHoldings textarea {
+  line-height: 1.65;
+  min-height: 116px;
+  padding-block: 9px;
+  resize: vertical;
+}
+
+.portfolioFieldGrid input:focus-visible,
+.portfolioHoldings textarea:focus-visible {
+  border-color: var(--hq-brand-primary);
+  box-shadow: 0 0 0 2px var(--hq-brand-subtle);
+  outline: 0;
+}
+
+.portfolioFormActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.portfolioFormActions button {
+  background: var(--hq-brand-primary);
+  border: 1px solid var(--hq-brand-primary);
+  border-radius: 4px;
+  color: var(--hq-brand-on-primary);
+  font: inherit;
+  font-size: 13px;
+  min-height: 34px;
+  padding: 0 18px;
+}
+
+.portfolioFormActions button:hover:not(:disabled) {
+  background: var(--hq-brand-primary-hover);
+}
+
+.portfolioFormActions button:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.portfolioNote {
+  border-top: 1px solid var(--hq-border-subtle);
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+  line-height: 1.7;
+  padding-top: 12px;
+}
+
+@media (max-width: 680px) {
+  .portfolioFieldGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 四列表在正文栏内直接完整展示，不为通用表格的 640px 下限多滚 40px。 */
+.rankingTable {
+  min-width: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.rankingTable th:first-child,
+.rankingTable td:first-child {
+  width: 48px;
+}
+
+.rankingTable th:nth-child(3),
+.rankingTable td:nth-child(3),
+.rankingTable th:nth-child(4),
+.rankingTable td:nth-child(4) {
+  width: 112px;
+}
+
+.rankingTable tbody th a,
+.rankingTable :global(.watchlist-cell) {
+  min-width: 0;
+}
+
+.rankingTable tbody th strong,
+.rankingTable tbody th small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 涨跌家数那三个数：横排、等宽，读的时候能直接比大小。 */
 .facts {
   display: grid;

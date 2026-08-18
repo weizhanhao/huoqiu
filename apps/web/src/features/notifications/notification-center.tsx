@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { useAccountSession } from "../account/account-session";
 import styles from "./notification-center.module.css";
 import {
   notificationCategories,
@@ -134,6 +135,7 @@ export function NotificationCenter({
 }: Readonly<{ initialFilter?: NotificationFilter }> = {}) {
   const { counts, hide, markAllRead, markRead, markUnread, notifications } =
     useNotificationSession();
+  const { account, loading: accountLoading } = useAccountSession();
   const [activeFilter, setActiveFilter] =
     useState<NotificationFilter>(initialFilter);
   const [announcement, setAnnouncement] = useState(
@@ -189,7 +191,7 @@ export function NotificationCenter({
     >
       <header className={styles.hero}>
         <div className={styles.heroCopy}>
-          <p className={styles.kicker}>消息中心</p>
+          <p className={styles.kicker}>与你相关</p>
           <h1 id="notification-center-heading">消息中心</h1>
           <p>查看与你的讨论、标的观察相关的消息。</p>
         </div>
@@ -208,16 +210,21 @@ export function NotificationCenter({
         ——而登录之后，关注、提及这些真实事件就是从库里读出来、并入同一个
         列表渲染的。那句话会把一条真人的关注明确说成假的，方向刚好反了。
       */}
-      <aside className={styles.disclosure} aria-label="消息数据说明">
-        <span aria-hidden="true">说</span>
-        <div>
-          <strong>登录后显示你的真实消息</strong>
-          <p>
-            关注、提及等事件来自本站账号的真实记录；已读与隐藏只在本次会话
-            保留，刷新后重置。
-          </p>
-        </div>
-      </aside>
+      {account === null ? (
+        <aside className={styles.disclosure} aria-label="消息数据说明">
+          <span aria-hidden="true">说</span>
+          <div>
+            <strong>
+              {accountLoading ? "正在读取账号状态" : "登录后显示你的真实消息"}
+            </strong>
+            <p>
+              {accountLoading
+                ? "正在确认当前账号，请稍候。"
+                : "关注、提及等事件来自本站账号的真实记录；已读与隐藏只在本次会话保留，刷新后重置。"}
+            </p>
+          </div>
+        </aside>
+      ) : null}
 
       <div className={styles.toolbar}>
         <div>
@@ -293,8 +300,8 @@ export function NotificationCenter({
       )}
 
       <footer className={styles.footer}>
-        <span>消息 · 未经运营审核</span>
-        <span>仅本次会话 · 未接入实时服务</span>
+        <span>消息按时间排序</span>
+        <span>已读与隐藏状态仅在本次会话保留</span>
       </footer>
     </section>
   );

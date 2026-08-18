@@ -9,7 +9,8 @@ import { useAccountSession } from "./account-session";
  *
  * 这里原本写死「关注 18 / 粉丝 186 / 帖子 42」——用户一眼就看出是假的，
  * 因为无论注册多少账号、发多少帖，数字纹丝不动。现在三个数字全部来自
- * /api/social/me 的真实计数。
+ * /api/social/me 的真实计数。侧栏只展示雪球同层级的关注与粉丝；帖子数留在
+ * 个人主页，不在这里挤成第三项。
  *
  * 防抖动：账号数据是客户端拉的，首帧一定拿不到。所以
  *   1) 未登录/加载中都渲染同样结构、同样行数的内容，只是文字不同；
@@ -51,32 +52,29 @@ export function SidebarAccount({
 
       {/*
         关注与粉丝要点得进去。
-        这三个计数原先是纯文字——站内明明已经有 /users/<id>/following 与
+        这两个计数原先是纯文字——站内明明已经有 /users/<id>/following 与
         /followers 两页，用户点上去却毫无反应，只能以为是坏了。
         未登录时没有 id 可指，保持纯文字。
       */}
       <p className="sidebar-stats">
         {account === null ? (
           <span>
-            关注 <strong>{stat(0)}</strong>
+            关注<strong>{stat(0)}</strong>
           </span>
         ) : (
           <Link href={`/users/${account.id}/following`}>
-            关注 <strong>{stat(account.followingCount)}</strong>
+            关注<strong>{stat(account.followingCount)}</strong>
           </Link>
         )}
         {account === null ? (
           <span>
-            粉丝 <strong>{stat(0)}</strong>
+            粉丝<strong>{stat(0)}</strong>
           </span>
         ) : (
           <Link href={`/users/${account.id}/followers`}>
-            粉丝 <strong>{stat(account.followerCount)}</strong>
+            粉丝<strong>{stat(account.followerCount)}</strong>
           </Link>
         )}
-        <span>
-          帖子 <strong>{stat(account?.postCount ?? 0)}</strong>
-        </span>
       </p>
     </>
   );

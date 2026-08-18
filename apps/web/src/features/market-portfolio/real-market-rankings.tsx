@@ -73,6 +73,7 @@ export function RealMarketRankings({
 }> = {}) {
   const [market, setMarket] = useState<MarketId>(initialMarket);
   const [direction, setDirection] = useState<DirectionId>(initialDirection);
+  const [pending, setPending] = useState(true);
   const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
@@ -83,14 +84,17 @@ export function RealMarketRankings({
        * 同步改状态会在同一轮渲染里再触发一次。对用户没有分别——它和
        * 紧随其后的请求本来就是同一件事。
        */
-      setState({ kind: "loading" });
+      setPending(true);
       try {
         const response = await fetch(
           `/api/market/hot?market=${market}&direction=${direction}&rows=${ROWS}`,
         );
         if (cancelled) return;
         if (!response.ok) {
-          setState({ kind: "failed" });
+          setState((current) =>
+            current.kind === "ready" ? current : { kind: "failed" },
+          );
+          setPending(false);
           return;
         }
         const data = (await response.json()) as {
@@ -103,8 +107,14 @@ export function RealMarketRankings({
           kind: "ready",
           rows: data.rows ?? [],
         });
+        setPending(false);
       } catch {
-        if (!cancelled) setState({ kind: "failed" });
+        if (!cancelled) {
+          setState((current) =>
+            current.kind === "ready" ? current : { kind: "failed" },
+          );
+          setPending(false);
+        }
       }
     })();
     return () => {
@@ -143,7 +153,7 @@ export function RealMarketRankings({
         </div>
       </header>
 
-      <section className={styles.panel}>
+      <section aria-busy={pending} className={styles.panel}>
         <div
           aria-label="榜单市场切换"
           className={styles.segmented}
@@ -178,19 +188,23 @@ export function RealMarketRankings({
           ))}
         </div>
 
-        {state.kind === "loading" ? (
-          <p aria-live="polite" className={styles.resultStatus}>
-            正在读取榜单……
-          </p>
-        ) : null}
+        <p aria-live="polite" className={styles.resultStatus}>
+          {pending
+            ? state.kind === "ready"
+              ? "正在更新榜单……"
+              : "正在读取榜单……"
+            : state.kind === "ready"
+              ? `已列出 ${state.rows.length} 条。`
+              : "榜单暂时取不到。"}
+        </p>
 
-        {state.kind === "failed" ? (
+        {!pending && state.kind === "failed" ? (
           <p className={styles.resultStatus}>榜单暂时取不到。</p>
         ) : null}
 
         {state.kind === "ready" ? (
           <ScrollableTable label="涨跌榜">
-            <table className="watchlist-table">
+            <table className={`watchlist-table ${styles.rankingTable}`}>
               <thead>
                 <tr>
                   <th className="watchlist-numeric" scope="col">

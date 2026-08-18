@@ -21,8 +21,16 @@ import styles from "./profile-settings.module.css";
 const STORAGE_KEY = "huoqiu.market-colors";
 
 const OPTIONS = [
-  { id: "green-up", label: "绿涨红跌" },
-  { id: "red-up", label: "红涨绿跌" },
+  {
+    description: "涨幅使用绿色，跌幅使用红色",
+    id: "green-up",
+    label: "绿涨红跌",
+  },
+  {
+    description: "A 股常用配色：涨幅红色，跌幅绿色",
+    id: "red-up",
+    label: "红涨绿跌",
+  },
 ] as const;
 
 const applyToDocument = (mode: string): void => {
@@ -121,9 +129,10 @@ export function MarketColorsPanel() {
       className={styles.contentSection}
       data-testid="market-colors-panel"
     >
-      <h3 className={styles.sectionHeading} id="market-colors-heading">
-        颜色设置
-      </h3>
+      <div className={styles.panelIntroduction}>
+        <h3 id="market-colors-heading">涨跌颜色</h3>
+        <p>选择你熟悉的市场配色，行情数字和 K 线会同步更新。</p>
+      </div>
 
       <fieldset>
         <legend className={styles.contentMeta}>涨跌配色</legend>
@@ -136,7 +145,10 @@ export function MarketColorsPanel() {
               type="radio"
               value={option.id}
             />
-            <span>{option.label}</span>
+            <span className={styles.optionCopy}>
+              <strong>{option.label}</strong>
+              <small>{option.description}</small>
+            </span>
           </label>
         ))}
       </fieldset>
@@ -151,7 +163,7 @@ export function MarketColorsPanel() {
       </button>
 
       {status === "" ? null : (
-        <p aria-live="polite" className={styles.contentMeta}>
+        <p aria-live="polite" className={styles.statusMessage}>
           {status}
         </p>
       )}

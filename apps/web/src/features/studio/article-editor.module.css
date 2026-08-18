@@ -15,8 +15,8 @@
    * 原先整卡一个 gap，标题、正文、分享范围、按钮四块等距排开，读起来
    * 没有主次。
    */
-  gap: var(--hq-spacing-5);
-  padding: var(--hq-spacing-6) var(--hq-spacing-5);
+  gap: 0;
+  padding: 16px 20px 14px;
 }
 
 .title {
@@ -25,9 +25,11 @@
   border-bottom: 1px solid var(--hq-border-subtle);
   border-radius: 0;
   color: var(--hq-text-primary);
-  font-size: var(--hq-type-size-title);
+  font-size: 21px;
   font-weight: var(--hq-type-weight-semibold);
-  padding: var(--hq-spacing-2) 0 var(--hq-spacing-3);
+  height: 46px;
+  min-height: 46px;
+  padding: 4px 0 9px;
 }
 
 .title::placeholder,
@@ -35,9 +37,17 @@
   color: var(--hq-text-tertiary);
 }
 
+.title:focus,
 .title:focus-visible,
+.body:focus,
 .body:focus-visible {
-  border-color: var(--hq-border-focus);
+  border-color: color-mix(
+    in srgb,
+    var(--hq-brand-primary) 35%,
+    var(--hq-border-subtle)
+  );
+  box-shadow: 0 1px 0
+    color-mix(in srgb, var(--hq-brand-primary) 18%, transparent);
   outline: none;
 }
 
@@ -45,14 +55,14 @@
   background: none;
   border: none;
   color: var(--hq-text-primary);
-  font-size: var(--hq-type-size-body);
+  font-size: var(--hq-type-size-body-compact);
   line-height: var(--hq-type-line-height-body);
   /*
    * 原先是 40dvh（实测 400px）。一进来就是一大片空白，像页面没加载完；
    * 写长了它自己会长（resize 与滚动都在），不必先占住半屏。
    */
-  min-height: 220px;
-  padding: 0;
+  min-height: 176px;
+  padding: 14px 0;
   resize: vertical;
 }
 
@@ -66,15 +76,16 @@
   border-top: 1px solid var(--hq-border-subtle);
   display: flex;
   flex-wrap: wrap;
-  gap: var(--hq-spacing-4);
+  gap: 12px;
   justify-content: space-between;
-  padding-top: var(--hq-spacing-4);
+  min-height: 52px;
+  padding-top: 10px;
 }
 
 .field {
   align-items: center;
   display: flex;
-  gap: var(--hq-spacing-3);
+  gap: 9px;
 }
 
 .fieldLabel {
@@ -101,7 +112,21 @@
     5px 5px,
     5px 5px;
   max-width: 200px;
-  padding-right: var(--hq-spacing-8);
+  height: 32px;
+  min-height: 32px;
+  padding: 0 34px 0 11px;
+}
+
+.field select:focus,
+.field select:focus-visible {
+  border-color: color-mix(
+    in srgb,
+    var(--hq-brand-primary) 35%,
+    var(--hq-border-default)
+  );
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--hq-brand-primary) 8%, transparent);
+  outline: none;
 }
 
 .actions {
@@ -114,8 +139,8 @@
 .secondary {
   border-radius: var(--hq-radius-control);
   font-size: var(--hq-type-size-body-compact);
-  min-height: var(--hq-touch-web-minimum);
-  padding: 0 var(--hq-spacing-5);
+  min-height: 32px;
+  padding: 0 13px;
 }
 
 .primary {
@@ -125,7 +150,10 @@
 }
 
 .primary:disabled {
-  opacity: 0.5;
+  background: var(--hq-surface-sunken);
+  border-color: var(--hq-border-default);
+  color: var(--hq-text-tertiary);
+  opacity: 1;
 }
 
 .secondary {
@@ -136,6 +164,53 @@
 
 .primary:focus-visible,
 .secondary:focus-visible {
-  outline: 2px solid var(--hq-border-focus);
-  outline-offset: 2px;
+  border-color: color-mix(
+    in srgb,
+    var(--hq-brand-primary) 38%,
+    var(--hq-border-default)
+  );
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--hq-brand-primary) 8%, transparent);
+  outline: none;
+}
+
+.primary:not(:disabled):hover {
+  background: var(--hq-brand-primary-hover);
+}
+
+.secondary:hover {
+  background: var(--hq-surface-sunken);
+  border-color: var(--hq-border-focus);
+}
+
+.notice {
+  background: var(--hq-surface-canvas);
+  border-left: 2px solid var(--hq-brand-primary);
+  border-radius: var(--hq-radius-control);
+  color: var(--hq-text-secondary);
+  font-size: var(--hq-type-size-body-compact);
+  margin-top: 10px;
+  min-height: 40px;
+  padding: 9px 11px;
+}
+
+.notice a {
+  color: var(--hq-brand-primary);
+  font-weight: var(--hq-type-weight-semibold);
+  text-decoration: none;
+}
+
+@media (max-width: 600px) {
+  .editor {
+    padding: 14px 16px;
+  }
+
+  .settings {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actions {
+    justify-content: flex-end;
+  }
 }

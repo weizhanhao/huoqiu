@@ -31,6 +31,10 @@ export function BlockAuthorButton({
       onClick={() => toggle(authorId)}
       type="button"
     >
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <path d="m6.4 6.4 11.2 11.2" />
+      </svg>
       {isBlocked ? "取消屏蔽" : "屏蔽"}
     </button>
   );

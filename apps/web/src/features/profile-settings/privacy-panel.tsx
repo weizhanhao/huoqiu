@@ -15,11 +15,15 @@ import styles from "./profile-settings.module.css";
  */
 
 const OPTIONS = [
-  { id: "everyone", label: "所有人" },
-  { id: "following", label: "我关注的人" },
-  { id: "followers", label: "关注我的人" },
-  { id: "off", label: "关闭评论" },
-  { id: "followers-3d", label: "关注我3天或以上的粉丝" },
+  { description: "任何已登录账号都可以评论", id: "everyone", label: "所有人" },
+  { description: "只允许你已关注的账号", id: "following", label: "我关注的人" },
+  { description: "只允许已关注你的账号", id: "followers", label: "关注我的人" },
+  { description: "新帖子不再接收评论", id: "off", label: "关闭评论" },
+  {
+    description: "降低新账号骚扰，保留长期关注者互动",
+    id: "followers-3d",
+    label: "关注我 3 天或以上的粉丝",
+  },
 ] as const;
 
 /** 只取数、不碰状态。 */
@@ -102,16 +106,21 @@ export function PrivacyPanel() {
       className={styles.contentSection}
       data-testid="privacy-panel"
     >
-      <h3 className={styles.sectionHeading} id="privacy-heading">
-        谁可以评论我发布的讨论?
-      </h3>
+      <div className={styles.panelIntroduction}>
+        <h3 id="privacy-heading">评论权限</h3>
+        <p>设置谁可以评论你新发布的讨论。</p>
+      </div>
 
       {account === null ? (
         <Link className={styles.inverseLink} href="/login">
           登录后设置评论范围
         </Link>
       ) : loading ? (
-        <p className={styles.contentMeta}>读取中…</p>
+        <div aria-label="正在读取隐私设置" className={styles.loadingState}>
+          <span />
+          <span />
+          <span />
+        </div>
       ) : (
         <>
           <fieldset>
@@ -128,7 +137,10 @@ export function PrivacyPanel() {
                   type="radio"
                   value={option.id}
                 />
-                <span>{option.label}</span>
+                <span className={styles.optionCopy}>
+                  <strong>{option.label}</strong>
+                  <small>{option.description}</small>
+                </span>
               </label>
             ))}
           </fieldset>
@@ -151,7 +163,7 @@ export function PrivacyPanel() {
       )}
 
       {status === "" ? null : (
-        <p aria-live="polite" className={styles.contentMeta}>
+        <p aria-live="polite" className={styles.statusMessage}>
           {status}
         </p>
       )}

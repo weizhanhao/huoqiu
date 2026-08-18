@@ -1,6 +1,8 @@
 .pageStack {
+  align-content: start;
   display: grid;
   gap: 18px;
+  grid-auto-rows: max-content;
   min-width: 0;
   padding-bottom: 32px;
   width: 100%;
@@ -15,7 +17,7 @@
   flex-wrap: wrap;
   gap: var(--hq-spacing-2) var(--hq-spacing-4);
   justify-content: space-between;
-  padding: var(--hq-spacing-3) var(--hq-spacing-4);
+  padding: 16px 18px;
 }
 
 /* JSX 里渲染的是 h1，只写 h2 的话这条规则一次都匹配不上。 */
@@ -45,16 +47,14 @@
   align-items: flex-end;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 4px;
   text-align: right;
 }
 
 .disclosure strong {
-  background: var(--hq-brand-primary);
-  border-radius: 999px;
-  color: var(--hq-brand-on-primary);
-  font-size: 13px;
-  padding: 7px 12px;
+  color: var(--hq-text-link);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .disclosure span,
@@ -71,7 +71,12 @@
   border: 1px solid var(--hq-border-default);
   border-radius: var(--hq-radius-card);
   min-width: 0;
-  padding: 20px;
+  padding: 18px;
+}
+
+/* 首次取数只替换表格区，不让频道高度在数据回来时突变。 */
+.panel[aria-busy="true"] {
+  min-height: 430px;
 }
 
 .sectionHeading {
@@ -79,14 +84,16 @@
   display: flex;
   gap: 16px;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
+.sectionHeading h2,
 .sectionHeading h3,
 .unavailable h3 {
-  font-size: 21px;
-  letter-spacing: -0.03em;
-  margin-top: 5px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
+  margin: 0;
 }
 
 .valuationGrid {
@@ -130,17 +137,112 @@
 }
 
 .filters {
+  border-bottom: 1px solid var(--hq-border-subtle);
+  border-top: 1px solid var(--hq-border-subtle);
+  display: grid;
+  width: 100%;
+}
+
+.filterRow {
+  align-items: center;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  min-height: 38px;
+}
+
+.filterRow + .filterRow {
+  border-top: 1px solid var(--hq-border-subtle);
+}
+
+.filterLabel {
+  color: var(--hq-text-tertiary);
+  font-size: 12px;
+  padding-left: 4px;
+}
+
+.filterOptions {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  justify-content: space-between;
+  gap: 22px;
+}
+
+.filterOptions button {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--hq-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  min-height: 30px;
+  padding: 0 2px;
+  position: relative;
+}
+
+.filterOptions button:hover,
+.filterOptions button:focus-visible,
+.filterOptions button[aria-pressed="true"] {
+  color: var(--hq-text-link);
+}
+
+.filterOptions button:focus-visible {
+  outline: 2px solid var(--hq-brand-primary);
+  outline-offset: 2px;
+}
+
+.filterOptions button[aria-pressed="true"] {
+  font-weight: 600;
+}
+
+.filterOptions button[aria-pressed="true"]::after {
+  background: var(--hq-brand-primary);
+  border-radius: 999px;
+  bottom: 1px;
+  content: "";
+  height: 2px;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 20px;
+}
+
+/* 类型是离散分类，用紧凑胶囊；周期是同一指标的时间口径，保持文字单选。 */
+.categoryOptions {
+  gap: 6px;
+}
+
+.categoryOptions button {
+  background: var(--hq-surface-base);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 15px;
+  min-height: 28px;
+  padding: 0 12px;
+}
+
+.categoryOptions button:hover,
+.categoryOptions button:focus-visible {
+  border-color: var(--hq-brand-primary);
+}
+
+.categoryOptions button[aria-pressed="true"] {
+  background: var(--hq-brand-subtle);
+  border-color: transparent;
+  color: var(--hq-text-link);
+}
+
+.categoryOptions button[aria-pressed="true"]::after {
+  display: none;
+}
+
+.periodOptions {
+  gap: 22px;
 }
 
 .segmented {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .segmented button,
@@ -211,7 +313,79 @@
 }
 
 .resultStatus {
-  margin: 12px 0;
+  margin: 10px 0;
+}
+
+/*
+ * 八列表不能硬挤进 600px 正文栏。此前表格仍用通用 640px 最小宽度，
+ * 结果是基金名称只剩几十像素，被逐字拆成四五行；横向滚动本来就由
+ * ScrollableTable 承担，这里给每列一个可读的真实宽度。
+ */
+.fundTable {
+  font-size: 13px;
+  min-width: 820px;
+  table-layout: fixed;
+}
+
+.fundTable th:first-child {
+  min-width: 190px;
+  width: 190px;
+}
+
+.fundTable th:first-child a,
+.fundTable th:first-child small,
+.fundTable td small {
+  display: block;
+}
+
+.fundTable th:first-child a {
+  color: var(--hq-text-primary);
+  overflow: hidden;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fundTable th:first-child a:hover {
+  color: var(--hq-text-link);
+}
+
+.fundTable th:nth-child(3),
+.fundTable td:nth-child(3) {
+  min-width: 92px;
+  width: 92px;
+  white-space: nowrap;
+}
+
+.fundTable th:nth-child(2),
+.fundTable td:nth-child(2) {
+  width: 78px;
+}
+
+.fundTable th:nth-child(n + 4),
+.fundTable td:nth-child(n + 4) {
+  width: 82px;
+}
+
+.fundTable th,
+.fundTable td {
+  padding: 11px 9px;
+}
+
+.pagination {
+  align-items: center;
+  margin-top: 12px;
+}
+
+.pagination button {
+  border-radius: 4px;
+  font-size: 13px;
+  min-height: 32px;
+  padding: 0 12px;
+}
+
+.pagination .resultStatus {
+  margin: 0 4px;
 }
 
 .emptyState {

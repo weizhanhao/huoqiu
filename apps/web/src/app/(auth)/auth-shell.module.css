@@ -1,252 +1,214 @@
-/*
- * 登录与注册的独立外壳。
- *
- * 全站唯一「一屏只做一件事」的页面：没有侧栏、没有右栏、没有其他频道入口。
- * 视线收在表单上，其余一概不放——那些入口这时候点了也没用。
- */
-/*
- * 整页铺一层品牌渐变，不再是灰底上浮一张卡。
- *
- * 一个财经站的门面，先得让人知道自己到了哪儿。渐变从品牌蓝的浅调过渡到
- * 页面底色，越往下越淡——内容区因此自然接上，不会出现一道生硬的分界线。
- */
 .page {
+  --auth-blue: #1576e9;
+  --auth-blue-deep: #0b5fc4;
+  --auth-navy: #101423;
+  --auth-ink: #101423;
+  --auth-muted: #667085;
+  --auth-line: #e5eaf1;
+  --auth-mist: #f4f7fb;
   background:
-    radial-gradient(
-      120rem 42rem at 18% -12%,
-      color-mix(in oklab, var(--hq-brand-primary) 18%, transparent),
-      transparent 60%
-    ),
-    radial-gradient(
-      90rem 36rem at 88% -6%,
-      color-mix(in oklab, var(--hq-brand-accent) 16%, transparent),
-      transparent 55%
-    ),
-    var(--hq-surface-canvas);
+    linear-gradient(90deg, rgb(21 118 233 / 5%) 1px, transparent 1px),
+    linear-gradient(rgb(21 118 233 / 5%) 1px, transparent 1px), var(--auth-mist);
+  background-size: 32px 32px;
+  color: var(--auth-ink);
   display: grid;
-  gap: var(--hq-spacing-6);
   grid-template-rows: auto 1fr auto;
   min-height: 100dvh;
-  padding: var(--hq-spacing-5) var(--hq-spacing-6) var(--hq-spacing-8);
 }
 
-/* 品牌靠左，和站内一致；居中会让它看着像个弹窗标题。 */
-.header {
-  display: flex;
-  justify-content: flex-start;
-  margin: 0 auto;
-  max-width: 68rem;
-  width: 100%;
-}
-
-.brand {
-  align-items: center;
-  color: var(--hq-brand-primary);
-  display: inline-flex;
-  font-size: var(--hq-type-size-title);
-  font-weight: var(--hq-type-weight-bold);
-  letter-spacing: var(--hq-type-tracking-tight);
-  /* 唯一的出口也是可点目标，给足触控高度。 */
-  min-height: var(--hq-touch-web-minimum);
-  text-decoration: none;
-}
-
-.brand:hover {
-  color: var(--hq-brand-primary-hover);
-}
-
-.brand:focus-visible {
-  outline: 2px solid var(--hq-border-focus);
-  outline-offset: 4px;
-}
-
-/*
- * 表单收窄居中。
- *
- * 上方留白略少于下方，视觉重心落在偏上位置——
- * 整屏垂直居中反而会让内容显得悬空。
- */
-/*
- * 左介绍、右表单。
- *
- * 原先是居中一列、最宽 30rem——一个财经站的门面只有灰底上一张输入框。
- * 窄屏下落回单列，介绍在上、表单在下。
- */
 .main {
   align-items: start;
   display: grid;
-  gap: clamp(var(--hq-spacing-6), 4vw, var(--hq-spacing-10));
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 24rem);
-  justify-self: center;
-  max-width: 68rem;
-  padding-top: clamp(var(--hq-spacing-6), 6vh, var(--hq-spacing-10));
+  gap: clamp(48px, 7vw, 92px);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: clamp(48px, 7vh, 76px) 24px 56px;
   width: 100%;
-}
-
-@media (max-width: 60rem) {
-  .main {
-    gap: var(--hq-spacing-5);
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 30rem;
-    padding-top: var(--hq-spacing-6);
-  }
 }
 
 .intro {
   display: grid;
-  gap: var(--hq-spacing-3);
-  padding-top: var(--hq-spacing-4);
+  min-width: 0;
+  padding-top: 10px;
 }
 
 .kicker {
-  color: var(--hq-text-link);
-  font-size: var(--hq-type-size-label-compact);
-  font-weight: var(--hq-type-weight-semibold);
+  align-items: center;
+  color: var(--auth-blue-deep);
+  display: flex;
+  font-size: 13px;
+  font-weight: 650;
+  gap: 10px;
   letter-spacing: 0.08em;
-  margin: 0;
+  margin: 0 0 16px;
 }
 
-/*
- * 标题要压得住整屏。
- *
- * 这一页此前最大的字是表单标题，于是整屏没有重心，看着就是一张表格。
- * 字号跟着视口走，最大到 3.25rem——和右边那张卡拉开明确的层级差。
- */
+.kicker::before {
+  background: var(--auth-blue);
+  content: "";
+  height: 2px;
+  width: 32px;
+}
+
 .tagline {
-  color: var(--hq-text-primary);
-  font-size: clamp(2rem, 1.1rem + 2.8vw, 3.25rem);
-  font-weight: var(--hq-type-weight-bold);
-  letter-spacing: var(--hq-type-tracking-tight);
-  line-height: 1.15;
+  color: var(--auth-navy);
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: clamp(38px, 4.3vw, 58px);
+  font-weight: 680;
+  letter-spacing: -0.045em;
+  line-height: 1.16;
   margin: 0;
-  max-width: 14em;
+  max-width: 10.5em;
 }
 
-/* 品牌色只落在这一处强调上，其余保持中性——颜色用来分主次，不用来装饰。 */
 .tagline em {
-  color: var(--hq-brand-primary);
+  color: var(--auth-blue);
   font-style: normal;
+  position: relative;
+  white-space: nowrap;
+}
+
+.tagline em::after {
+  background: var(--auth-blue);
+  bottom: -5px;
+  content: "";
+  height: 3px;
+  left: 0;
+  opacity: 0.22;
+  position: absolute;
+  width: 100%;
 }
 
 .introNote {
-  color: var(--hq-text-secondary);
-  font-size: var(--hq-type-size-body);
-  line-height: 1.75;
-  margin: 0;
-  max-width: 32rem;
+  color: var(--auth-muted);
+  font-size: 16px;
+  line-height: 1.8;
+  margin: 24px 0 0;
+  max-width: 34rem;
 }
 
 .points {
-  color: var(--hq-text-secondary);
+  border-left: 2px solid rgb(21 118 233 / 18%);
+  color: #4e5d70;
   display: grid;
-  font-size: var(--hq-type-size-label-compact);
-  gap: var(--hq-spacing-2);
+  font-size: 14px;
+  gap: 11px;
   list-style: none;
-  margin: var(--hq-spacing-2) 0 0;
-  padding: 0;
+  margin: 24px 0 0;
+  padding: 0 0 0 18px;
 }
 
 .points li {
-  padding-left: var(--hq-spacing-4);
-  position: relative;
+  align-items: center;
+  display: flex;
+  gap: 10px;
 }
 
-/* 用几何标记而不是 emoji：emoji 在读屏里会被念成一长串名字。 */
 .points li::before {
-  color: var(--hq-brand-primary);
-  content: "▸";
-  left: 0;
-  position: absolute;
+  background: var(--auth-blue);
+  border-radius: 50%;
+  content: "";
+  flex: 0 0 5px;
+  height: 5px;
+  width: 5px;
 }
 
-/*
- * 表单浮在渐变之上。
- *
- * 站内的卡片靠一道细描边分层就够，那是在灰底上；这里底下是渐变，
- * 只有描边会显得贴在背景上、糊成一片。给它一层实底加投影，
- * 让它明确地「浮起来」——这是整屏唯一需要被立刻找到的东西。
- */
+.marketPanel {
+  background: #fff;
+  border: 1px solid var(--auth-line);
+  border-top: 3px solid var(--auth-blue);
+  margin-top: 34px;
+  max-width: 650px;
+}
+
+.marketHeading {
+  align-items: center;
+  border-bottom: 1px solid var(--auth-line);
+  display: flex;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.marketHeading strong {
+  color: var(--auth-navy);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.marketHeading span {
+  color: var(--auth-muted);
+  font-size: 12px;
+}
+
+.marketStrip {
+  display: block;
+  padding: 0 14px;
+}
+
+.marketStrip :global(.market-index-pagination) {
+  height: 24px;
+}
+
+.marketStrip :global(.index-card) {
+  border: 0;
+  border-radius: 0;
+  min-height: 106px;
+  padding: 16px;
+}
+
+.marketStrip :global(.index-card + .index-card) {
+  border-left: 1px solid var(--auth-line);
+}
+
+.marketStrip :global(.index-card:hover) {
+  background: #f8fbff;
+}
+
+.marketStrip :global(.index-card > strong) {
+  font-family: DIN-Medium, "Helvetica Neue", Arial, sans-serif;
+  font-size: 22px;
+}
+
 .formSlot {
   display: grid;
-  gap: var(--hq-spacing-4);
+  gap: 16px;
+  position: sticky;
+  top: 28px;
 }
 
-.formSlot > :global(div) > :global(section) {
-  background: var(--hq-surface-base);
-  border-color: transparent;
-  box-shadow: var(--hq-shadow-floating);
-}
-
-.footer {
-  color: var(--hq-text-tertiary);
-  font-size: var(--hq-type-size-caption);
-  line-height: var(--hq-type-line-height-body);
-  text-align: center;
-}
-
-/*
- * 登录页左栏的指数条。
- *
- * 站内首页的指数条是横向四张卡；这里宽度只有一半，让它自动折行，
- * 不然会把左栏撑出去。
- */
-/*
- * 指数条横排。
- *
- * RealIndexCards 直接吐出一串 .index-card，本身不带容器，所以排布由这里定。
- * 竖着堆三张会把左栏撑得很长，下面又空一大片；横排一行才是行情条的样子。
- */
-.marketStrip {
-  display: grid;
-  gap: var(--hq-spacing-3);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: var(--hq-spacing-6);
-}
-
-@media (max-width: 40rem) {
-  .marketStrip {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-/*
- * 登录页左栏的热榜。
- *
- * 半透明白底压在渐变上：既能读清字，又不像站内那种实底卡片那样把渐变
- * 整块切掉。这一块是背景信息，不该抢右边表单的注意力。
- */
 .hotBoard {
-  backdrop-filter: blur(8px);
-  background: color-mix(in oklab, var(--hq-surface-base) 72%, transparent);
-  border: 1px solid var(--hq-border-subtle);
-  border-radius: var(--hq-radius-card);
-  margin-top: var(--hq-spacing-5);
-  max-width: 32rem;
-  padding: var(--hq-spacing-4) var(--hq-spacing-5);
+  background: #fff;
+  border: 1px solid var(--auth-line);
+  margin-top: 16px;
+  max-width: 650px;
+  padding: 16px;
 }
 
 .hotHeading {
-  align-items: baseline;
+  align-items: center;
+  border-bottom: 1px solid var(--auth-line);
   display: flex;
-  gap: var(--hq-spacing-3);
   justify-content: space-between;
-  margin-bottom: var(--hq-spacing-3);
+  margin-bottom: 8px;
+  padding-bottom: 12px;
 }
 
 .hotHeading h3 {
-  font-size: var(--hq-type-size-label);
-  font-weight: var(--hq-type-weight-semibold);
+  color: var(--auth-navy);
+  font-size: 14px;
+  font-weight: 650;
   margin: 0;
 }
 
 .hotHeading span {
-  color: var(--hq-text-tertiary);
-  font-size: var(--hq-type-size-caption);
+  color: var(--auth-muted);
+  font-size: 12px;
 }
 
 .hotList {
   display: grid;
-  gap: var(--hq-spacing-1);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -255,37 +217,149 @@
 .hotList li {
   align-items: center;
   display: grid;
-  gap: var(--hq-spacing-3);
-  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
-  min-height: 2rem;
+  gap: 12px;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  min-height: 40px;
 }
 
 .hotRank {
-  color: var(--hq-text-tertiary);
-  font-size: var(--hq-type-size-caption);
+  color: #8792a3;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
 .hotName {
-  color: var(--hq-text-primary);
+  color: var(--auth-ink);
   display: flex;
-  font-size: var(--hq-type-size-label-compact);
-  gap: var(--hq-spacing-2);
+  font-size: 14px;
+  gap: 9px;
   min-width: 0;
   text-decoration: none;
 }
 
 .hotName small {
-  color: var(--hq-text-tertiary);
+  color: #8792a3;
   font-variant-numeric: tabular-nums;
 }
 
 a.hotName:hover {
-  color: var(--hq-text-link);
+  color: var(--auth-blue-deep);
 }
 
 .hotList strong {
-  font-size: var(--hq-type-size-label-compact);
+  font-family: DIN-Medium, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
+}
+
+.footer {
+  align-items: center;
+  border-top: 1px solid var(--auth-line);
+  color: #7b8797;
+  display: flex;
+  font-size: 12px;
+  gap: 18px;
+  justify-content: center;
+  min-height: 52px;
+  padding: 10px 24px;
+}
+
+.footer p {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .main {
+    gap: 32px;
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 620px;
+    padding-top: 36px;
+  }
+
+  .formSlot {
+    order: 1;
+    position: static;
+  }
+
+  .intro {
+    order: 2;
+    padding-top: 8px;
+  }
+
+  .tagline {
+    font-size: clamp(32px, 8vw, 46px);
+    max-width: 12em;
+  }
+}
+
+@media (max-width: 560px) {
+  .page {
+    background: var(--auth-mist);
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .main {
+    padding: 20px 12px 36px;
+  }
+
+  .intro {
+    padding-inline: 4px;
+  }
+
+  .kicker {
+    margin-bottom: 12px;
+  }
+
+  .tagline {
+    font-size: 32px;
+    letter-spacing: -0.035em;
+  }
+
+  .introNote {
+    font-size: 15px;
+    margin-top: 18px;
+  }
+
+  .points {
+    font-size: 13px;
+    margin-top: 18px;
+  }
+
+  .marketPanel {
+    margin-top: 26px;
+  }
+
+  .marketStrip {
+    padding-inline: 10px;
+  }
+
+  .marketStrip :global(.index-card) {
+    min-height: 84px;
+  }
+
+  .marketStrip :global(.index-card + .index-card) {
+    border-left: 0;
+    border-top: 1px solid var(--auth-line);
+  }
+
+  .hotBoard {
+    padding: 14px;
+  }
+
+  .footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+    padding-inline: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .page *::before,
+  .page *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

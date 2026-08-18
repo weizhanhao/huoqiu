@@ -8,6 +8,7 @@ import {
   useBrowserStore,
   writeBrowserStore,
 } from "../../lib/browser-store";
+import { ShellIcon } from "./shell-icons";
 
 /*
  * 顶栏搜索。
@@ -208,7 +209,20 @@ export function GlobalSearchBox() {
       : undefined;
 
   return (
-    <div className="global-search-shell" ref={containerRef}>
+    <div
+      className="global-search-shell"
+      onBlur={(event) => {
+        /*
+         * 焦点真正离开搜索组件就收起面板。relatedTarget 仍在
+         * 面板内时不关，因此鼠标点候选链接不会被 blur 抢先截断。
+         */
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setOpen(false);
+          setActive(-1);
+        }
+      }}
+      ref={containerRef}
+    >
       <form
         action="/search"
         className="global-search"
@@ -279,12 +293,14 @@ export function GlobalSearchBox() {
               setActive(-1);
             }
           }}
-          placeholder="搜索代码、名称或拼音首字母"
+          placeholder="搜索"
           role="combobox"
           type="search"
           value={query}
         />
-        <button type="submit">搜索</button>
+        <button aria-label="搜索" type="submit">
+          <ShellIcon name="search" />
+        </button>
       </form>
 
       {hasPanel ? (

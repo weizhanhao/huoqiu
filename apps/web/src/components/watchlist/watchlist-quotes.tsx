@@ -129,6 +129,7 @@ export function WatchlistQuotes({
   symbols,
 }: Readonly<{ symbols: readonly string[] }>) {
   const [state, setState] = useState<FetchState>({ kind: "idle" });
+  const [pending, setPending] = useState(true);
   const [active, setActive] = useState<string>(ALL);
 
   /*
@@ -141,8 +142,12 @@ export function WatchlistQuotes({
    * 重试按钮用这个：按钮回调不在 effect 里，就地改状态没有问题。
    */
   const load = useCallback(async (): Promise<void> => {
-    setState({ kind: "loading" });
-    setState(await fetchQuotes(key));
+    setPending(true);
+    const next = await fetchQuotes(key);
+    setState((current) =>
+      next.kind === "failed" && current.kind === "ready" ? current : next,
+    );
+    setPending(false);
   }, [key]);
 
   /*
@@ -155,9 +160,14 @@ export function WatchlistQuotes({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      setState({ kind: "loading" });
+      setPending(true);
       const next = await fetchQuotes(key);
-      if (!cancelled) setState(next);
+      if (!cancelled) {
+        setState((current) =>
+          next.kind === "failed" && current.kind === "ready" ? current : next,
+        );
+        setPending(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -226,7 +236,11 @@ export function WatchlistQuotes({
   }
 
   return (
-    <div className="watchlist-quotes" data-testid="watchlist-quotes">
+    <div
+      aria-busy={pending}
+      className="watchlist-quotes"
+      data-testid="watchlist-quotes"
+    >
       <nav aria-label="自选品种" className="watchlist-categories">
         <button
           aria-pressed={active === ALL}
@@ -253,9 +267,9 @@ export function WatchlistQuotes({
         })}
       </nav>
 
-      {state.kind === "loading" ? (
+      {pending ? (
         <p aria-live="polite" className="watchlist-hint">
-          正在读取行情……
+          {state.kind === "ready" ? "正在更新行情……" : "正在读取行情……"}
         </p>
       ) : null}
 

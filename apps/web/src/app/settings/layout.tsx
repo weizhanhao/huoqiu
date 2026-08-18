@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 
-import { DesktopShell } from "../../components/shell/desktop-shell";
+import { SiteTopbar } from "../../components/shell/site-topbar";
 import {
   SettingsHeading,
   SettingsNav,
 } from "../../features/profile-settings/settings-nav";
+import styles from "./settings-shell.module.css";
 
 /*
  * 设置页外壳。
@@ -18,10 +19,11 @@ export default function SettingsLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <DesktopShell activeUtility="settings">
-      <div className="settings-layout">
+    <div className={styles.shell}>
+      <SiteTopbar />
+      <main className={styles.layout}>
         <SettingsNav />
-        <div className="settings-content">
+        <div className={styles.content}>
           {/*
             八个子页此前一个标题都没有：页面上第一个标题是右栏的「热股榜」。
             标题与选中的导航项取自同一份清单，不会对不上。
@@ -29,7 +31,7 @@ export default function SettingsLayout({
           <SettingsHeading />
           {children}
         </div>
-      </div>
-    </DesktopShell>
+      </main>
+    </div>
   );
 }

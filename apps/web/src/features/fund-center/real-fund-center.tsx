@@ -79,6 +79,7 @@ export function RealFundCenter({
   const [sort, setSort] = useState<SortId>(initialSort);
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
+  const [pending, setPending] = useState(true);
   const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
@@ -89,7 +90,14 @@ export function RealFundCenter({
        * 同步改状态会在同一轮渲染里再触发一次。对用户没有分别——它和
        * 紧随其后的请求本来就是同一件事。
        */
-      setState({ kind: "loading" });
+      /*
+       * 切分类/排序/翻页时保留上一批表格。
+       *
+       * 这里原先把 state 立刻改回 loading，整张表会被卸载，页面高度骤降；
+       * 用户如果已经向下滚，浏览器会回收 scrollTop，于是 sticky 左栏整块上跳。
+       * pending 只更新状态文案，旧表原位保留，等新数据回来再一次替换。
+       */
+      setPending(true);
       try {
         const response = await fetch(
           `/api/funds/list?category=${category}&sort=${sort}&page=${page}`,
@@ -97,6 +105,7 @@ export function RealFundCenter({
         if (cancelled) return;
         if (!response.ok) {
           setState({ kind: "failed" });
+          setPending(false);
           return;
         }
         const data = (await response.json()) as {
@@ -109,8 +118,12 @@ export function RealFundCenter({
           rows: data.rows ?? [],
           total: data.total ?? null,
         });
+        setPending(false);
       } catch {
-        if (!cancelled) setState({ kind: "failed" });
+        if (!cancelled) {
+          setState({ kind: "failed" });
+          setPending(false);
+        }
       }
     })();
     return () => {
@@ -163,6 +176,7 @@ export function RealFundCenter({
       </header>
 
       <section
+        aria-busy={pending}
         aria-labelledby="fund-list-heading"
         className={styles.panel}
         tabIndex={-1}
@@ -177,37 +191,51 @@ export function RealFundCenter({
         </div>
 
         <div className={styles.filters}>
-          <div aria-label="基金分类" className={styles.segmented} role="group">
-            {CATEGORIES.map((item) => (
-              <button
-                aria-pressed={category === item.id}
-                key={item.id}
-                onClick={() => {
-                  setCategory(item.id);
-                  // 换分类要回到第一页，否则会停在上一类的第 5 页。
-                  setPage(1);
-                }}
-                type="button"
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className={styles.filterRow}>
+            <span className={styles.filterLabel}>基金类型</span>
+            <div
+              aria-label="基金类型"
+              className={`${styles.filterOptions} ${styles.categoryOptions}`}
+              role="group"
+            >
+              {CATEGORIES.map((item) => (
+                <button
+                  aria-pressed={category === item.id}
+                  key={item.id}
+                  onClick={() => {
+                    setCategory(item.id);
+                    // 换分类要回到第一页，否则会停在上一类的第 5 页。
+                    setPage(1);
+                  }}
+                  type="button"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div aria-label="排序依据" className={styles.segmented} role="group">
-            {SORTS.map((item) => (
-              <button
-                aria-pressed={sort === item.id}
-                key={item.id}
-                onClick={() => {
-                  setSort(item.id);
-                  setPage(1);
-                }}
-                type="button"
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className={styles.filterRow}>
+            <span className={styles.filterLabel}>业绩周期</span>
+            <div
+              aria-label="业绩统计周期"
+              className={`${styles.filterOptions} ${styles.periodOptions}`}
+              role="group"
+            >
+              {SORTS.map((item) => (
+                <button
+                  aria-pressed={sort === item.id}
+                  key={item.id}
+                  onClick={() => {
+                    setSort(item.id);
+                    setPage(1);
+                  }}
+                  type="button"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -217,16 +245,16 @@ export function RealFundCenter({
           只换文字，所以切排序、切市场、失败都会被念出来。
         */}
         <p aria-live="polite" className={styles.resultStatus} role="status">
-          {state.kind === "loading"
-            ? "正在读取……"
+          {pending
+            ? state.kind === "ready"
+              ? "正在更新排行……"
+              : "正在读取……"
             : state.kind === "failed"
               ? "基金列表取不到。"
-              : `已列出 ${state.rows.length} 条。`}
+              : state.kind === "ready"
+                ? `已列出 ${state.rows.length} 条。`
+                : "正在读取……"}
         </p>
-
-        {state.kind === "loading" ? (
-          <p className={styles.resultStatus}>正在读取基金列表……</p>
-        ) : null}
 
         {state.kind === "failed" ? (
           <p className={styles.resultStatus}>
@@ -251,7 +279,7 @@ export function RealFundCenter({
         {state.kind === "ready" ? (
           <>
             <ScrollableTable label="基金排行">
-              <table className="watchlist-table">
+              <table className={`watchlist-table ${styles.fundTable}`}>
                 <thead>
                   <tr>
                     <th scope="col">基金</th>
@@ -322,7 +350,11 @@ export function RealFundCenter({
               </table>
             </ScrollableTable>
 
-            <div aria-label="翻页" className={styles.segmented} role="group">
+            <div
+              aria-label="翻页"
+              className={`${styles.segmented} ${styles.pagination} hq-pagination`}
+              role="group"
+            >
               <button
                 disabled={page === 1}
                 onClick={() => setPage((current) => Math.max(1, current - 1))}

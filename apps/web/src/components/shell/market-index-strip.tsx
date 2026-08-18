@@ -1,5 +1,5 @@
 import { loadFxSnapshot } from "../../features/real-finance/fx-rates.server";
-import { RealIndexCards } from "./real-index-cards";
+import { RealIndexCards, type FxIndexCard } from "./real-index-cards";
 
 /*
  * 频道栏上方的指数条。
@@ -14,32 +14,35 @@ import { RealIndexCards } from "./real-index-cards";
  */
 export function MarketIndexStrip() {
   const fx = loadFxSnapshot();
-  const usd = fx?.rates.find((rate) => rate.code === "USD") ?? null;
-  const usdChange = usd?.changePct ?? null;
+  const preferredCurrencies = ["USD", "HKD", "EUR", "JPY", "GBP", "AUD"];
+  const fxCards: readonly FxIndexCard[] = preferredCurrencies.map((code) => {
+    const rate = fx?.rates.find((candidate) => candidate.code === code) ?? null;
+    const directChange = rate?.changePct ?? null;
+    /*
+     * 快照保存的是「1 人民币兑多少外币」，卡片展示的是更常见的反向报价。
+     * 反向涨跌不是简单取负：r 涨 p%，1/r 的变化是 -p/(100+p)。
+     */
+    const inverseChange =
+      directChange === null
+        ? null
+        : Number(((-directChange / (100 + directChange)) * 100).toFixed(3));
+    return {
+      changePercent: inverseChange,
+      code,
+      label: rate === null ? code : `${rate.label} / 人民币`,
+      source: fx === null ? "暂无数据" : `央行参考 · ${fx.date}`,
+      value: rate === null ? null : 1 / rate.rate,
+    };
+  });
 
+  /*
+   * 行情轮播属于页面外壳，不属于下面某个频道的正文。
+   * 基金 / 自选等宽工作区会把正文从 640px 扩到 920px，但不能连带把
+   * 三张行情卡也拉宽。固定在标准主栏宽度里，右栏显隐只影响下方内容。
+   */
   return (
-    <section aria-label="市场概览" className="index-strip">
-      <RealIndexCards />
-
-      <div className="index-card index-card-fx">
-        <span className="index-card-name">美元 / 人民币</span>
-        <strong>{usd === null ? "—" : (1 / usd.rate).toFixed(4)}</strong>
-        {/* 汇率的涨跌方向要按「1 美元换多少人民币」来看，与 rate 相反。 */}
-        <span
-          className={
-            usdChange === null
-              ? undefined
-              : usdChange >= 0
-                ? "market-down"
-                : "market-up"
-          }
-        >
-          {usdChange === null
-            ? "—"
-            : `${-usdChange >= 0 ? "+" : ""}${(-usdChange).toFixed(2)}%`}
-        </span>
-        <small>{fx === null ? "暂无数据" : `央行参考 · ${fx.date}`}</small>
-      </div>
-    </section>
+    <div className="market-index-dock">
+      <RealIndexCards fxCards={fxCards} />
+    </div>
   );
 }

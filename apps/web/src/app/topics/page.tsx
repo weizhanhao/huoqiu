@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { DesktopShell } from "../../components/shell/desktop-shell";
 import { communityFeedCards } from "../../features/community/community-fixtures";
-import styles from "../../features/account/account.module.css";
+import styles from "./topics.module.css";
 
 /*
  * 话题广场。
@@ -18,6 +18,8 @@ export const metadata: Metadata = {
 };
 
 type Topic = Readonly<{ count: number; tag: string }>;
+
+const PAGE_SIZE = 10;
 
 const topics = (): readonly Topic[] => {
   const counts = new Map<string, number>();
@@ -38,36 +40,83 @@ const topics = (): readonly Topic[] => {
   );
 };
 
-export default function TopicsPage() {
+type TopicsPageProperties = Readonly<{
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}>;
+
+const pageValue = (value: string | string[] | undefined): number => {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+};
+
+const pageHref = (page: number): string =>
+  page === 1 ? "/topics" : `/topics?page=${page}`;
+
+export default async function TopicsPage({
+  searchParams,
+}: TopicsPageProperties) {
   const rows = topics();
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(pageValue((await searchParams).page), pageCount);
+  const visibleRows = rows.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   return (
     <DesktopShell>
-      <section aria-labelledby="topics-heading" className={styles.page}>
+      <section
+        aria-labelledby="topics-heading"
+        className={styles.page}
+        data-testid="topics-hub"
+      >
         <header className={styles.heading}>
           <h1 id="topics-heading">话题</h1>
-          <p>社区记录里出现过的话题，按记录数排序。</p>
+          <p>社区记录里出现过的话题，按记录数排序，共 {rows.length} 个。</p>
         </header>
 
         {rows.length === 0 ? (
           <p className={styles.hint}>还没有话题。</p>
         ) : (
           <ul className={styles.directory}>
-            {rows.map((topic) => (
+            {visibleRows.map((topic) => (
               <li className={styles.directoryRow} key={topic.tag}>
                 <Link href={`/topics/${encodeURIComponent(topic.tag)}`}>
-                  #{topic.tag}
+                  <span className={styles.topicName}>
+                    <span aria-hidden="true">#</span>
+                    {topic.tag}
+                  </span>
+                  <small>{topic.count} 条记录</small>
+                  <span aria-hidden="true" className={styles.chevron}>
+                    ›
+                  </span>
                 </Link>
-                {/*
-                  计数用 <small>，不用 styles.secondary——那个类是按钮样式
-                  （带边框、hover、44px 最小高度），套在一个纯计数上，看着像
-                  个能按的东西，实际点不动。
-                */}
-                <small>{topic.count} 条记录</small>
               </li>
             ))}
           </ul>
         )}
+
+        {pageCount > 1 ? (
+          <nav
+            aria-label="话题分页"
+            className={`${styles.pagination} hq-pagination`}
+          >
+            {currentPage > 1 ? (
+              <Link href={pageHref(currentPage - 1)}>上一页</Link>
+            ) : (
+              <span aria-disabled="true">上一页</span>
+            )}
+            <span className={styles.pageStatus}>
+              第 {currentPage} / {pageCount} 页
+            </span>
+            {currentPage < pageCount ? (
+              <Link href={pageHref(currentPage + 1)}>下一页</Link>
+            ) : (
+              <span aria-disabled="true">下一页</span>
+            )}
+          </nav>
+        ) : null}
       </section>
     </DesktopShell>
   );

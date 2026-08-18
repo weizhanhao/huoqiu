@@ -60,7 +60,13 @@ export function ChannelNavigation() {
    * 否则站在关注页上点亮的是热门。没有路由上下文时返回 null（静态渲染、
    * 测试里单独渲染都是）。
    */
-  const active = activeNavHref(usePathname() ?? "", CHANNEL_HREFS);
+  const pathname = usePathname() ?? "";
+  const active = activeNavHref(
+    pathname === "/portfolios" || pathname.startsWith("/portfolios/")
+      ? "/watchlist"
+      : pathname,
+    CHANNEL_HREFS,
+  );
 
   return (
     <nav className="channel-tabs" aria-label="全局频道">

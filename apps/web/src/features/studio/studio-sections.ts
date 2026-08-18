@@ -26,35 +26,28 @@ export type StudioGroup = Readonly<{
 
 export const studioGroups: readonly StudioGroup[] = [
   {
-    label: "发布",
-    sections: [{ label: "发布长文", slug: "publish", status: "ready" }],
-  },
-  {
-    label: "草稿箱",
+    label: "创作",
     sections: [
+      { label: "发布长文", slug: "publish", status: "ready" },
       { label: "讨论草稿", slug: "drafts/discussion", status: "ready" },
       { label: "长文草稿", slug: "drafts/article", status: "ready" },
     ],
   },
   {
-    label: "内容管理",
-    sections: [{ label: "我的作品", slug: "content", status: "ready" }],
-  },
-  {
-    label: "数据中心",
+    label: "内容与数据",
     sections: [
+      { label: "我的作品", slug: "content", status: "ready" },
       { label: "数据总览", slug: "data", status: "ready" },
       { label: "作品详情", slug: "data/posts", status: "ready" },
       { label: "粉丝数据", slug: "data/followers", status: "ready" },
     ],
   },
   {
-    label: "创作者权益",
-    sections: [{ label: "权益与申请", slug: "benefits", status: "preview" }],
-  },
-  {
-    label: "账号认证",
-    sections: [{ label: "认证入口", slug: "verification", status: "preview" }],
+    label: "账号与权益",
+    sections: [
+      { label: "权益与申请", slug: "benefits", status: "preview" },
+      { label: "认证入口", slug: "verification", status: "preview" },
+    ],
   },
 ];
 

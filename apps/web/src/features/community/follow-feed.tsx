@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import styles from "./follow-feed.module.css";
-import { useAccountSession } from "../account/account-session";
+import { useAccountSession, type SocialPost } from "../account/account-session";
 
 /*
  * 关注流。
@@ -36,19 +36,54 @@ const formatTime = (iso: string): string => {
   }).format(parsed);
 };
 
-type StreamProperties = Readonly<{ children: React.ReactNode }>;
+type StreamProperties = Readonly<{
+  children: React.ReactNode;
+  label?: string;
+}>;
 
 /* 三种状态用同一个外框，省得每处各写一遍 aria 与 testid。 */
-function Stream({ children }: StreamProperties) {
+function Stream({ children, label = "关注" }: StreamProperties) {
   return (
     <section
-      aria-label="关注"
+      aria-label={label}
       className={styles.stream}
       data-testid="follow-stream"
     >
       {children}
     </section>
   );
+}
+
+function PostCards({ posts }: Readonly<{ posts: readonly SocialPost[] }>) {
+  return posts.map((post) => (
+    <article className={styles.card} key={post.id}>
+      <header className={styles.author}>
+        {/*
+          头像和昵称在同一个链接里：分开写，昵称那一行只有 30px 高，
+          手指点不准，读屏也要把同一个人念两遍。
+        */}
+        <Link className={styles.identity} href={`/users/${post.authorId}`}>
+          <span aria-hidden="true" className={styles.avatar}>
+            {post.authorName.slice(0, 1)}
+          </span>
+          <strong>{post.authorName}</strong>
+        </Link>
+        <time className={styles.time} dateTime={post.createdAt}>
+          {formatTime(post.createdAt)}
+        </time>
+      </header>
+      {hasWrittenTitle(post.title, post.body) ? (
+        <h3 className={styles.title}>
+          <Link href={`/community/posts/${post.id}`}>{post.title}</Link>
+        </h3>
+      ) : null}
+      <p className={styles.body}>
+        <Link className={styles.bodyLink} href={`/community/posts/${post.id}`}>
+          {post.body}
+        </Link>
+      </p>
+    </article>
+  ));
 }
 
 export function FollowFeed() {
@@ -83,38 +118,7 @@ export function FollowFeed() {
 
   return (
     <Stream>
-      {followed.map((post) => (
-        <article className={styles.card} key={post.id}>
-          <header className={styles.author}>
-            {/*
-              头像和昵称在同一个链接里：分开写，昵称那一行只有 30px 高，
-              手指点不准，读屏也要把同一个人念两遍。
-            */}
-            <Link className={styles.identity} href={`/users/${post.authorId}`}>
-              <span aria-hidden="true" className={styles.avatar}>
-                {post.authorName.slice(0, 1)}
-              </span>
-              <strong>{post.authorName}</strong>
-            </Link>
-            <time className={styles.time} dateTime={post.createdAt}>
-              {formatTime(post.createdAt)}
-            </time>
-          </header>
-          {hasWrittenTitle(post.title, post.body) ? (
-            <h3 className={styles.title}>
-              <Link href={`/community/posts/${post.id}`}>{post.title}</Link>
-            </h3>
-          ) : null}
-          <p className={styles.body}>
-            <Link
-              className={styles.bodyLink}
-              href={`/community/posts/${post.id}`}
-            >
-              {post.body}
-            </Link>
-          </p>
-        </article>
-      ))}
+      <PostCards posts={followed} />
     </Stream>
   );
 }

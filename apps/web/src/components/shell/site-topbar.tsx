@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 import { activeNavHref } from "./active-nav";
 import { GlobalSearchBox } from "./global-search-box";
 import { NotificationNavigationLink } from "./notification-navigation-link";
-import { PublishDialog } from "../../features/publish/publish-dialog";
-import { DemoDataBadge } from "../system/demo-data-badge";
+import { BrandGlyph } from "./shell-icons";
+import { SettingsMenu } from "./settings-menu";
 
 /*
  * 全站顶栏。
@@ -25,17 +25,20 @@ import { DemoDataBadge } from "../system/demo-data-badge";
  */
 const TOPBAR_MATCHES = ["/notifications", "/settings"];
 
-export function SiteTopbar() {
+export function SiteTopbar({
+  variant = "full",
+}: Readonly<{ variant?: "auth" | "full" }>) {
   /* 没有路由上下文时返回 null（静态渲染、测试里单独渲染都是）。 */
   const active = activeNavHref(usePathname() ?? "", TOPBAR_MATCHES);
   const notificationsActive = active === "/notifications";
   const settingsActive = active === "/settings";
+  const auth = variant === "auth";
 
   return (
-    <header className="d0-topbar">
+    <header className={`d0-topbar${auth ? " d0-topbar-auth" : ""}`}>
       <Link className="d0-brand" href="/" aria-label="火球首页">
         <span className="brand-mark" aria-hidden="true">
-          火
+          <BrandGlyph />
         </span>
         {/*
           站名不是页面标题。这里原本是 <h1>，于是全站每一页的唯一 h1 都是
@@ -44,35 +47,18 @@ export function SiteTopbar() {
         */}
         <span className="brand-word">火球</span>
       </Link>
-      <GlobalSearchBox />
-      <nav className="top-actions" aria-label="顶部功能">
-        <NotificationNavigationLink
-          active={notificationsActive}
-          variant="top"
-        />
-        {/*
-          发帖走弹框，不再整页跳转。写一句话跳走一整页、发完再跳回来，
-          中间那一页的上下文就丢了——雪球在这里也是弹框。
-          长文仍然是独立一页，弹框里点「长文」过去。
-        */}
-        <PublishDialog className="top-action-link">
-          <span className="unavailable-icon" aria-hidden="true">
-            ＋
-          </span>
-          <span>发帖</span>
-        </PublishDialog>
-        <Link
-          aria-current={settingsActive ? "page" : undefined}
-          className="top-action-link"
-          href="/settings"
-        >
-          <span className="unavailable-icon" aria-hidden="true">
-            ⚙
-          </span>
-          <span>设置</span>
-        </Link>
-      </nav>
-      <DemoDataBadge variant="environment" />
+      {auth ? null : (
+        <>
+          <GlobalSearchBox />
+          <nav className="top-actions" aria-label="顶部功能">
+            <NotificationNavigationLink
+              active={notificationsActive}
+              variant="top"
+            />
+            <SettingsMenu active={settingsActive} />
+          </nav>
+        </>
+      )}
     </header>
   );
 }

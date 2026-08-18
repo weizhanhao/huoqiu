@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
-import styles from "./account.module.css";
+import styles from "./auth-experience.module.css";
 import { useAccountSession } from "./account-session";
 
 /*
@@ -45,7 +45,7 @@ export function AuthExperience({
   nextPath: rawNextPath,
 }: Readonly<{ mode: Mode; nextPath?: string | null }>) {
   // accounts 不再取：登录页上那份公开的账号名册已经删掉了。
-  const { account, login, logout, register } = useAccountSession();
+  const { account, login, register } = useAccountSession();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -67,6 +67,19 @@ export function AuthExperience({
   const nextPath = safeNextPath(rawNextPath ?? null);
 
   const isRegister = mode === "register";
+  const destination = nextPath ?? "/";
+  const nextSuffix =
+    nextPath === null ? "" : `?next=${encodeURIComponent(nextPath)}`;
+
+  /*
+   * 登录页不是账号中心。
+   *
+   * 已有会话的人直接进入目标页；没有 next 就进入首页。这样登录完成、刷新登录
+   * 页或从浏览器历史回到这里，都不会停在一张「已登录」状态卡上。
+   */
+  useEffect(() => {
+    if (account !== null) router.replace(destination);
+  }, [account, destination, router]);
 
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -105,16 +118,18 @@ export function AuthExperience({
          * 回到刚才那一页。是「点了才发现要登录」走过来的，就送回去；
          * 直接打开登录页的，留在原地看已登录状态。
          */
-        const destination = nextPath;
-        if (destination !== null) {
-          setStatus({ kind: "ok", text: "登录成功，正在返回…" });
-          router.replace(destination);
-          return;
-        }
         setStatus({
           kind: "ok",
-          text: isRegister ? "注册成功，已为你登录。" : "登录成功。",
+          text:
+            nextPath === null
+              ? isRegister
+                ? "注册成功，正在进入首页…"
+                : "登录成功，正在进入首页…"
+              : isRegister
+                ? "注册成功，正在返回…"
+                : "登录成功，正在返回…",
         });
+        router.replace(destination);
         return;
       }
       setStatus({ kind: "error", text: failure });
@@ -130,60 +145,50 @@ export function AuthExperience({
 
   if (account !== null) {
     return (
-      <div className={styles.page}>
-        <section className={styles.card}>
-          <div className={styles.heading}>
-            <h1>已登录</h1>
-            <p>
-              当前身份 <strong>{account.displayName}</strong>（{account.email}
-              ）。
-            </p>
-          </div>
-          <div className={styles.signedIn}>
-            {/*
-              已经登录、却又带着 next 落在这一页（比如点了浏览器后退），
-              要有一条明确的路走回去，而不是让人自己想办法。
-            */}
-            {nextPath === null ? null : (
-              <Link className={styles.secondary} href={nextPath}>
-                返回刚才的页面
-              </Link>
-            )}
-            <p className={styles.signedInStats}>
-              <span>
-                关注 <strong>{account.followingCount}</strong>
-              </span>
-              <span>
-                粉丝 <strong>{account.followerCount}</strong>
-              </span>
-              <span>
-                帖子 <strong>{account.postCount}</strong>
-              </span>
-            </p>
-            <Link className={styles.secondary} href={`/users/${account.id}`}>
-              查看我的主页
-            </Link>
-            <button className={styles.secondary} onClick={logout} type="button">
-              退出登录
-            </button>
-          </div>
-        </section>
+      <div aria-live="polite" className={styles.redirecting} role="status">
+        正在进入{nextPath === null ? "首页" : "刚才的页面"}…
       </div>
     );
   }
 
   return (
     <div className={styles.page}>
-      <section className={styles.card}>
+      <section
+        className={`${styles.card} ${
+          isRegister ? styles.registerCard : styles.loginCard
+        }`}
+      >
+        <nav aria-label="账号入口" className={styles.modeSwitch}>
+          <Link
+            aria-current={isRegister ? undefined : "page"}
+            href={`/login${nextSuffix}`}
+          >
+            登录
+          </Link>
+          <Link
+            aria-current={isRegister ? "page" : undefined}
+            href={`/register${nextSuffix}`}
+          >
+            注册
+          </Link>
+        </nav>
+
         <div className={styles.heading}>
           <h1>{isRegister ? "注册火球账号" : "登录火球"}</h1>
           <p>
-            账号、帖子与关注关系保存在本机服务端，刷新和重启后仍在。这里不接入
-            任何第三方登录，也不会向外发送你的邮箱或密码。
+            {isRegister
+              ? "创建账号后即可关注、发帖并保存自己的组合。"
+              : "继续查看你的关注、消息与个人组合。"}
           </p>
         </div>
 
-        <form method="post" className={styles.form} onSubmit={submit}>
+        <form
+          method="post"
+          className={`${styles.form} ${
+            isRegister ? styles.registerForm : styles.loginForm
+          }`}
+          onSubmit={submit}
+        >
           {isRegister ? (
             <label className={styles.field}>
               <span>显示名</span>
@@ -192,6 +197,7 @@ export function AuthExperience({
                 maxLength={80}
                 name="display_name"
                 onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="你希望社区如何称呼你"
                 required
                 type="text"
                 value={displayName}
@@ -205,6 +211,7 @@ export function AuthExperience({
               autoComplete="email"
               name="email"
               onChange={(event) => setEmail(event.target.value)}
+              placeholder="name@example.com"
               required
               type="email"
               value={email}
@@ -222,9 +229,11 @@ export function AuthExperience({
               type="password"
               value={password}
             />
-            <small className={styles.hint}>
-              至少 {MINIMUM_PASSWORD_LENGTH} 位，仅以加盐散列存储。
-            </small>
+            {isRegister ? (
+              <small className={styles.hint}>
+                请设置至少 {MINIMUM_PASSWORD_LENGTH} 位密码。
+              </small>
+            ) : null}
           </label>
 
           <p
@@ -240,18 +249,6 @@ export function AuthExperience({
             {isRegister ? "注册并登录" : "登录"}
           </button>
         </form>
-
-        <p className={styles.switchLine}>
-          {isRegister ? (
-            <>
-              已经有账号？<Link href="/login">直接登录</Link>
-            </>
-          ) : (
-            <>
-              还没有账号？<Link href="/register">注册一个</Link>
-            </>
-          )}
-        </p>
       </section>
 
       {/*

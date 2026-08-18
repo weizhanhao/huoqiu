@@ -32,9 +32,9 @@ export function CreatorsHub() {
       className={styles.page}
       data-testid="creators-hub"
     >
-      <header className={styles.hero}>
+      <header className={`${styles.hero} ${styles.creatorHero}`}>
         <div>
-          <p className={styles.kicker}>达人榜</p>
+          <p className={styles.kicker}>社区作者</p>
           <h1 id="creators-heading">达人榜</h1>
         </div>
         <p className={styles.heroNote}>
@@ -42,7 +42,7 @@ export function CreatorsHub() {
         </p>
       </header>
 
-      <section className={styles.panel}>
+      <section className={`${styles.panel} ${styles.creatorPanel}`}>
         <div className={styles.panelHeading}>
           <h3>按关注数排序</h3>
           <span>{ranked.length} 位</span>
