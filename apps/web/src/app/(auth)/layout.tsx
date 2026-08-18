@@ -68,7 +68,6 @@ export default function AuthLayout({
       </main>
 
       <footer className={styles.footer}>
-        <p>行情数据来自公开接口，不构成投资建议。</p>
         <p>账号与内容保存在当前服务端。</p>
       </footer>
     </div>

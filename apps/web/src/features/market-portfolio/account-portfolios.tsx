@@ -445,7 +445,7 @@ export function AccountPortfolios() {
       )}
 
       <p className={styles.portfolioNote}>
-        当日收益按持仓权重对各标的当日涨跌幅加权得出，数据来自公开行情接口；
+        当日收益按持仓权重对各标的当日涨跌幅加权得出；
         任一持仓取不到行情时显示「—」，不给出不完整的加权结果。
       </p>
     </section>

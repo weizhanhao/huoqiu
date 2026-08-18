@@ -97,8 +97,14 @@ describe("fund center routes", () => {
     expect(markup).not.toContain("火球长跑指数 A");
     expect(markup).not.toContain("fund_syn_000");
     expect(markup).not.toContain("样本数据 · 非实时");
-    // 做不了的事要写出来，而不是摆一个点了没反应的「购买」。
-    expect(markup).toContain("不提供申购赎回");
+    /*
+     * 页面上不能出现申购赎回入口。
+     *
+     * 原来断言的是那句说明文案，而文案会随产品调整；不能变的是**站内没有
+     * 销售牌照，就不该摆一个点了没反应的「购买」**。改成断言按钮不存在。
+     */
+    expect(markup).not.toContain("立即购买");
+    expect(markup).not.toContain("申购");
   });
 
   it("keeps the deep-linked category from the address bar", async () => {

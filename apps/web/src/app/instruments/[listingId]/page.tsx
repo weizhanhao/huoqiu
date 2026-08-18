@@ -111,7 +111,6 @@ export default async function InstrumentPage({
   return (
     <RealInstrumentDetail
       chartSeries={chartSeries}
-      fetchedAt={listing.fetchedAt}
       metrics={metrics}
       period={period}
       quote={listing.quote}

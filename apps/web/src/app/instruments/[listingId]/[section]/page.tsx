@@ -342,12 +342,7 @@ export default async function InstrumentSectionPage({
       <SectionBody content={content} slug={section.slug} />
 
       <p className={styles.disclosure}>
-        {content.kind === "executives"
-          ? "资料来源：新浪财经公开 F10 页面"
-          : content.kind === "statement" || content.kind === "forecast"
-            ? "资料来源：东方财富数据中心公开接口"
-            : "资料来源：东方财富公开 F10 接口"}{" "}
-        · 按公司披露口径，非实时，不构成投资建议。
+        按公司披露口径，非实时。
       </p>
     </div>
   );

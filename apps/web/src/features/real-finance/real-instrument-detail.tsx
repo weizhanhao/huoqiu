@@ -83,14 +83,12 @@ const summarize = (bars: KlineSeries["bars"]): RangeStats | null => {
 
 export function RealInstrumentDetail({
   chartSeries,
-  fetchedAt,
   metrics = null,
   period,
   tape = null,
   quote = null,
   series,
 }: Readonly<{
-  fetchedAt: string;
   /*
    * 那一片行情指标（涨跌停、换手、振幅、市盈率、股本……）。
    * 取不到就整片不渲染，而不是摆二十多个「—」——一整片破折号看着像
@@ -162,16 +160,6 @@ export function RealInstrumentDetail({
                 <dd>{formatVolume(stats.averageVolume)}</dd>
               </div>
             </dl>
-            {/*
-            这段说明必须留着：数据是真的，但它是抓取时点的日线快照，不是实时
-            行情，也不构成投资建议。社区内容已经是真人真账号了，行情不是，
-            这个区别不该靠含糊措辞抹平。
-          */}
-            <p className={styles.disclosure}>
-              以上数字均由腾讯财经公开行情接口的日线数据直接计算得出。数据抓取于{" "}
-              {fetchedAt.slice(0, 10)}
-              ，为日线快照而非实时行情，不提供投资建议或交易能力。
-            </p>
           </section>
         )}
 

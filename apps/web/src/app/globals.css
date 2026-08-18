@@ -3002,3 +3002,66 @@ a.fund-row:hover strong:first-child {
   --hq-market-down-subtle: #2a1518;
   --hq-market-down-border: #4a2126;
 }
+
+/*
+ * 手机端扫码页（/app）。
+ *
+ * 单独一页、没有外壳，给的是「拿手机扫一下」这一件事。所以版式只有三段：
+ * 码、地址、步骤——不放导航，也不放行情。
+ */
+.app-preview {
+  margin: 0 auto;
+  max-width: 460px;
+  padding: 48px 20px 64px;
+}
+
+.app-preview h1 {
+  font-size: 24px;
+  line-height: 1.3;
+  margin: 0 0 6px;
+}
+
+.app-preview-lede {
+  color: var(--hq-text-secondary);
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+
+.app-preview-card {
+  align-items: center;
+  background: var(--hq-surface-canvas);
+  border: 1px solid var(--hq-border-default);
+  border-radius: 12px;
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  padding: 24px;
+}
+
+.app-preview-qr {
+  height: 240px;
+  width: 240px;
+}
+
+.app-preview-url {
+  background: var(--hq-surface-subtle);
+  border: 1px solid var(--hq-border-subtle);
+  border-radius: 6px;
+  font-size: 14px;
+  padding: 4px 8px;
+}
+
+.app-preview-steps {
+  margin: 24px 0 0;
+  padding-left: 22px;
+}
+
+.app-preview-steps li {
+  margin-bottom: 10px;
+}
+
+.app-preview-note {
+  color: var(--hq-text-secondary);
+  font-size: 14px;
+  margin-top: 20px;
+}

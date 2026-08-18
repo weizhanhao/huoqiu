@@ -84,8 +84,7 @@ export default async function PortfolioPage({
 
         <p className={styles.disclosure}>
           这是一个记录用的组合：只保存标的与权重，不涉及真实资金、下单或持仓，
-          也不构成投资建议。当日收益按权重对各标的当日涨跌幅加权得出，
-          数据来自公开行情接口。
+          当日收益按权重对各标的当日涨跌幅加权得出。
         </p>
       </div>
     </DesktopShell>

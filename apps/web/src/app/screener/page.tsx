@@ -351,14 +351,13 @@ export default async function ScreenerPage({
             </nav>
 
             <p className={styles.disclosure}>
-              数据来源：东方财富公开行情接口 · 抓取于{" "}
-              {beijingTime(result.fetchedAt)}（北京时间）
+              抓取于 {beijingTime(result.fetchedAt)}（北京时间）
               {result.delayed ? " · 延时行情源" : ""}
               {isStale(result.fetchedAt)
                 ? " · 上游暂时不可达，当前显示的是这一时刻的存档数据，并非最新行情"
                 : ""}
-              ，非实时逐笔，不构成投资建议。市盈率为负表示公司当期亏损；
-              显示为「—」表示该指标不适用或未披露，不代表数值为零。
+              。市盈率为负表示公司当期亏损；显示为「—」表示该指标不适用或未披露，
+              不代表数值为零。
             </p>
           </>
         )}

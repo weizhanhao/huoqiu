@@ -185,7 +185,6 @@ export function RealMarketOverview() {
           <strong>
             {overview?.delayed === true ? "延时行情源" : "公开行情数据"}
           </strong>
-          <span>非实时逐笔 · 不构成投资建议</span>
         </div>
       </header>
 
@@ -286,9 +285,6 @@ export function RealMarketOverview() {
           */}
           <MarketChanges />
 
-          <p className={styles.resultStatus}>
-            数据来自东方财富公开行情接口，不构成投资建议。
-          </p>
         </>
       )}
     </div>

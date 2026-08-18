@@ -144,9 +144,6 @@ export function DesktopShell({
             指数条里，那三张卡是沪深三大指数的实时行情。
           */}
 
-          <p className="rail-disclosure">
-            行情数据来自公开接口 · 不构成投资建议
-          </p>
         </aside>
       </div>
       {/*

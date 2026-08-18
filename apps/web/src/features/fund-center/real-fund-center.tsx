@@ -167,11 +167,6 @@ export function RealFundCenter({
         </div>
         <div className={styles.disclosure}>
           <strong>公开净值数据</strong>
-          {/*
-            站内没有基金销售牌照，做不了申购赎回。与其摆一个点了没反应的
-            「购买」按钮，不如把做不了的事直接写出来。
-          */}
-          <span>不提供申购赎回 · 不构成投资建议</span>
         </div>
       </header>
 

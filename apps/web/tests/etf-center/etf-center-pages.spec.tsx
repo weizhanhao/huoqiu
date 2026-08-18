@@ -24,8 +24,15 @@ describe("ETF center routes", () => {
     expect(markup).not.toContain("etf_syn_000");
     expect(markup).not.toContain("样本数据 · 非实时");
     expect(markup).not.toContain("不连接真实行情");
-    // 做不了的事仍要写出来，而不是摆一个点了没反应的「买入」。
-    expect(markup).toContain("不提供交易");
+    /*
+     * 页面上不能出现买入入口。
+     *
+     * 原来这里断言的是「不提供交易」那句说明文案，而说明文案是会随产品调整
+     * 的；真正不能变的是**站内没有交易能力，就不该摆一个点了没反应的按钮**。
+     * 所以改成直接断言那个按钮不存在。
+     */
+    expect(markup).not.toContain("买入");
+    expect(markup).not.toContain("卖出");
   });
 
   it("keeps the deep-linked ordering from the address bar", async () => {

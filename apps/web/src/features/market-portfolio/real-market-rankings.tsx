@@ -149,7 +149,6 @@ export function RealMarketRankings({
               ? "延时行情源"
               : "公开行情数据"}
           </strong>
-          <span>非实时逐笔 · 不构成投资建议</span>
         </div>
       </header>
 
@@ -264,8 +263,8 @@ export function RealMarketRankings({
         ) : null}
 
         <p className={styles.resultStatus}>
-          数据来自东方财富公开行情接口。港股与美股暂无站内详情页，
-          那两个市场的行只显示名称，不给点不开的链接。
+          港股与美股暂无站内详情页，那两个市场的行只显示名称，
+          不给点不开的链接。
         </p>
       </section>
     </div>

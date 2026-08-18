@@ -161,8 +161,7 @@ export function CommunityFeed({
         <p className={styles.eyebrow}>社区</p>
         <h2 id="community-heading">社区观察</h2>
         <p>
-          栏目记录由编辑部维护，用户内容来自本机注册账号。文中不含真实行情，
-          也不构成投资建议。
+          栏目记录由编辑部维护，用户内容来自本机注册账号。
         </p>
         <Link className={styles.backLink} href="/publish">
           写帖子

@@ -167,9 +167,7 @@ export function RealFundDetail({ fund }: Readonly<{ fund: Fund }>) {
         页面上摆一个买入按钮，是在假装能做一件它做不了的事。
       */}
       <p className={styles.disclosure}>
-        数据来源：东方财富公开基金接口 ·
-        净值按基金披露口径，非实时。本站不提供基金申购、定投或赎回功能，
-        也不构成投资建议；交易请通过持牌销售机构办理。
+        本站不提供基金申购、定投或赎回功能。
       </p>
     </div>
   );

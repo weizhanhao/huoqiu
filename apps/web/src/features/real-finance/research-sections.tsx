@@ -65,7 +65,7 @@ export function ResearchReportsSection({
       )}
       {research.reports.length === 0 ? null : (
         <p className={styles.disclosure}>
-          评级与目标价是各家券商各自的观点，不代表本站判断，也不构成投资建议。
+          评级与目标价是各家券商各自的观点，不代表本站判断。
         </p>
       )}
     </section>

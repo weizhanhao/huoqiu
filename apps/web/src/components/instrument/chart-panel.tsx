@@ -21,15 +21,6 @@ import {
  * 分时与五日画折线（带均价线和昨收基准），其余周期画蜡烛。
  */
 
-/*
- * 来源说明每个周期都要在。
- *
- * 这一行原本挂在日 K 图组件里，切到分时就没了——而分时恰好是默认视图，
- * 等于绝大多数人看到的那一屏没有来源标注。数据是真的，但它是公开接口的
- * 快照、不是实时行情，这个区别不该因为换了个周期就消失。
- */
-const SOURCE_NOTE = "腾讯财经公开行情接口 · 非实时，不构成投资建议";
-
 export function ChartPanel({
   period,
   quote,
@@ -87,7 +78,6 @@ export function ChartPanel({
             <TradingChart previousClose={series.previousClose} series={series} />
           )}
 
-          <p className={styles.source}>{SOURCE_NOTE}</p>
         </div>
 
         <ChartSide quote={quote} tape={tape} />

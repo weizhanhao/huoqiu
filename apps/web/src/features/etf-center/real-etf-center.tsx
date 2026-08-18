@@ -147,11 +147,6 @@ export function RealEtfCenter({
               ? "延时行情源"
               : "公开行情数据"}
           </strong>
-          {/*
-            站内没有交易能力。与其摆一个点了没反应的「买入」，
-            不如把做不了的事直接写出来。
-          */}
-          <span>不提供交易 · 不构成投资建议</span>
         </div>
       </header>
 

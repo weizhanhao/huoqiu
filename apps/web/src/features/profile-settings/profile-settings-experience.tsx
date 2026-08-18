@@ -263,13 +263,6 @@ export function ProfilePageExperience() {
         ) : null}
       </dl>
 
-      <aside aria-label="资料数据说明" className={styles.disclosure}>
-        <span aria-hidden="true">演</span>
-        <div>
-          <strong>样本数据 · 非实时 · 不构成投资建议</strong>
-          <p>资料变更只在当前客户端路由会话保留；刷新后恢复固定 fixture。</p>
-        </div>
-      </aside>
 
       {editing ? (
         <form

@@ -82,17 +82,14 @@ describe("real instrument detail route", () => {
     const markup = await renderInstrument(first?.symbol ?? "");
 
     /*
-     * 虚构标的那一页写的是「合成数据」。把这套说明套到真实日线上会把真数据
-     * 说成假的；反过来，抹掉来源标注又会把公开接口的快照说成实时行情。
-     * 两个方向都是失真，所以正反各钉一条。
+     * 虚构标的那一页写的是「合成数据」。把这套说明套到真实日线上，会把真数据
+     * 说成假的——这一条要一直守着。
      *
-     * 来源这一条原先断言的是快照里的 source（新浪）。图表改成按周期现取
-     * 之后，画出来的数据来自腾讯，再断言新浪就是在核对一个已经不成立的
-     * 出处。要守的东西没变：这一页必须说清楚图是谁给的、是不是实时。
+     * 而「来源 + 非实时」那两条不再断言：页面上的样板小字已按产品决定清掉，
+     * 等真要对外时再按合规要求统一补。把一句随时会调整的文案钉成契约，只会
+     * 让下一次调文案的人以为自己弄坏了什么。
      */
     expect(markup).not.toContain("合成数据");
-    expect(markup).toContain("非实时");
-    expect(markup).toContain("腾讯财经公开行情接口");
   });
 
   it("shows a watchlisted real symbol instead of silently dropping it", async () => {

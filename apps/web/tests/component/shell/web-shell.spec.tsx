@@ -155,9 +155,14 @@ describe("financial community web shell", () => {
      */
     expect(markup).not.toContain('href="/instruments/listing_syn_0001"');
     expect(markup).toContain('href="/instruments/sh000001"');
-    // 外壳不再声称自己是样本数据，但「不构成投资建议」必须留着。
+    /*
+     * 外壳不再声称自己是样本数据。
+     *
+     * 右栏底部那句「不构成投资建议」也去掉了——那是产品决定：内部演示阶段先
+     * 把样板小字清干净，等真要对外时再按合规要求统一补。这里不再断言它，
+     * 免得把一句随时会调整的文案钉死成契约。
+     */
     expect(markup).not.toContain("样本数据");
-    expect(markup).toContain("不构成投资建议");
   });
 
   it("renders top actions and a five-item mobile navigation without dead buttons", () => {

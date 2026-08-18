@@ -237,8 +237,8 @@ export function PortfolioLeaderboard() {
         </ScrollableTable>
       )}
       <p className="watchlist-hint">
-        组合只记录标的与权重，不涉及真实资金、下单或持仓，也不构成投资建议。
-        当日收益按持仓权重对各标的当日涨跌幅加权得出，数据来自公开行情接口；
+        组合只记录标的与权重，不涉及真实资金、下单或持仓。
+        当日收益按持仓权重对各标的当日涨跌幅加权得出；
         任一持仓取不到行情时显示「—」。
       </p>
     </section>
