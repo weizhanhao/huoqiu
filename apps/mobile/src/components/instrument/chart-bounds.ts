@@ -27,6 +27,30 @@ export const ratio = ({ high, low }: Bounds, value: number): number =>
  *
  * 宽度为 0（布局还没量到）时一律回 0，不要除出 NaN。
  */
+/**
+ * 移动平均。窗口不满的位置为 null——那不是 0，也不该被画出来。
+ *
+ * 前几根算不出 MA20 是事实：它需要二十根。补个 0 的话，线会从图的最底下
+ * 拔地而起，看图的人会以为那一段真的跌到过零。
+ *
+ * 要在**全量**上算，再截显示的那一段：只拿屏幕上这 120 根算，第 1 根的
+ * MA20 永远是空的，而它明明有历史可用。
+ */
+export const movingAverage = (
+  values: readonly number[],
+  window: number,
+): readonly (number | null)[] => {
+  if (window <= 0) return values.map(() => null);
+  const out: (number | null)[] = [];
+  let sum = 0;
+  for (const [index, value] of values.entries()) {
+    sum += value;
+    if (index >= window) sum -= values[index - window] ?? 0;
+    out.push(index >= window - 1 ? sum / window : null);
+  }
+  return out;
+};
+
 export const barIndexAt = (x: number, width: number, count: number): number => {
   if (count <= 0) return 0;
   if (!Number.isFinite(x) || width <= 0) return 0;

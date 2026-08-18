@@ -2,7 +2,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { ChartBar, ChartPoint } from "../../../src/api/market-api";
-import { barIndexAt } from "../../../src/components/instrument/chart-bounds";
+import {
+  barIndexAt,
+  movingAverage,
+} from "../../../src/components/instrument/chart-bounds";
 import { PriceChart } from "../../../src/components/instrument/price-chart";
 
 /*
@@ -25,6 +28,27 @@ const point = (time: string, price: number): ChartPoint => ({
   price,
   time,
   volumeShares: 1000,
+});
+
+describe("moving average", () => {
+  it("leaves the first bars empty instead of pretending they are zero", () => {
+    /*
+     * 前四根算不出 MA5——那是事实。补 0 的话线会从图底拔地而起，
+     * 看图的人以为那几天真的跌到过零。
+     */
+    expect(movingAverage([1, 2, 3, 4, 5], 5)).toEqual([
+      null,
+      null,
+      null,
+      null,
+      3,
+    ]);
+  });
+
+  it("slides the window instead of averaging everything so far", () => {
+    /* 第 6 个位置是 (2+3+4+5+6)/5 = 4，不是全部六个数的平均。 */
+    expect(movingAverage([1, 2, 3, 4, 5, 6], 5)?.[5]).toBe(4);
+  });
 });
 
 describe("bar index under a finger", () => {
@@ -50,7 +74,139 @@ describe("bar index under a finger", () => {
   });
 });
 
+/*
+ * 画布里那一层的直接子元素个数。
+ *
+ * RN 里 position:absolute 是相对**父元素**定位的。柱子外面一旦多套一层没有
+ * 样式的 View，那层自己在流里、尺寸为零，所有柱子就以它为原点排出去——画布
+ * 是空的，蜡烛叠到页面顶上的报价头上。这条不会报错，断言文字的用例也照样绿，
+ * 只有看屏幕的人发现整张图跑飞了。
+ *
+ * 所以这里数的是「深度为 1 的孩子」：多包一层，数就对不上。
+ */
+const canvasChildCount = (markup: string): number => {
+  const at = markup.indexOf('data-testid="price-chart-canvas"');
+  expect(at).toBeGreaterThan(-1);
+  let cursor = markup.indexOf(">", at) + 1;
+  let depth = 0;
+  let children = 0;
+  while (cursor < markup.length) {
+    const next = markup.indexOf("<", cursor);
+    if (next === -1) break;
+    const isClose = markup[next + 1] === "/";
+    const end = markup.indexOf(">", next);
+    const selfClosing = markup[end - 1] === "/";
+    if (isClose) {
+      if (depth === 0) break;
+      depth -= 1;
+    } else {
+      if (depth === 0) children += 1;
+      if (!selfClosing) depth += 1;
+    }
+    cursor = end + 1;
+  }
+  return children;
+};
+
 describe("price chart", () => {
+  it("puts the candles directly inside the canvas", () => {
+    /*
+     * 两根柱子 = 两条影线 + 两个实体 = 4 个元素，加上三条均线（这里根数不够，
+     * 一条都画不出来）和右侧两个刻度，一共 6 个。多包一层的话这个数会掉到 3。
+     */
+    const markup = renderToStaticMarkup(
+      <PriceChart
+        failure={null}
+        loading={false}
+        previousClose={null}
+        series={{
+          bars: [
+            bar("2026-08-14", 10, 11, 9, 10.5),
+            bar("2026-08-17", 10.5, 12, 10, 11.8),
+          ],
+          kind: "candle",
+          period: "day",
+        }}
+      />,
+    );
+
+    expect(canvasChildCount(markup)).toBe(6);
+  });
+
+  it("draws the intraday line as a connected line, not loose dots", () => {
+    /*
+     * 每一列要从上一个点的高度连到这个点的高度。只画点的话，价格一跳，屏幕上
+     * 就是两颗离得很远的孤点，中间什么都没有——那正是这一版之前分时图的样子。
+     *
+     * 三个点里第二段跨了 10 到 12，所以那一段的高度必须明显大于线本身的粗细。
+     */
+    const markup = renderToStaticMarkup(
+      <PriceChart
+        failure={null}
+        loading={false}
+        previousClose={10}
+        series={{
+          kind: "line",
+          period: "intraday",
+          points: [point("09:30", 10), point("09:31", 12), point("09:32", 12)],
+        }}
+      />,
+    );
+
+    const heights = [...markup.matchAll(/height:([0-9.]+)px/gu)].map((found) =>
+      Number(found[1]),
+    );
+    expect(Math.max(...heights)).toBeGreaterThan(10);
+  });
+
+  it("lets you read the intraday chart by touch too", () => {
+    /* 用户原话：「分时线不可交互是个问题」。 */
+    const markup = renderToStaticMarkup(
+      <PriceChart
+        failure={null}
+        loading={false}
+        previousClose={10}
+        series={{
+          kind: "line",
+          period: "intraday",
+          points: [point("09:30", 10), point("15:00", 11)],
+        }}
+      />,
+    );
+
+    expect(markup).toContain('data-testid="price-chart-canvas"');
+    /* 读数条：时间、价、均价——和 K 线那条同一个位置。 */
+    expect(markup).toContain("最新 15:00");
+    expect(markup).toContain("价 11.00");
+    expect(markup).toContain("均价 11.00");
+  });
+
+  it("shows the moving averages a K-line reader expects", () => {
+    const bars = Array.from({ length: 25 }, (_, index) =>
+      bar(
+        `2026-07-${String(index + 1).padStart(2, "0")}`,
+        10,
+        11,
+        9,
+        10 + index * 0.1,
+      ),
+    );
+    const markup = renderToStaticMarkup(
+      <PriceChart
+        failure={null}
+        loading={false}
+        previousClose={null}
+        series={{ bars, kind: "candle", period: "day" }}
+      />,
+    );
+
+    expect(markup).toContain("MA5");
+    expect(markup).toContain("MA10");
+    expect(markup).toContain("MA20");
+    /* 25 根足够算出 MA20，那一格不该是破折号。 */
+    expect(markup).not.toContain("MA20 —");
+  });
+
   it("shows the latest bar's numbers before anyone touches it", () => {
     /*
      * 柱子只有两三个像素宽，光看图读不出「这根是哪天、多少钱」。默认先把最新
