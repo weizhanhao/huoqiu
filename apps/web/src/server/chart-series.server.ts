@@ -396,6 +396,22 @@ export const resetChartSeriesCache = (): void => {
   seriesCache.clear();
 };
 
+/**
+ * 缓存里现成的那一份；没有就是 null，不会去问上游。
+ *
+ * 路由拿它决定「这次要不要花外呼额度」。闸设在路由最前面时，命中缓存的请求
+ * 也照样扣一次额度——于是在同一只票的八个周期之间来回切几轮就被限住，而这
+ * 几轮里其实一次外呼都没发生。额度该记在真正出站的请求头上。
+ */
+export const peekChartSeries = (
+  rawSymbol: string,
+  period: ChartPeriod,
+): ChartSeries | null => {
+  const cached = seriesCache.get(`${rawSymbol.trim().toLowerCase()}:${period}`);
+  if (cached === undefined) return null;
+  return Date.now() - cached.at < cacheWindowOf(period) ? cached.value : null;
+};
+
 export const loadChartSeries = async (
   rawSymbol: string,
   period: ChartPeriod,
