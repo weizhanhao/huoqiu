@@ -76,17 +76,17 @@ const formatPercent = (value: number | null): string => {
 /*
  * 涨跌配色。
  *
- * null 不上色。此前写的是 `changePct >= 0`，取不到值时一律按涨处理，
- * 于是一条读不到的行情会显示成上涨的颜色。
+ * null 不上色；接口明确返回 0 时按平盘偏涨展示，保证每张有真实数值的
+ * 行情卡都有清楚的红绿方向底色。
  */
 const toneClass = (value: number | null): string | undefined => {
-  if (value === null || value === 0) return undefined;
-  return value > 0 ? "market-up" : "market-down";
+  if (value === null) return undefined;
+  return value >= 0 ? "market-up" : "market-down";
 };
 
 const cardToneClass = (value: number | null): string => {
-  if (value === null || value === 0) return "";
-  return value > 0 ? " index-card-up" : " index-card-down";
+  if (value === null) return "";
+  return value >= 0 ? " index-card-up" : " index-card-down";
 };
 
 export function RealIndexCards({
