@@ -23,11 +23,10 @@ export default function StudioHomePage() {
         >
           <header className={styles.sectionHeader}>
             <div>
-              <p className={styles.eyebrow}>QUICK ACCESS</p>
               <h2 className={styles.heading} id="studio-quick-title">
-                继续你的创作
+                常用入口
               </h2>
-              <p className={styles.subheading}>从上次停下的地方继续</p>
+              <p className={styles.subheading}>继续创作或管理已有内容</p>
             </div>
           </header>
           <nav aria-label="创作者常用入口" className={styles.quickLinks}>

@@ -22,13 +22,13 @@ export function StudioDashboardHeader() {
   return (
     <section className={styles.dashboardHeader}>
       <div className={styles.dashboardIdentity}>
-        <p className={styles.eyebrow}>CREATOR SPACE · 创作工作台</p>
+        <p className={styles.eyebrow}>创作者中心</p>
         <h1>
-          把灵感，写成
-          <span>有影响力的观点。</span>
+          创作工作台
+          <span>管理内容，也关注每一次真实反馈</span>
         </h1>
         <p className={styles.dashboardLead}>
-          记录市场判断、沉淀长期思考，也让每一次表达被真正看见。
+          在这里开始写作、继续草稿，并查看已发布作品的数据表现。
         </p>
         <div className={styles.accountChip}>
           <span aria-hidden="true" className={styles.dashboardAvatar}>
@@ -56,12 +56,11 @@ export function StudioDashboardHeader() {
       </div>
       <div className={styles.dashboardActions}>
         <div className={styles.composerHeading}>
-          <span aria-hidden="true">✦</span>
+          <span aria-hidden="true">写</span>
           <p>开始创作</p>
-          <small>NEW STORY</small>
         </div>
-        <h2>此刻，最值得记录的判断是什么？</h2>
-        <p>从一个标题开始，把零散想法整理成完整长文。</p>
+        <h2>写一篇新的长文</h2>
+        <p>把市场判断和长期思考整理成完整内容。</p>
         <Link
           className={styles.workspaceAction}
           href={account === null ? "/login" : "/studio/publish"}
