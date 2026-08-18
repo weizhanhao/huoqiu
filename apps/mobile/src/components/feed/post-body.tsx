@@ -23,17 +23,25 @@ export type PostBodyProperties = Readonly<{
   body: string;
   onAddToWatchlist: (symbol: string, label: string) => void;
   onOpenInstrument: (symbol: string) => void;
+  onOpenTopic: (tag: string) => void;
+  onOpenUser: (accountId: string) => void;
   topics: readonly string[];
 }>;
 
 /* href 形如 /instruments/sh600519，末段就是代码。 */
 const symbolOf = (href: string): string => href.split("/").pop() ?? "";
 
+/* 话题的 href 是 /topics/<编码过的标签>，@某人 的是 /users/<id>。 */
+const lastSegment = (href: string): string =>
+  decodeURIComponent(href.split("/").pop() ?? "");
+
 export function PostBody({
   accounts,
   body,
   onAddToWatchlist,
   onOpenInstrument,
+  onOpenTopic,
+  onOpenUser,
   topics,
 }: PostBodyProperties) {
   const segments = parsePostBody(body, { accounts, topics });
@@ -62,6 +70,7 @@ export function PostBody({
           if (segment.kind === "cashtag") {
             return (
               <Text
+                accessibilityRole="link"
                 key={key}
                 onPress={() => {
                   onOpenInstrument(symbolOf(segment.href));
@@ -72,8 +81,40 @@ export function PostBody({
               </Text>
             );
           }
+          /*
+           * 话题和 @某人 也要真能点。
+           *
+           * 这两种此前只染成链接色，没有 onPress——蓝字、点不动。那比不染色
+           * 更糟：蓝色本身就是「这里能点」的承诺，染了又点不动，用户会以为
+           * 是自己没点准，于是再点几次。
+           *
+           * 解析层已经替我们做过判断：话题不在已知列表里、@ 的名字重名或不
+           * 存在时，回来的是普通 text 段，走不到这里。所以这里拿到的一定是
+           * 点得开的。
+           */
+          if (segment.kind === "topic") {
+            return (
+              <Text
+                accessibilityRole="link"
+                key={key}
+                onPress={() => {
+                  onOpenTopic(lastSegment(segment.href));
+                }}
+                style={styles.link}
+              >
+                {segment.text}
+              </Text>
+            );
+          }
           return (
-            <Text key={key} style={styles.link}>
+            <Text
+              accessibilityRole="link"
+              key={key}
+              onPress={() => {
+                onOpenUser(lastSegment(segment.href));
+              }}
+              style={styles.link}
+            >
               {segment.text}
             </Text>
           );

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { extractTopics } from "../../src/social/post-body";
+import { extractTopics, plainPostText } from "../../src/social/post-body";
 
 /*
  * 正文里写过哪些话题。
@@ -36,5 +36,41 @@ describe("extract topics", () => {
   it("skips an empty pair", () => {
     expect(extractTopics("##")).toEqual([]);
     expect(extractTopics("#   #")).toEqual([]);
+  });
+});
+
+/*
+ * 摘要用的纯文本。
+ *
+ * 列表里的摘要此前直接印正文原文，于是读者看到的是
+ * 「$贵州茅台(SH600519)$ 今天收 1293.09 #指数投资#」——那是存储格式，不是
+ * 给人读的。摘要又不适合渲染成可点的富文本：整行本来就是「打开详情」，
+ * 里面再套链接会把点击抢走。
+ */
+describe("plain post text", () => {
+  it("keeps the stock name and drops the marker", () => {
+    expect(plainPostText("看好 $贵州茅台(SH600519)$ 这一段")).toBe(
+      "看好 贵州茅台 这一段",
+    );
+  });
+
+  it("keeps the tag and drops the hashes", () => {
+    expect(plainPostText("记一笔 #指数投资# 完")).toBe("记一笔 指数投资 完");
+  });
+
+  it("drops an image entirely", () => {
+    /* 摘要里放不下图，留一串上传路径只是噪音。 */
+    expect(plainPostText("配图在此 ![](/api/social/uploads/a.jpg) 就这样")).toBe(
+      "配图在此 就这样",
+    );
+  });
+
+  it("keeps an @mention readable as written", () => {
+    expect(plainPostText("问问 @林岸 怎么看")).toBe("问问 @林岸 怎么看");
+  });
+
+  it("collapses the blank space the markers leave behind", () => {
+    /* 去掉记号后常剩下连续空行，摘要里那些只是空洞。 */
+    expect(plainPostText("第一段\n\n\n第二段")).toBe("第一段 第二段");
   });
 });

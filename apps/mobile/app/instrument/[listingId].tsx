@@ -1,6 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { Linking } from "react-native";
 
 import {
   fetchAnnouncements,
@@ -17,6 +16,7 @@ import {
   type InstrumentTab,
 } from "../../src/components/instrument/instrument-screen";
 import { useComingSoon } from "../../src/components/system/coming-soon";
+import { openExternal } from "../../src/lib/open-external";
 import { useRemote } from "../../src/hooks/use-remote";
 import { createD0BackHandler } from "../../src/navigation/back-or-home";
 import { useAccountSession } from "../../src/session/account-session";
@@ -103,11 +103,11 @@ export default function InstrumentScreen() {
         });
       }}
       onOpenAnnouncement={(item) => {
-        void Linking.openURL(item.href);
+        openExternal(item.href, fail);
       }}
       onOpenReport={(report) => {
         /* 研报正文在东财站上，站内没有转载——照实跳出去。 */
-        void Linking.openURL(report.href);
+        openExternal(report.href, fail);
       }}
       onOpenPost={(id) => {
         router.push({ params: { postId: id }, pathname: "/post/[postId]" });

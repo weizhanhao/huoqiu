@@ -13,12 +13,7 @@
  * 会 replace 到一个不存在的地址，屏幕上是 expo-router 的英文报错页，
  * 退不回去也进不来。类型没跟着路由改，编译器也就没能拦住。
  */
-type TabHref =
-  | "/fund"
-  | "/home"
-  | "/private-fund"
-  | "/profile"
-  | "/watchlist";
+type TabHref = "/fund" | "/home" | "/private-fund" | "/profile" | "/watchlist";
 
 type D0BackRouter = Readonly<{
   back: () => void;
@@ -27,10 +22,7 @@ type D0BackRouter = Readonly<{
 }>;
 
 export const createD0BackHandler =
-  (
-    router: D0BackRouter,
-    fallback: TabHref = "/home",
-  ): (() => void) =>
+  (router: D0BackRouter, fallback: TabHref = "/home"): (() => void) =>
   () => {
     if (router.canGoBack()) {
       router.back();

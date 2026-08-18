@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Keyboard, Linking } from "react-native";
+import { Keyboard } from "react-native";
 
 import {
   fetchChart,
@@ -10,6 +10,8 @@ import {
   type SearchHit,
 } from "../src/api/market-api";
 import { SearchScreen as SearchView } from "../src/components/search/search-screen";
+import { useComingSoon } from "../src/components/system/coming-soon";
+import { openExternal } from "../src/lib/open-external";
 import { useRemote } from "../src/hooks/use-remote";
 import { createD0BackHandler } from "../src/navigation/back-or-home";
 
@@ -28,6 +30,7 @@ const DEBOUNCE_MS = 250;
 const SPARKLINE_ROWS = 6;
 
 export default function SearchRoute() {
+  const { fail } = useComingSoon();
   const router = useRouter();
   const onBack = createD0BackHandler(router);
 
@@ -143,7 +146,7 @@ export default function SearchRoute() {
         });
       }}
       onOpenNews={(item) => {
-        void Linking.openURL(item.href);
+        openExternal(item.href, fail);
       }}
       onOpenSymbol={(symbol) => {
         router.push({

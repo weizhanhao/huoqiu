@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loadChartSeries } from "../../src/server/chart-series.server";
+import {
+  loadChartSeries,
+  resetChartSeriesCache,
+} from "../../src/server/chart-series.server";
 
 /*
  * 图表的各个周期。
@@ -51,6 +54,13 @@ const stub = (handler: (url: string) => string | null): void => {
 afterEach(() => {
   vi.unstubAllGlobals();
   requested.length = 0;
+  /*
+   * 用例之间清缓存。
+   *
+   * 不清的话，第二条用例问同一只票会命中上一条留下的结果，于是「拿错字段名
+   * 应该返回空」那类断言拿到的是上一条的成功结果——而它会绿。
+   */
+  resetChartSeriesCache();
 });
 
 describe("the intraday series", () => {
@@ -205,6 +215,43 @@ describe("the candle periods", () => {
     expect(requested[0]).not.toContain("web.ifzq.gtimg.cn");
     expect(requested[0]).toContain("mkline");
     expect(requested[0]).toContain("m60");
+  });
+});
+
+describe("the short-lived series cache", () => {
+  /*
+   * 个股页上方有八个周期按钮。每按一次就是一次外呼，而外呼是有闸的
+   * （每个来源每分钟 60 次）——来回切几轮就把自己限住了，界面上写的是
+   * 「请求过于频繁」，而用户做的事只是在看同一只票的不同周期。
+   *
+   * 同一只票同一个周期，几十秒内本来就是同一份数据。缓存一下，来回切就不再
+   * 花任何外呼额度，切回刚看过的那个周期也立刻出图。
+   */
+  const rows = [["2026-08-17", "10.00", "11.00", "12.00", "9.00", "100"]];
+
+  it("serves a repeat request without asking upstream again", async () => {
+    stub(() => klineBody("sh600519", "qfqday", rows));
+
+    const first = await loadChartSeries("sh600519", "day");
+    const callsAfterFirst = requested.length;
+    const second = await loadChartSeries("sh600519", "day");
+
+    expect(callsAfterFirst).toBeGreaterThan(0);
+    expect(requested.length).toBe(callsAfterFirst);
+    expect(second).toEqual(first);
+  });
+
+  it("keeps each period separate", async () => {
+    /* 共用一个键的话，切到周 K 会拿到日 K 的那份——图变了，数据没变。 */
+    stub((url) =>
+      klineBody("sh600519", url.includes(",week,") ? "qfqweek" : "qfqday", rows),
+    );
+
+    await loadChartSeries("sh600519", "day");
+    const afterDay = requested.length;
+    await loadChartSeries("sh600519", "week");
+
+    expect(requested.length).toBeGreaterThan(afterDay);
   });
 });
 

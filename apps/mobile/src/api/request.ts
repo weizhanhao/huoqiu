@@ -72,7 +72,10 @@ export const request = async <T>(
   if (!response.ok) {
     return {
       kind: "rejected",
-      message: readError(parsed, `请求失败（HTTP ${String(response.status)}）。`),
+      message: readError(
+        parsed,
+        `请求失败（HTTP ${String(response.status)}）。`,
+      ),
     };
   }
 

@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { ChartBar, ChartPoint } from "../../../src/api/market-api";
+import { barIndexAt } from "../../../src/components/instrument/chart-bounds";
 import { PriceChart } from "../../../src/components/instrument/price-chart";
 
 /*
@@ -26,7 +27,58 @@ const point = (time: string, price: number): ChartPoint => ({
   volumeShares: 1000,
 });
 
+describe("bar index under a finger", () => {
+  /*
+   * 十字光标读的就是这个函数。算错的表现不是报错，是「线停在别处」——
+   * 用户瞄第一根，读数给的是第二根，而两根的数字都是真的。
+   */
+  it("maps the left edge to the first bar and the right edge to the last", () => {
+    expect(barIndexAt(0, 300, 10)).toBe(0);
+    expect(barIndexAt(299, 300, 10)).toBe(9);
+  });
+
+  it("clamps a finger that slid past either edge", () => {
+    /* 手指划出图外时 locationX 会是负数或超出宽度，正好发生在想看头尾的时候。 */
+    expect(barIndexAt(-40, 300, 10)).toBe(0);
+    expect(barIndexAt(999, 300, 10)).toBe(9);
+  });
+
+  it("does not divide by a width it has not measured yet", () => {
+    /* 布局还没量到时宽度是 0，除下去是 NaN，样式会整块失效。 */
+    expect(barIndexAt(120, 0, 10)).toBe(0);
+    expect(barIndexAt(120, 300, 0)).toBe(0);
+  });
+});
+
 describe("price chart", () => {
+  it("shows the latest bar's numbers before anyone touches it", () => {
+    /*
+     * 柱子只有两三个像素宽，光看图读不出「这根是哪天、多少钱」。默认先把最新
+     * 一根的开高低收摆出来，按住拖动时再跟着手指走。
+     */
+    const markup = renderToStaticMarkup(
+      <PriceChart
+        failure={null}
+        loading={false}
+        previousClose={null}
+        series={{
+          bars: [
+            bar("2026-08-14", 10, 11, 9, 10.5),
+            bar("2026-08-17", 10.5, 12.25, 10.1, 11.8),
+          ],
+          kind: "candle",
+          period: "day",
+        }}
+      />,
+    );
+
+    expect(markup).toContain("最新 2026-08-17");
+    expect(markup).toContain("开 10.50");
+    expect(markup).toContain("高 12.25");
+    expect(markup).toContain("低 10.10");
+    expect(markup).toContain("收 11.80");
+  });
+
   it("makes the minute-chart axis readable", () => {
     /*
      * 分钟级周期上游给的 date 是 202604221030 这样一串十二位数。原样印在坐标

@@ -1,3 +1,4 @@
+import { plainPostText } from "@huoqiu/domain/social/post-body";
 import { tokens } from "@huoqiu/native-ui";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -324,7 +325,7 @@ export function InstrumentScreen({
               >
                 <Text style={styles.rowTitle}>{post.authorName}</Text>
                 <Text numberOfLines={3} style={styles.rowBody}>
-                  {post.body}
+                  {plainPostText(post.body)}
                 </Text>
               </Pressable>
             ))

@@ -8,7 +8,10 @@ import {
   View,
 } from "react-native";
 
+import type { MentionAccount } from "@huoqiu/domain/social/post-body";
+
 import type { AccountSummary, SocialPost } from "../../api/social-api";
+import { PostCard } from "../feed/post-card";
 import { appTouchMinimum } from "../../styles/app-touch";
 
 /*
@@ -18,34 +21,28 @@ import { appTouchMinimum } from "../../styles/app-touch";
  * 「我的」里，不在这儿——用户原话是「这个关注只显示关注人发的内容」。
  */
 
-const formatTime = (iso: string): string => {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return "";
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${pad(parsed.getMonth() + 1)}/${pad(parsed.getDate())} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
-};
-
-/*
- * 短帖没有标题。
- *
- * 发短帖时标题是正文前 24 个字截出来的，不是作者另写的。照着把标题和正文
- * 都印出来，同一句话会连着出现两遍，第一遍还断在半个词上。
- */
-const hasWrittenTitle = (title: string, body: string): boolean =>
-  !body.trim().startsWith(title.trim());
-
 export type FollowFeedProperties = Readonly<{
+  /** 用于把正文里的 @昵称 解析成链接。 */
+  accounts: readonly MentionAccount[];
   failure: string | null;
   following: readonly string[];
   loading: boolean;
   /** 自己的账号 id——推荐位里要把自己剔掉。 */
   meId: string | null;
+  likedPostIds: readonly string[];
+  onAddToWatchlist: (symbol: string, label: string) => void;
   onFollow: (accountId: string) => void;
+  onOpenInstrument: (symbol: string) => void;
   onOpenPost: (postId: string) => void;
+  onOpenTopic: (tag: string) => void;
   onOpenUser: (accountId: string) => void;
   onRefresh: () => void;
+  onShowNotice: (title: string, detail: string) => void;
+  onToggleFollow: (authorId: string) => void;
+  onToggleLike: (postId: string) => void;
   posts: readonly SocialPost[];
   signedIn: boolean;
+  topics: readonly string[];
   /** 站上所有账号，推荐位从里面挑。 */
   suggestions: readonly AccountSummary[];
 }>;
@@ -57,17 +54,26 @@ const Notice = ({ text }: Readonly<{ text: string }>) => (
 );
 
 export function FollowFeed({
+  accounts,
   failure,
   following,
+  likedPostIds,
   loading,
   meId,
+  onAddToWatchlist,
   onFollow,
+  onOpenInstrument,
   onOpenPost,
+  onOpenTopic,
   onOpenUser,
   onRefresh,
+  onShowNotice,
+  onToggleFollow,
+  onToggleLike,
   posts,
   signedIn,
   suggestions,
+  topics,
 }: FollowFeedProperties) {
   /*
    * 先复制再 sort，不能用 toSorted。
@@ -195,39 +201,39 @@ export function FollowFeed({
       ) : null}
 
       {/*
-        整张卡可点进详情，作者那一行单独可点进主页。此前两者都不可点：在关注流
-        里看到一条帖子想看评论，点不动；想看这个人还写过什么，也点不动——而
-        详情页和用户主页都是做好了的。
+        用和别的频道同一张卡。
+
+        PostCard 当初就是从这个文件里提出去的（见那个文件开头的注释），可这里
+        一直留着自己那份内联的卡——于是同一条帖子在「推荐」里 $代码$ 是蓝的、
+        点得动、底下还有一行「加自选」，在「关注」里就是一串灰字。#话题# 同理。
+        两份卡各长各的，差出来的正是这些。
       */}
       {followed.map((post) => (
-        <Pressable
-          accessibilityRole="button"
+        <PostCard
+          accounts={accounts}
+          following={following.includes(post.authorId)}
           key={post.id}
-          onPress={() => {
+          liked={likedPostIds.includes(post.id)}
+          onAddToWatchlist={onAddToWatchlist}
+          onOpen={() => {
             onOpenPost(post.id);
           }}
-          style={styles.card}
-        >
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              onOpenUser(post.authorId);
-            }}
-            style={styles.author}
-          >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {post.authorName.slice(0, 1)}
-              </Text>
-            </View>
-            <Text style={styles.authorName}>{post.authorName}</Text>
-            <Text style={styles.time}>{formatTime(post.createdAt)}</Text>
-          </Pressable>
-          {hasWrittenTitle(post.title, post.body) ? (
-            <Text style={styles.title}>{post.title}</Text>
-          ) : null}
-          <Text style={styles.body}>{post.body}</Text>
-        </Pressable>
+          onOpenAuthor={() => {
+            onOpenUser(post.authorId);
+          }}
+          onOpenInstrument={onOpenInstrument}
+          onOpenTopic={onOpenTopic}
+          onOpenUser={onOpenUser}
+          onShowActionNotice={onShowNotice}
+          onToggleFollow={() => {
+            onToggleFollow(post.authorId);
+          }}
+          onToggleLike={() => {
+            onToggleLike(post.id);
+          }}
+          post={post}
+          topics={topics}
+        />
       ))}
     </ScrollView>
   );

@@ -33,7 +33,11 @@ export const signColorFor = (
   mode: "green-up" | "red-up",
   changePercent: number | null | undefined,
 ): string => {
-  if (changePercent === null || changePercent === undefined || changePercent === 0) {
+  if (
+    changePercent === null ||
+    changePercent === undefined ||
+    changePercent === 0
+  ) {
     return tokens.text.secondary;
   }
   const rising = changePercent > 0;
@@ -75,4 +79,5 @@ export const signedAmount = (
 export const fixedOrMissing = (
   value: number | null | undefined,
   digits: number,
-): string => (value === null || value === undefined ? MISSING : value.toFixed(digits));
+): string =>
+  value === null || value === undefined ? MISSING : value.toFixed(digits);

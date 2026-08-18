@@ -1,7 +1,7 @@
 import { tokens } from "@huoqiu/native-ui";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Linking, RefreshControl, ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 
 import {
   fetchEtfList,
@@ -50,6 +50,7 @@ import {
   type ChannelId,
 } from "../../src/components/shell/channel-bar";
 import { useComingSoon } from "../../src/components/system/coming-soon";
+import { openExternal } from "../../src/lib/open-external";
 import { useRemote } from "../../src/hooks/use-remote";
 import {
   readChannelOrder,
@@ -291,6 +292,9 @@ export default function HomeScreen() {
       onAddToWatchlist={(symbol, label) => {
         void addToWatchlist(label, `/instruments/${symbol}`);
       }}
+      onOpenTopic={(tag) => {
+        router.push({ params: { tag }, pathname: "/topic/[tag]" });
+      }}
       onOpenInstrument={(symbol) => {
         openInstrument(`/instruments/${symbol}`);
       }}
@@ -382,10 +386,15 @@ export default function HomeScreen() {
       >
         {channel === "follow" ? (
           <FollowFeed
+            accounts={accounts}
             failure={failure}
             following={following}
+            likedPostIds={likedPostIds}
             loading={loading}
             meId={account?.id ?? null}
+            onAddToWatchlist={(symbol, label) => {
+              void addToWatchlist(label, `/instruments/${symbol}`);
+            }}
             onFollow={(accountId) => {
               void follow(accountId);
             }}
@@ -398,10 +407,26 @@ export default function HomeScreen() {
                 pathname: "/user/[accountId]",
               });
             }}
+            onOpenInstrument={(symbol) => {
+              openInstrument(`/instruments/${symbol}`);
+            }}
+            onOpenTopic={(tag) => {
+              router.push({ params: { tag }, pathname: "/topic/[tag]" });
+            }}
             onRefresh={refreshAll}
+            onShowNotice={show}
+            onToggleFollow={(authorId) => {
+              void toggleFollow(authorId).then((message) => {
+                if (message !== null) fail("关注没成功", message);
+              });
+            }}
+            onToggleLike={(postId) => {
+              void toggleLike(postId);
+            }}
             posts={posts}
             signedIn={account !== null}
             suggestions={accounts}
+            topics={topics.value ?? []}
           />
         ) : null}
 
@@ -412,7 +437,7 @@ export default function HomeScreen() {
             news={news.value}
             onOpenInstrument={openInstrument}
             onOpenNews={(item) => {
-              void Linking.openURL(item.href);
+              openExternal(item.href, fail);
             }}
             topics={topics.value}
           />
@@ -422,7 +447,7 @@ export default function HomeScreen() {
           <VideoChannel
             failure={videos.failure}
             onOpen={(video) => {
-              void Linking.openURL(video.href);
+              openExternal(video.href, fail);
             }}
             videos={videos.value}
           />
@@ -445,7 +470,7 @@ export default function HomeScreen() {
             failure={news.failure}
             news={news.value}
             onOpen={(item) => {
-              void Linking.openURL(item.href);
+              openExternal(item.href, fail);
             }}
           />
         ) : null}
@@ -484,7 +509,7 @@ export default function HomeScreen() {
             <PrivateBoard
               managers={managers.value}
               onOpen={(url) => {
-                void Linking.openURL(url);
+                openExternal(url, fail);
               }}
             />
             {postFeed(

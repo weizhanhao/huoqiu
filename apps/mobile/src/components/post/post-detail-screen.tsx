@@ -67,6 +67,9 @@ export type PostDetailScreenProperties = Readonly<{
   onChangeDraft: (text: string) => void;
   onOpenAuthor: () => void;
   onOpenInstrument: (symbol: string) => void;
+  onOpenTopic: (tag: string) => void;
+  /** 正文或评论里 @到的人。 */
+  onOpenUser: (accountId: string) => void;
   onReplyTo: (comment: PostComment | null) => void;
   onSubmit: () => void;
   onToggleBookmark: () => void;
@@ -102,6 +105,8 @@ export function PostDetailScreen({
   onChangeDraft,
   onOpenAuthor,
   onOpenInstrument,
+  onOpenTopic,
+  onOpenUser,
   onReplyTo,
   onSubmit,
   onToggleBookmark,
@@ -202,6 +207,8 @@ export function PostDetailScreen({
               body={post.body}
               onAddToWatchlist={onAddToWatchlist}
               onOpenInstrument={onOpenInstrument}
+              onOpenTopic={onOpenTopic}
+              onOpenUser={onOpenUser}
               topics={topics}
             />
             <Text style={styles.time}>{formatTime(post.createdAt)}</Text>

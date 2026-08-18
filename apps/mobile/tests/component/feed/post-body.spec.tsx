@@ -23,12 +23,51 @@ const render = (
       body={body}
       onAddToWatchlist={vi.fn()}
       onOpenInstrument={vi.fn()}
+      onOpenTopic={vi.fn()}
+      onOpenUser={vi.fn()}
       topics={["复盘"]}
       {...overrides}
     />,
   );
 
+/** 这段文字所在的那个节点的开标签。 */
+const tagAround = (markup: string, text: string): string => {
+  const at = markup.indexOf(text);
+  expect(at).toBeGreaterThan(-1);
+  return markup.slice(markup.lastIndexOf("<", at), at);
+};
+
 describe("post body", () => {
+  it("makes a topic tappable, not just blue", () => {
+    /*
+     * #话题# 此前染成了链接色却没有 onPress——蓝字、点不动。那比不染色更糟：
+     * 蓝色就是「这里能点」的承诺，染了色又点不动，用户会以为是自己没点准，
+     * 于是再点几次。
+     */
+    const markup = render("今天复盘 #复盘# 记一笔。");
+
+    expect(markup).toContain("#复盘#");
+    /* 可点的文字节点在 react-native-web 上会带 tabindex。 */
+    expect(tagAround(markup, "#复盘#")).toContain("tabindex");
+  });
+
+  it("makes an @mention tappable", () => {
+    /* 同理：@某人 是蓝的，点下去应该进他的主页。 */
+    const markup = render("这条问问 @林岸 怎么看。");
+
+    expect(tagAround(markup, "@林岸")).toContain("tabindex");
+  });
+
+  it("leaves a topic nobody has used as plain text", () => {
+    /*
+     * 解析规则要求话题在已知列表里才成链接。不在列表里的 #xx# 是普通文字，
+     * 不该染成蓝色——点进去会是一页空的。
+     */
+    const markup = render("随手写个 #还没人用过的话题# 看看。");
+
+    expect(tagAround(markup, "#还没人用过的话题#")).not.toContain("tabindex");
+  });
+
   it("turns a stock reference into both a jump and an add-to-watchlist", () => {
     const markup = render("今天看了 $贵州茅台(SH600519)$，先不动。");
 

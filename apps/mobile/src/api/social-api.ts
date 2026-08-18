@@ -383,20 +383,12 @@ export const publishPost = async (
  * 涨跌用什么颜色。未登录时服务端回默认档而不是 401，所以读这条不需要令牌。
  */
 export type CommentPolicy =
-  | "everyone"
-  | "followers"
-  | "followers-3d"
-  | "following"
-  | "off";
+  "everyone" | "followers" | "followers-3d" | "following" | "off";
 
 export type MarketColorMode = "green-up" | "red-up";
 
 export type NotificationCategory =
-  | "follows"
-  | "likes"
-  | "mentions"
-  | "replies"
-  | "system";
+  "follows" | "likes" | "mentions" | "replies" | "system";
 
 export type PrivacySettings = Readonly<{
   commentPolicy: CommentPolicy;

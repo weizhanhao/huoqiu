@@ -594,10 +594,12 @@ export type ResearchReport = Readonly<{
 export const fetchResearchReports = async (
   symbol: string,
 ): Promise<ApiResult<readonly ResearchReport[]>> => {
-  const result = await request<Readonly<{ reports?: readonly ResearchReport[] }>>(
-    `/api/market/research?symbol=${encodeURIComponent(symbol)}`,
-    { method: "GET", token: null },
-  );
+  const result = await request<
+    Readonly<{ reports?: readonly ResearchReport[] }>
+  >(`/api/market/research?symbol=${encodeURIComponent(symbol)}`, {
+    method: "GET",
+    token: null,
+  });
   if (result.kind !== "ok") return result;
   return { kind: "ok", value: result.value.reports ?? [] };
 };

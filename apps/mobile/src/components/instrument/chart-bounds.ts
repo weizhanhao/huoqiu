@@ -17,3 +17,19 @@ export const boundsOf = (values: readonly number[]): Bounds => {
 
 export const ratio = ({ high, low }: Bounds, value: number): number =>
   (value - low) / (high - low);
+
+/**
+ * 手指按在图上第几根柱子。
+ *
+ * 边缘要夹住：手指划出图外时 locationX 会是负数或大于宽度，不夹的话读到的是
+ * 一个不存在的下标，十字线跳到别处、读数变成一片空白——而这恰恰发生在用户
+ * 想看第一根或最后一根的时候，因为那时手指就在边上。
+ *
+ * 宽度为 0（布局还没量到）时一律回 0，不要除出 NaN。
+ */
+export const barIndexAt = (x: number, width: number, count: number): number => {
+  if (count <= 0) return 0;
+  if (!Number.isFinite(x) || width <= 0) return 0;
+  const index = Math.floor((x / width) * count);
+  return Math.min(Math.max(index, 0), count - 1);
+};

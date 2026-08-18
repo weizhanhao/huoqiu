@@ -48,17 +48,26 @@ const render = (
 ): string =>
   renderToStaticMarkup(
     <FollowFeed
+      accounts={[]}
       failure={null}
       following={[]}
       loading={false}
       meId="me"
+      likedPostIds={[]}
+      onAddToWatchlist={vi.fn()}
       onFollow={vi.fn()}
+      onOpenInstrument={vi.fn()}
+      onOpenTopic={vi.fn()}
       onOpenPost={vi.fn()}
       onOpenUser={vi.fn()}
       onRefresh={vi.fn()}
+      onShowNotice={vi.fn()}
+      onToggleFollow={vi.fn()}
+      onToggleLike={vi.fn()}
       posts={[]}
       signedIn
       suggestions={[]}
+      topics={[]}
       {...overrides}
     />,
   );

@@ -1,3 +1,4 @@
+import { plainPostText } from "@huoqiu/domain/social/post-body";
 import { tokens } from "@huoqiu/native-ui";
 import { useRouter } from "expo-router";
 import {
@@ -126,7 +127,7 @@ export default function ProfileScreen() {
       ) : (
         mine.map((post) => (
           <View key={post.id} style={styles.card}>
-            <Text style={styles.cardBody}>{post.body}</Text>
+            <Text style={styles.cardBody}>{plainPostText(post.body)}</Text>
           </View>
         ))
       )}

@@ -1,3 +1,4 @@
+import { plainPostText } from "@huoqiu/domain/social/post-body";
 import { tokens } from "@huoqiu/native-ui";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -146,7 +147,7 @@ export function UserScreen({
                   {post.title}
                 </Text>
                 <Text numberOfLines={2} style={styles.postBody}>
-                  {post.body}
+                  {plainPostText(post.body)}
                 </Text>
                 <Text style={styles.postTime}>{post.publishedLabel}</Text>
               </Pressable>

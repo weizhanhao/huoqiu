@@ -1,10 +1,17 @@
 import { tokens } from "@huoqiu/native-ui";
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback, useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+  type LayoutChangeEvent,
+} from "react-native";
 
-import type { ChartSeries } from "../../api/market-api";
+import type { ChartBar, ChartSeries } from "../../api/market-api";
 import { useSignColor } from "../../styles/market-colors";
 import { signedPercent } from "../../styles/market-sign";
-import { boundsOf, ratio } from "./chart-bounds";
+import { barIndexAt, boundsOf, ratio } from "./chart-bounds";
 
 /*
  * 分时与 K 线。
@@ -16,8 +23,11 @@ import { boundsOf, ratio } from "./chart-bounds";
  * 加影线（高低之间），分时画一条由细段拼出的折线。分辨率不如原生图表，
  * 但形状、方向、量能都是真的。
  *
- * 明确不做的：十字光标、缩放、技术指标。做半套「看着能拖却拖不动」的交互，
- * 比老实给一张静态图更糟。
+ * 十字光标是有的：按住图往左右拖，读数跟着手指走。用 RN 自带的 responder
+ * 事件做，不引手势库——那些库都带原生模块，装进来这个工程就打不开 Expo Go。
+ *
+ * 明确不做的：缩放、技术指标。做半套「看着能捏却捏不动」的交互，比老实给一张
+ * 画得对的图更糟。
  */
 
 const CHART_HEIGHT = 168;
@@ -39,6 +49,38 @@ const axisLabel = (date: string | undefined): string => {
   return date;
 };
 
+/*
+ * 手指底下那根柱子的读数。
+ *
+ * 一张 K 线图最常被问的问题是「这根是哪天、多少钱」。没有读数的话，用户只能
+ * 靠图形猜——而柱子只有两三个像素宽，猜不出来。
+ *
+ * 「live」用来区分「你正按着的这根」和「默认显示的最新一根」：不区分的话，
+ * 松开手之后那一行数字还在，看起来像光标卡住了。
+ */
+const Readout = ({
+  bar,
+  live,
+}: Readonly<{ bar: ChartBar | undefined; live: boolean }>) => {
+  const signColor = useSignColor();
+  if (bar === undefined) return null;
+  const change = bar.close - bar.open;
+  const percent = bar.open === 0 ? null : (change / bar.open) * 100;
+  return (
+    <View style={styles.readout}>
+      <Text style={styles.readoutDate}>
+        {live ? axisLabel(bar.date) : `最新 ${axisLabel(bar.date)}`}
+      </Text>
+      <Text style={styles.readoutCell}>开 {bar.open.toFixed(2)}</Text>
+      <Text style={styles.readoutCell}>高 {bar.high.toFixed(2)}</Text>
+      <Text style={styles.readoutCell}>低 {bar.low.toFixed(2)}</Text>
+      <Text style={[styles.readoutCell, { color: signColor(change) }]}>
+        收 {bar.close.toFixed(2)} {signedPercent(percent)}
+      </Text>
+    </View>
+  );
+};
+
 export type PriceChartProperties = Readonly<{
   failure: string | null;
   loading: boolean;
@@ -53,6 +95,23 @@ export function PriceChart({
   series,
 }: PriceChartProperties) {
   const signColor = useSignColor();
+
+  /*
+   * 十字光标的状态。
+   *
+   * 宽度得自己量：柱子的位置是按百分比排的，而手指给的是像素。没量到之前
+   * （width 为 0）barIndexAt 一律回 0，不会算出 NaN。
+   */
+  const [canvasWidth, setCanvasWidth] = useState(0);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const measure = useCallback((event: LayoutChangeEvent) => {
+    setCanvasWidth(event.nativeEvent.layout.width);
+  }, []);
+
+  const clear = useCallback(() => {
+    setActiveIndex(null);
+  }, []);
 
   if (failure !== null) {
     return (
@@ -168,10 +227,43 @@ export function PriceChart({
   ]);
   const volumeTop = Math.max(...shown.map((bar) => bar.volumeShares), 1);
   const width = 100 / shown.length;
+  const active = activeIndex === null ? null : shown[activeIndex];
+
+  /* 柱子数量到这里才知道，所以这个处理器不能是 hook——就地闭包即可。 */
+  const track = (event: GestureResponderEvent): void => {
+    setActiveIndex(
+      barIndexAt(event.nativeEvent.locationX, canvasWidth, shown.length),
+    );
+  };
 
   return (
     <View>
-      <View style={styles.canvas}>
+      {/*
+        读数条占一个固定的位置，不是按住才出现。
+        按住才长出来的话，整张图会往下跳一行，手指底下的那根柱子就不再是刚才
+        瞄准的那根了。没按住时显示最后一根——也就是最新的那根。
+      */}
+      <Readout bar={active ?? shown[shown.length - 1]} live={active !== null} />
+      <View
+        onLayout={measure}
+        onResponderMove={track}
+        onResponderRelease={clear}
+        onResponderTerminate={clear}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={track}
+        style={styles.canvas}
+        testID="price-chart-canvas"
+      >
+        {activeIndex === null ? null : (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.crosshair,
+              { left: `${(activeIndex + 0.5) * width}%` },
+            ]}
+          />
+        )}
         {shown.map((bar, index) => {
           const top = ratio(bounds, Math.max(bar.open, bar.close));
           const bottom = ratio(bounds, Math.min(bar.open, bar.close));
@@ -248,6 +340,34 @@ export function PriceChart({
 }
 
 const styles = StyleSheet.create({
+  /* 十字线只画竖的一条：横的那条要跟着价格走，在这个精度下反而误导。 */
+  crosshair: {
+    backgroundColor: tokens.text.tertiary,
+    bottom: 0,
+    position: "absolute",
+    top: 0,
+    width: 1,
+  },
+  readout: {
+    alignItems: "center",
+    columnGap: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    rowGap: 2,
+  },
+  readoutCell: {
+    color: tokens.text.secondary,
+    fontSize: 12,
+    fontVariant: ["tabular-nums"],
+  },
+  readoutDate: {
+    color: tokens.text.primary,
+    fontSize: 12,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "600",
+  },
   axis: {
     flexDirection: "row",
     justifyContent: "space-between",

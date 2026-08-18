@@ -51,6 +51,7 @@ export type PostChannelProperties = Readonly<{
   onAddToWatchlist: (symbol: string, label: string) => void;
   onOpenInstrument: (symbol: string) => void;
   onOpenPost: (postId: string) => void;
+  onOpenTopic: (tag: string) => void;
   onOpenUser: (accountId: string) => void;
   onToggleLike: (postId: string) => void;
   onShowNotice: (title: string, detail: string) => void;
@@ -71,6 +72,7 @@ export function PostChannel({
   onAddToWatchlist,
   onOpenInstrument,
   onOpenPost,
+  onOpenTopic,
   onOpenUser,
   onToggleLike,
   onShowNotice,
@@ -110,6 +112,8 @@ export function PostChannel({
             onOpenUser(post.authorId);
           }}
           onOpenInstrument={onOpenInstrument}
+          onOpenTopic={onOpenTopic}
+          onOpenUser={onOpenUser}
           onShowActionNotice={onShowNotice}
           onToggleFollow={() => {
             onToggleFollow(post.authorId);

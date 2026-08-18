@@ -145,6 +145,12 @@ export default function PostDetailRoute() {
           pathname: "/user/[accountId]",
         });
       }}
+      onOpenTopic={(tag) => {
+        router.push({ params: { tag }, pathname: "/topic/[tag]" });
+      }}
+      onOpenUser={(accountId) => {
+        router.push({ params: { accountId }, pathname: "/user/[accountId]" });
+      }}
       onOpenInstrument={(symbol) => {
         router.push({
           params: { listingId: symbol },

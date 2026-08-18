@@ -83,6 +83,45 @@ export const insertAtCursor = (
 const tokenPattern =
   /!\[\]\((?<image>[^)\s]+)\)|\$(?<stockName>[^$()\n]{1,40})\((?<symbol>[A-Za-z]{1,4}\d{4,6}|[A-Z][A-Z.]{0,9})\)\$|#(?<tag>[^#\n]{1,40})#|@(?<mention>[一-龥A-Za-z0-9_]{1,24})/gu;
 
+/**
+ * 摘要用的纯文本：把记号换成它们读起来的样子。
+ *
+ * 列表里的摘要不该出现 `$贵州茅台(SH600519)$`、`![](/api/social/uploads/x.jpg)`
+ * 这种东西——那是存储格式，不是给人读的。可摘要又不适合渲染成可点的富文本：
+ * 整行本来就是一个「打开详情」的按钮，里面再套一层链接会把点击抢走。
+ *
+ * 所以摘要走这一条：股票只留名字、话题只留标签、@ 原样保留（它读起来就是
+ * 「@某人」）、图片整段去掉。想点的人进详情，那里每一处都是活的。
+ */
+export const plainPostText = (body: string): string => {
+  const parts: string[] = [];
+  /*
+   * 话题要拿正文里出现过的那些当已知列表。
+   *
+   * 传空数组的话，解析器会把每个 #x# 当成普通文字放过去——摘要里于是原样留着
+   * 井号。这里不关心这个话题站上有没有别人用过：#号本身是记号，摘要里就该去掉。
+   */
+  for (const segment of parsePostBody(body, {
+    accounts: [],
+    topics: extractTopics(body),
+  })) {
+    if (segment.kind === "image") continue;
+    if (segment.kind === "cashtag") {
+      /* $贵州茅台(SH600519)$ → 贵州茅台 */
+      parts.push(segment.text.replace(/^\$|\([^()]*\)\$$/gu, ""));
+      continue;
+    }
+    if (segment.kind === "topic") {
+      /* #基金定投# → 基金定投 */
+      parts.push(segment.text.replaceAll("#", ""));
+      continue;
+    }
+    parts.push(segment.text);
+  }
+  /* 去掉记号后常留下连续空白与空行，摘要里那些只是空洞。 */
+  return parts.join("").replace(/\s+/gu, " ").trim();
+};
+
 export const parsePostBody = (
   body: string,
   context: Readonly<{

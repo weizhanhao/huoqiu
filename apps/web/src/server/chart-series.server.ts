@@ -307,9 +307,7 @@ const readCandleRows = (
  * 月 K 已经按时间升序，所以「当年第一根」就是先遇到的那根，末根就是最后覆盖
  * 上去的那根。高低取全年极值——不是任何单月的极值，这两者常常不在同一个月。
  */
-const foldIntoYears = (
-  monthly: readonly CandleBar[],
-): readonly CandleBar[] => {
+const foldIntoYears = (monthly: readonly CandleBar[]): readonly CandleBar[] => {
   const byYear = new Map<string, CandleBar>();
   for (const bar of monthly) {
     const year = bar.date.slice(0, 4);
@@ -364,6 +362,40 @@ const loadPreviousClose = async (code: string): Promise<number | null> => {
  * 返回 null 而不是空序列：空序列会画出一张什么都没有的图，看着像这只
  * 股票停牌了，而实际上是没问到。
  */
+/*
+ * 一份很短命的内存缓存。
+ *
+ * 个股页上方有八个周期按钮，每按一次就是一次外呼，而外呼有闸：同一个来源每
+ * 分钟 60 次。来回切几轮就把自己限住了——界面上写着「请求过于频繁」，而用户
+ * 做的事只是在看同一只票的不同周期。
+ *
+ * 同一只票同一个周期，几十秒内本来就是同一份数据。盘中的分时要跟着走，所以
+ * 它的窗口短；日周月年是收盘才变的，可以久一点。
+ *
+ * 只在内存里，进程重启即清空，多实例之间也不共享——当前是单进程部署，够用；
+ * 别把它当成一层正经的缓存设施。
+ */
+const SERIES_CACHE_MS = { fast: 15_000, slow: 120_000 } as const;
+/* 缓存本身不能变成内存耗尽的入口。 */
+const MAX_SERIES_KEYS = 400;
+
+const seriesCache = new Map<string, { at: number; value: ChartSeries }>();
+
+const cacheWindowOf = (period: ChartPeriod): number =>
+  period === "intraday" || period === "5day" || MINUTE_PERIODS.has(period)
+    ? SERIES_CACHE_MS.fast
+    : SERIES_CACHE_MS.slow;
+
+/**
+ * 清空缓存。
+ *
+ * 给用例用：两条用例问同一只票时，后一条会命中前一条留下的结果，于是
+ * 「字段名拿错应当拿到空」这类断言拿到的是上一条的成功结果——而它会绿。
+ */
+export const resetChartSeriesCache = (): void => {
+  seriesCache.clear();
+};
+
 export const loadChartSeries = async (
   rawSymbol: string,
   period: ChartPeriod,
@@ -372,6 +404,29 @@ export const loadChartSeries = async (
   if (!isChartPeriod(period)) return null;
   const code = tencentCodeOf(symbol);
   if (code === null) return null;
+
+  const cacheKey = `${symbol}:${period}`;
+  const cached = seriesCache.get(cacheKey);
+  if (cached !== undefined && Date.now() - cached.at < cacheWindowOf(period)) {
+    return cached.value;
+  }
+
+  /* 存一份，并且顺手把过期的清掉——不清的话这张表只会长不会缩。 */
+  const remember = (value: ChartSeries): ChartSeries => {
+    if (seriesCache.size >= MAX_SERIES_KEYS) {
+      const now = Date.now();
+      for (const [key, entry] of seriesCache) {
+        if (now - entry.at >= cacheWindowOf(period)) seriesCache.delete(key);
+      }
+      /* 全都还新鲜时，丢掉最早插入的那个：Map 按插入顺序迭代。 */
+      if (seriesCache.size >= MAX_SERIES_KEYS) {
+        const oldest = seriesCache.keys().next();
+        if (!oldest.done) seriesCache.delete(oldest.value);
+      }
+    }
+    seriesCache.set(cacheKey, { at: Date.now(), value });
+    return value;
+  };
 
   // 沪深按手给量，港美股按股。
   const countsLots = !symbol.startsWith("hk") && !symbol.startsWith("us");
@@ -402,13 +457,13 @@ export const loadChartSeries = async (
 
     const points = readMinuteRows(rows);
     if (points.length === 0) return null;
-    return {
+    return remember({
       kind: "line",
       period,
       points,
       previousClose: await loadPreviousClose(code),
       symbol,
-    };
+    });
   }
 
   /*
@@ -427,7 +482,13 @@ export const loadChartSeries = async (
     if (monthly === null || monthly.kind !== "candle") return null;
     const bars = foldIntoYears(monthly.bars);
     if (bars.length === 0) return null;
-    return { bars, kind: "candle", period, previousClose: null, symbol };
+    return remember({
+      bars,
+      kind: "candle",
+      period,
+      previousClose: null,
+      symbol,
+    });
   }
 
   const config = CANDLE_PERIODS[period];
@@ -444,5 +505,11 @@ export const loadChartSeries = async (
   const bars = readCandleRows(Array.isArray(raw) ? raw : [], countsLots);
   if (bars.length === 0) return null;
 
-  return { bars, kind: "candle", period, previousClose: null, symbol };
+  return remember({
+    bars,
+    kind: "candle",
+    period,
+    previousClose: null,
+    symbol,
+  });
 };

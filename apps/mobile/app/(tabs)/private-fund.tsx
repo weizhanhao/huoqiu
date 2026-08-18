@@ -2,7 +2,6 @@ import { tokens } from "@huoqiu/native-ui";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
-  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,6 +13,7 @@ import {
 import { fetchPrivateFundManagers } from "../../src/api/market-api";
 import { EntryGrid } from "../../src/components/shell/entry-grid";
 import { useComingSoon } from "../../src/components/system/coming-soon";
+import { openExternal } from "../../src/lib/open-external";
 import { useRemote } from "../../src/hooks/use-remote";
 import { appTouchMinimum } from "../../src/styles/app-touch";
 
@@ -29,7 +29,7 @@ import { appTouchMinimum } from "../../src/styles/app-touch";
 export default function PrivateFundScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { show } = useComingSoon();
+  const { fail, show } = useComingSoon();
   const { failure, loading, refresh, value } = useRemote(
     fetchPrivateFundManagers,
   );
@@ -133,7 +133,7 @@ export default function PrivateFundScreen() {
             accessibilityRole="button"
             key={manager.disclosureUrl}
             onPress={() => {
-              void Linking.openURL(manager.disclosureUrl);
+              openExternal(manager.disclosureUrl, fail);
             }}
             style={styles.row}
           >

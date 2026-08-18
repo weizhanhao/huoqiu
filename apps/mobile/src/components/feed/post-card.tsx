@@ -44,6 +44,9 @@ export type PostCardProperties = Readonly<{
   onOpen: () => void;
   onOpenAuthor: () => void;
   onOpenInstrument: (symbol: string) => void;
+  onOpenTopic: (tag: string) => void;
+  /** 正文里 @到的人；和 onOpenAuthor 不同，那个是这条帖子的作者。 */
+  onOpenUser: (accountId: string) => void;
   onShowActionNotice: (title: string, detail: string) => void;
   onToggleLike: () => void;
   onToggleFollow: () => void;
@@ -59,6 +62,8 @@ export function PostCard({
   onOpen,
   onOpenAuthor,
   onOpenInstrument,
+  onOpenTopic,
+  onOpenUser,
   onShowActionNotice,
   onToggleFollow,
   onToggleLike,
@@ -118,6 +123,8 @@ export function PostCard({
         body={post.body}
         onAddToWatchlist={onAddToWatchlist}
         onOpenInstrument={onOpenInstrument}
+        onOpenTopic={onOpenTopic}
+        onOpenUser={onOpenUser}
         topics={topics}
       />
 
