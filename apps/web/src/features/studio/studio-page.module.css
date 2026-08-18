@@ -1049,6 +1049,27 @@
   margin-top: 8px;
 }
 
+.accountPanel {
+  align-items: center;
+  background: #f7faff;
+  border: 1px solid #e2edf8;
+  border-radius: 11px;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  margin-top: 7px;
+  max-width: 570px;
+  padding: 11px 14px;
+}
+
+.accountPanel .accountChip {
+  margin: 0;
+}
+
+.accountPanel .dashboardStats {
+  margin: 0;
+}
+
 .dashboardAvatar {
   background: #edf6ff;
   border-color: #d4e9fd;
@@ -1158,5 +1179,11 @@
   .dashboardIdentity h1 span {
     display: block;
     margin: 3px 0 0;
+  }
+
+  .accountPanel {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
   }
 }

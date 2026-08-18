@@ -30,29 +30,31 @@ export function StudioDashboardHeader() {
         <p className={styles.dashboardLead}>
           在这里开始写作、继续草稿，并查看已发布作品的数据表现。
         </p>
-        <div className={styles.accountChip}>
-          <span aria-hidden="true" className={styles.dashboardAvatar}>
-            {avatar}
-          </span>
-          <span>
-            <strong>{name}</strong>
-            <small>{caption}</small>
-          </span>
+        <div className={styles.accountPanel}>
+          <div className={styles.accountChip}>
+            <span aria-hidden="true" className={styles.dashboardAvatar}>
+              {avatar}
+            </span>
+            <span>
+              <strong>{name}</strong>
+              <small>{caption}</small>
+            </span>
+          </div>
+          <dl aria-label="创作者账号概览" className={styles.dashboardStats}>
+            <div>
+              <dt>作品</dt>
+              <dd>{account?.postCount ?? "—"}</dd>
+            </div>
+            <div>
+              <dt>粉丝</dt>
+              <dd>{account?.followerCount ?? "—"}</dd>
+            </div>
+            <div>
+              <dt>关注</dt>
+              <dd>{account?.followingCount ?? "—"}</dd>
+            </div>
+          </dl>
         </div>
-        <dl aria-label="创作者账号概览" className={styles.dashboardStats}>
-          <div>
-            <dt>作品</dt>
-            <dd>{account?.postCount ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>粉丝</dt>
-            <dd>{account?.followerCount ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>关注</dt>
-            <dd>{account?.followingCount ?? "—"}</dd>
-          </div>
-        </dl>
       </div>
       <div className={styles.dashboardActions}>
         <div className={styles.composerHeading}>
