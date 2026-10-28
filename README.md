@@ -3,6 +3,9 @@
 火球是一个 pnpm + Turborepo Monorepo。应用位于 `apps/*`，共享包位于
 `packages/*`。
 
+换电脑或接手维护，请先读 [项目交接与启动说明](docs/HANDOFF.md)。
+其中包含当前 Web 的最短启动路径、服务器位置、备份范围及已知问题。
+
 ## Prerequisites
 
 - Node.js 24.15.0（`nvm use`）
