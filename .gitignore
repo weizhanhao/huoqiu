@@ -1,5 +1,6 @@
 .worktrees/
 .superpowers/
+.DS_Store
 
 node_modules/
 .next/
